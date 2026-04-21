@@ -1,0 +1,156 @@
+export const DEFAULT_CATEGORIES = [
+  'Vivienda',
+  'Transporte',
+  'Alimentacion',
+  'Suscripciones',
+  'Ocio',
+  'Salud',
+  'Otros',
+];
+
+export const DEFAULT_SETTINGS = {
+  baseCurrency: 'EUR',
+  locale: 'de-AT',
+  theme: 'light',
+  categories: DEFAULT_CATEGORIES,
+  supabaseUrl: '',
+  supabaseAnonKey: '',
+  allocationTargets: [
+    { ticker: 'VWCE', targetWeight: 55 },
+    { ticker: 'VUSA', targetWeight: 25 },
+    { ticker: 'EUNA', targetWeight: 20 },
+  ],
+  csvMapping: {
+    date: 'date',
+    amount: 'amount',
+    category: 'category',
+    description: 'description',
+    currency: 'currency',
+  },
+};
+
+const today = new Date();
+const isoDay = today.toISOString().slice(0, 10);
+const monthPrefix = isoDay.slice(0, 7);
+
+export const DEFAULT_DATA = {
+  expenses: [
+    {
+      id: 'exp-rent',
+      date: `${monthPrefix}-02`,
+      amountCents: 112000,
+      currency: 'EUR',
+      category: 'Vivienda',
+      subcategory: 'Alquiler',
+      description: 'Rent',
+      isRecurring: true,
+    },
+    {
+      id: 'exp-grocery',
+      date: `${monthPrefix}-06`,
+      amountCents: 8450,
+      currency: 'EUR',
+      category: 'Alimentacion',
+      subcategory: 'Supermercado',
+      description: 'Weekly groceries',
+      isRecurring: false,
+    },
+    {
+      id: 'exp-gym',
+      date: `${monthPrefix}-10`,
+      amountCents: 2999,
+      currency: 'EUR',
+      category: 'Salud',
+      subcategory: 'Gym',
+      description: 'Monthly gym membership',
+      isRecurring: true,
+    },
+  ],
+  fixedExpenses: [
+    {
+      id: 'fix-rent',
+      name: 'Alquiler',
+      amountCents: 112000,
+      currency: 'EUR',
+      chargeDay: 2,
+      category: 'Vivienda',
+      active: true,
+      alerts: true,
+    },
+    {
+      id: 'fix-strom',
+      name: 'Strom',
+      amountCents: 6800,
+      currency: 'EUR',
+      chargeDay: 14,
+      category: 'Vivienda',
+      active: true,
+      alerts: true,
+    },
+  ],
+  incomes: [
+    {
+      id: 'inc-salary',
+      date: `${monthPrefix}-05`,
+      amountCents: 310000,
+      currency: 'EUR',
+      incomeKind: 'fixed',
+      source: 'Main salary',
+      frequency: 'monthly',
+      payDay: 5,
+    },
+    {
+      id: 'inc-freelance',
+      date: `${monthPrefix}-11`,
+      amountCents: 85000,
+      currency: 'EUR',
+      incomeKind: 'variable',
+      source: 'Side project',
+      client: 'Studio Nord',
+      invoiceStatus: 'sent',
+    },
+    {
+      id: 'inc-dividend',
+      date: `${monthPrefix}-17`,
+      amountCents: 2400,
+      currency: 'EUR',
+      incomeKind: 'dividend',
+      source: 'Dividend payout',
+      assetTicker: 'VWCE',
+    },
+  ],
+  holdings: [
+    {
+      id: 'hold-vwce',
+      ticker: 'VWCE.DE',
+      name: 'Vanguard FTSE All-World',
+      platform: 'Trade Republic',
+      quantity: 12.4,
+      averageBuyPriceCents: 10345,
+      currentPriceCents: 11620,
+    },
+    {
+      id: 'hold-vusa',
+      ticker: 'VUSA.DE',
+      name: 'Vanguard S&P 500',
+      platform: 'IBKR',
+      quantity: 18.3,
+      averageBuyPriceCents: 7960,
+      currentPriceCents: 8422,
+    },
+  ],
+  dividends: [
+    {
+      id: 'div-vusa-1',
+      date: `${monthPrefix}-17`,
+      amountCents: 2400,
+      ticker: 'VUSA.DE',
+      currency: 'EUR',
+    },
+  ],
+  portfolioCashflows: [
+    { id: 'cf-1', date: `${monthPrefix}-03`, amountCents: -50000, ticker: 'VWCE.DE' },
+    { id: 'cf-2', date: `${monthPrefix}-09`, amountCents: -35000, ticker: 'VUSA.DE' },
+    { id: 'cf-3', date: `${monthPrefix}-17`, amountCents: 2400, ticker: 'VUSA.DE' },
+  ],
+};
