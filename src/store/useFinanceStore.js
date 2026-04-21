@@ -1,0 +1,583 @@
+import { create } from 'zustand';
+import { DEFAULT_SETTINGS } from '../data/defaults';
+import {
+  deleteRecord,
+  ensureEntitySyncFields,
+  ensureSeedData,
+  exportDatabaseSnapshot,
+  getAllRecords,
+  importDatabaseSnapshot,
+  loadSyncMeta,
+  loadSettings,
+  putRecord,
+  saveSettings,
+  saveSyncMeta,
+  sanitizeSettingsForSync,
+} from '../utils/storage';
+import { computeDashboardData, computePortfolioMetrics } from '../utils/finance';
+import {
+  clearSupabaseBrowserClient,
+  createSupabaseBrowserClient,
+  fetchRemoteChanges,
+  getSupabaseBrowserClient,
+  getSupabaseConfig,
+  upsertRemoteRecords,
+} from '../utils/supabase';
+import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
+import { fetchTickerPriceCents } from '../utils/yahoo';
+
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows'];
+let authSubscription = null;
+
+function buildDerived(state) {
+  return {
+    dashboard: computeDashboardData(state),
+    portfolio: computePortfolioMetrics(
+      state.holdings,
+      state.dividends,
+      state.portfolioCashflows,
+      state.settings.allocationTargets,
+    ),
+  };
+}
+
+function makeId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function buildDividendIncome(dividend, existingIncomeId) {
+  return {
+    id: existingIncomeId || dividend.linkedIncomeId || makeId('inc'),
+    date: dividend.date,
+    amountCents: dividend.amountCents,
+    currency: dividend.currency || 'EUR',
+    incomeKind: 'dividend',
+    source: `${dividend.ticker} dividend`,
+    assetTicker: dividend.ticker,
+  };
+}
+
+function upsertItem(items, nextItem) {
+  const index = items.findIndex((item) => item.id === nextItem.id);
+  return index >= 0 ? items.map((item) => (item.id === nextItem.id ? nextItem : item)) : [nextItem, ...items];
+}
+
+function buildSyncRecord(userId, storeName, record) {
+  return {
+    user_id: userId,
+    store_name: storeName,
+    record_id: record.id,
+    payload: record,
+    updated_at: record.updatedAt,
+    deleted_at: null,
+  };
+}
+
+function buildDeleteTombstone(userId, storeName, tombstone) {
+  return {
+    user_id: userId,
+    store_name: storeName,
+    record_id: tombstone.id,
+    payload: null,
+    updated_at: tombstone.updatedAt,
+    deleted_at: tombstone.deletedAt,
+  };
+}
+
+export const useFinanceStore = create((set, get) => ({
+  hydrated: false,
+  settings: DEFAULT_SETTINGS,
+  supabaseConfigured: false,
+  supabaseSession: null,
+  supabaseUser: null,
+  supabaseSyncStatus: 'idle',
+  supabaseLastSyncedAt: null,
+  supabaseError: '',
+  syncMeta: {
+    lastPulledAt: {},
+    deletedRecords: {},
+    conflicts: [],
+  },
+  expenses: [],
+  fixedExpenses: [],
+  incomes: [],
+  holdings: [],
+  dividends: [],
+  portfolioCashflows: [],
+  derived: {
+    dashboard: {
+      netWorthCents: 0,
+      cashflowCents: 0,
+      savingsRate: 0,
+      portfolioPnlMonthCents: 0,
+      expenseSeries: [],
+      incomeSeries: [],
+      netWorthSeries: [],
+      cashflowSeries: [],
+      upcomingEvents: [],
+    },
+    portfolio: {
+      currentValueCents: 0,
+      investedCents: 0,
+      pnlCents: 0,
+      pnlPercent: 0,
+      dividendIncomeCents: 0,
+      dividendYield: 0,
+      twrr: 0,
+      xirr: 0,
+      allocationActual: [],
+    },
+  },
+
+  bootstrap: async () => {
+    await ensureSeedData();
+    const settings = loadSettings();
+    const syncMeta = loadSyncMeta();
+    const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
+    const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
+    await Promise.all(
+      STORE_KEYS.map(async (storeName, index) => {
+        const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
+        await Promise.all(dirty.map((item) => putRecord(storeName, item)));
+      }),
+    );
+    const nextState = {
+      settings,
+      expenses: normalizedRecords[0],
+      fixedExpenses: normalizedRecords[1],
+      incomes: normalizedRecords[2],
+      holdings: normalizedRecords[3],
+      dividends: normalizedRecords[4],
+      portfolioCashflows: normalizedRecords[5],
+      hydrated: true,
+      supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
+      syncMeta,
+    };
+    set({ ...nextState, derived: buildDerived(nextState) });
+    await get().initializeSupabase();
+  },
+
+  initializeSupabase: async () => {
+    if (authSubscription) {
+      authSubscription.unsubscribe();
+      authSubscription = null;
+    }
+
+    clearSupabaseBrowserClient();
+    const settings = get().settings;
+    const client = createSupabaseBrowserClient(settings);
+    const config = getSupabaseConfig(settings);
+
+    if (!client) {
+      set({
+        supabaseConfigured: false,
+        supabaseSession: null,
+        supabaseUser: null,
+        supabaseSyncStatus: 'idle',
+        supabaseError: '',
+      });
+      return;
+    }
+
+    const { data, error } = await client.auth.getSession();
+    if (error) {
+      set({
+        supabaseConfigured: Boolean(config.url && config.anonKey),
+        supabaseSyncStatus: 'error',
+        supabaseError: error.message,
+      });
+      return;
+    }
+
+    set({
+      supabaseConfigured: Boolean(config.url && config.anonKey),
+      supabaseSession: data.session,
+      supabaseUser: data.session?.user ?? null,
+      supabaseError: '',
+    });
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      set({
+        supabaseSession: session,
+        supabaseUser: session?.user ?? null,
+        supabaseSyncStatus: event === 'SIGNED_OUT' ? 'idle' : get().supabaseSyncStatus,
+        supabaseError: '',
+      });
+
+      if (event === 'SIGNED_IN') {
+        window.setTimeout(() => {
+          get().pullFromSupabase();
+        }, 0);
+      }
+    });
+
+    authSubscription = subscription;
+  },
+
+  toggleTheme: () => {
+    const nextTheme = get().settings.theme === 'light' ? 'dark' : 'light';
+    const settings = { ...get().settings, theme: nextTheme };
+    saveSettings(settings);
+    set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
+  },
+
+  updateSettings: (partial) => {
+    const settings = { ...get().settings, ...partial };
+    saveSettings(settings);
+    set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
+  },
+
+  saveSupabaseSettings: async (partial) => {
+    const settings = { ...get().settings, ...partial };
+    saveSettings(settings);
+    set((state) => ({
+      settings,
+      supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
+      derived: buildDerived({ ...state, settings }),
+    }));
+    await get().initializeSupabase();
+  },
+
+  saveEntity: async (storeName, entity) => {
+    const prefix = storeName.slice(0, 3);
+    const record = ensureEntitySyncFields({ ...entity, id: entity.id || makeId(prefix) }, new Date().toISOString());
+    await putRecord(storeName, record);
+    set((state) => {
+      const nextList = upsertItem(state[storeName], record);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== record.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `${storeName}:${record.id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = { ...state, [storeName]: nextList };
+      return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    });
+    return record;
+  },
+
+  removeEntity: async (storeName, id) => {
+    await deleteRecord(storeName, id);
+    set((state) => {
+      const nextList = state[storeName].filter((item) => item.id !== id);
+      const timestamp = new Date().toISOString();
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        [storeName]: [
+          ...(state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== id),
+          { id, updatedAt: timestamp, deletedAt: timestamp },
+        ],
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `${storeName}:${id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = { ...state, [storeName]: nextList };
+      return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    });
+  },
+
+  saveFixedExpense: async (entity) => get().saveEntity('fixedExpenses', entity),
+
+  toggleFixedExpenseStatus: async (id) => {
+    const current = get().fixedExpenses.find((item) => item.id === id);
+    if (!current) return;
+    await get().saveEntity('fixedExpenses', { ...current, active: !current.active });
+  },
+
+  saveDividend: async (entity) => {
+    const prefix = 'div';
+    const current = entity.id ? get().dividends.find((item) => item.id === entity.id) : null;
+    const linkedIncome = buildDividendIncome(entity, current?.linkedIncomeId);
+    const timestamp = new Date().toISOString();
+    const record = ensureEntitySyncFields({
+      ...entity,
+      id: entity.id || makeId(prefix),
+      linkedIncomeId: linkedIncome.id,
+    }, timestamp);
+    const syncedIncome = ensureEntitySyncFields(linkedIncome, timestamp);
+
+    await putRecord('dividends', record);
+    await putRecord('incomes', syncedIncome);
+
+    set((state) => {
+      const nextDividends = upsertItem(state.dividends, record);
+      const nextIncomes = upsertItem(state.incomes, syncedIncome);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        dividends: (state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== record.id),
+        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== syncedIncome.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter(
+          (item) => item.id !== `dividends:${record.id}` && item.id !== `incomes:${syncedIncome.id}`,
+        ),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes };
+      return {
+        dividends: nextDividends,
+        incomes: nextIncomes,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
+    });
+
+    return record;
+  },
+
+  removeDividend: async (id) => {
+    const current = get().dividends.find((item) => item.id === id);
+    if (!current) return;
+    await deleteRecord('dividends', id);
+    if (current.linkedIncomeId) {
+      await deleteRecord('incomes', current.linkedIncomeId);
+    }
+    set((state) => {
+      const nextDividends = state.dividends.filter((item) => item.id !== id);
+      const nextIncomes = current.linkedIncomeId ? state.incomes.filter((item) => item.id !== current.linkedIncomeId) : state.incomes;
+      const timestamp = new Date().toISOString();
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        dividends: [...(state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== id), { id, updatedAt: timestamp, deletedAt: timestamp }],
+        incomes: current.linkedIncomeId
+          ? [...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== current.linkedIncomeId), { id: current.linkedIncomeId, updatedAt: timestamp, deletedAt: timestamp }]
+          : state.syncMeta.deletedRecords.incomes || [],
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter(
+          (item) => item.id !== `dividends:${id}` && item.id !== `incomes:${current.linkedIncomeId}`,
+        ),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes };
+      return {
+        dividends: nextDividends,
+        incomes: nextIncomes,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
+    });
+  },
+
+  refreshPrices: async () => {
+    const holdings = get().holdings;
+    const refreshed = await Promise.all(
+      holdings.map(async (holding) => ({
+        ...holding,
+        currentPriceCents: await fetchTickerPriceCents(holding.ticker),
+      })),
+    );
+
+    await Promise.all(refreshed.map((holding) => putRecord('holdings', holding)));
+    set((state) => {
+      const nextState = { ...state, holdings: refreshed };
+      return { holdings: refreshed, derived: buildDerived(nextState) };
+    });
+  },
+
+  exportBackup: async () => exportDatabaseSnapshot(get().settings),
+
+  importBackup: async (snapshot) => {
+    await importDatabaseSnapshot(snapshot);
+    await get().bootstrap();
+  },
+
+  sendMagicLink: async (email) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'auth-pending', supabaseError: '' });
+    const { error } = await client.auth.signInWithOtp({ email });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+    set({ supabaseSyncStatus: 'auth-email-sent' });
+  },
+
+  signOutSupabase: async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { error } = await client.auth.signOut({ scope: 'local' });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+    set({
+      supabaseSession: null,
+      supabaseUser: null,
+      supabaseSyncStatus: 'idle',
+      supabaseError: '',
+    });
+  },
+
+  pushToSupabase: async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'syncing-up', supabaseError: '' });
+    try {
+      const { data: authData, error: authError } = await client.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('No authenticated Supabase user');
+      const state = get();
+      const rows = [
+        ...STORE_KEYS.flatMap((storeName) => state[storeName].map((record) => buildSyncRecord(userId, storeName, record))),
+        ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
+      ];
+      await upsertRemoteRecords(client, rows);
+      set({
+        supabaseSyncStatus: 'synced',
+        supabaseLastSyncedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+  },
+
+  pullFromSupabase: async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'syncing-down', supabaseError: '' });
+    try {
+      const { data: authData, error: authError } = await client.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('No authenticated Supabase user');
+      const state = get();
+      const since = Object.values(state.syncMeta.lastPulledAt || {}).sort().at(-1);
+      const changes = await fetchRemoteChanges(client, userId, since);
+      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
+      let nextConflicts = [...state.syncMeta.conflicts];
+
+      for (const change of changes) {
+        if (!STORE_KEYS.includes(change.store_name)) continue;
+        const localRecord = state[change.store_name].find((item) => item.id === change.record_id);
+        const localTombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
+        if (detectConflict({ localRecord, localTombstone, remoteChange: change, lastPulledAt: since })) {
+          nextConflicts = upsertConflict(
+            nextConflicts,
+            buildConflict({
+              storeName: change.store_name,
+              remoteChange: change,
+              localRecord,
+              localTombstone,
+            }),
+          );
+          continue;
+        }
+
+        if (change.deleted_at) {
+          await deleteRecord(change.store_name, change.record_id);
+          nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
+        } else if (change.payload) {
+          await putRecord(change.store_name, ensureEntitySyncFields(change.payload, change.updated_at));
+          nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
+        }
+        nextConflicts = removeConflict(nextConflicts, `${change.store_name}:${change.record_id}`);
+      }
+
+      const latestTimestamp = changes.at(-1)?.updated_at || new Date().toISOString();
+      const nextSyncMeta = {
+        lastPulledAt: Object.fromEntries(STORE_KEYS.map((storeName) => [storeName, latestTimestamp])),
+        deletedRecords: nextDeletedRecords,
+        conflicts: nextConflicts,
+      };
+      saveSyncMeta(nextSyncMeta);
+      set({
+        supabaseSyncStatus: 'synced',
+        supabaseLastSyncedAt: latestTimestamp,
+        supabaseError: '',
+        syncMeta: nextSyncMeta,
+      });
+      await get().bootstrap();
+    } catch (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+  },
+
+  resolveConflictUseRemote: async (conflictId) => {
+    const conflict = get().syncMeta.conflicts.find((item) => item.id === conflictId);
+    if (!conflict) return;
+
+    if (conflict.remoteDeletedAt) {
+      await deleteRecord(conflict.storeName, conflict.recordId);
+      set((state) => {
+        const nextList = state[conflict.storeName].filter((item) => item.id !== conflict.recordId);
+        const nextDeletedRecords = {
+          ...state.syncMeta.deletedRecords,
+          [conflict.storeName]: (state.syncMeta.deletedRecords[conflict.storeName] || []).filter((item) => item.id !== conflict.recordId),
+        };
+        const nextSyncMeta = {
+          ...state.syncMeta,
+          deletedRecords: nextDeletedRecords,
+          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
+        };
+        saveSyncMeta(nextSyncMeta);
+        const nextState = { ...state, [conflict.storeName]: nextList };
+        return { [conflict.storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+      });
+      return;
+    }
+
+    const remoteRecord = ensureEntitySyncFields(conflict.remoteRecord, conflict.remoteUpdatedAt);
+    await putRecord(conflict.storeName, remoteRecord);
+    set((state) => {
+      const nextList = upsertItem(state[conflict.storeName], remoteRecord);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        [conflict.storeName]: (state.syncMeta.deletedRecords[conflict.storeName] || []).filter((item) => item.id !== conflict.recordId),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = { ...state, [conflict.storeName]: nextList };
+      return { [conflict.storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    });
+  },
+
+  resolveConflictKeepLocal: async (conflictId) => {
+    const client = getSupabaseBrowserClient();
+    const conflict = get().syncMeta.conflicts.find((item) => item.id === conflictId);
+    if (!client || !conflict) return;
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError) throw authError;
+    const userId = authData.user?.id;
+    if (!userId) throw new Error('No authenticated Supabase user');
+
+    const localRecord = get()[conflict.storeName].find((item) => item.id === conflict.recordId);
+    const localTombstone = (get().syncMeta.deletedRecords[conflict.storeName] || []).find((item) => item.id === conflict.recordId);
+
+    if (localTombstone && !localRecord) {
+      await upsertRemoteRecords(client, [buildDeleteTombstone(userId, conflict.storeName, localTombstone)]);
+    } else if (localRecord) {
+      await upsertRemoteRecords(client, [buildSyncRecord(userId, conflict.storeName, localRecord)]);
+    }
+
+    set((state) => {
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
+      };
+      saveSyncMeta(nextSyncMeta);
+      return { syncMeta: nextSyncMeta };
+    });
+  },
+}));
