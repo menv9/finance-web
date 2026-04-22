@@ -143,7 +143,10 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
   const currentMonthIncomes = incomes.filter((item) => monthKey(item.date) === currentMonth);
 
-  const totalExpensesCents = sumAmount(currentMonthExpenses);
+  const fixedMonthlyCents = (fixedExpenses || [])
+    .filter((f) => f.active)
+    .reduce((sum, f) => sum + (f.amountCents || 0), 0);
+  const totalExpensesCents = sumAmount(currentMonthExpenses) + fixedMonthlyCents;
   const totalIncomeCents = sumAmount(currentMonthIncomes);
   const cashflowCents = totalIncomeCents - totalExpensesCents;
   const savingsRate = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
