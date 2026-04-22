@@ -84,29 +84,58 @@ export function computeTWRR(holdings, cashflows) {
 }
 
 export function computeXIRR(cashflows, endingValueCents) {
-  if (!cashflows.length) return 0;
-  const datedFlows = [...cashflows.map((flow) => ({ ...flow })), { date: new Date().toISOString().slice(0, 10), amountCents: endingValueCents }];
-  const startDate = parseISO(datedFlows[0].date);
-  let rate = 0.12;
+  if (!cashflows.length || !endingValueCents) return 0;
 
-  for (let iteration = 0; iteration < 50; iteration += 1) {
+  // Convention: deposits (money in) are negative; ending value (money back) is positive.
+  // Flip stored deposit signs so Newton's method has opposite signs to converge on.
+  const datedFlows = [
+    ...cashflows.map((flow) => ({
+      date: flow.date,
+      amountCents: -Math.abs(flow.amountCents),
+    })),
+    { date: new Date().toISOString().slice(0, 10), amountCents: Math.abs(endingValueCents) },
+  ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // XIRR is undefined if all flows share a sign.
+  const hasPositive = datedFlows.some((f) => f.amountCents > 0);
+  const hasNegative = datedFlows.some((f) => f.amountCents < 0);
+  if (!hasPositive || !hasNegative) return 0;
+
+  const startDate = parseISO(datedFlows[0].date);
+  const RATE_MIN = -0.9999;
+  const RATE_MAX = 10;
+  let rate = 0.1;
+
+  for (let iteration = 0; iteration < 100; iteration += 1) {
     let functionValue = 0;
     let derivativeValue = 0;
 
-    datedFlows.forEach((flow) => {
+    for (const flow of datedFlows) {
       const years = differenceInCalendarDays(parseISO(flow.date), startDate) / 365;
-      const denominator = (1 + rate) ** years;
-      functionValue += flow.amountCents / denominator;
-      derivativeValue += (-years * flow.amountCents) / ((1 + rate) ** (years + 1));
-    });
+      const base = 1 + rate;
+      const denom = base ** years;
+      if (!Number.isFinite(denom) || denom === 0) return 0;
+      functionValue += flow.amountCents / denom;
+      derivativeValue += (-years * flow.amountCents) / (base ** (years + 1));
+    }
 
-    const nextRate = rate - functionValue / derivativeValue;
+    if (!Number.isFinite(functionValue) || !Number.isFinite(derivativeValue)) return 0;
+    if (Math.abs(derivativeValue) < 1e-10) return 0;
+
+    let nextRate = rate - functionValue / derivativeValue;
     if (!Number.isFinite(nextRate)) return 0;
-    if (Math.abs(nextRate - rate) < 0.00001) return nextRate * 100;
+    if (nextRate < RATE_MIN) nextRate = RATE_MIN;
+    if (nextRate > RATE_MAX) nextRate = RATE_MAX;
+
+    if (Math.abs(nextRate - rate) < 1e-7) {
+      // If we converged only because we hit the clamp, the true rate is outside a sane range.
+      if (nextRate <= RATE_MIN + 1e-6 || nextRate >= RATE_MAX - 1e-6) return null;
+      return nextRate * 100;
+    }
     rate = nextRate;
   }
 
-  return rate * 100;
+  return null;
 }
 
 export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows }) {
