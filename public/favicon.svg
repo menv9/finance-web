@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Navy canvas background -->
+  <rect width="32" height="32" rx="7" fill="#141B26"/>
+
+  <!-- Area fill under the trend line -->
+  <path
+    d="M5 24 L10 19 L15 21 L21 13 L27 8 V27 H5 Z"
+    fill="#5FB394"
+    fill-opacity="0.18"
+  />
+
+  <!-- Trend line -->
+  <polyline
+    points="5,24 10,19 15,21 21,13 27,8"
+    fill="none"
+    stroke="#5FB394"
+    stroke-width="2.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Peak dot -->
+  <circle cx="27" cy="8" r="2.5" fill="#5FB394"/>
+</svg>
