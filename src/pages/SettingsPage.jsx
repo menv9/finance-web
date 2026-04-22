@@ -1,7 +1,28 @@
 import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
-import { SectionCard } from '../components/SectionCard';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { Card, Button, FormField, Input, Select, Table, EmptyState } from '../components/ui';
+import { rise } from '../utils/motion';
+
+const sections = [
+  { id: 'preferences', label: 'Preferences' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'targets', label: 'Allocation targets' },
+  { id: 'sync', label: 'Supabase sync' },
+  { id: 'conflicts', label: 'Conflicts' },
+  { id: 'backup', label: 'Backup' },
+];
+
+function SectionLink({ id, label }) {
+  return (
+    <a
+      href={`#${id}`}
+      className="block py-2 pl-3 border-l border-rule text-sm text-ink-muted hover:text-ink hover:border-accent transition-colors duration-180"
+    >
+      {label}
+    </a>
+  );
+}
 
 export default function SettingsPage() {
   const settings = useFinanceStore((state) => state.settings);
@@ -21,6 +42,7 @@ export default function SettingsPage() {
   const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
   const resolveConflictUseRemote = useFinanceStore((state) => state.resolveConflictUseRemote);
   const resolveConflictKeepLocal = useFinanceStore((state) => state.resolveConflictKeepLocal);
+
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
   const [targetInput, setTargetInput] = useState({ ticker: '', targetWeight: '' });
@@ -30,263 +52,435 @@ export default function SettingsPage() {
     email: '',
   });
 
+  const targetColumns = [
+    { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono">{r.ticker}</span> },
+    { key: 'targetWeight', header: 'Target', numeric: true, render: (r) => `${r.targetWeight}%` },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (r) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTargetInput({ ticker: r.ticker, targetWeight: `${r.targetWeight}` })}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              updateSettings({
+                allocationTargets: settings.allocationTargets.filter((t) => t.ticker !== r.ticker),
+              })
+            }
+          >
+            Remove
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="page-grid">
-      <PageHeader eyebrow="Settings" title="Preferences and backup" description="User-editable categories, allocation targets, base currency, theme and full JSON backup." />
+    <div className="grid grid-cols-1 gap-12">
+      <PageHeader
+        number="05"
+        eyebrow="Module"
+        title="Settings"
+        description="Preferences, categories, allocation targets, sync, and backup. All changes persist locally; Supabase sync is optional."
+      />
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <SectionCard title="General preferences">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="field">
-              <label htmlFor="base-currency">Base currency</label>
-              <select id="base-currency" value={settings.baseCurrency} onChange={(event) => updateSettings({ baseCurrency: event.target.value })}>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-                <option value="GBP">GBP</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="locale">Locale</label>
-              <select id="locale" value={settings.locale} onChange={(event) => updateSettings({ locale: event.target.value })}>
-                <option value="de-AT">de-AT</option>
-                <option value="en-GB">en-GB</option>
-                <option value="en-US">en-US</option>
-              </select>
-            </div>
-          </div>
-        </SectionCard>
+      <div className="grid gap-10 lg:grid-cols-12">
+        {/* left rail */}
+        <aside className="lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
+          <p className="eyebrow mb-3">On this page</p>
+          <nav aria-label="Settings sections" className="flex flex-col">
+            {sections.map((s) => (
+              <SectionLink key={s.id} {...s} />
+            ))}
+          </nav>
+        </aside>
 
-        <SectionCard title="Categories">
-          <div className="flex flex-wrap gap-2">
-            {settings.categories.map((category) => (
-              <span key={category} className="badge">
-                {category}
-                <button
-                  className="button-ghost !p-0 text-xs"
+        {/* content */}
+        <div className="lg:col-span-9 grid gap-10">
+          <Card
+            id="preferences"
+            eyebrow="General"
+            title="Preferences"
+            description="Base currency and locale affect every number shown across the app."
+            className={rise(1)}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField label="Base currency" htmlFor="base-currency">
+                <Select
+                  id="base-currency"
+                  value={settings.baseCurrency}
+                  onChange={(e) => updateSettings({ baseCurrency: e.target.value })}
+                >
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
+                </Select>
+              </FormField>
+              <FormField label="Locale" htmlFor="locale">
+                <Select
+                  id="locale"
+                  value={settings.locale}
+                  onChange={(e) => updateSettings({ locale: e.target.value })}
+                >
+                  <option value="de-AT">de-AT</option>
+                  <option value="en-GB">en-GB</option>
+                  <option value="en-US">en-US</option>
+                </Select>
+              </FormField>
+            </div>
+          </Card>
+
+          <Card
+            id="categories"
+            eyebrow="Taxonomy"
+            title="Expense categories"
+            description="Edit, add, or remove. Categories are referenced across expense entry and filtering."
+            className={rise(2)}
+          >
+            <div className="flex flex-wrap gap-2">
+              {settings.categories.map((category) => (
+                <span
+                  key={category}
+                  className="inline-flex items-center gap-2 rounded-full border border-rule bg-surface-raised px-3 py-1 text-xs text-ink"
+                >
+                  <span>{category}</span>
+                  <button
+                    type="button"
+                    className="text-ink-faint hover:text-ink transition-colors"
+                    onClick={() => {
+                      setEditingCategory(category);
+                      setCategoryInput(category);
+                    }}
+                  >
+                    edit
+                  </button>
+                  {settings.categories.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-ink-faint hover:text-danger transition-colors"
+                      onClick={() =>
+                        updateSettings({
+                          categories: settings.categories.filter((c) => c !== category),
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap items-end gap-3">
+              <FormField label={editingCategory ? 'Edit category' : 'Add category'} className="flex-1 min-w-[220px]">
+                <Input
+                  value={categoryInput}
+                  placeholder="e.g. Groceries"
+                  onChange={(e) => setCategoryInput(e.target.value)}
+                />
+              </FormField>
+              <Button
+                onClick={() => {
+                  if (!categoryInput.trim()) return;
+                  const next = categoryInput.trim();
+                  if (editingCategory) {
+                    updateSettings({
+                      categories: settings.categories.map((c) => (c === editingCategory ? next : c)),
+                    });
+                    setEditingCategory('');
+                  } else if (!settings.categories.includes(next)) {
+                    updateSettings({ categories: [...settings.categories, next] });
+                  }
+                  setCategoryInput('');
+                }}
+              >
+                {editingCategory ? 'Save' : 'Add'}
+              </Button>
+              {editingCategory ? (
+                <Button
+                  variant="secondary"
                   onClick={() => {
-                    setEditingCategory(category);
-                    setCategoryInput(category);
+                    setEditingCategory('');
+                    setCategoryInput('');
                   }}
                 >
-                  Edit
-                </button>
-                {settings.categories.length > 1 ? (
-                  <button
-                    className="button-ghost !p-0 text-xs"
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card
+            id="targets"
+            eyebrow="Portfolio"
+            title="Allocation targets"
+            description="Used for the actual-vs-target comparison in the Portfolio module."
+            className={rise(3)}
+          >
+            {settings.allocationTargets?.length ? (
+              <Table columns={targetColumns} rows={settings.allocationTargets.map((t) => ({ ...t, id: t.ticker }))} density="compact" />
+            ) : (
+              <EmptyState title="No targets set" description="Add a ticker and its target weight below." />
+            )}
+            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <FormField label="Ticker">
+                <Input
+                  placeholder="e.g. VWCE"
+                  value={targetInput.ticker}
+                  onChange={(e) => setTargetInput((p) => ({ ...p, ticker: e.target.value.toUpperCase() }))}
+                />
+              </FormField>
+              <FormField label="Weight %">
+                <Input
+                  type="number"
+                  numeric
+                  placeholder="e.g. 60"
+                  value={targetInput.targetWeight}
+                  onChange={(e) => setTargetInput((p) => ({ ...p, targetWeight: e.target.value }))}
+                />
+              </FormField>
+              <div className="flex items-end">
+                <Button
+                  onClick={() => {
+                    if (!targetInput.ticker || !targetInput.targetWeight) return;
+                    updateSettings({
+                      allocationTargets: [
+                        ...settings.allocationTargets.filter((t) => t.ticker !== targetInput.ticker),
+                        { ticker: targetInput.ticker, targetWeight: Number(targetInput.targetWeight) },
+                      ],
+                    });
+                    setTargetInput({ ticker: '', targetWeight: '' });
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            id="sync"
+            eyebrow="Optional"
+            title="Supabase sync"
+            description="Layer device sync and auth on top of the local-first data. All data stays in IndexedDB first."
+            action={
+              <span
+                className={
+                  'inline-flex items-center gap-1.5 text-xs ' +
+                  (supabaseConfigured ? 'text-positive' : 'text-ink-faint')
+                }
+              >
+                <span
+                  aria-hidden
+                  className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseConfigured ? 'bg-positive' : 'bg-ink-faint')}
+                />
+                {supabaseConfigured ? 'Configured' : 'Local only'}
+              </span>
+            }
+            className={rise(4)}
+          >
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-4">
+                <FormField label="Project URL" htmlFor="supabase-url">
+                  <Input
+                    id="supabase-url"
+                    value={supabaseInput.url}
+                    placeholder="https://your-project.supabase.co"
+                    onChange={(e) => setSupabaseInput((p) => ({ ...p, url: e.target.value }))}
+                  />
+                </FormField>
+                <FormField label="Publishable / anon key" htmlFor="supabase-key">
+                  <Input
+                    id="supabase-key"
+                    value={supabaseInput.anonKey}
+                    placeholder="sb_publishable_..."
+                    onChange={(e) => setSupabaseInput((p) => ({ ...p, anonKey: e.target.value }))}
+                  />
+                </FormField>
+                <div>
+                  <Button
                     onClick={() =>
-                      updateSettings({
-                        categories: settings.categories.filter((item) => item !== category),
+                      saveSupabaseSettings({
+                        supabaseUrl: supabaseInput.url.trim(),
+                        supabaseAnonKey: supabaseInput.anonKey.trim(),
                       })
                     }
                   >
-                    Remove
-                  </button>
-                ) : null}
-              </span>
-            ))}
-          </div>
-          <div className="mt-4 flex gap-2">
-            <input className="flex-1 rounded-[14px] border border-[var(--border-soft)] bg-[var(--bg-surface-strong)] px-4 py-3" value={categoryInput} placeholder="Add category" onChange={(event) => setCategoryInput(event.target.value)} />
-            <button className="button-primary" onClick={() => {
-              if (!categoryInput.trim()) return;
-              const nextCategory = categoryInput.trim();
-              if (editingCategory) {
-                updateSettings({
-                  categories: settings.categories.map((item) => (item === editingCategory ? nextCategory : item)),
-                });
-                setEditingCategory('');
-              } else if (!settings.categories.includes(nextCategory)) {
-                updateSettings({ categories: [...settings.categories, nextCategory] });
-              }
-              setCategoryInput('');
-            }}>{editingCategory ? 'Save' : 'Add'}</button>
-            {editingCategory ? (
-              <button className="button-secondary" onClick={() => {
-                setEditingCategory('');
-                setCategoryInput('');
-              }}>Cancel</button>
-            ) : null}
-          </div>
-        </SectionCard>
-      </section>
-
-      <SectionCard title="Allocation targets" subtitle="Used for actual vs target comparison in portfolio.">
-        <div className="table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Target weight</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {settings.allocationTargets.map((target) => (
-                <tr key={target.ticker}>
-                  <td>{target.ticker}</td>
-                  <td>{target.targetWeight}%</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button className="button-ghost" onClick={() => setTargetInput({ ticker: target.ticker, targetWeight: `${target.targetWeight}` })}>Edit</button>
-                      <button className="button-ghost" onClick={() => updateSettings({
-                        allocationTargets: settings.allocationTargets.filter((item) => item.ticker !== target.ticker),
-                      })}>Remove</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-          <input className="rounded-[14px] border border-[var(--border-soft)] bg-[var(--bg-surface-strong)] px-4 py-3" placeholder="Ticker" value={targetInput.ticker} onChange={(event) => setTargetInput((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))} />
-          <input className="rounded-[14px] border border-[var(--border-soft)] bg-[var(--bg-surface-strong)] px-4 py-3" placeholder="Weight %" type="number" value={targetInput.targetWeight} onChange={(event) => setTargetInput((prev) => ({ ...prev, targetWeight: event.target.value }))} />
-          <button className="button-primary" onClick={() => {
-            if (!targetInput.ticker || !targetInput.targetWeight) return;
-            updateSettings({
-              allocationTargets: [...settings.allocationTargets.filter((target) => target.ticker !== targetInput.ticker), { ticker: targetInput.ticker, targetWeight: Number(targetInput.targetWeight) }],
-            });
-            setTargetInput({ ticker: '', targetWeight: '' });
-          }}>Save target</button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Supabase sync (v2)" subtitle="Optional auth and device sync layered on top of the local-first data model.">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="grid gap-4">
-            <div className="field">
-              <label htmlFor="supabase-url">Project URL</label>
-              <input
-                id="supabase-url"
-                value={supabaseInput.url}
-                placeholder="https://your-project.supabase.co"
-                onChange={(event) => setSupabaseInput((prev) => ({ ...prev, url: event.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="supabase-key">Publishable / anon key</label>
-              <input
-                id="supabase-key"
-                value={supabaseInput.anonKey}
-                placeholder="sb_publishable_..."
-                onChange={(event) => setSupabaseInput((prev) => ({ ...prev, anonKey: event.target.value }))}
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                className="button-primary"
-                onClick={() => saveSupabaseSettings({ supabaseUrl: supabaseInput.url.trim(), supabaseAnonKey: supabaseInput.anonKey.trim() })}
-              >
-                Save Supabase config
-              </button>
-              <span className="badge">{supabaseConfigured ? 'Configured' : 'Local only'}</span>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="field">
-              <label htmlFor="supabase-email">Sign in with magic link</label>
-              <input
-                id="supabase-email"
-                type="email"
-                value={supabaseInput.email}
-                placeholder="you@example.com"
-                onChange={(event) => setSupabaseInput((prev) => ({ ...prev, email: event.target.value }))}
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                className="button-secondary"
-                disabled={!supabaseConfigured || !supabaseInput.email}
-                onClick={() => sendMagicLink(supabaseInput.email)}
-              >
-                Send magic link
-              </button>
-              <button className="button-secondary" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
-                Sign out
-              </button>
-            </div>
-            <p className="text-sm text-[var(--text-muted)]">
-              {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'No authenticated Supabase session yet.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button className="button-primary" disabled={!supabaseUser} onClick={() => pushToSupabase()}>
-            Push local data to Supabase
-          </button>
-          <button className="button-secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
-            Pull latest snapshot from Supabase
-          </button>
-        </div>
-
-        <div className="mt-4 rounded-[18px] bg-[var(--bg-muted)] px-4 py-4 text-sm text-[var(--text-muted)]">
-          <p>Status: {supabaseSyncStatus}</p>
-          <p>{supabaseLastSyncedAt ? `Last sync: ${new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)}` : 'Last sync: not yet'}</p>
-          <p>{supabaseError ? `Error: ${supabaseError}` : 'No sync errors recorded.'}</p>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Sync conflicts" subtitle="Shown when the same record changed locally and remotely after the last sync.">
-        {conflicts.length ? (
-          <div className="grid gap-4">
-            {conflicts.map((conflict) => (
-              <div key={conflict.id} className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--bg-surface-strong)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{conflict.storeName} / {conflict.recordId}</p>
-                    <p className="mt-1 text-sm text-[var(--text-muted)]">
-                      Remote updated {new Date(conflict.remoteUpdatedAt).toLocaleString(settings.locale)}
-                    </p>
-                  </div>
-                  <span className="badge">Conflict</span>
-                </div>
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-[16px] bg-[var(--bg-muted)] p-3">
-                    <p className="text-sm font-semibold">Local</p>
-                    <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs text-[var(--text-muted)]">{JSON.stringify(conflict.localTombstone || conflict.localRecord, null, 2)}</pre>
-                  </div>
-                  <div className="rounded-[16px] bg-[var(--bg-muted)] p-3">
-                    <p className="text-sm font-semibold">Remote</p>
-                    <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs text-[var(--text-muted)]">{JSON.stringify(conflict.remoteDeletedAt ? { deletedAt: conflict.remoteDeletedAt } : conflict.remoteRecord, null, 2)}</pre>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button className="button-primary" onClick={() => resolveConflictKeepLocal(conflict.id)}>Keep local version</button>
-                  <button className="button-secondary" onClick={() => resolveConflictUseRemote(conflict.id)}>Use remote version</button>
+                    Save config
+                  </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--text-muted)]">No sync conflicts detected right now.</p>
-        )}
-      </SectionCard>
 
-      <SectionCard title="Backup and restore" subtitle="Complete JSON dump for migration or sync prep.">
-        <div className="flex flex-wrap gap-3">
-          <button className="button-secondary" onClick={async () => {
-            const backup = await exportBackup();
-            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = 'finance-tracker-backup.json';
-            anchor.click();
-            URL.revokeObjectURL(url);
-          }}>Export backup JSON</button>
-          <label className="button-primary">
-            Import backup JSON
-            <input type="file" accept="application/json" className="hidden" onChange={async (event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              const snapshot = JSON.parse(await file.text());
-              await importBackup(snapshot);
-            }} />
-          </label>
+              <div className="grid gap-4">
+                <FormField label="Magic link sign-in" htmlFor="supabase-email">
+                  <Input
+                    id="supabase-email"
+                    type="email"
+                    value={supabaseInput.email}
+                    placeholder="you@example.com"
+                    onChange={(e) => setSupabaseInput((p) => ({ ...p, email: e.target.value }))}
+                  />
+                </FormField>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={!supabaseConfigured || !supabaseInput.email}
+                    onClick={() => sendMagicLink(supabaseInput.email)}
+                  >
+                    Send link
+                  </Button>
+                  <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
+                    Sign out
+                  </Button>
+                </div>
+                <p className="text-xs text-ink-muted">
+                  {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'No authenticated session.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-rule pt-6">
+              <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
+                Push local → cloud
+              </Button>
+              <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
+                Pull cloud → local
+              </Button>
+            </div>
+
+            <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">Status</dt>
+                <dd className="text-ink">{supabaseSyncStatus}</dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">Last</dt>
+                <dd className="text-ink numeric">
+                  {supabaseLastSyncedAt
+                    ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
+                    : '—'}
+                </dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">Error</dt>
+                <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
+                  {supabaseError || 'none'}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card
+            id="conflicts"
+            eyebrow="Sync"
+            title="Conflicts"
+            description="Shown when the same record changed locally and remotely after the last sync."
+            className={rise(5)}
+          >
+            {conflicts.length ? (
+              <div className="grid gap-4">
+                {conflicts.map((conflict) => (
+                  <div key={conflict.id} className="rounded-md border border-rule-strong bg-surface-raised p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-sm text-ink">
+                          {conflict.storeName} / {conflict.recordId}
+                        </p>
+                        <p className="eyebrow mt-1">
+                          remote updated {new Date(conflict.remoteUpdatedAt).toLocaleString(settings.locale)}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center rounded-sm bg-danger-soft px-2 py-0.5 text-xs text-danger border border-danger/30">
+                        conflict
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-md bg-surface-sunken p-3">
+                        <p className="eyebrow mb-2">Local</p>
+                        <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
+                          {JSON.stringify(conflict.localTombstone || conflict.localRecord, null, 2)}
+                        </pre>
+                      </div>
+                      <div className="rounded-md bg-surface-sunken p-3">
+                        <p className="eyebrow mb-2">Remote</p>
+                        <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
+                          {JSON.stringify(
+                            conflict.remoteDeletedAt
+                              ? { deletedAt: conflict.remoteDeletedAt }
+                              : conflict.remoteRecord,
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button onClick={() => resolveConflictKeepLocal(conflict.id)}>Keep local</Button>
+                      <Button variant="secondary" onClick={() => resolveConflictUseRemote(conflict.id)}>
+                        Use remote
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted">No sync conflicts right now.</p>
+            )}
+          </Card>
+
+          <Card
+            id="backup"
+            eyebrow="Portability"
+            title="Backup and restore"
+            description="Complete JSON dump for migration, device transfer, or pre-sync insurance."
+            className={rise(6)}
+          >
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  const backup = await exportBackup();
+                  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+                    type: 'application/json',
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement('a');
+                  anchor.href = url;
+                  anchor.download = 'finance-tracker-backup.json';
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Export JSON
+              </Button>
+              <label className="inline-flex">
+                <Button as="span" variant="primary">
+                  Import JSON
+                </Button>
+                <input
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    const snapshot = JSON.parse(await file.text());
+                    await importBackup(snapshot);
+                  }}
+                />
+              </label>
+            </div>
+          </Card>
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }
