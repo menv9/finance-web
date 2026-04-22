@@ -76,8 +76,8 @@ export default {
       },
       boxShadow: {
         hairline: '0 0 0 1px var(--rule)',
-        soft: '0 1px 0 var(--rule), 0 12px 32px -20px rgba(0,0,0,0.35)',
-        lift: '0 1px 0 var(--rule), 0 24px 48px -24px rgba(0,0,0,0.45)',
+        soft: '0 1px 0 var(--rule), 0 12px 32px -20px rgba(8,14,26,0.45)',
+        lift: '0 1px 0 var(--rule), 0 24px 48px -24px rgba(8,14,26,0.55)',
         'focus-ring': '0 0 0 2px var(--canvas), 0 0 0 4px var(--accent)',
       },
       letterSpacing: {

@@ -8,25 +8,25 @@
    Tokens — Dark (default)
 —————————————————————————————————————————————— */
 :root {
-  --canvas: #0B0E0F;
-  --surface: #11161A;
-  --surface-raised: #161C21;
-  --surface-sunken: #0A0D0F;
-  --rule: rgba(230, 232, 223, 0.08);
-  --rule-strong: rgba(230, 232, 223, 0.16);
-  --ink: #ECEBE4;
-  --ink-muted: #A8AEA6;
-  --ink-faint: #767F78;
-  --ink-inverse: #0B0E0F;
+  --canvas: #141B26;
+  --surface: #1B2434;
+  --surface-raised: #232E42;
+  --surface-sunken: #0F1620;
+  --rule: rgba(210, 220, 240, 0.09);
+  --rule-strong: rgba(210, 220, 240, 0.18);
+  --ink: #E6EAF2;
+  --ink-muted: #A5AEC3;
+  --ink-faint: #6F788E;
+  --ink-inverse: #141B26;
   --accent: #5FB394;
   --accent-strong: #7BC9AB;
-  --accent-soft: rgba(95, 179, 148, 0.14);
+  --accent-soft: rgba(95, 179, 148, 0.16);
   --accent-ink: #0B1E16;
-  --danger: #C47B55;
-  --danger-soft: rgba(196, 123, 85, 0.14);
-  --positive: #8FB97E;
-  --positive-soft: rgba(143, 185, 126, 0.14);
-  --grain: 0.035;
+  --danger: #D08A66;
+  --danger-soft: rgba(208, 138, 102, 0.16);
+  --positive: #9CC490;
+  --positive-soft: rgba(156, 196, 144, 0.16);
+  --grain: 0.03;
   color-scheme: dark;
 }
 
