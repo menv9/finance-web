@@ -106,13 +106,36 @@ export function saveSyncMeta(meta) {
   localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
 }
 
+// Optional demo seed. Drop a file at `src/data/demo.json` exported from
+// Settings → Backup → Export JSON and it will be used as the seed for any
+// fresh browser instead of the hardcoded defaults. Safe if absent.
+const demoModules = import.meta.glob('../data/demo.json', { eager: true, import: 'default' });
+const DEMO_BACKUP = Object.values(demoModules)[0] || null;
+
+export function getDemoSettings() {
+  return DEMO_BACKUP?.settings || null;
+}
+
 export async function ensureSeedData() {
   const seedFlag = localStorage.getItem('pft-seeded');
   if (seedFlag) return;
 
+  const demoData = DEMO_BACKUP?.data;
+
   await Promise.all(
-    STORE_NAMES.map((storeName) => putManyRecords(storeName, DEFAULT_DATA[storeName] || [])),
+    STORE_NAMES.map((storeName) =>
+      putManyRecords(storeName, (demoData?.[storeName]) || DEFAULT_DATA[storeName] || []),
+    ),
   );
+
+  if (DEMO_BACKUP?.settings) {
+    const existing = localStorage.getItem(SETTINGS_KEY);
+    if (!existing) {
+      const { supabaseUrl: _u, supabaseAnonKey: _k, ...safeSettings } = DEMO_BACKUP.settings;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...safeSettings }));
+    }
+  }
+
   localStorage.setItem('pft-seeded', 'true');
 }
 
