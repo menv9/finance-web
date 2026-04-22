@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { parseAmountToCents, parseCsv } from '../utils/csv';
+import { FormField, Input, Select, Button } from './ui';
 
 export function CsvImportCard({ mapping, categories, onImport }) {
   const [preview, setPreview] = useState([]);
@@ -45,74 +46,86 @@ export function CsvImportCard({ mapping, categories, onImport }) {
     });
 
   return (
-    <div className="grid gap-4">
-      <div className="field">
-        <label htmlFor="csv-file">CSV import</label>
-        <input
-          id="csv-file"
-          type="file"
-          accept=".csv,text/csv"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            const text = await file.text();
-            const parsed = parseCsv(text);
-            setPreview(parsed.rows);
-            setHeaders(parsed.headers);
-            setDelimiter(parsed.delimiter);
-          }}
-        />
-      </div>
+    <div className="grid gap-5">
+      <FormField label="CSV file" htmlFor="csv-file" hint="Comma, semicolon, or tab-delimited exports supported.">
+        {(props) => (
+          <Input
+            {...props}
+            type="file"
+            accept=".csv,text/csv"
+            className="file:mr-3 file:rounded-sm file:border file:border-rule-strong file:bg-surface-raised file:px-3 file:py-1 file:text-xs file:text-ink-muted hover:file:text-ink cursor-pointer"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              const text = await file.text();
+              const parsed = parseCsv(text);
+              setPreview(parsed.rows);
+              setHeaders(parsed.headers);
+              setDelimiter(parsed.delimiter);
+            }}
+          />
+        )}
+      </FormField>
 
       {preview.length ? (
         <>
-          <div className="rounded-[18px] bg-[var(--bg-muted)] px-4 py-4 text-sm text-[var(--text-muted)]">
-            <p>Detected delimiter: {delimiter === '\t' ? 'tab' : delimiter}</p>
-          </div>
+          <p className="eyebrow">
+            Detected delimiter: <span className="font-mono text-ink">{delimiter === '\t' ? 'tab' : delimiter}</span>
+          </p>
 
           <div className="grid gap-4 md:grid-cols-2">
             {Object.entries(localMapping).map(([field, value]) => (
-              <div className="field" key={field}>
-                <label htmlFor={`map-${field}`}>{field}</label>
-                <select
-                  id={`map-${field}`}
-                  value={value}
-                  onChange={(event) =>
-                    setLocalMapping((prev) => ({ ...prev, [field]: event.target.value }))
-                  }
-                >
-                  {headers.map((column) => (
-                    <option key={column} value={column}>
-                      {column}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FormField label={field} htmlFor={`map-${field}`} key={field}>
+                {(props) => (
+                  <Select
+                    {...props}
+                    value={value}
+                    onChange={(event) =>
+                      setLocalMapping((prev) => ({ ...prev, [field]: event.target.value }))
+                    }
+                  >
+                    {headers.map((column) => (
+                      <option key={column} value={column}>
+                        {column}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
             ))}
-            <div className="field">
-              <label htmlFor="amount-mode">Amount interpretation</label>
-              <select id="amount-mode" value={amountMode} onChange={(event) => setAmountMode(event.target.value)}>
-                <option value="signed">Use CSV sign as-is</option>
-                <option value="expense-positive">Force positive expenses</option>
-                <option value="income-negative">Force negative values</option>
-              </select>
-            </div>
+            <FormField label="Amount interpretation" htmlFor="amount-mode">
+              {(props) => (
+                <Select {...props} value={amountMode} onChange={(event) => setAmountMode(event.target.value)}>
+                  <option value="signed">Use CSV sign as-is</option>
+                  <option value="expense-positive">Force positive expenses</option>
+                  <option value="income-negative">Force negative values</option>
+                </Select>
+              )}
+            </FormField>
           </div>
 
-          <div className="table-shell">
-            <table>
+          <div className="overflow-x-auto rounded-md border border-rule">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
+                <tr className="border-b border-rule bg-surface-sunken">
                   {headers.map((header) => (
-                    <th key={header}>{header}</th>
+                    <th
+                      key={header}
+                      scope="col"
+                      className="eyebrow px-3 py-2 text-left text-ink-muted"
+                    >
+                      {header}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {preview.slice(0, 5).map((row, index) => (
-                  <tr key={index}>
+                  <tr key={index} className="border-b border-rule last:border-0">
                     {headers.map((header) => (
-                      <td key={header}>{row[header]}</td>
+                      <td key={header} className="px-3 py-2 text-ink-muted">
+                        {row[header]}
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -121,21 +134,25 @@ export function CsvImportCard({ mapping, categories, onImport }) {
           </div>
 
           {validation.length ? (
-            <div className="rounded-[18px] border border-[var(--border-soft)] px-4 py-4">
-              <p className="text-sm font-semibold">Validation summary</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                {validation.filter((item) => item.valid).length} valid rows, {validation.filter((item) => !item.valid).length} invalid rows.
+            <div className="rounded-md border border-rule px-4 py-3">
+              <p className="eyebrow">Validation summary</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                <span className="text-positive">{validation.filter((item) => item.valid).length} valid</span>
+                {' · '}
+                <span className="text-danger">{validation.filter((item) => !item.valid).length} invalid</span>
               </p>
               {validation.filter((item) => !item.valid).slice(0, 5).map((item) => (
-                <p key={item.index} className="mt-2 text-sm text-[var(--danger)]">
+                <p key={item.index} className="mt-2 text-xs text-danger">
                   Row {item.index + 2}: {item.issues.join('; ')}
                 </p>
               ))}
             </div>
           ) : null}
 
-          <button
-            className="button-primary w-fit"
+          <Button
+            variant="primary"
+            size="sm"
+            className="w-fit"
             onClick={() => {
               const built = buildRows(preview);
               setValidation(built);
@@ -143,7 +160,7 @@ export function CsvImportCard({ mapping, categories, onImport }) {
             }}
           >
             Import valid rows
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

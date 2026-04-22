@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormField, Input, Select, Button } from '../ui';
 
 const defaultValue = {
   ticker: '',
@@ -13,13 +14,20 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
-    averageBuyPriceCents: initialValue?.averageBuyPriceCents ? `${initialValue.averageBuyPriceCents / 100}` : '',
-    currentPriceCents: initialValue?.currentPriceCents ? `${initialValue.currentPriceCents / 100}` : '',
+    averageBuyPriceCents: initialValue?.averageBuyPriceCents
+      ? `${initialValue.averageBuyPriceCents / 100}`
+      : '',
+    currentPriceCents: initialValue?.currentPriceCents
+      ? `${initialValue.currentPriceCents / 100}`
+      : '',
   });
+
+  const set = (key) => (event) =>
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
   return (
     <form
-      className="grid gap-4 md:grid-cols-2"
+      className="grid gap-5 md:grid-cols-2"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit({
@@ -31,73 +39,85 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         });
       }}
     >
-      <div className="md:col-span-2 text-lg font-semibold">{initialValue ? 'Edit holding' : 'Add holding'}</div>
-      <div className="field">
-        <label htmlFor="holding-ticker">Ticker</label>
-        <input
-          id="holding-ticker"
-          value={form.ticker}
-          onChange={(event) => setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="holding-name">Name</label>
-        <input
-          id="holding-name"
-          value={form.name}
-          onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="holding-platform">Platform</label>
-        <select
-          id="holding-platform"
-          value={form.platform}
-          onChange={(event) => setForm((prev) => ({ ...prev, platform: event.target.value }))}
-        >
-          <option value="Trade Republic">Trade Republic</option>
-          <option value="IBKR">IBKR</option>
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="holding-quantity">Quantity</label>
-        <input
-          id="holding-quantity"
-          type="number"
-          step="0.0001"
-          value={form.quantity}
-          onChange={(event) => setForm((prev) => ({ ...prev, quantity: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="holding-buy">Average buy price</label>
-        <input
-          id="holding-buy"
-          type="number"
-          step="0.01"
-          value={form.averageBuyPriceCents}
-          onChange={(event) => setForm((prev) => ({ ...prev, averageBuyPriceCents: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="holding-current">Current price</label>
-        <input
-          id="holding-current"
-          type="number"
-          step="0.01"
-          value={form.currentPriceCents}
-          onChange={(event) => setForm((prev) => ({ ...prev, currentPriceCents: event.target.value }))}
-        />
-      </div>
-      <div className="md:col-span-2 flex justify-end gap-2">
+      <FormField label="Ticker" htmlFor="holding-ticker" required>
+        {(props) => (
+          <Input
+            {...props}
+            value={form.ticker}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
+            }
+            placeholder="VWCE"
+            className="font-mono"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Name" htmlFor="holding-name">
+        {(props) => (
+          <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
+        )}
+      </FormField>
+
+      <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
+        {(props) => (
+          <Select {...props} value={form.platform} onChange={set('platform')}>
+            <option value="Trade Republic">Trade Republic</option>
+            <option value="IBKR">Interactive Brokers</option>
+            <option value="DEGIRO">DEGIRO</option>
+            <option value="Other">Other</option>
+          </Select>
+        )}
+      </FormField>
+
+      <FormField label="Quantity" htmlFor="holding-quantity" required>
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            step="0.0001"
+            value={form.quantity}
+            onChange={set('quantity')}
+            placeholder="0"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Average buy price" htmlFor="holding-buy" required>
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            step="0.01"
+            value={form.averageBuyPriceCents}
+            onChange={set('averageBuyPriceCents')}
+            placeholder="0.00"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Current price" htmlFor="holding-current" hint="Refreshed via Yahoo Finance" className="md:col-span-2">
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            step="0.01"
+            value={form.currentPriceCents}
+            onChange={set('currentPriceCents')}
+            placeholder="0.00"
+          />
+        )}
+      </FormField>
+
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         {onCancel ? (
-          <button type="button" className="button-secondary" onClick={onCancel}>
+          <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         ) : null}
-        <button type="submit" className="button-primary">
-          Save holding
-        </button>
+        <Button type="submit" variant="primary">
+          {initialValue ? 'Save changes' : 'Add holding'}
+        </Button>
       </div>
     </form>
   );

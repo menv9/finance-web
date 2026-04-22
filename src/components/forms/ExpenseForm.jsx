@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
+import { FormField, Input, Select, Textarea, Checkbox, Button } from '../ui';
 
 const initialState = {
   date: normalizeDateInput(new Date()),
@@ -18,11 +19,12 @@ export function ExpenseForm({ categories, initialValue, onSubmit, onCancel }) {
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
 
-  const title = useMemo(() => (initialValue ? 'Edit expense' : 'Add expense'), [initialValue]);
+  const set = (key) => (event) =>
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
   return (
     <form
-      className="grid gap-4 md:grid-cols-2"
+      className="grid gap-5 md:grid-cols-2"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit({
@@ -32,88 +34,89 @@ export function ExpenseForm({ categories, initialValue, onSubmit, onCancel }) {
         });
       }}
     >
-      <div className="md:col-span-2">
-        <h3 className="text-lg font-semibold">{title}</h3>
-      </div>
-      <div className="field">
-        <label htmlFor="expense-date">Date</label>
-        <input
-          id="expense-date"
-          type="date"
-          value={form.date}
-          onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="expense-amount">Amount</label>
-        <input
-          id="expense-amount"
-          type="number"
-          step="0.01"
-          value={form.amountCents}
-          onChange={(event) => setForm((prev) => ({ ...prev, amountCents: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="expense-category">Category</label>
-        <select
-          id="expense-category"
-          value={form.category}
-          onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-        >
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="expense-subcategory">Subcategory</label>
-        <input
-          id="expense-subcategory"
-          value={form.subcategory}
-          onChange={(event) => setForm((prev) => ({ ...prev, subcategory: event.target.value }))}
-        />
-      </div>
-      <div className="field md:col-span-2">
-        <label htmlFor="expense-description">Description</label>
-        <textarea
-          id="expense-description"
-          rows="3"
-          value={form.description}
-          onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="expense-currency">Currency</label>
-        <select
-          id="expense-currency"
-          value={form.currency}
-          onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}
-        >
-          <option value="EUR">EUR</option>
-          <option value="USD">USD</option>
-          <option value="GBP">GBP</option>
-        </select>
-      </div>
-      <label className="flex items-center gap-3 rounded-[18px] bg-[var(--bg-muted)] px-4 py-3 text-sm">
-        <input
-          type="checkbox"
+      <FormField label="Date" htmlFor="expense-date">
+        {(props) => (
+          <Input {...props} type="date" value={form.date} onChange={set('date')} />
+        )}
+      </FormField>
+
+      <FormField label="Amount" htmlFor="expense-amount" required>
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            step="0.01"
+            value={form.amountCents}
+            onChange={set('amountCents')}
+            placeholder="0.00"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Category" htmlFor="expense-category">
+        {(props) => (
+          <Select {...props} value={form.category} onChange={set('category')}>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+
+      <FormField label="Subcategory" htmlFor="expense-subcategory">
+        {(props) => (
+          <Input
+            {...props}
+            value={form.subcategory}
+            onChange={set('subcategory')}
+            placeholder="Optional"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Description" htmlFor="expense-description" className="md:col-span-2">
+        {(props) => (
+          <Textarea
+            {...props}
+            rows={3}
+            value={form.description}
+            onChange={set('description')}
+            placeholder="A short note for the ledger"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Currency" htmlFor="expense-currency">
+        {(props) => (
+          <Select {...props} value={form.currency} onChange={set('currency')}>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+          </Select>
+        )}
+      </FormField>
+
+      <div className="flex items-center">
+        <Checkbox
+          label="Mark as recurring"
           checked={form.isRecurring}
-          onChange={(event) => setForm((prev) => ({ ...prev, isRecurring: event.target.checked }))}
+          onChange={(checked) =>
+            setForm((prev) => ({ ...prev, isRecurring: checked }))
+          }
         />
-        Mark as recurring
-      </label>
-      <div className="md:col-span-2 flex justify-end gap-2">
+      </div>
+
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         {onCancel ? (
-          <button type="button" className="button-secondary" onClick={onCancel}>
+          <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         ) : null}
-        <button type="submit" className="button-primary">
-          Save expense
-        </button>
+        <Button type="submit" variant="primary">
+          {initialValue ? 'Save changes' : 'Add expense'}
+        </Button>
       </div>
     </form>
   );
