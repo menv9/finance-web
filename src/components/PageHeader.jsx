@@ -1,14 +1,32 @@
-export function PageHeader({ eyebrow, title, description, actions }) {
+export function PageHeader({ eyebrow, title, description, actions, number }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        {eyebrow ? (
-          <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">{eyebrow}</p>
+    <header className="mb-10 grid gap-6 border-b border-rule pb-8 lg:grid-cols-12 lg:gap-8">
+      <div className="lg:col-span-8 flex gap-4 lg:gap-6">
+        {number ? (
+          <span
+            aria-hidden
+            className="numeric text-xs text-ink-faint pt-2 tracking-widest"
+          >
+            {number}
+          </span>
         ) : null}
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">{title}</h1>
-        {description ? <p className="mt-2 max-w-3xl text-[var(--text-muted)]">{description}</p> : null}
+        <div className="min-w-0 flex-1">
+          {eyebrow ? <p className="eyebrow mb-3">{eyebrow}</p> : null}
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl text-ink leading-[0.95] tracking-tight break-words">
+            {title}
+          </h1>
+          {description ? (
+            <p className="mt-4 max-w-prose text-base text-ink-muted leading-relaxed">
+              {description}
+            </p>
+          ) : null}
+        </div>
       </div>
-      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-    </div>
+      {actions ? (
+        <div className="lg:col-span-4 flex flex-wrap items-start gap-2 lg:justify-end lg:pt-2">
+          {actions}
+        </div>
+      ) : null}
+    </header>
   );
 }
