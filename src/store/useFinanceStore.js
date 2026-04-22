@@ -241,8 +241,26 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   saveEntity: async (storeName, entity) => {
+    let value = entity;
+
+    // When an expense is flagged recurring, mirror it into the Recurring bills store
+    // and keep a back-reference so repeat saves don't spawn duplicates.
+    if (storeName === 'expenses' && value.isRecurring && !value.fixedExpenseId) {
+      const chargeDay = Number((value.date || '').slice(-2)) || 1;
+      const fixed = await get().saveFixedExpense({
+        name: value.description || value.category || 'Recurring charge',
+        amountCents: value.amountCents,
+        currency: value.currency,
+        chargeDay,
+        category: value.category,
+        active: true,
+        alerts: true,
+      });
+      value = { ...value, fixedExpenseId: fixed.id };
+    }
+
     const prefix = storeName.slice(0, 3);
-    const record = ensureEntitySyncFields({ ...entity, id: entity.id || makeId(prefix) }, new Date().toISOString());
+    const record = ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }, new Date().toISOString());
     await putRecord(storeName, record);
     set((state) => {
       const nextList = upsertItem(state[storeName], record);
@@ -263,6 +281,22 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   removeEntity: async (storeName, id) => {
+    // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
+    // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
+    if (storeName === 'holdings') {
+      const holding = get().holdings.find((h) => h.id === id);
+      const cashflows = get().portfolioCashflows.filter((c) => c.holdingId === id);
+      for (const cf of cashflows) {
+        await get().removeEntity('portfolioCashflows', cf.id);
+      }
+      if (holding?.ticker) {
+        const dividends = get().dividends.filter((d) => d.ticker === holding.ticker);
+        for (const div of dividends) {
+          await get().removeDividend(div.id);
+        }
+      }
+    }
+
     await deleteRecord(storeName, id);
     set((state) => {
       const nextList = state[storeName].filter((item) => item.id !== id);

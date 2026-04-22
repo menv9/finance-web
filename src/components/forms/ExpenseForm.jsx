@@ -100,7 +100,7 @@ export function ExpenseForm({ categories, initialValue, onSubmit, onCancel }) {
 
       <div className="flex items-center">
         <Checkbox
-          label="Mark as recurring"
+          label="Also add to Recurring bills"
           checked={form.isRecurring}
           onChange={(checked) =>
             setForm((prev) => ({ ...prev, isRecurring: checked }))
