@@ -112,9 +112,8 @@ export default function DashboardPage() {
     <div ref={reportRef} className="grid grid-cols-1 gap-12">
       <PageHeader
         number="01"
-        eyebrow={`${greeting()} · ${formatLongDate()}`}
-        title="A private account of where your money stands."
-        description="A calm overview — net worth, monthly rhythm, and what's due next. Every number derived from your own ledger, nothing else."
+        eyebrow={formatLongDate()}
+        title={`${greeting()}.`}
         actions={
           <>
             <Button
