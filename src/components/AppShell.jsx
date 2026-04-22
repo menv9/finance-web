@@ -63,13 +63,28 @@ function Logo() {
   );
 }
 
+function SignOutIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 15l3-5-3-5" />
+      <path d="M16 10H7" />
+      <path d="M7 4H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+    </svg>
+  );
+}
+
 export function AppShell({ children }) {
   const theme = useFinanceStore((state) => state.settings.theme);
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
   const metrics = useFinanceStore((state) => state.derived.dashboard);
   const baseCurrency = useFinanceStore((state) => state.settings.baseCurrency);
+  const supabaseUser = useFinanceStore((state) => state.supabaseUser);
+  const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
+  const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const locale = useMemo(() => 'de-AT', []);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -134,6 +149,27 @@ export function AppShell({ children }) {
                 {formatCurrency(metrics.netWorthCents, baseCurrency, locale)}
               </span>
             </div>
+
+            {/* User pill + sign-out — only when Supabase auth is active */}
+            {supabaseConfigured && supabaseUser && (
+              <div className="hidden sm:flex items-center gap-2 border-l border-rule pl-3">
+                <span
+                  className="eyebrow text-[0.6rem] text-ink-faint max-w-[96px] truncate"
+                  title={supabaseUser.email}
+                >
+                  {userHandle}
+                </span>
+                <button
+                  type="button"
+                  onClick={signOutSupabase}
+                  aria-label="Sign out"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-faint transition-colors duration-180 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  <SignOutIcon />
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -173,11 +209,23 @@ export function AppShell({ children }) {
                   <span className="font-display text-lg">{link.label}</span>
                 </NavLink>
               ))}
-              <div className="mt-3 flex items-baseline gap-2 pt-3 border-t border-rule">
-                <span className="eyebrow text-[0.6rem]">Net worth</span>
-                <span className="numeric text-sm text-ink">
-                  {formatCurrency(metrics.netWorthCents, baseCurrency, locale)}
-                </span>
+              <div className="mt-3 flex items-center justify-between pt-3 border-t border-rule">
+                <div className="flex items-baseline gap-2">
+                  <span className="eyebrow text-[0.6rem]">Net worth</span>
+                  <span className="numeric text-sm text-ink">
+                    {formatCurrency(metrics.netWorthCents, baseCurrency, locale)}
+                  </span>
+                </div>
+                {supabaseConfigured && supabaseUser && (
+                  <button
+                    type="button"
+                    onClick={() => { setMobileOpen(false); signOutSupabase(); }}
+                    className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
+                  >
+                    <SignOutIcon />
+                    <span className="eyebrow text-[0.6rem]">Sign out</span>
+                  </button>
+                )}
               </div>
             </nav>
           </div>
