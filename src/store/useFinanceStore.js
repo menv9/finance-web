@@ -129,6 +129,27 @@ export const useFinanceStore = create((set, get) => ({
     },
   },
 
+  reloadStoreData: async () => {
+    const settings = loadSettings();
+    const syncMeta = loadSyncMeta();
+    const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
+    const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
+    set((state) => {
+      const nextState = {
+        ...state,
+        settings,
+        syncMeta,
+        expenses: normalizedRecords[0],
+        fixedExpenses: normalizedRecords[1],
+        incomes: normalizedRecords[2],
+        holdings: normalizedRecords[3],
+        dividends: normalizedRecords[4],
+        portfolioCashflows: normalizedRecords[5],
+      };
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
+  },
+
   bootstrap: async () => {
     await ensureSeedData();
     const settings = loadSettings();
@@ -538,7 +559,7 @@ export const useFinanceStore = create((set, get) => ({
         supabaseError: '',
         syncMeta: nextSyncMeta,
       });
-      await get().bootstrap();
+      await get().reloadStoreData();
     } catch (error) {
       set({ supabaseSyncStatus: 'error', supabaseError: error.message });
       throw error;
