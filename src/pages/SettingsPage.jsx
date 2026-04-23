@@ -8,7 +8,7 @@ const sections = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'categories', label: 'Categories' },
   { id: 'targets', label: 'Allocation targets' },
-  { id: 'sync', label: 'Supabase sync' },
+  { id: 'sync', label: 'Sync' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'backup', label: 'Backup' },
 ];
@@ -27,10 +27,8 @@ function SectionLink({ id, label }) {
 export default function SettingsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
-  const saveSupabaseSettings = useFinanceStore((state) => state.saveSupabaseSettings);
   const exportBackup = useFinanceStore((state) => state.exportBackup);
   const importBackup = useFinanceStore((state) => state.importBackup);
-  const sendMagicLink = useFinanceStore((state) => state.sendMagicLink);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const pushToSupabase = useFinanceStore((state) => state.pushToSupabase);
   const pullFromSupabase = useFinanceStore((state) => state.pullFromSupabase);
@@ -46,11 +44,6 @@ export default function SettingsPage() {
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
   const [targetInput, setTargetInput] = useState({ ticker: '', targetWeight: '' });
-  const [supabaseInput, setSupabaseInput] = useState({
-    url: settings.supabaseUrl || '',
-    anonKey: settings.supabaseAnonKey || '',
-    email: '',
-  });
 
   const targetColumns = [
     { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono">{r.ticker}</span> },
@@ -268,91 +261,26 @@ export default function SettingsPage() {
 
           <Card
             id="sync"
-            eyebrow="Optional"
-            title="Supabase sync"
-            description="Layer device sync and auth on top of the local-first data. All data stays in IndexedDB first."
+            eyebrow="Cloud"
+            title="Sync"
+            description="Push or pull data between this device and the cloud. Sign in from the login page."
             action={
-              <span
-                className={
-                  'inline-flex items-center gap-1.5 text-xs ' +
-                  (supabaseConfigured ? 'text-positive' : 'text-ink-faint')
-                }
-              >
-                <span
-                  aria-hidden
-                  className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseConfigured ? 'bg-positive' : 'bg-ink-faint')}
-                />
-                {supabaseConfigured ? 'Configured' : 'Local only'}
+              <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
+                <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
+                {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'Not signed in'}
               </span>
             }
             className={rise(4)}
           >
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="grid gap-4">
-                <FormField label="Project URL" htmlFor="supabase-url">
-                  <Input
-                    id="supabase-url"
-                    value={supabaseInput.url}
-                    placeholder="https://your-project.supabase.co"
-                    onChange={(e) => setSupabaseInput((p) => ({ ...p, url: e.target.value }))}
-                  />
-                </FormField>
-                <FormField label="Publishable / anon key" htmlFor="supabase-key">
-                  <Input
-                    id="supabase-key"
-                    value={supabaseInput.anonKey}
-                    placeholder="sb_publishable_..."
-                    onChange={(e) => setSupabaseInput((p) => ({ ...p, anonKey: e.target.value }))}
-                  />
-                </FormField>
-                <div>
-                  <Button
-                    onClick={() =>
-                      saveSupabaseSettings({
-                        supabaseUrl: supabaseInput.url.trim(),
-                        supabaseAnonKey: supabaseInput.anonKey.trim(),
-                      })
-                    }
-                  >
-                    Save config
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <FormField label="Magic link sign-in" htmlFor="supabase-email">
-                  <Input
-                    id="supabase-email"
-                    type="email"
-                    value={supabaseInput.email}
-                    placeholder="you@example.com"
-                    onChange={(e) => setSupabaseInput((p) => ({ ...p, email: e.target.value }))}
-                  />
-                </FormField>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    disabled={!supabaseConfigured || !supabaseInput.email}
-                    onClick={() => sendMagicLink(supabaseInput.email)}
-                  >
-                    Send link
-                  </Button>
-                  <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
-                    Sign out
-                  </Button>
-                </div>
-                <p className="text-xs text-ink-muted">
-                  {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'No authenticated session.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2 border-t border-rule pt-6">
+            <div className="flex flex-wrap gap-2">
               <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
                 Push local → cloud
               </Button>
               <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
                 Pull cloud → local
+              </Button>
+              <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
+                Sign out
               </Button>
             </div>
 
