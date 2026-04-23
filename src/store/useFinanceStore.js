@@ -28,6 +28,7 @@ import { fetchTickerPriceCents } from '../utils/yahoo';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows'];
 let authSubscription = null;
+let autoPushTimer = null;
 
 function buildDerived(state) {
   return {
@@ -263,10 +264,14 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   triggerAutoPush: () => {
-    const { supabaseUser, supabaseSyncStatus, pushToSupabase } = get();
-    if (!supabaseUser) return;
-    if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-    pushToSupabase().catch(() => {});
+    if (autoPushTimer) clearTimeout(autoPushTimer);
+    autoPushTimer = setTimeout(() => {
+      autoPushTimer = null;
+      const { supabaseUser, supabaseSyncStatus, pushToSupabase } = get();
+      if (!supabaseUser) return;
+      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+      pushToSupabase().catch(() => {});
+    }, 1000);
   },
 
   saveEntity: async (storeName, entity) => {
