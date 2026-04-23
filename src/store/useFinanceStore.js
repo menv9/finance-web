@@ -559,16 +559,18 @@ export const useFinanceStore = create((set, get) => ({
         nextConflicts = removeConflict(nextConflicts, `${change.store_name}:${change.record_id}`);
       }
 
-      const latestTimestamp = changes.at(-1)?.updated_at || new Date().toISOString();
+      const latestTimestamp = changes.at(-1)?.updated_at;
       const nextSyncMeta = {
-        lastPulledAt: Object.fromEntries(STORE_KEYS.map((storeName) => [storeName, latestTimestamp])),
+        lastPulledAt: latestTimestamp
+          ? Object.fromEntries(STORE_KEYS.map((storeName) => [storeName, latestTimestamp]))
+          : state.syncMeta.lastPulledAt,
         deletedRecords: nextDeletedRecords,
         conflicts: nextConflicts,
       };
       saveSyncMeta(nextSyncMeta);
       set({
         supabaseSyncStatus: 'synced',
-        supabaseLastSyncedAt: latestTimestamp,
+        supabaseLastSyncedAt: latestTimestamp || get().supabaseLastSyncedAt,
         supabaseError: '',
         syncMeta: nextSyncMeta,
       });
