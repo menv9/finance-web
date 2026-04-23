@@ -262,6 +262,13 @@ export const useFinanceStore = create((set, get) => ({
     await get().initializeSupabase();
   },
 
+  triggerAutoPush: () => {
+    const { supabaseUser, supabaseSyncStatus, pushToSupabase } = get();
+    if (!supabaseUser) return;
+    if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+    pushToSupabase().catch(() => {});
+  },
+
   saveEntity: async (storeName, entity) => {
     let value = entity;
 
@@ -299,6 +306,7 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
+    get().triggerAutoPush();
     return record;
   },
 
@@ -339,6 +347,9 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
+  },
+
+    get().triggerAutoPush();
   },
 
   saveFixedExpense: async (entity) => get().saveEntity('fixedExpenses', entity),
@@ -389,6 +400,7 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
 
+    get().triggerAutoPush();
     return record;
   },
 
@@ -426,6 +438,7 @@ export const useFinanceStore = create((set, get) => ({
         derived: buildDerived(nextState),
       };
     });
+    get().triggerAutoPush();
   },
 
   refreshPrices: async () => {
