@@ -20,6 +20,19 @@ export default function App() {
     bootstrap();
   }, [bootstrap]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const { supabaseUser, supabaseSyncStatus, pullFromSupabase } = useFinanceStore.getState();
+      if (!supabaseUser) return;
+      if (supabaseSyncStatus === 'syncing-down' || supabaseSyncStatus === 'syncing-up') return;
+      pullFromSupabase().catch(() => {});
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   if (!hydrated) {
     return <LoadingScreen label="Loading your finance workspace..." />;
   }
