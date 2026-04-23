@@ -149,12 +149,13 @@ export const useFinanceStore = create((set, get) => ({
       holdings: normalizedRecords[3],
       dividends: normalizedRecords[4],
       portfolioCashflows: normalizedRecords[5],
-      hydrated: true,
+      hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
     };
     set({ ...nextState, derived: buildDerived(nextState) });
     await get().initializeSupabase();
+    set({ hydrated: true });
   },
 
   initializeSupabase: async () => {
