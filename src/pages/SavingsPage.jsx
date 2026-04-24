@@ -242,13 +242,43 @@ export default function SavingsPage() {
 
       {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
 
+      {/* Entries log */}
+      <Card
+        eyebrow="Log"
+        title="Savings entries"
+        description="Every time you put money aside, log it here."
+        className={rise(2)}
+        action={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add saving
+          </Button>
+        }
+      >
+        {savingsEntries.length ? (
+          <Table
+            columns={entryColumns}
+            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
+          />
+        ) : (
+          <EmptyState
+            title="No savings logged yet"
+            description="Start logging what you put aside each month."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add saving
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
       {/* Entries chart */}
       <Card
         eyebrow="History"
         title="Savings over time"
         description="Monthly totals from your logged entries."
         variant="chart"
-        className={rise(2)}
+        className={rise(3)}
         action={
           <Button variant="primary" size="sm" onClick={openNew}>
             <PlusIcon /> Add saving
@@ -272,36 +302,6 @@ export default function SavingsPage() {
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-ink-faint">No entries yet — add your first saving to see the chart.</p>
           </div>
-        )}
-      </Card>
-
-      {/* Entries log */}
-      <Card
-        eyebrow="Log"
-        title="Savings entries"
-        description="Every time you put money aside, log it here."
-        className={rise(3)}
-        action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add saving
-          </Button>
-        }
-      >
-        {savingsEntries.length ? (
-          <Table
-            columns={entryColumns}
-            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
-          />
-        ) : (
-          <EmptyState
-            title="No savings logged yet"
-            description="Start logging what you put aside each month."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add saving
-              </Button>
-            }
-          />
         )}
       </Card>
 

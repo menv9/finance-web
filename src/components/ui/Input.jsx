@@ -3,7 +3,7 @@ import { cn } from './cn';
 
 const baseField =
   'block w-full rounded-md border border-rule-strong bg-surface-raised text-ink placeholder:text-ink-faint ' +
-  'px-3 py-2.5 text-sm transition-colors duration-180 ' +
+  'px-3 py-2.5 text-base sm:text-sm transition-colors duration-180 ' +
   'hover:border-ink-faint ' +
   'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 ' +
   'disabled:cursor-not-allowed disabled:opacity-60 ' +

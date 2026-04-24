@@ -138,29 +138,43 @@ export function computeXIRR(cashflows, endingValueCents) {
   return null;
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, savingsConfig, savingsEntries }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
-  const currentMonthIncomes = incomes.filter((item) => monthKey(item.date) === currentMonth);
+  const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth);
 
-  const fixedMonthlyCents = (fixedExpenses || [])
-    .filter((f) => f.active)
-    .reduce((sum, f) => sum + (f.amountCents || 0), 0);
-  const totalExpensesCents = sumAmount(currentMonthExpenses) + fixedMonthlyCents;
-  const totalIncomeCents = sumAmount(currentMonthIncomes);
-  const cashflowCents = totalIncomeCents - totalExpensesCents;
-  const savingsRate = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
-  const portfolio = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
+  // Fix: only count actually-logged expenses. Adding fixedMonthlyCents on top
+  // double-counts recurring bills that were already saved as expense entries.
+  const totalExpensesCents = sumAmount(currentMonthExpenses);
+  const totalIncomeCents   = sumAmount(currentMonthIncomes);
+  const cashflowCents      = totalIncomeCents - totalExpensesCents;
+  const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
+  const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
+
+  // Fix: real net worth = savings balance (starting balance + logged entries) + portfolio.
+  // The old formula (12-month cumulative cashflow + portfolio) ignored pre-existing
+  // savings and only looked back 12 months.
+  const savingsBalance =
+    (savingsConfig?.currentBalanceCents || 0) +
+    (savingsEntries || []).reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const netWorthCents = savingsBalance + portfolio.currentValueCents;
 
   const monthlyExpenses = computeExpenseSeries(expenses);
-  const monthlyIncome = computeIncomeSeries(incomes);
-  const netWorthSeries = lastTwelveMonths().map((month, index) => ({
-    month: month.label,
-    netWorthCents:
-      monthlyIncome.slice(0, index + 1).reduce((sum, item) => sum + item.amountCents, 0) -
-      monthlyExpenses.slice(0, index + 1).reduce((sum, item) => sum + item.amountCents, 0) +
-      portfolio.currentValueCents,
-  }));
+  const monthlyIncome   = computeIncomeSeries(incomes);
+
+  // Fix: build the net worth series by working BACKWARDS from the real current
+  // net worth, subtracting each subsequent month's logged cashflow. This gives
+  // a coherent historical view rather than adding a static portfolio value to
+  // a rolling 12-month cashflow sum.
+  const netWorthSeries = lastTwelveMonths().map((month, index) => {
+    const subsequentCashflow =
+      monthlyIncome.slice(index + 1).reduce((sum, item) => sum + item.amountCents, 0) -
+      monthlyExpenses.slice(index + 1).reduce((sum, item) => sum + item.amountCents, 0);
+    return {
+      month: month.label,
+      netWorthCents: netWorthCents - subsequentCashflow,
+    };
+  });
 
   const cashflowSeries = monthlyIncome.map((incomePoint, index) => ({
     month: incomePoint.month,
@@ -191,7 +205,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   ];
 
   return {
-    netWorthCents: cashflowSeries.reduce((sum, point) => sum + point.incomeCents - point.expenseCents, 0) + portfolio.currentValueCents,
+    netWorthCents,
     cashflowCents,
     savingsRate,
     portfolioPnlMonthCents: portfolio.pnlCents,
