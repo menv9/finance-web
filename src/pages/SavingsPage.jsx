@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
+import { TransferForm } from '../components/forms/TransferForm';
 import {
   Area,
   AreaChart,
@@ -17,7 +19,7 @@ import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { monthKey } from '../utils/dates';
-import { Card, Button, Stat, FormField, Input, Modal, EmptyState, Table } from '../components/ui';
+import { Card, Button, Stat, FormField, Input, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ export default function SavingsPage() {
   const saveSavingsConfig  = useFinanceStore((state) => state.saveSavingsConfig);
   const saveSavingsEntry   = useFinanceStore((state) => state.saveSavingsEntry);
   const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
+  const executeTransfer    = useFinanceStore((state) => state.executeTransfer);
   const settings           = useFinanceStore((state) => state.settings);
 
   const confirm = useConfirm();
@@ -110,6 +113,7 @@ export default function SavingsPage() {
   const openEdit = (id) => setModal({ open: true, id });
   const close    = () => setModal({ open: false, id: null });
   const editingEntry = savingsEntries.find((e) => e.id === modal.id);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   // ── Derived values ──
   const currentBalanceCents  = savingsConfig.currentBalanceCents  || 0;
@@ -164,12 +168,32 @@ export default function SavingsPage() {
   // ── Table columns ──
   const entryColumns = [
     { key: 'date', header: 'Date', width: 110 },
+    {
+      key: 'type',
+      header: 'Type',
+      width: 90,
+      render: (r) =>
+        r.amountCents < 0 ? (
+          <span className="inline-flex items-center rounded-sm bg-danger-soft border border-danger/20 px-2 py-0.5 text-xs text-danger">
+            Withdrawal
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-sm bg-surface-sunken border border-rule px-2 py-0.5 text-xs text-ink-muted">
+            Deposit
+          </span>
+        ),
+    },
     { key: 'note', header: 'Note', render: (r) => r.note || <span className="text-ink-faint">—</span> },
     {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
-      render: (r) => formatCurrency(r.amountCents, currency, locale),
+      render: (r) => (
+        <span className={r.amountCents < 0 ? 'text-danger font-mono tabular' : 'font-mono tabular'}>
+          {r.amountCents < 0 ? '−' : '+'}
+          {formatCurrency(Math.abs(r.amountCents), currency, locale).replace(/^[−-]/, '')}
+        </span>
+      ),
     },
     {
       key: 'actions',
@@ -177,11 +201,17 @@ export default function SavingsPage() {
       align: 'right',
       render: (r) => (
         <div className="flex justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
-              removeSavingsEntry(r.id);
-          }}>Delete</Button>
+          {!r.transferId && (
+            <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
+          )}
+          {r.transferId ? (
+            <span className="text-xs text-ink-faint px-2 py-1">via transfer</span>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={async () => {
+              if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
+                removeSavingsEntry(r.id);
+            }}>Delete</Button>
+          )}
         </div>
       ),
     },
@@ -195,9 +225,14 @@ export default function SavingsPage() {
         title="Savings"
         description="Log what you put aside and project how your money grows over time."
         actions={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add saving
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
+              Transfer
+            </Button>
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add saving
+            </Button>
+          </>
         }
       />
 
@@ -464,7 +499,7 @@ export default function SavingsPage() {
         </Card>
       )}
 
-      {/* Modal */}
+      {/* Entry modal */}
       <Modal
         open={modal.open}
         onClose={close}
@@ -480,6 +515,25 @@ export default function SavingsPage() {
             close();
           }}
           onCancel={close}
+        />
+      </Modal>
+
+      {/* Transfer modal */}
+      <Modal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        eyebrow="Money movement"
+        title="New transfer from savings"
+        description="Pay an expense from savings or move money to your portfolio."
+        size="md"
+      >
+        <TransferForm
+          defaultFromModule="savings"
+          onSubmit={async (spec) => {
+            await executeTransfer(spec);
+            setTransferOpen(false);
+          }}
+          onCancel={() => setTransferOpen(false)}
         />
       </Modal>
     </div>

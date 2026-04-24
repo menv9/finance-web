@@ -138,7 +138,7 @@ export function computeXIRR(cashflows, endingValueCents) {
   return null;
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, savingsConfig, savingsEntries }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, savingsConfig, savingsEntries, transfers = [] }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
   const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth);
@@ -204,6 +204,15 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
       .filter((event) => isWithinInterval(event.dueDate, { start: new Date(), end: new Date(Date.now() + 7 * 86400000) })),
   ];
 
+  // Income distribution this month (transfers from income → savings/portfolio)
+  const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth));
+  const distributedToSavingsCents = thisMonthTransfers
+    .filter((t) => t.fromModule === 'income' && t.toModule === 'savings')
+    .reduce((s, t) => s + t.amountCents, 0);
+  const distributedToPortfolioCents = thisMonthTransfers
+    .filter((t) => t.fromModule === 'income' && t.toModule === 'portfolio')
+    .reduce((s, t) => s + t.amountCents, 0);
+
   return {
     netWorthCents,
     cashflowCents,
@@ -214,6 +223,9 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     netWorthSeries,
     cashflowSeries,
     upcomingEvents,
+    totalIncomeCents,
+    distributedToSavingsCents,
+    distributedToPortfolioCents,
   };
 }
 

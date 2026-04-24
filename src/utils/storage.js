@@ -1,8 +1,8 @@
 import { DEFAULT_DATA, DEFAULT_SETTINGS } from '../data/defaults';
 
 const DB_NAME = 'personal-finance-tracker';
-const DB_VERSION = 4;
-const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers'];
+const DB_VERSION = 5;
+const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers'];
 const SETTINGS_KEY = 'pft-settings';
 const SYNC_META_KEY = 'pft-sync-meta';
 

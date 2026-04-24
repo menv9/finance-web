@@ -26,7 +26,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPriceCents } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers'];
 let authSubscription = null;
 let autoPushTimer = null;
 let focusHandler = null;
@@ -130,6 +130,7 @@ export const useFinanceStore = create((set, get) => ({
   savingsEntries: [],
   budgets: [],
   rollovers: [],
+  transfers: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -175,6 +176,7 @@ export const useFinanceStore = create((set, get) => ({
         savingsEntries: normalizedRecords[7],
         budgets: normalizedRecords[8],
         rollovers: normalizedRecords[9],
+        transfers: normalizedRecords[10],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -204,6 +206,7 @@ export const useFinanceStore = create((set, get) => ({
       savingsEntries: normalizedRecords[7],
       budgets: normalizedRecords[8],
       rollovers: normalizedRecords[9],
+      transfers: normalizedRecords[10],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -534,6 +537,152 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
     get().triggerAutoPush();
+  },
+
+  executeTransfer: async (spec) => {
+    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker } = spec;
+    const timestamp = new Date().toISOString();
+    const currency = get().settings.baseCurrency;
+    const trfId = `trf-${crypto.randomUUID()}`;
+    const toPut = []; // { storeName, record }
+
+    let linkedSavingsEntryId = null;
+    let linkedExpenseId = null;
+    let linkedCashflowId = null;
+
+    // Source side — what leaves
+    if (fromModule === 'savings') {
+      const entry = ensureEntitySyncFields({
+        id: `sav-${crypto.randomUUID()}`,
+        date,
+        amountCents: -Math.abs(amountCents),
+        note: description || 'Transfer out',
+        transferId: trfId,
+      }, timestamp);
+      toPut.push({ storeName: 'savingsEntries', record: entry });
+      linkedSavingsEntryId = entry.id;
+    }
+
+    // Destination side — what arrives
+    if (toModule === 'expenses') {
+      const expense = ensureEntitySyncFields({
+        id: `exp-${crypto.randomUUID()}`,
+        date,
+        amountCents: Math.abs(amountCents),
+        currency,
+        category: category || 'Otros',
+        description: description || 'Transfer expense',
+        isRecurring: false,
+        transferId: trfId,
+      }, timestamp);
+      toPut.push({ storeName: 'expenses', record: expense });
+      linkedExpenseId = expense.id;
+    } else if (toModule === 'portfolio') {
+      const cashflow = ensureEntitySyncFields({
+        id: `pcf-${crypto.randomUUID()}`,
+        date,
+        amountCents: -Math.abs(amountCents), // negative = capital deposit
+        ticker: ticker || null,
+        holdingId: null,
+        kind: 'transfer_in',
+        transferId: trfId,
+      }, timestamp);
+      toPut.push({ storeName: 'portfolioCashflows', record: cashflow });
+      linkedCashflowId = cashflow.id;
+    } else if (toModule === 'savings') {
+      const entry = ensureEntitySyncFields({
+        id: `sav-${crypto.randomUUID()}`,
+        date,
+        amountCents: Math.abs(amountCents),
+        note: description || 'Transfer in',
+        transferId: trfId,
+      }, timestamp);
+      toPut.push({ storeName: 'savingsEntries', record: entry });
+      linkedSavingsEntryId = entry.id;
+    }
+
+    const trf = ensureEntitySyncFields({
+      id: trfId,
+      date,
+      amountCents: Math.abs(amountCents),
+      fromModule,
+      fromId: fromId || null,
+      toModule,
+      description: description || '',
+      category: category || null,
+      ticker: ticker || null,
+      linkedSavingsEntryId,
+      linkedExpenseId,
+      linkedCashflowId,
+    }, timestamp);
+    toPut.push({ storeName: 'transfers', record: trf });
+
+    await Promise.all(toPut.map(({ storeName, record }) => putRecord(storeName, record)));
+
+    set((state) => {
+      let nextState = { ...state };
+      for (const { storeName, record } of toPut) {
+        nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], record) };
+      }
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
+
+    get().triggerAutoPush();
+    return trf;
+  },
+
+  removeTransfer: async (id) => {
+    const trf = get().transfers.find((t) => t.id === id);
+    if (!trf) return;
+    const timestamp = new Date().toISOString();
+
+    const toDelete = [];
+    if (trf.linkedSavingsEntryId) toDelete.push({ storeName: 'savingsEntries', id: trf.linkedSavingsEntryId });
+    if (trf.linkedExpenseId) toDelete.push({ storeName: 'expenses', id: trf.linkedExpenseId });
+    if (trf.linkedCashflowId) toDelete.push({ storeName: 'portfolioCashflows', id: trf.linkedCashflowId });
+    toDelete.push({ storeName: 'transfers', id });
+
+    await Promise.all(toDelete.map(({ storeName, id: recId }) => deleteRecord(storeName, recId)));
+
+    set((state) => {
+      let nextState = { ...state };
+      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
+      for (const { storeName, id: recId } of toDelete) {
+        nextState = {
+          ...nextState,
+          [storeName]: storeName === 'savings'
+            ? nextState[storeName]
+            : (nextState[storeName] || []).filter((item) => item.id !== recId),
+        };
+        nextDeletedRecords[storeName] = [
+          ...(nextDeletedRecords[storeName] || []).filter((item) => item.id !== recId),
+          { id: recId, updatedAt: timestamp, deletedAt: timestamp },
+        ];
+      }
+      const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
+      saveSyncMeta(nextSyncMeta);
+      return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    });
+
+    get().triggerAutoPush();
+  },
+
+  distributeIncome: async (incomeId, confirmedAllocations) => {
+    const income = get().incomes.find((i) => i.id === incomeId);
+    if (!income) return [];
+    const results = [];
+    for (const alloc of confirmedAllocations) {
+      const trf = await get().executeTransfer({
+        date: income.date,
+        amountCents: alloc.amountCents,
+        fromModule: 'income',
+        fromId: incomeId,
+        toModule: alloc.toModule,
+        description: `Income distribution — ${income.source}`,
+      });
+      results.push(trf);
+    }
+    return results;
   },
 
   refreshPrices: async () => {

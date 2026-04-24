@@ -10,7 +10,8 @@ const links = [
   { to: '/income', label: 'Income', num: '03' },
   { to: '/portfolio', label: 'Portfolio', num: '04' },
   { to: '/savings', label: 'Savings', num: '05' },
-  { to: '/settings', label: 'Settings', num: '06' },
+  { to: '/transfers', label: 'Transfers', num: '06' },
+  { to: '/settings', label: 'Settings', num: '07' },
 ];
 
 function SunIcon() {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
+import { DistributeIncomeModal } from '../components/DistributeIncomeModal';
 import {
   Bar,
   BarChart,
@@ -36,8 +37,10 @@ export default function IncomePage() {
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
+  const transfers = useFinanceStore((state) => state.transfers);
   const confirm = useConfirm();
   const [modal, setModal] = useState({ open: false, id: null });
+  const [distributeModal, setDistributeModal] = useState({ open: false, income: null });
   const currency = settings.baseCurrency;
   const locale = settings.locale;
   const editingIncome = incomes.find((income) => income.id === modal.id);
@@ -90,6 +93,9 @@ export default function IncomePage() {
       align: 'right',
       render: (r) => (
         <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setDistributeModal({ open: true, income: r })}>
+            Distribute
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
             if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
@@ -282,6 +288,12 @@ export default function IncomePage() {
           onCancel={close}
         />
       </Modal>
+
+      <DistributeIncomeModal
+        open={distributeModal.open}
+        income={distributeModal.income}
+        onClose={() => setDistributeModal({ open: false, income: null })}
+      />
     </div>
   );
 }

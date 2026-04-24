@@ -108,6 +108,12 @@ export default function DashboardPage() {
 
   const upcoming = dashboard.upcomingEvents || [];
 
+  const totalIncomeCents = dashboard.totalIncomeCents || 0;
+  const distributedToSavingsCents = dashboard.distributedToSavingsCents || 0;
+  const distributedToPortfolioCents = dashboard.distributedToPortfolioCents || 0;
+  const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
+  const hasDistribution = distributedTotalCents > 0;
+
   return (
     <div ref={reportRef} className="grid grid-cols-1 gap-12">
       <PageHeader
@@ -264,6 +270,56 @@ export default function DashboardPage() {
           <RecentActivity items={recentActivity} currency={currency} locale={locale} />
         </Card>
       </section>
+
+      {/* Income distribution — only when transfers exist this month */}
+      {hasDistribution && (
+        <Card
+          eyebrow="This month"
+          title="Income distribution"
+          description="How your income was split between savings, portfolio, and discretionary spending."
+          className={rise(5)}
+          action={
+            <Button variant="link" size="sm" asChild>
+              <Link to="/transfers">All transfers →</Link>
+            </Button>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: 'Total income', valueCents: totalIncomeCents, color: 'text-ink' },
+              { label: '→ Savings', valueCents: distributedToSavingsCents, color: 'text-accent' },
+              { label: '→ Portfolio', valueCents: distributedToPortfolioCents, color: 'text-positive' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-md border border-rule bg-surface-sunken px-4 py-3">
+                <p className="eyebrow mb-1">{item.label}</p>
+                <p className={`numeric text-lg font-medium ${item.color}`}>
+                  {formatCurrency(item.valueCents, currency, locale)}
+                </p>
+              </div>
+            ))}
+          </div>
+          {totalIncomeCents > 0 && (
+            <div className="mt-4">
+              <div className="mb-1 flex justify-between text-xs text-ink-muted">
+                <span>Distributed</span>
+                <span className="numeric">{totalIncomeCents > 0 ? ((distributedTotalCents / totalIncomeCents) * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-500"
+                  style={{ width: `${Math.min(100, (distributedTotalCents / totalIncomeCents) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-ink-muted">
+                Discretionary remaining:{' '}
+                <span className="numeric font-medium text-ink">
+                  {formatCurrency(Math.max(0, totalIncomeCents - distributedTotalCents), currency, locale)}
+                </span>
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Upcoming */}
       <Card
