@@ -16,7 +16,7 @@ export function Card({
 }) {
   const padY = density === 'compact' ? 'py-4' : 'py-6';
   const padX = density === 'compact' ? 'px-4' : 'px-6';
-  const chartBody = variant === 'chart' ? 'h-[320px]' : '';
+  const chartBody = variant === 'chart' ? 'h-[220px] sm:h-[260px] lg:h-[300px]' : '';
   const flush = variant === 'flush';
 
   return (
