@@ -352,8 +352,6 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
-  },
-
     get().triggerAutoPush();
   },
 
