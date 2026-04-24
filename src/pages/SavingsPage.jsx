@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   ReferenceLine,
   ResponsiveContainer,
@@ -64,12 +66,12 @@ function PlusIcon() {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function SavingsPage() {
-  const savingsConfig   = useFinanceStore((state) => state.savingsConfig);
-  const savingsEntries  = useFinanceStore((state) => state.savingsEntries);
-  const saveSavingsConfig = useFinanceStore((state) => state.saveSavingsConfig);
-  const saveSavingsEntry  = useFinanceStore((state) => state.saveSavingsEntry);
+  const savingsConfig      = useFinanceStore((state) => state.savingsConfig);
+  const savingsEntries     = useFinanceStore((state) => state.savingsEntries);
+  const saveSavingsConfig  = useFinanceStore((state) => state.saveSavingsConfig);
+  const saveSavingsEntry   = useFinanceStore((state) => state.saveSavingsEntry);
   const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
-  const settings = useFinanceStore((state) => state.settings);
+  const settings           = useFinanceStore((state) => state.settings);
 
   const currency = settings.baseCurrency;
   const locale   = settings.locale;
@@ -77,7 +79,7 @@ export default function SavingsPage() {
   // ── Config form state ──
   const [config, setConfig] = useState({
     currentBalance:   savingsConfig.currentBalanceCents  ? (savingsConfig.currentBalanceCents  / 100).toFixed(2) : '',
-    monthlyOverride:  savingsConfig.monthlyOverrideCents ? (savingsConfig.monthlyOverrideCents / 100).toFixed(2) : '',
+    monthlySavings:   savingsConfig.monthlyOverrideCents ? (savingsConfig.monthlyOverrideCents / 100).toFixed(2) : '',
     annualReturnRate: savingsConfig.annualReturnRate ?? 0,
     goal:             savingsConfig.goalCents            ? (savingsConfig.goalCents            / 100).toFixed(2) : '',
     projectionYears:  savingsConfig.projectionYears ?? 30,
@@ -91,10 +93,10 @@ export default function SavingsPage() {
 
   const saveConfig = async () => {
     await saveSavingsConfig({
-      currentBalanceCents:  Math.round(parseFloat(config.currentBalance   || 0) * 100),
-      monthlyOverrideCents: Math.round(parseFloat(config.monthlyOverride  || 0) * 100),
+      currentBalanceCents:  Math.round(parseFloat(config.currentBalance  || 0) * 100),
+      monthlyOverrideCents: Math.round(parseFloat(config.monthlySavings  || 0) * 100),
       annualReturnRate:     parseFloat(config.annualReturnRate || 0),
-      goalCents:            Math.round(parseFloat(config.goal             || 0) * 100),
+      goalCents:            Math.round(parseFloat(config.goal            || 0) * 100),
       projectionYears:      Number(config.projectionYears),
     });
     setConfigDirty(false);
@@ -109,7 +111,7 @@ export default function SavingsPage() {
 
   // ── Derived values ──
   const currentBalanceCents  = savingsConfig.currentBalanceCents  || 0;
-  const monthlyOverrideCents = savingsConfig.monthlyOverrideCents || 0;
+  const monthlySavingsCents  = savingsConfig.monthlyOverrideCents || 0;
   const annualReturnRate     = savingsConfig.annualReturnRate ?? 0;
   const goalCents            = savingsConfig.goalCents || 0;
   const projectionYears      = Number(config.projectionYears) || 30;
@@ -129,24 +131,38 @@ export default function SavingsPage() {
     [savingsEntries, thisMonthKey],
   );
 
-  const realAvgCents    = useMemo(() => computeMonthlyAvg(savingsEntries), [savingsEntries]);
-  // Only use a monthly contribution in the projection if the user explicitly set one.
-  // Logged entries are historical records, not a commitment to save that amount every month.
-  const monthlyForProjection = monthlyOverrideCents > 0 ? monthlyOverrideCents : 0;
+  const realAvgCents = useMemo(() => computeMonthlyAvg(savingsEntries), [savingsEntries]);
 
+  // Monthly entries chart data — grouped by month
+  const monthlyChartData = useMemo(() => {
+    const map = {};
+    savingsEntries.forEach((e) => {
+      const key = monthKey(e.date);
+      map[key] = (map[key] || 0) + e.amountCents;
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, amountCents]) => ({
+        month,
+        label: new Date(month + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+        amountCents,
+      }));
+  }, [savingsEntries, locale]);
+
+  // Projection uses only explicitly set monthly savings — entries are historical records
   const projection = useMemo(
-    () => projectSavings(totalSavedCents, monthlyForProjection, annualReturnRate, projectionYears),
-    [totalSavedCents, monthlyForProjection, annualReturnRate, projectionYears],
+    () => projectSavings(totalSavedCents, monthlySavingsCents, annualReturnRate, projectionYears),
+    [totalSavedCents, monthlySavingsCents, annualReturnRate, projectionYears],
   );
 
-  const projectionEnd  = projection.at(-1)?.valueCents ?? 0;
-  const goalYear       = yearsToGoal(projection, goalCents);
-  const goalProgress   = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
+  const projectionEnd = projection.at(-1)?.valueCents ?? 0;
+  const goalYear      = yearsToGoal(projection, goalCents);
+  const goalProgress  = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
 
   // ── Table columns ──
   const entryColumns = [
-    { key: 'date',   header: 'Date',   width: 110 },
-    { key: 'note',   header: 'Note',   render: (r) => r.note || <span className="text-ink-faint">—</span> },
+    { key: 'date', header: 'Date', width: 110 },
+    { key: 'note', header: 'Note', render: (r) => r.note || <span className="text-ink-faint">—</span> },
     {
       key: 'amountCents',
       header: 'Amount',
@@ -172,7 +188,7 @@ export default function SavingsPage() {
         number="05"
         eyebrow="Module"
         title="Savings"
-        description="Log what you put aside, track your balance, and project how your money grows over time."
+        description="Log what you put aside and project how your money grows over time."
         actions={
           <Button variant="primary" size="sm" onClick={openNew}>
             <PlusIcon /> Add saving
@@ -205,11 +221,11 @@ export default function SavingsPage() {
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
           <Stat
             label="Monthly avg"
-            value={monthlyOverrideCents > 0 ? monthlyOverrideCents : realAvgCents}
+            value={realAvgCents}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={monthlyOverrideCents > 0 ? 'used in projection' : 'based on your log — set override to use in projection'}
+            hint="avg per month from your log"
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(4)}>
@@ -219,17 +235,84 @@ export default function SavingsPage() {
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={annualReturnRate > 0 ? `at ${annualReturnRate}% interest` : 'no interest applied'}
+            hint={annualReturnRate > 0 ? `at ${annualReturnRate}% p.a.` : 'set up projection below'}
           />
         </div>
       </section>
 
-      {/* Config */}
+      {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
+
+      {/* Entries chart */}
       <Card
-        eyebrow="Configuration"
-        title="Savings setup"
-        description="Set your starting balance, interest rate, goal, and optionally override the monthly amount used in projections."
+        eyebrow="History"
+        title="Savings over time"
+        description="Monthly totals from your logged entries."
+        variant="chart"
+        className={rise(2)}
+        action={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add saving
+          </Button>
+        }
+      >
+        {monthlyChartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <YAxis
+                tickFormatter={(v) => formatCurrency(v, currency, locale)}
+                tickLine={false} axisLine={false} width={90}
+              />
+              <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
+              <Bar dataKey="amountCents" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-ink-faint">No entries yet — add your first saving to see the chart.</p>
+          </div>
+        )}
+      </Card>
+
+      {/* Entries log */}
+      <Card
+        eyebrow="Log"
+        title="Savings entries"
+        description="Every time you put money aside, log it here."
         className={rise(3)}
+        action={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add saving
+          </Button>
+        }
+      >
+        {savingsEntries.length ? (
+          <Table
+            columns={entryColumns}
+            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
+          />
+        ) : (
+          <EmptyState
+            title="No savings logged yet"
+            description="Start logging what you put aside each month."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add saving
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
+      {/* ── SECTION 2: Future projection ───────────────────────────────────── */}
+
+      {/* Projection config */}
+      <Card
+        eyebrow="Projection"
+        title="Future projection setup"
+        description="Set your starting balance, how much you save each month, interest rate, and goal. Independent from your entry log."
+        className={rise(4)}
         action={
           <Button variant={configDirty ? 'primary' : 'secondary'} size="sm" onClick={saveConfig} disabled={!configDirty}>
             {configDirty ? 'Save changes' : 'Saved'}
@@ -239,11 +322,21 @@ export default function SavingsPage() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <FormField
             label={`Starting balance (${currency})`}
-            hint="What you had before using this app"
+            hint="What you currently have saved"
           >
             {({ id, ...a11y }) => (
               <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
                 value={config.currentBalance} onChange={changeConfig('currentBalance')} {...a11y} />
+            )}
+          </FormField>
+
+          <FormField
+            label={`Monthly savings (${currency})`}
+            hint="How much you plan to save each month"
+          >
+            {({ id, ...a11y }) => (
+              <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
+                value={config.monthlySavings} onChange={changeConfig('monthlySavings')} {...a11y} />
             )}
           </FormField>
 
@@ -266,16 +359,6 @@ export default function SavingsPage() {
                 value={config.goal} onChange={changeConfig('goal')} {...a11y} />
             )}
           </FormField>
-
-          <FormField
-            label={`Monthly override (${currency})`}
-            hint="Optional — leave empty to use your logged average"
-          >
-            {({ id, ...a11y }) => (
-              <Input id={id} type="number" min="0" step="0.01" numeric placeholder="use avg"
-                value={config.monthlyOverride} onChange={changeConfig('monthlyOverride')} {...a11y} />
-            )}
-          </FormField>
         </div>
       </Card>
 
@@ -284,7 +367,7 @@ export default function SavingsPage() {
         eyebrow={`${projectionYears}-year projection`}
         title="Growth over time"
         variant="chart"
-        className={rise(4)}
+        className={rise(5)}
         action={
           <div className="relative inline-flex items-center">
             <select
@@ -341,7 +424,7 @@ export default function SavingsPage() {
 
       {/* Goal progress */}
       {goalCents > 0 && (
-        <Card eyebrow="Goal" title="Progress towards target" className={rise(5)}>
+        <Card eyebrow="Goal" title="Progress towards target" className={rise(6)}>
           <div className="grid gap-5">
             <div className="flex items-baseline justify-between">
               <p className="text-sm text-ink-muted">
@@ -368,43 +451,13 @@ export default function SavingsPage() {
               ) : (
                 <span className="text-danger">
                   Your current savings rate won&apos;t reach the goal within {projectionYears} years.
-                  Try increasing your monthly contribution, interest rate, or projection period.
+                  Try increasing your monthly savings, interest rate, or projection period.
                 </span>
               )}
             </p>
           </div>
         </Card>
       )}
-
-      {/* Savings log */}
-      <Card
-        eyebrow="Log"
-        title="Savings entries"
-        description="Every time you put money aside, log it here."
-        className={rise(6)}
-        action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add saving
-          </Button>
-        }
-      >
-        {savingsEntries.length ? (
-          <Table
-            columns={entryColumns}
-            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
-          />
-        ) : (
-          <EmptyState
-            title="No savings logged yet"
-            description="Start logging what you put aside each month."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add saving
-              </Button>
-            }
-          />
-        )}
-      </Card>
 
       {/* Modal */}
       <Modal
