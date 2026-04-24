@@ -1,0 +1,427 @@
+import { useMemo, useState } from 'react';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { PageHeader } from '../components/PageHeader';
+import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
+import { useFinanceStore } from '../store/useFinanceStore';
+import { formatCurrency } from '../utils/formatters';
+import { monthKey } from '../utils/dates';
+import { Card, Button, Stat, FormField, Input, Modal, EmptyState, Table } from '../components/ui';
+import { rise } from '../utils/motion';
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function projectSavings(startCents, monthlyContributionCents, annualReturnRate, years) {
+  const r = annualReturnRate / 100 / 12;
+  const points = [];
+  for (let y = 0; y <= years; y++) {
+    const n = y * 12;
+    const value =
+      r === 0
+        ? startCents + monthlyContributionCents * n
+        : startCents * Math.pow(1 + r, n) +
+          monthlyContributionCents * ((Math.pow(1 + r, n) - 1) / r);
+    points.push({ year: y, label: y === 0 ? 'Now' : `${y}y`, valueCents: Math.round(value) });
+  }
+  return points;
+}
+
+function computeMonthlyAvg(entries) {
+  if (!entries.length) return 0;
+  const total = entries.reduce((sum, e) => sum + e.amountCents, 0);
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const first = new Date(sorted[0].date);
+  const now = new Date();
+  const months = Math.max(
+    1,
+    (now.getFullYear() - first.getFullYear()) * 12 + (now.getMonth() - first.getMonth()) + 1,
+  );
+  return Math.round(total / months);
+}
+
+function yearsToGoal(projection, goalCents) {
+  if (!goalCents) return null;
+  const hit = projection.find((p) => p.valueCents >= goalCents);
+  return hit ? hit.year : null;
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
+      <path d="M6 1v10M1 6h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
+export default function SavingsPage() {
+  const savingsConfig   = useFinanceStore((state) => state.savingsConfig);
+  const savingsEntries  = useFinanceStore((state) => state.savingsEntries);
+  const saveSavingsConfig = useFinanceStore((state) => state.saveSavingsConfig);
+  const saveSavingsEntry  = useFinanceStore((state) => state.saveSavingsEntry);
+  const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
+  const settings = useFinanceStore((state) => state.settings);
+
+  const currency = settings.baseCurrency;
+  const locale   = settings.locale;
+
+  // ── Config form state ──
+  const [config, setConfig] = useState({
+    currentBalance:   savingsConfig.currentBalanceCents  ? (savingsConfig.currentBalanceCents  / 100).toFixed(2) : '',
+    monthlyOverride:  savingsConfig.monthlyOverrideCents ? (savingsConfig.monthlyOverrideCents / 100).toFixed(2) : '',
+    annualReturnRate: savingsConfig.annualReturnRate ?? 0,
+    goal:             savingsConfig.goalCents            ? (savingsConfig.goalCents            / 100).toFixed(2) : '',
+    projectionYears:  savingsConfig.projectionYears ?? 30,
+  });
+  const [configDirty, setConfigDirty] = useState(false);
+
+  const changeConfig = (field) => (e) => {
+    setConfig((f) => ({ ...f, [field]: e.target.value }));
+    setConfigDirty(true);
+  };
+
+  const saveConfig = async () => {
+    await saveSavingsConfig({
+      currentBalanceCents:  Math.round(parseFloat(config.currentBalance   || 0) * 100),
+      monthlyOverrideCents: Math.round(parseFloat(config.monthlyOverride  || 0) * 100),
+      annualReturnRate:     parseFloat(config.annualReturnRate || 0),
+      goalCents:            Math.round(parseFloat(config.goal             || 0) * 100),
+      projectionYears:      Number(config.projectionYears),
+    });
+    setConfigDirty(false);
+  };
+
+  // ── Modal state ──
+  const [modal, setModal] = useState({ open: false, id: null });
+  const openNew  = () => setModal({ open: true,  id: null });
+  const openEdit = (id) => setModal({ open: true, id });
+  const close    = () => setModal({ open: false, id: null });
+  const editingEntry = savingsEntries.find((e) => e.id === modal.id);
+
+  // ── Derived values ──
+  const currentBalanceCents  = savingsConfig.currentBalanceCents  || 0;
+  const monthlyOverrideCents = savingsConfig.monthlyOverrideCents || 0;
+  const annualReturnRate     = savingsConfig.annualReturnRate ?? 0;
+  const goalCents            = savingsConfig.goalCents || 0;
+  const projectionYears      = Number(config.projectionYears) || 30;
+  const xAxisInterval        = projectionYears <= 10 ? 0 : projectionYears <= 20 ? 1 : 4;
+
+  const totalEntriesCents = useMemo(
+    () => savingsEntries.reduce((sum, e) => sum + e.amountCents, 0),
+    [savingsEntries],
+  );
+  const totalSavedCents = currentBalanceCents + totalEntriesCents;
+
+  const thisMonthKey = monthKey(new Date());
+  const savedThisMonthCents = useMemo(
+    () => savingsEntries
+      .filter((e) => monthKey(e.date) === thisMonthKey)
+      .reduce((sum, e) => sum + e.amountCents, 0),
+    [savingsEntries, thisMonthKey],
+  );
+
+  const realAvgCents    = useMemo(() => computeMonthlyAvg(savingsEntries), [savingsEntries]);
+  const monthlyForProjection = monthlyOverrideCents > 0 ? monthlyOverrideCents : realAvgCents;
+
+  const projection = useMemo(
+    () => projectSavings(totalSavedCents, monthlyForProjection, annualReturnRate, projectionYears),
+    [totalSavedCents, monthlyForProjection, annualReturnRate, projectionYears],
+  );
+
+  const projectionEnd  = projection.at(-1)?.valueCents ?? 0;
+  const goalYear       = yearsToGoal(projection, goalCents);
+  const goalProgress   = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
+
+  // ── Table columns ──
+  const entryColumns = [
+    { key: 'date',   header: 'Date',   width: 110 },
+    { key: 'note',   header: 'Note',   render: (r) => r.note || <span className="text-ink-faint">—</span> },
+    {
+      key: 'amountCents',
+      header: 'Amount',
+      numeric: true,
+      render: (r) => formatCurrency(r.amountCents, currency, locale),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (r) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => removeSavingsEntry(r.id)}>Delete</Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-12">
+      <PageHeader
+        number="05"
+        eyebrow="Module"
+        title="Savings"
+        description="Log what you put aside, track your balance, and project how your money grows over time."
+        actions={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add saving
+          </Button>
+        }
+      />
+
+      {/* KPIs */}
+      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
+        <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
+          <Stat
+            label="Total saved"
+            value={totalSavedCents}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint="starting balance + logged entries"
+          />
+        </div>
+        <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
+          <Stat
+            label="This month"
+            value={savedThisMonthCents}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint="saved so far this month"
+          />
+        </div>
+        <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
+          <Stat
+            label="Monthly avg"
+            value={monthlyOverrideCents > 0 ? monthlyOverrideCents : realAvgCents}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint={monthlyOverrideCents > 0 ? 'manual override active' : 'based on your log'}
+          />
+        </div>
+        <div className={'min-w-0 bg-surface p-6 ' + rise(4)}>
+          <Stat
+            label={`In ${projectionYears} years`}
+            value={projectionEnd}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint={annualReturnRate > 0 ? `at ${annualReturnRate}% interest` : 'no interest applied'}
+          />
+        </div>
+      </section>
+
+      {/* Config */}
+      <Card
+        eyebrow="Configuration"
+        title="Savings setup"
+        description="Set your starting balance, interest rate, goal, and optionally override the monthly amount used in projections."
+        className={rise(3)}
+        action={
+          <Button variant={configDirty ? 'primary' : 'secondary'} size="sm" onClick={saveConfig} disabled={!configDirty}>
+            {configDirty ? 'Save changes' : 'Saved'}
+          </Button>
+        }
+      >
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <FormField
+            label={`Starting balance (${currency})`}
+            hint="What you had before using this app"
+          >
+            {({ id, ...a11y }) => (
+              <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
+                value={config.currentBalance} onChange={changeConfig('currentBalance')} {...a11y} />
+            )}
+          </FormField>
+
+          <FormField
+            label="Interest rate (%)"
+            hint="0 for cash savings, or your account's rate"
+          >
+            {({ id, ...a11y }) => (
+              <Input id={id} type="number" min="0" max="100" step="0.1" numeric placeholder="0"
+                value={config.annualReturnRate} onChange={changeConfig('annualReturnRate')} {...a11y} />
+            )}
+          </FormField>
+
+          <FormField
+            label={`Savings goal (${currency})`}
+            hint="Optional target amount"
+          >
+            {({ id, ...a11y }) => (
+              <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
+                value={config.goal} onChange={changeConfig('goal')} {...a11y} />
+            )}
+          </FormField>
+
+          <FormField
+            label={`Monthly override (${currency})`}
+            hint="Optional — leave empty to use your logged average"
+          >
+            {({ id, ...a11y }) => (
+              <Input id={id} type="number" min="0" step="0.01" numeric placeholder="use avg"
+                value={config.monthlyOverride} onChange={changeConfig('monthlyOverride')} {...a11y} />
+            )}
+          </FormField>
+        </div>
+      </Card>
+
+      {/* Projection chart */}
+      <Card
+        eyebrow={`${projectionYears}-year projection`}
+        title="Growth over time"
+        variant="chart"
+        className={rise(4)}
+        action={
+          <div className="relative inline-flex items-center">
+            <select
+              value={config.projectionYears}
+              onChange={changeConfig('projectionYears')}
+              aria-label="Projection period"
+              className="appearance-none cursor-pointer rounded-md border border-rule-strong bg-surface-raised pl-3 pr-7 h-8 text-xs text-ink-muted hover:text-ink hover:border-ink-faint transition-colors duration-180 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent font-sans"
+            >
+              {[5, 10, 15, 20, 25, 30, 40, 50].map((y) => (
+                <option key={y} value={y}>{y} years</option>
+              ))}
+            </select>
+            <svg aria-hidden viewBox="0 0 12 12" className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-ink-faint">
+              <path d="M2 4.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        }
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={projection} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor="var(--accent)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 4" vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} interval={xAxisInterval} />
+            <YAxis
+              tickFormatter={(v) => formatCurrency(v, currency, locale)}
+              tickLine={false} axisLine={false} width={90}
+            />
+            <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Value']} />
+            {goalCents > 0 && (
+              <ReferenceLine
+                y={goalCents}
+                stroke="var(--positive)"
+                strokeDasharray="4 4"
+                label={{ value: 'Goal', position: 'insideTopRight', fill: 'var(--positive)', fontSize: 11 }}
+              />
+            )}
+            <Area
+              type="monotone"
+              dataKey="valueCents"
+              stroke="var(--accent)"
+              strokeWidth={2}
+              fill="url(#savingsGradient)"
+              dot={false}
+              activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--accent)' }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Goal progress */}
+      {goalCents > 0 && (
+        <Card eyebrow="Goal" title="Progress towards target" className={rise(5)}>
+          <div className="grid gap-5">
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm text-ink-muted">
+                {formatCurrency(totalSavedCents, currency, locale)}{' '}
+                <span className="text-ink-faint">of</span>{' '}
+                {formatCurrency(goalCents, currency, locale)}
+              </p>
+              <p className="numeric text-sm font-medium text-ink">{goalProgress.toFixed(1)}%</p>
+            </div>
+            <div className="h-2 w-full rounded-full bg-surface-sunken overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${goalProgress}%` }}
+              />
+            </div>
+            <p className="text-sm text-ink-muted">
+              {goalYear === 0 ? (
+                <span className="text-positive font-medium">You&apos;ve already reached your goal!</span>
+              ) : goalYear !== null ? (
+                <>
+                  At your current rate you&apos;ll reach your goal in{' '}
+                  <span className="text-ink font-medium">{goalYear} year{goalYear !== 1 ? 's' : ''}</span>.
+                </>
+              ) : (
+                <span className="text-danger">
+                  Your current savings rate won&apos;t reach the goal within {projectionYears} years.
+                  Try increasing your monthly contribution, interest rate, or projection period.
+                </span>
+              )}
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Savings log */}
+      <Card
+        eyebrow="Log"
+        title="Savings entries"
+        description="Every time you put money aside, log it here."
+        className={rise(6)}
+        action={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add saving
+          </Button>
+        }
+      >
+        {savingsEntries.length ? (
+          <Table
+            columns={entryColumns}
+            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
+          />
+        ) : (
+          <EmptyState
+            title="No savings logged yet"
+            description="Start logging what you put aside each month."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add saving
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
+      {/* Modal */}
+      <Modal
+        open={modal.open}
+        onClose={close}
+        eyebrow="Savings entry"
+        title={editingEntry ? 'Edit entry' : 'Log a saving'}
+        description="Record an amount you set aside."
+      >
+        <SavingsEntryForm
+          initialValue={editingEntry}
+          currency={currency}
+          onSubmit={async (value) => {
+            await saveSavingsEntry(value);
+            close();
+          }}
+          onCancel={close}
+        />
+      </Modal>
+    </div>
+  );
+}

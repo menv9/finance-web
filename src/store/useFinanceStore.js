@@ -26,9 +26,18 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPriceCents } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries'];
 let authSubscription = null;
 let autoPushTimer = null;
+
+const SAVINGS_DEFAULT = {
+  id: 'savings-config',
+  currentBalanceCents: 0,
+  monthlyOverrideCents: 0,
+  annualReturnRate: 0,
+  goalCents: 0,
+  projectionYears: 30,
+};
 
 function buildDerived(state) {
   return {
@@ -105,6 +114,8 @@ export const useFinanceStore = create((set, get) => ({
   holdings: [],
   dividends: [],
   portfolioCashflows: [],
+  savingsConfig: SAVINGS_DEFAULT,
+  savingsEntries: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -146,6 +157,8 @@ export const useFinanceStore = create((set, get) => ({
         holdings: normalizedRecords[3],
         dividends: normalizedRecords[4],
         portfolioCashflows: normalizedRecords[5],
+        savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
+        savingsEntries: normalizedRecords[7],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -171,6 +184,8 @@ export const useFinanceStore = create((set, get) => ({
       holdings: normalizedRecords[3],
       dividends: normalizedRecords[4],
       portfolioCashflows: normalizedRecords[5],
+      savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
+      savingsEntries: normalizedRecords[7],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -250,6 +265,37 @@ export const useFinanceStore = create((set, get) => ({
     const settings = { ...get().settings, ...partial };
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
+  },
+
+  saveSavingsConfig: async (config) => {
+    const record = ensureEntitySyncFields(
+      { ...SAVINGS_DEFAULT, ...config, id: 'savings-config' },
+      new Date().toISOString(),
+    );
+    await putRecord('savings', record);
+    set({ savingsConfig: record });
+    get().triggerAutoPush();
+  },
+
+  saveSavingsEntry: async (entry) => {
+    const record = ensureEntitySyncFields(
+      { ...entry, id: entry.id || `sav-${crypto.randomUUID()}` },
+      new Date().toISOString(),
+    );
+    await putRecord('savingsEntries', record);
+    set((state) => ({
+      savingsEntries: upsertItem(state.savingsEntries, record),
+    }));
+    get().triggerAutoPush();
+    return record;
+  },
+
+  removeSavingsEntry: async (id) => {
+    await deleteRecord('savingsEntries', id);
+    set((state) => ({
+      savingsEntries: state.savingsEntries.filter((e) => e.id !== id),
+    }));
+    get().triggerAutoPush();
   },
 
   saveSupabaseSettings: async (partial) => {

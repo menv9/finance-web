@@ -80,7 +80,7 @@ export default function SettingsPage() {
   return (
     <div className="grid grid-cols-1 gap-12">
       <PageHeader
-        number="05"
+        number="06"
         eyebrow="Module"
         title="Settings"
         description="Preferences, categories, allocation targets, sync, and backup. All changes persist locally; Supabase sync is optional."

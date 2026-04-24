@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const IncomePage = lazy(() => import('./pages/IncomePage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const SavingsPage = lazy(() => import('./pages/SavingsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
@@ -55,6 +56,7 @@ export default function App() {
                   <Route path="/expenses" element={<ExpensesPage />} />
                   <Route path="/income" element={<IncomePage />} />
                   <Route path="/portfolio" element={<PortfolioPage />} />
+                  <Route path="/savings" element={<SavingsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </AppShell>
