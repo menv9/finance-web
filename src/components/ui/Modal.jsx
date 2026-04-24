@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { cn } from './cn';
 
 const sizeMap = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
-  xl: 'max-w-5xl',
+  sm: 'sm:max-w-md',
+  md: 'sm:max-w-xl',
+  lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl',
 };
 
 export function Modal({
@@ -78,7 +78,7 @@ export function Modal({
           'rounded-t-2xl sm:rounded-lg',
           'max-h-[92dvh] overflow-y-auto',
           'animate-[modalRise_220ms_cubic-bezier(0.22,0.61,0.36,1)]',
-          'sm:' + (sizeMap[size] || sizeMap.md),
+          sizeMap[size] || sizeMap.md,
         )}
       >
         {(eyebrow || title || description) && (
