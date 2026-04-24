@@ -248,7 +248,7 @@ export default function ExpensesPage() {
                 tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                 tickLine={false}
                 axisLine={false}
-                width={90}
+                width={60}
               />
               <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
               <Bar dataKey="amountCents" fill="var(--danger)" radius={[3, 3, 0, 0]} />

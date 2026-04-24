@@ -262,7 +262,7 @@ export default function SavingsPage() {
               <XAxis dataKey="label" tickLine={false} axisLine={false} />
               <YAxis
                 tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false} axisLine={false} width={90}
+                tickLine={false} axisLine={false} width={60}
               />
               <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
               <Bar dataKey="amountCents" fill="var(--accent)" radius={[4, 4, 0, 0]} />
@@ -398,7 +398,7 @@ export default function SavingsPage() {
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval={xAxisInterval} />
             <YAxis
               tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-              tickLine={false} axisLine={false} width={90}
+              tickLine={false} axisLine={false} width={60}
             />
             <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Value']} />
             {goalCents > 0 && (
