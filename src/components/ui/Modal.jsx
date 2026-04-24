@@ -23,9 +23,16 @@ export function Modal({
   const panelRef = useRef(null);
   const lastActiveRef = useRef(null);
 
+  // Keep onClose in a ref so the effect below never re-runs just because
+  // the parent re-renders and passes a new function reference (e.g. on every
+  // keystroke in a controlled input). Without this, focusTarget?.focus() fires
+  // on every letter typed, which dismisses the iOS soft keyboard.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   const handleClose = useCallback(() => {
-    onClose?.();
-  }, [onClose]);
+    onCloseRef.current?.();
+  }, []); // stable — never recreated
 
   useEffect(() => {
     if (!open) return undefined;
@@ -54,7 +61,7 @@ export function Modal({
         lastActiveRef.current.focus();
       }
     };
-  }, [open, handleClose, initialFocusRef]);
+  }, [open, handleClose, initialFocusRef]); // handleClose is now stable
 
   if (!open) return null;
 
@@ -76,7 +83,7 @@ export function Modal({
         className={cn(
           'relative w-full border border-rule bg-surface shadow-lift',
           'rounded-t-2xl sm:rounded-lg',
-          'max-h-[92dvh] overflow-y-auto',
+          'max-h-[92svh] overflow-y-auto',
           'animate-[modalRise_220ms_cubic-bezier(0.22,0.61,0.36,1)]',
           sizeMap[size] || sizeMap.md,
         )}

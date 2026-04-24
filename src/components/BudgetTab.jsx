@@ -5,6 +5,7 @@ import { normalizeDateInput } from '../utils/dates';
 import { Card, Button, FormField, Input, EmptyState, Modal } from './ui';
 import { cn } from './ui/cn';
 import { rise } from '../utils/motion';
+import { ManageCategoriesModal } from './ManageCategoriesModal';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export function BudgetTab() {
   const saveEntity = useFinanceStore((s) => s.saveEntity);
   const removeEntity = useFinanceStore((s) => s.removeEntity);
   const saveSavingsEntry = useFinanceStore((s) => s.saveSavingsEntry);
+  const updateSettings = useFinanceStore((s) => s.updateSettings);
 
   const { baseCurrency: currency, locale, categories: expenseCategories } = settings;
 
@@ -99,6 +101,7 @@ export function BudgetTab() {
   const [modal, setModal] = useState({ open: false, category: null });
   const [newCategory, setNewCategory] = useState('');
   const [budgetAmount, setBudgetAmount] = useState('');
+  const [catModalOpen, setCatModalOpen] = useState(false);
 
   const prevMonth = getPrevMonth(selectedMonth);
   const isEditing = modal.open && modal.category !== null;
@@ -181,6 +184,10 @@ export function BudgetTab() {
     if (!category) return;
     const cents = Math.round(parseFloat(budgetAmount || '0') * 100);
     if (!cents || isNaN(cents) || cents <= 0) return;
+    // Auto-add to expense categories if it doesn't exist there yet
+    if (!expenseCategories.includes(category)) {
+      updateSettings({ categories: [...expenseCategories, category] });
+    }
     const existing = budgets.find((b) => b.category === category);
     await saveEntity('budgets', {
       id: `budget-${category}`,
@@ -237,9 +244,14 @@ export function BudgetTab() {
         title="Category budgets"
         description="Your monthly limits for variable spending. These repeat automatically — no need to set them each month."
         action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add category
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
+              Manage categories
+            </Button>
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add budget
+            </Button>
+          </div>
         }
         className={rise(2)}
       >
@@ -304,6 +316,8 @@ export function BudgetTab() {
           </ul>
         </Card>
       )}
+
+      <ManageCategoriesModal open={catModalOpen} onClose={() => setCatModalOpen(false)} />
 
       {/* add / edit modal */}
       <Modal

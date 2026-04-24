@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { BudgetTab } from '../components/BudgetTab';
 import { CsvImportCard } from '../components/CsvImportCard';
+import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { PageHeader } from '../components/PageHeader';
 import { ExpenseForm } from '../components/forms/ExpenseForm';
 import { FixedExpenseForm } from '../components/forms/FixedExpenseForm';
@@ -53,6 +54,7 @@ export default function ExpensesPage() {
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('expenses');
+  const [catModalOpen, setCatModalOpen] = useState(false);
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
 
@@ -375,6 +377,15 @@ export default function ExpensesPage() {
             </Select>
           </FormField>
         </div>
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setCatModalOpen(true)}
+            className="text-xs text-accent hover:underline"
+          >
+            Manage categories
+          </button>
+        </div>
 
         {filteredExpenses.length ? (
           <Table columns={expenseColumns} rows={filteredExpenses} />
@@ -435,6 +446,8 @@ export default function ExpensesPage() {
           />
         )}
       </Card>
+
+      <ManageCategoriesModal open={catModalOpen} onClose={() => setCatModalOpen(false)} />
 
       <Modal
         open={expenseModal.open}
