@@ -60,7 +60,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10 sm:py-16"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4 sm:py-16"
       role="dialog"
       aria-modal="true"
       aria-label={title || 'Dialog'}
@@ -74,9 +74,11 @@ export function Modal({
       <div
         ref={panelRef}
         className={cn(
-          'relative w-full rounded-lg border border-rule bg-surface shadow-lift',
+          'relative w-full border border-rule bg-surface shadow-lift',
+          'rounded-t-2xl sm:rounded-lg',
+          'max-h-[92dvh] overflow-y-auto',
           'animate-[modalRise_220ms_cubic-bezier(0.22,0.61,0.36,1)]',
-          sizeMap[size] || sizeMap.md,
+          'sm:' + (sizeMap[size] || sizeMap.md),
         )}
       >
         {(eyebrow || title || description) && (
