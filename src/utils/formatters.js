@@ -1,3 +1,14 @@
+// Compact formatter for chart Y-axes — keeps labels short on mobile
+// e.g. € 1.400,00 → € 1,4K
+export function formatCurrencyCompact(amountCents, currency = 'EUR', locale = 'de-AT') {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format((amountCents || 0) / 100);
+}
+
 export function formatCurrency(amountCents, currency = 'EUR', locale = 'de-AT') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',

@@ -14,7 +14,7 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { monthKey } from '../utils/dates';
 import { Card, Button, Stat, FormField, Input, Modal, EmptyState, Table } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -261,7 +261,7 @@ export default function SavingsPage() {
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} />
               <YAxis
-                tickFormatter={(v) => formatCurrency(v, currency, locale)}
+                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                 tickLine={false} axisLine={false} width={90}
               />
               <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
@@ -397,7 +397,7 @@ export default function SavingsPage() {
             <CartesianGrid strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval={xAxisInterval} />
             <YAxis
-              tickFormatter={(v) => formatCurrency(v, currency, locale)}
+              tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
               tickLine={false} axisLine={false} width={90}
             />
             <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Value']} />

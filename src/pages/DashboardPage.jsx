@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { exportElementToPdf } from '../utils/pdf';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { rise } from '../utils/motion';
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis
-                tickFormatter={(v) => formatCurrency(v, currency, locale)}
+                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                 tickLine={false}
                 axisLine={false}
                 width={90}
@@ -236,7 +236,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="2 4" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis
-                  tickFormatter={(v) => formatCurrency(v, currency, locale)}
+                  tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                   tickLine={false}
                   axisLine={false}
                   width={90}

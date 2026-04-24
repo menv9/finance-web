@@ -6,7 +6,7 @@ import { ExpenseForm } from '../components/forms/ExpenseForm';
 import { FixedExpenseForm } from '../components/forms/FixedExpenseForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { categoryBreakdown, computeExpenseSeries } from '../utils/finance';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
 import { rowsToCsv } from '../utils/csv';
 import {
@@ -245,7 +245,7 @@ export default function ExpensesPage() {
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis
-                tickFormatter={(v) => formatCurrency(v, currency, locale)}
+                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                 tickLine={false}
                 axisLine={false}
                 width={90}

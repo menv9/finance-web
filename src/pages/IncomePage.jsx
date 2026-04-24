@@ -15,7 +15,7 @@ import { PageHeader } from '../components/PageHeader';
 import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { computeIncomeSeries, yearlySideIncome } from '../utils/finance';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, Table, EmptyState, Modal } from '../components/ui';
 import { rise } from '../utils/motion';
 
@@ -222,7 +222,7 @@ export default function IncomePage() {
             <CartesianGrid strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="month" tickLine={false} axisLine={false} />
             <YAxis
-              tickFormatter={(v) => formatCurrency(v, currency, locale)}
+              tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
               tickLine={false}
               axisLine={false}
               width={90}
