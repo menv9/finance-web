@@ -19,7 +19,7 @@ export function SavingsEntryForm({ initialValue, currency = 'EUR', onSubmit, onC
 
   return (
     <form
-      className="grid gap-5 md:grid-cols-2"
+      className="grid grid-cols-1 gap-5 md:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit({
