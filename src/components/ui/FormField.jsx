@@ -26,7 +26,7 @@ export function FormField({
           {required ? <span aria-hidden className="text-danger">*</span> : null}
         </label>
       ) : null}
-      <div className={cn('relative w-full min-w-0 overflow-hidden', error && 'ring-1 ring-danger rounded-md')}>
+      <div className={cn('relative w-full min-w-0', error && 'ring-1 ring-danger rounded-md')}>
         {typeof children === 'function'
           ? children({ id, 'aria-describedby': [hintId, errorId].filter(Boolean).join(' ') || undefined, 'aria-invalid': Boolean(error) || undefined })
           : children}
