@@ -72,6 +72,16 @@ function upsertItem(items, nextItem) {
   return index >= 0 ? items.map((item) => (item.id === nextItem.id ? nextItem : item)) : [nextItem, ...items];
 }
 
+// The 'savings' IndexedDB store holds a single config object, but Zustand
+// exposes it as `savingsConfig` (not an array). This helper normalises every
+// store name into the flat array that the sync functions expect.
+function getStateRecords(state, storeName) {
+  if (storeName === 'savings') {
+    return state.savingsConfig?.id ? [state.savingsConfig] : [];
+  }
+  return state[storeName] || [];
+}
+
 function buildSyncRecord(userId, storeName, record) {
   return {
     user_id: userId,
@@ -552,7 +562,7 @@ export const useFinanceStore = create((set, get) => ({
       if (!userId) throw new Error('No authenticated Supabase user');
       const state = get();
       const rows = [
-        ...STORE_KEYS.flatMap((storeName) => state[storeName].map((record) => buildSyncRecord(userId, storeName, record))),
+        ...STORE_KEYS.flatMap((storeName) => getStateRecords(state, storeName).map((record) => buildSyncRecord(userId, storeName, record))),
         ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
       ];
       await upsertRemoteRecords(client, rows);
@@ -583,7 +593,7 @@ export const useFinanceStore = create((set, get) => ({
 
       for (const change of changes) {
         if (!STORE_KEYS.includes(change.store_name)) continue;
-        const localRecord = state[change.store_name].find((item) => item.id === change.record_id);
+        const localRecord = getStateRecords(state, change.store_name).find((item) => item.id === change.record_id);
         const localTombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
         if (detectConflict({ localRecord, localTombstone, remoteChange: change, lastPulledAt: since })) {
           nextConflicts = upsertConflict(
