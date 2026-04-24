@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useConfirm } from '../components/ConfirmContext';
 import {
   Bar,
   BarChart,
@@ -48,6 +49,7 @@ export default function PortfolioPage() {
   const saveDividend = useFinanceStore((state) => state.saveDividend);
   const removeDividend = useFinanceStore((state) => state.removeDividend);
   const refreshPrices = useFinanceStore((state) => state.refreshPrices);
+  const confirm = useConfirm();
   const [holdingModal, setHoldingModal] = useState({ open: false, id: null });
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
   const [refreshing, setRefreshing] = useState(false);
@@ -85,7 +87,10 @@ export default function PortfolioPage() {
       render: (r) => (
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditDividend(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => removeDividend(r.id)}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete dividend', description: `Remove the ${r.ticker} dividend entry? This will also remove it from the income ledger.` }))
+              removeDividend(r.id);
+          }}>Delete</Button>
         </div>
       ),
     },
@@ -125,7 +130,10 @@ export default function PortfolioPage() {
       render: (r) => (
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditHolding(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => removeEntity('holdings', r.id)}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete holding', description: `Remove ${r.ticker} from your portfolio? This cannot be undone.` }))
+              removeEntity('holdings', r.id);
+          }}>Delete</Button>
         </div>
       ),
     },

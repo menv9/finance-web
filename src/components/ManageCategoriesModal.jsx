@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useConfirm } from './ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Modal, Button, FormField, Input } from './ui';
 
 export function ManageCategoriesModal({ open, onClose }) {
+  const confirm = useConfirm();
   const settings = useFinanceStore((s) => s.settings);
   const updateSettings = useFinanceStore((s) => s.updateSettings);
   const [draft, setDraft] = useState('');
@@ -35,7 +37,10 @@ export function ManageCategoriesModal({ open, onClose }) {
           {categories.map((cat) => (
             <li key={cat} className="flex items-center justify-between gap-3 py-2.5">
               <span className="text-sm text-ink">{cat}</span>
-              <Button variant="ghost" size="sm" onClick={() => remove(cat)}>
+              <Button variant="ghost" size="sm" onClick={async () => {
+                if (await confirm({ title: 'Remove category', description: `Remove "${cat}"? Existing expenses in this category won't be affected.` }))
+                  remove(cat);
+              }}>
                 Remove
               </Button>
             </li>

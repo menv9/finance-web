@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '../components/ConfirmContext';
 import {
   Bar,
   BarChart,
@@ -35,6 +36,7 @@ export default function IncomePage() {
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
+  const confirm = useConfirm();
   const [modal, setModal] = useState({ open: false, id: null });
   const currency = settings.baseCurrency;
   const locale = settings.locale;
@@ -89,7 +91,10 @@ export default function IncomePage() {
       render: (r) => (
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => removeEntity('incomes', r.id)}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
+              removeEntity('incomes', r.id);
+          }}>Delete</Button>
         </div>
       ),
     },

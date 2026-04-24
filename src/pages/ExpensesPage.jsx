@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '../components/ConfirmContext';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { BudgetTab } from '../components/BudgetTab';
 import { CsvImportCard } from '../components/CsvImportCard';
@@ -58,6 +59,7 @@ export default function ExpensesPage() {
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
 
+  const confirm = useConfirm();
   const locale = settings.locale;
   const currency = settings.baseCurrency;
   const filteredExpenses = useMemo(
@@ -145,7 +147,10 @@ export default function ExpensesPage() {
           <Button variant="ghost" size="sm" onClick={() => openEditExpense(r.id)}>
             Edit
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => removeEntity('expenses', r.id)}>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+              removeEntity('expenses', r.id);
+          }}>
             Delete
           </Button>
         </div>
@@ -201,7 +206,10 @@ export default function ExpensesPage() {
           <Button variant="ghost" size="sm" onClick={() => toggleFixedExpenseStatus(r.id)}>
             {r.active ? 'Pause' : 'Resume'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => removeEntity('fixedExpenses', r.id)}>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete recurring bill', description: `"${r.name}" will be permanently removed.` }))
+              removeEntity('fixedExpenses', r.id);
+          }}>
             Delete
           </Button>
         </div>

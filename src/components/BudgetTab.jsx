@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from './ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
@@ -92,6 +93,7 @@ export function BudgetTab() {
   const saveSavingsEntry = useFinanceStore((s) => s.saveSavingsEntry);
   const updateSettings = useFinanceStore((s) => s.updateSettings);
 
+  const confirm = useConfirm();
   const { baseCurrency: currency, locale, categories: expenseCategories } = settings;
 
   const [selectedMonth, setSelectedMonth] = useState(
@@ -266,7 +268,10 @@ export function BudgetTab() {
                 currency={currency}
                 locale={locale}
                 onEdit={() => openEdit(b.category)}
-                onRemove={() => removeBudget(b.category)}
+                onRemove={async () => {
+                  if (await confirm({ title: 'Remove budget', description: `Remove the budget for "${b.category}"? The category itself won't be affected.` }))
+                    removeBudget(b.category);
+                }}
               />
             ))}
           </div>

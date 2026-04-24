@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useConfirm } from '../components/ConfirmContext';
 import {
   Area,
   AreaChart,
@@ -73,6 +74,7 @@ export default function SavingsPage() {
   const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
   const settings           = useFinanceStore((state) => state.settings);
 
+  const confirm = useConfirm();
   const currency = settings.baseCurrency;
   const locale   = settings.locale;
 
@@ -176,7 +178,10 @@ export default function SavingsPage() {
       render: (r) => (
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => removeSavingsEntry(r.id)}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
+              removeSavingsEntry(r.id);
+          }}>Delete</Button>
         </div>
       ),
     },

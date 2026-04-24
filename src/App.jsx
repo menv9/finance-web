@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { ConfirmProvider } from './components/ConfirmContext';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useFinanceStore } from './store/useFinanceStore';
@@ -39,6 +40,7 @@ export default function App() {
   }
 
   return (
+    <ConfirmProvider>
     <Suspense fallback={<LoadingScreen label="Preparing module..." compact />}>
       <Routes>
         {/* Public — auth page (outside AppShell, no nav) */}
@@ -65,5 +67,6 @@ export default function App() {
         />
       </Routes>
     </Suspense>
+    </ConfirmProvider>
   );
 }
