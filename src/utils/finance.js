@@ -140,8 +140,9 @@ export function computeXIRR(cashflows, endingValueCents) {
 
 export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, savingsConfig, savingsEntries, transfers = [] }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
+  const today = format(new Date(), 'yyyy-MM-dd');
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
-  const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth);
+  const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth && item.date <= today);
 
   // Fix: only count actually-logged expenses. Adding fixedMonthlyCents on top
   // double-counts recurring bills that were already saved as expense entries.
