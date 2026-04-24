@@ -88,7 +88,7 @@ function buildSyncRecord(userId, storeName, record) {
     store_name: storeName,
     record_id: record.id,
     payload: record,
-    updated_at: record.updatedAt,
+    updated_at: record.updatedAt || new Date().toISOString(),
     deleted_at: null,
   };
 }
