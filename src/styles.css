@@ -63,6 +63,32 @@ input[type="date"] {
 }
 
 /* ——————————————————————————————————————————————
+   Tokens — Eris (secret lavender mode 🌸)
+—————————————————————————————————————————————— */
+[data-theme='eris'] {
+  --canvas: #EDE8FB;
+  --surface: #F4F0FE;
+  --surface-raised: #FDFCFF;
+  --surface-sunken: #E2DAFC;
+  --rule: rgba(100, 80, 180, 0.09);
+  --rule-strong: rgba(100, 80, 180, 0.20);
+  --ink: #2A1F50;
+  --ink-muted: #6B5A90;
+  --ink-faint: #A89CC8;
+  --ink-inverse: #F4F0FE;
+  --accent: #9B7FD4;
+  --accent-strong: #7B5CB4;
+  --accent-soft: rgba(155, 127, 212, 0.18);
+  --accent-ink: #FDFCFF;
+  --danger: #C47A8A;
+  --danger-soft: rgba(196, 122, 138, 0.15);
+  --positive: #7ABDA0;
+  --positive-soft: rgba(122, 189, 160, 0.15);
+  --grain: 0.03;
+  color-scheme: light;
+}
+
+/* ——————————————————————————————————————————————
    Reset + base
 —————————————————————————————————————————————— */
 * { box-sizing: border-box; }

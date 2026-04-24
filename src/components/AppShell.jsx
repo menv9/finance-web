@@ -87,10 +87,13 @@ export function AppShell({ children }) {
 
   const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
 
+  const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
+
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.body.dataset.theme = theme;
-  }, [theme]);
+    const appliedTheme = isEris ? 'eris' : theme;
+    document.documentElement.dataset.theme = appliedTheme;
+    document.body.dataset.theme = appliedTheme;
+  }, [theme, isEris]);
 
   useEffect(() => {
     if (!mobileOpen) return;
