@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { cn } from './cn';
 
 const baseField =
-  'w-full rounded-md border border-rule-strong bg-surface-raised text-ink placeholder:text-ink-faint ' +
+  'block w-full rounded-md border border-rule-strong bg-surface-raised text-ink placeholder:text-ink-faint ' +
   'px-3 py-2.5 text-sm transition-colors duration-180 ' +
   'hover:border-ink-faint ' +
   'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 ' +
