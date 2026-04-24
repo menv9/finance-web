@@ -29,6 +29,8 @@ import { fetchTickerPriceCents } from '../utils/yahoo';
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers'];
 let authSubscription = null;
 let autoPushTimer = null;
+let focusHandler = null;
+let autoPullInterval = null;
 
 const SAVINGS_DEFAULT = {
   id: 'savings-config',
@@ -223,6 +225,8 @@ export const useFinanceStore = create((set, get) => ({
     const config = getSupabaseConfig(settings);
 
     if (!client) {
+      if (autoPullInterval) { clearInterval(autoPullInterval); autoPullInterval = null; }
+      if (focusHandler) { window.removeEventListener('focus', focusHandler); focusHandler = null; }
       set({
         supabaseConfigured: false,
         supabaseSession: null,
@@ -250,6 +254,32 @@ export const useFinanceStore = create((set, get) => ({
       supabaseError: '',
     });
 
+    // Already signed in on app load — pull latest data immediately
+    if (data.session) {
+      window.setTimeout(() => {
+        get().pullFromSupabase().catch(() => {});
+      }, 0);
+    }
+
+    // Re-register focus handler so switching back to the tab syncs silently
+    if (focusHandler) window.removeEventListener('focus', focusHandler);
+    focusHandler = () => {
+      const { supabaseUser, supabaseSyncStatus } = get();
+      if (!supabaseUser) return;
+      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+      get().pullFromSupabase().catch(() => {});
+    };
+    window.addEventListener('focus', focusHandler);
+
+    // Poll every 30 s so open tabs on other devices pick up changes automatically
+    if (autoPullInterval) clearInterval(autoPullInterval);
+    autoPullInterval = setInterval(() => {
+      const { supabaseUser, supabaseSyncStatus } = get();
+      if (!supabaseUser) return;
+      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+      get().pullFromSupabase().catch(() => {});
+    }, 30_000);
+
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
@@ -262,7 +292,7 @@ export const useFinanceStore = create((set, get) => ({
 
       if (event === 'SIGNED_IN') {
         window.setTimeout(() => {
-          get().pullFromSupabase();
+          get().pullFromSupabase().catch(() => {});
         }, 0);
       }
     });
