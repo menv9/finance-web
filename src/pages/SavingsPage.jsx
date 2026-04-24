@@ -130,7 +130,9 @@ export default function SavingsPage() {
   );
 
   const realAvgCents    = useMemo(() => computeMonthlyAvg(savingsEntries), [savingsEntries]);
-  const monthlyForProjection = monthlyOverrideCents > 0 ? monthlyOverrideCents : realAvgCents;
+  // Only use a monthly contribution in the projection if the user explicitly set one.
+  // Logged entries are historical records, not a commitment to save that amount every month.
+  const monthlyForProjection = monthlyOverrideCents > 0 ? monthlyOverrideCents : 0;
 
   const projection = useMemo(
     () => projectSavings(totalSavedCents, monthlyForProjection, annualReturnRate, projectionYears),
@@ -207,7 +209,7 @@ export default function SavingsPage() {
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={monthlyOverrideCents > 0 ? 'manual override active' : 'based on your log'}
+            hint={monthlyOverrideCents > 0 ? 'used in projection' : 'based on your log — set override to use in projection'}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(4)}>
