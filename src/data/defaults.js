@@ -153,4 +153,6 @@ export const DEFAULT_DATA = {
     { id: 'cf-2', date: `${monthPrefix}-09`, amountCents: -35000, ticker: 'VUSA.DE' },
     { id: 'cf-3', date: `${monthPrefix}-17`, amountCents: 2400, ticker: 'VUSA.DE' },
   ],
+  budgets: [],
+  rollovers: [],
 };

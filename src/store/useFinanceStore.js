@@ -26,7 +26,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPriceCents } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers'];
 let authSubscription = null;
 let autoPushTimer = null;
 
@@ -126,6 +126,8 @@ export const useFinanceStore = create((set, get) => ({
   portfolioCashflows: [],
   savingsConfig: SAVINGS_DEFAULT,
   savingsEntries: [],
+  budgets: [],
+  rollovers: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -169,6 +171,8 @@ export const useFinanceStore = create((set, get) => ({
         portfolioCashflows: normalizedRecords[5],
         savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
         savingsEntries: normalizedRecords[7],
+        budgets: normalizedRecords[8],
+        rollovers: normalizedRecords[9],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -196,6 +200,8 @@ export const useFinanceStore = create((set, get) => ({
       portfolioCashflows: normalizedRecords[5],
       savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
       savingsEntries: normalizedRecords[7],
+      budgets: normalizedRecords[8],
+      rollovers: normalizedRecords[9],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { BudgetTab } from '../components/BudgetTab';
 import { CsvImportCard } from '../components/CsvImportCard';
 import { PageHeader } from '../components/PageHeader';
 import { ExpenseForm } from '../components/forms/ExpenseForm';
@@ -51,6 +52,7 @@ export default function ExpensesPage() {
   const toggleFixedExpenseStatus = useFinanceStore((state) => state.toggleFixedExpenseStatus);
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [activeTab, setActiveTab] = useState('expenses');
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
 
@@ -224,6 +226,30 @@ export default function ExpensesPage() {
         }
       />
 
+      {/* tab switcher */}
+      <div className="flex w-fit overflow-hidden rounded-lg border border-rule">
+        {[
+          { id: 'expenses', label: 'Expenses' },
+          { id: 'budget', label: 'Budget' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={
+              'px-5 py-2 text-sm font-medium transition-colors ' +
+              (activeTab === tab.id
+                ? 'bg-ink text-ink-inverse'
+                : 'bg-surface text-ink-muted hover:bg-surface-sunken hover:text-ink')
+            }
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'budget' && <BudgetTab />}
+
+      {activeTab === 'expenses' && <>
       {/* summary stats */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
@@ -447,6 +473,7 @@ export default function ExpensesPage() {
           onCancel={closeFixedModal}
         />
       </Modal>
+      </>}
     </div>
   );
 }
