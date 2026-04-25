@@ -830,29 +830,33 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('attachments', attachment);
     set((state) => ({ attachments: upsertItem(state.attachments, attachment) }));
 
-    // Upload to Supabase Storage when available
+    // Upload to Supabase Storage and push metadata directly (bypass full-push race conditions)
     const client = getSupabaseBrowserClient();
     if (client) {
       const { data: authData } = await client.auth.getUser();
       const userId = authData?.user?.id;
       if (userId) {
         const path = `${userId}/${id}`;
-        const { error } = await client.storage
+        const { error: uploadError } = await client.storage
           .from('expense-attachments')
           .upload(path, file, { contentType: file.type, upsert: true });
-        if (!error) {
-          const synced = { ...attachment, storagePath: path, updatedAt: new Date().toISOString() };
+
+        const synced = uploadError
+          ? attachment
+          : { ...attachment, storagePath: path, updatedAt: new Date().toISOString() };
+
+        if (!uploadError) {
           await putRecord('attachments', synced);
           set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
-          // Push immediately so other devices see it without waiting for debounce
-          get().pushToSupabase().catch(() => {});
-          return synced;
         }
+
+        // Directly upsert just this attachment record — avoids being blocked by
+        // a concurrent pushToSupabase that's already syncing the expense save
+        await upsertRemoteRecords(client, [buildSyncRecord(userId, 'attachments', synced)]);
+        return synced;
       }
     }
 
-    // No Supabase — still push the local metadata record
-    get().pushToSupabase().catch(() => {});
     return attachment;
   },
 
