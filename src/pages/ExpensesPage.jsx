@@ -128,7 +128,7 @@ export default function ExpensesPage() {
         </span>
       ),
     },
-    { key: 'subcategory', header: 'Sub', render: (r) => r.subcategory || <span className="text-ink-faint">—</span> },
+    { key: 'subcategory', header: 'Sub', hideOnMobile: true, render: (r) => r.subcategory || <span className="text-ink-faint">—</span> },
     {
       key: 'amountCents',
       header: 'Amount',
@@ -138,6 +138,7 @@ export default function ExpensesPage() {
     {
       key: 'isRecurring',
       header: 'Recurring',
+      hideOnMobile: true,
       align: 'center',
       render: (r) =>
         r.isRecurring ? (

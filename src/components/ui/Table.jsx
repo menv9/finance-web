@@ -54,6 +54,7 @@ export function Table({
                   'border-b border-rule',
                   'eyebrow font-medium',
                   pad,
+                  c.hideOnMobile && 'hidden sm:table-cell',
                 )}
               >
                 {c.header}
@@ -82,6 +83,7 @@ export function Table({
                       pad,
                       'text-sm text-ink',
                       c.numeric && 'font-mono tabular text-ink',
+                      c.hideOnMobile && 'hidden sm:table-cell',
                     )}
                   >
                     {content}
