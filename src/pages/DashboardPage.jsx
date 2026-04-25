@@ -81,7 +81,10 @@ export default function DashboardPage() {
     const prev = s[s.length - 2]?.netWorthCents ?? 0;
     const curr = s[s.length - 1]?.netWorthCents ?? 0;
     if (!prev) return null;
-    return ((curr - prev) / Math.abs(prev)) * 100;
+    const delta = ((curr - prev) / Math.abs(prev)) * 100;
+    // Hide delta when it's an unreliable projection artefact (e.g. base near zero)
+    if (Math.abs(delta) > 500) return null;
+    return delta;
   }, [dashboard.netWorthSeries]);
 
   const recentActivity = useMemo(() => {

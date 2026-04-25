@@ -194,7 +194,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
       monthlyExpenses.slice(index + 1).reduce((sum, item) => sum + item.amountCents, 0);
     return {
       month: month.label,
-      netWorthCents: netWorthCents - subsequentCashflow,
+      netWorthCents: Math.max(0, netWorthCents - subsequentCashflow),
     };
   });
 
