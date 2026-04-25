@@ -2,18 +2,38 @@ const TTL_MS = 15 * 60 * 1000;
 
 // ── Alpha Vantage ─────────────────────────────────────────────────────────────
 
+// Detect crypto/FX pairs like BTC/EUR, ETH/USD
+function parseCurrencyPair(ticker) {
+  const match = ticker.match(/^([A-Z]+)\/([A-Z]+)$/);
+  return match ? { from: match[1], to: match[2] } : null;
+}
+
 async function fetchFromAlphaVantage(ticker, apiKey) {
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${encodeURIComponent(apiKey)}`;
+  const pair = parseCurrencyPair(ticker);
+
+  let url;
+  if (pair) {
+    // Crypto/FX pair — use exchange rate endpoint
+    url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${encodeURIComponent(apiKey)}`;
+  } else {
+    url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${encodeURIComponent(apiKey)}`;
+  }
+
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Alpha Vantage HTTP ${res.status}`);
   const data = await res.json();
 
-  // Rate limit hit returns a note field instead of data
   if (data.Note || data.Information) {
     throw new Error('Alpha Vantage rate limit reached — try again later');
   }
 
-  const price = parseFloat(data?.['Global Quote']?.['05. price'] || '0');
+  let price;
+  if (pair) {
+    price = parseFloat(data?.['Realtime Currency Exchange Rate']?.['5. Exchange Rate'] || '0');
+  } else {
+    price = parseFloat(data?.['Global Quote']?.['05. price'] || '0');
+  }
+
   if (!price) throw new Error(`No price data from Alpha Vantage for ${ticker}`);
   return Math.round(price * 100);
 }
