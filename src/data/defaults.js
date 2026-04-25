@@ -158,4 +158,5 @@ export const DEFAULT_DATA = {
   budgets: [],
   rollovers: [],
   transfers: [],
+  attachments: [],
 };

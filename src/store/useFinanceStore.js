@@ -6,6 +6,7 @@ import {
   ensureSeedData,
   exportDatabaseSnapshot,
   getAllRecords,
+  getRecord,
   importDatabaseSnapshot,
   loadSyncMeta,
   loadSettings,
@@ -26,7 +27,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPriceCents } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments'];
 let authSubscription = null;
 let autoPushTimer = null;
 let focusHandler = null;
@@ -131,6 +132,7 @@ export const useFinanceStore = create((set, get) => ({
   budgets: [],
   rollovers: [],
   transfers: [],
+  attachments: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -177,6 +179,7 @@ export const useFinanceStore = create((set, get) => ({
         budgets: normalizedRecords[8],
         rollovers: normalizedRecords[9],
         transfers: normalizedRecords[10],
+        attachments: normalizedRecords[11],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -207,6 +210,7 @@ export const useFinanceStore = create((set, get) => ({
       budgets: normalizedRecords[8],
       rollovers: normalizedRecords[9],
       transfers: normalizedRecords[10],
+      attachments: normalizedRecords[11],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -808,6 +812,96 @@ export const useFinanceStore = create((set, get) => ({
     });
   },
 
+  // ── Attachments ───────────────────────────────────────────────────────────
+
+  uploadAttachment: async (expenseId, file) => {
+    const id = makeId('att');
+    const attachment = ensureEntitySyncFields({
+      id,
+      expenseId,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      storagePath: null,
+    });
+
+    // Cache blob locally
+    await putRecord('attachmentBlobs', { id, blob: file });
+    await putRecord('attachments', attachment);
+    set((state) => ({ attachments: upsertItem(state.attachments, attachment) }));
+
+    // Upload to Supabase Storage when available
+    const client = getSupabaseBrowserClient();
+    if (client) {
+      const { data: authData } = await client.auth.getUser();
+      const userId = authData?.user?.id;
+      if (userId) {
+        const path = `${userId}/${id}`;
+        const { error } = await client.storage
+          .from('expense-attachments')
+          .upload(path, file, { contentType: file.type, upsert: true });
+        if (!error) {
+          const synced = { ...attachment, storagePath: path, updatedAt: new Date().toISOString() };
+          await putRecord('attachments', synced);
+          set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
+          get().triggerAutoPush();
+          return synced;
+        }
+      }
+    }
+
+    get().triggerAutoPush();
+    return attachment;
+  },
+
+  removeAttachment: async (id) => {
+    const attachment = get().attachments.find((a) => a.id === id);
+    if (!attachment) return;
+
+    await deleteRecord('attachmentBlobs', id);
+
+    const client = getSupabaseBrowserClient();
+    if (client && attachment.storagePath) {
+      await client.storage.from('expense-attachments').remove([attachment.storagePath]);
+    }
+
+    await deleteRecord('attachments', id);
+    const timestamp = new Date().toISOString();
+    const tombstone = { id, updatedAt: timestamp, deletedAt: timestamp };
+
+    set((state) => {
+      const nextAttachments = state.attachments.filter((a) => a.id !== id);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        attachments: [...(state.syncMeta.deletedRecords.attachments || []).filter((t) => t.id !== id), tombstone],
+      };
+      const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
+      saveSyncMeta(nextSyncMeta);
+      return { attachments: nextAttachments, syncMeta: nextSyncMeta };
+    });
+
+    get().triggerAutoPush();
+  },
+
+  // Returns an object URL (from local blob) or a signed Supabase Storage URL.
+  // Caller should revoke object URLs when done if they persist.
+  getAttachmentUrl: async (attachment) => {
+    const blobRecord = await getRecord('attachmentBlobs', attachment.id);
+    if (blobRecord?.blob) {
+      return URL.createObjectURL(blobRecord.blob);
+    }
+
+    const client = getSupabaseBrowserClient();
+    if (client && attachment.storagePath) {
+      const { data, error } = await client.storage
+        .from('expense-attachments')
+        .createSignedUrl(attachment.storagePath, 3600);
+      if (!error && data?.signedUrl) return data.signedUrl;
+    }
+
+    return null;
+  },
+
   pushToSupabase: async () => {
     const client = getSupabaseBrowserClient();
     if (!client) throw new Error('Supabase is not configured');
@@ -823,6 +917,24 @@ export const useFinanceStore = create((set, get) => ({
         ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
       ];
       await upsertRemoteRecords(client, rows);
+
+      // Upload any attachment files not yet in Supabase Storage
+      const unsynced = get().attachments.filter((a) => !a.storagePath);
+      for (const att of unsynced) {
+        const blobRecord = await getRecord('attachmentBlobs', att.id);
+        if (!blobRecord?.blob) continue;
+        const path = `${userId}/${att.id}`;
+        const { error: uploadError } = await client.storage
+          .from('expense-attachments')
+          .upload(path, blobRecord.blob, { contentType: att.mimeType, upsert: true });
+        if (!uploadError) {
+          const synced = { ...att, storagePath: path, updatedAt: new Date().toISOString() };
+          await putRecord('attachments', synced);
+          await upsertRemoteRecords(client, [buildSyncRecord(userId, 'attachments', synced)]);
+          set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
+        }
+      }
+
       set({
         supabaseSyncStatus: 'synced',
         supabaseLastSyncedAt: new Date().toISOString(),

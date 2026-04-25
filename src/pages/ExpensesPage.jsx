@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
 import { CsvImportCard } from '../components/CsvImportCard';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
@@ -47,17 +48,21 @@ function PlusIcon() {
 export default function ExpensesPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
+  const attachments = useFinanceStore((state) => state.attachments);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const saveFixedExpense = useFinanceStore((state) => state.saveFixedExpense);
   const toggleFixedExpenseStatus = useFinanceStore((state) => state.toggleFixedExpenseStatus);
+  const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
+  const removeAttachment = useFinanceStore((state) => state.removeAttachment);
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('expenses');
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
+  const [attachmentModal, setAttachmentModal] = useState({ open: false, expenseId: null });
 
   const confirm = useConfirm();
   const locale = settings.locale;
@@ -86,6 +91,9 @@ export default function ExpensesPage() {
   const openNewFixed = () => setFixedModal({ open: true, id: null });
   const openEditFixed = (id) => setFixedModal({ open: true, id });
   const closeFixedModal = () => setFixedModal({ open: false, id: null });
+
+  const openAttachments = (expenseId) => setAttachmentModal({ open: true, expenseId });
+  const closeAttachments = () => setAttachmentModal({ open: false, expenseId: null });
 
   const exportCsv = () => {
     const csv = rowsToCsv(
@@ -142,19 +150,27 @@ export default function ExpensesPage() {
       key: 'actions',
       header: '',
       align: 'right',
-      render: (r) => (
-        <div className="flex justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditExpense(r.id)}>
-            Edit
-          </Button>
-          <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
-              removeEntity('expenses', r.id);
-          }}>
-            Delete
-          </Button>
-        </div>
-      ),
+      render: (r) => {
+        const attCount = attachments.filter((a) => a.expenseId === r.id).length;
+        return (
+          <div className="flex justify-end gap-1">
+            {attCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => openAttachments(r.id)}>
+                📎 {attCount}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => openEditExpense(r.id)}>
+              Edit
+            </Button>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                removeEntity('expenses', r.id);
+            }}>
+              Delete
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -457,6 +473,12 @@ export default function ExpensesPage() {
 
       <ManageCategoriesModal open={catModalOpen} onClose={() => setCatModalOpen(false)} />
 
+      <AttachmentViewer
+        open={attachmentModal.open}
+        onClose={closeAttachments}
+        expenseId={attachmentModal.expenseId}
+      />
+
       <Modal
         open={expenseModal.open}
         onClose={closeExpenseModal}
@@ -468,8 +490,13 @@ export default function ExpensesPage() {
         <ExpenseForm
           categories={settings.categories}
           initialValue={editingExpense}
-          onSubmit={async (value) => {
-            await saveEntity('expenses', value);
+          existingAttachments={attachments.filter((a) => a.expenseId === editingExpense?.id)}
+          onRemoveAttachment={removeAttachment}
+          onSubmit={async (value, pendingFiles) => {
+            const saved = await saveEntity('expenses', value);
+            for (const file of pendingFiles) {
+              await uploadAttachment(saved.id, file);
+            }
             closeExpenseModal();
           }}
           onCancel={closeExpenseModal}

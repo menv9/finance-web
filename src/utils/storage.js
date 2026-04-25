@@ -1,8 +1,8 @@
 import { DEFAULT_DATA, DEFAULT_SETTINGS } from '../data/defaults';
 
 const DB_NAME = 'personal-finance-tracker';
-const DB_VERSION = 5;
-const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers'];
+const DB_VERSION = 6;
+const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments', 'attachmentBlobs'];
 const SETTINGS_KEY = 'pft-settings';
 const SYNC_META_KEY = 'pft-sync-meta';
 
@@ -33,6 +33,17 @@ async function withStore(storeName, mode, callback) {
 
     transaction.oncomplete = () => resolve(result);
     transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function getRecord(storeName, id) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readonly');
+    const store = transaction.objectStore(storeName);
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
   });
 }
 
