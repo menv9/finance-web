@@ -25,7 +25,7 @@ import {
   upsertRemoteRecords,
 } from '../utils/supabase';
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
-import { fetchTickerPriceCents } from '../utils/yahoo';
+import { fetchTickerPrice } from '../utils/yahoo';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments'];
 let authSubscription = null;
@@ -738,21 +738,52 @@ export const useFinanceStore = create((set, get) => ({
   refreshPrices: async () => {
     const { holdings, settings } = get();
     const apiKey = settings.alphaVantageApiKey || '';
+    const baseCurrency = settings.baseCurrency || 'EUR';
 
     // Alpha Vantage free tier = 5 req/min. Fetch sequentially with a gap to avoid
     // rate-limiting when the user has many holdings.
     const DELAY_MS = apiKey ? 13000 : 0; // 13 s between requests when using AV
+
+    // Step 1: fetch { priceCents, currency } for each holding
     const results = [];
     for (let i = 0; i < holdings.length; i++) {
       if (i > 0 && DELAY_MS) await new Promise((r) => setTimeout(r, DELAY_MS));
-      results.push(await Promise.allSettled([fetchTickerPriceCents(holdings[i].ticker, apiKey)]).then((r) => r[0]));
+      results.push(await Promise.allSettled([fetchTickerPrice(holdings[i].ticker, apiKey)]).then((r) => r[0]));
     }
 
+    // Step 2: collect unique foreign currencies that need FX conversion
+    const foreignCurrencies = [
+      ...new Set(
+        results
+          .filter((r) => r.status === 'fulfilled' && r.value.currency !== baseCurrency)
+          .map((r) => r.value.currency),
+      ),
+    ];
+
+    // Step 3: fetch FX rates (FROM/TO format works with both AV and Yahoo)
+    // Result: { USD: 0.92, GBP: 1.17, ... } — multiply priceCents by this to get baseCurrency cents
+    const fxRates = {};
+    for (const foreignCurrency of foreignCurrencies) {
+      if (DELAY_MS) await new Promise((r) => setTimeout(r, DELAY_MS));
+      try {
+        const { priceCents } = await fetchTickerPrice(`${foreignCurrency}/${baseCurrency}`, apiKey);
+        fxRates[foreignCurrency] = priceCents / 100;
+      } catch {
+        // FX fetch failed — prices in this currency will be stored unconverted (best effort)
+      }
+    }
+
+    // Step 4: build refreshed holdings, converting prices to baseCurrency where possible
     const failures = [];
     const refreshed = holdings.map((holding, index) => {
       const result = results[index];
       if (result.status === 'fulfilled') {
-        return { ...holding, currentPriceCents: result.value };
+        const { priceCents, currency } = result.value;
+        let convertedPriceCents = priceCents;
+        if (currency !== baseCurrency && fxRates[currency] != null) {
+          convertedPriceCents = Math.round(priceCents * fxRates[currency]);
+        }
+        return { ...holding, currentPriceCents: convertedPriceCents };
       }
       failures.push({ ticker: holding.ticker, message: result.reason?.message || 'unknown error' });
       return holding;
