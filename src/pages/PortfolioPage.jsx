@@ -53,6 +53,7 @@ export default function PortfolioPage() {
   const [holdingModal, setHoldingModal] = useState({ open: false, id: null });
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
   const editingHolding = holdings.find((item) => item.id === holdingModal.id);
   const editingDividend = dividends.find((item) => item.id === dividendModal.id);
   const locale = settings.locale;
@@ -68,7 +69,14 @@ export default function PortfolioPage() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    try { await refreshPrices(); } finally { setRefreshing(false); }
+    setRefreshError('');
+    try {
+      await refreshPrices();
+    } catch (err) {
+      setRefreshError(err.message || 'Price refresh failed');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const dividendColumns = [
@@ -148,6 +156,9 @@ export default function PortfolioPage() {
         description="Holdings, allocation, performance — and dividends that mirror into the income ledger automatically."
         actions={
           <>
+            {refreshError && (
+              <span className="text-xs text-danger">{refreshError}</span>
+            )}
             <Button variant="secondary" size="sm" loading={refreshing} onClick={onRefresh}>
               Refresh prices
             </Button>
