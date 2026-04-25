@@ -18,7 +18,7 @@ export const Input = forwardRef(function Input(
     <input
       ref={ref}
       type={type}
-      className={cn(baseField, isNumeric && 'font-mono tabular', type === 'date' && 'text-left', className)}
+      className={cn(baseField, isNumeric && 'font-mono tabular', (type === 'date' || type === 'month') && 'text-left', className)}
       {...rest}
     />
   );
