@@ -279,14 +279,14 @@ export const useFinanceStore = create((set, get) => ({
     };
     window.addEventListener('focus', focusHandler);
 
-    // Poll every 30 s so open tabs on other devices pick up changes automatically
+    // Poll every 8 s so open tabs on other devices pick up changes quickly
     if (autoPullInterval) clearInterval(autoPullInterval);
     autoPullInterval = setInterval(() => {
       const { supabaseUser, supabaseSyncStatus } = get();
       if (!supabaseUser) return;
       if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
       get().pullFromSupabase().catch(() => {});
-    }, 30_000);
+    }, 8_000);
 
     const {
       data: { subscription },
@@ -844,13 +844,15 @@ export const useFinanceStore = create((set, get) => ({
           const synced = { ...attachment, storagePath: path, updatedAt: new Date().toISOString() };
           await putRecord('attachments', synced);
           set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
-          get().triggerAutoPush();
+          // Push immediately so other devices see it without waiting for debounce
+          get().pushToSupabase().catch(() => {});
           return synced;
         }
       }
     }
 
-    get().triggerAutoPush();
+    // No Supabase — still push the local metadata record
+    get().pushToSupabase().catch(() => {});
     return attachment;
   },
 
