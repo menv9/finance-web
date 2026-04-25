@@ -15,7 +15,6 @@ export const DEFAULT_SETTINGS = {
   categories: DEFAULT_CATEGORIES,
   supabaseUrl: '',
   supabaseAnonKey: '',
-  allocationRules: {},
   allocationTargets: [
     { ticker: 'VWCE', targetWeight: 55 },
     { ticker: 'VUSA', targetWeight: 25 },
@@ -45,6 +44,7 @@ export const DEFAULT_DATA = {
       subcategory: 'Alquiler',
       description: 'Rent',
       isRecurring: true,
+      fixedExpenseId: 'fix-rent',
     },
     {
       id: 'exp-grocery',

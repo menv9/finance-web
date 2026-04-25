@@ -212,6 +212,7 @@ export const useFinanceStore = create((set, get) => ({
       syncMeta,
     };
     set({ ...nextState, derived: buildDerived(nextState) });
+    await get().autoCreateFixedExpenses();
     await get().initializeSupabase();
     set({ hydrated: true });
   },
@@ -407,6 +408,10 @@ export const useFinanceStore = create((set, get) => ({
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
     get().triggerAutoPush();
+    // When a fixed expense is saved, immediately check if it needs an expense entry this month
+    if (storeName === 'fixedExpenses') {
+      await get().autoCreateFixedExpenses();
+    }
     return record;
   },
 
@@ -456,6 +461,59 @@ export const useFinanceStore = create((set, get) => ({
     const current = get().fixedExpenses.find((item) => item.id === id);
     if (!current) return;
     await get().saveEntity('fixedExpenses', { ...current, active: !current.active });
+  },
+
+  // Auto-create expense entries for fixed expenses whose charge day has arrived
+  // this month but don't yet have a corresponding expense entry.
+  autoCreateFixedExpenses: async () => {
+    const { fixedExpenses, expenses, settings } = get();
+    const today = new Date();
+    const todayDay = today.getDate();
+    const currentMonth = today.toISOString().slice(0, 7);
+    // Last day of current month (handles short months like Feb)
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+
+    const toCreate = [];
+
+    for (const fe of fixedExpenses) {
+      if (!fe.active) continue;
+      if (fe.chargeDay > todayDay) continue; // not charged yet this month
+
+      // Dedup: check by fixedExpenseId (new entries) or fuzzy match (legacy entries)
+      const alreadyExists = expenses.some(
+        (e) =>
+          e.date?.startsWith(currentMonth) &&
+          (e.fixedExpenseId === fe.id ||
+            (e.isRecurring && e.amountCents === fe.amountCents && e.category === fe.category)),
+      );
+      if (alreadyExists) continue;
+
+      const chargeDay = Math.min(fe.chargeDay, daysInMonth);
+      const dateStr = `${currentMonth}-${String(chargeDay).padStart(2, '0')}`;
+
+      const expense = ensureEntitySyncFields({
+        id: makeId('exp'),
+        date: dateStr,
+        amountCents: fe.amountCents,
+        currency: fe.currency || settings.baseCurrency,
+        category: fe.category || 'Otros',
+        description: fe.name,
+        isRecurring: true,
+        fixedExpenseId: fe.id,
+      }, new Date().toISOString());
+
+      toCreate.push(expense);
+    }
+
+    if (!toCreate.length) return;
+
+    await Promise.all(toCreate.map((e) => putRecord('expenses', e)));
+    set((state) => {
+      const nextExpenses = [...state.expenses, ...toCreate];
+      const nextState = { ...state, expenses: nextExpenses };
+      return { expenses: nextExpenses, derived: buildDerived(nextState) };
+    });
+    get().triggerAutoPush();
   },
 
   saveDividend: async (entity) => {
@@ -665,24 +723,6 @@ export const useFinanceStore = create((set, get) => ({
     });
 
     get().triggerAutoPush();
-  },
-
-  distributeIncome: async (incomeId, confirmedAllocations) => {
-    const income = get().incomes.find((i) => i.id === incomeId);
-    if (!income) return [];
-    const results = [];
-    for (const alloc of confirmedAllocations) {
-      const trf = await get().executeTransfer({
-        date: income.date,
-        amountCents: alloc.amountCents,
-        fromModule: 'income',
-        fromId: incomeId,
-        toModule: alloc.toModule,
-        description: `Income distribution — ${income.source}`,
-      });
-      results.push(trf);
-    }
-    return results;
   },
 
   refreshPrices: async () => {

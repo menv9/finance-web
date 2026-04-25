@@ -1,172 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Card, Button, FormField, Input, Select, Table, EmptyState } from '../components/ui';
 import { rise } from '../utils/motion';
 
-// ── Allocation Rules Card ─────────────────────────────────────────────────────
-
-function AllocationRulesCard({ settings, updateSettings }) {
-  const rules = settings.allocationRules || {};
-  const [newSource, setNewSource] = useState('');
-
-  const addSource = () => {
-    const name = newSource.trim();
-    if (!name || rules[name]) return;
-    updateSettings({ allocationRules: { ...rules, [name]: [] } });
-    setNewSource('');
-  };
-
-  const removeSource = (source) => {
-    const next = { ...rules };
-    delete next[source];
-    updateSettings({ allocationRules: next });
-  };
-
-  const addRule = (source) => {
-    updateSettings({
-      allocationRules: {
-        ...rules,
-        [source]: [...(rules[source] || []), { toModule: 'savings', kind: 'fixed', amountCents: 0, percent: 0 }],
-      },
-    });
-  };
-
-  const updateRule = (source, index, patch) => {
-    const updated = (rules[source] || []).map((r, i) => (i === index ? { ...r, ...patch } : r));
-    updateSettings({ allocationRules: { ...rules, [source]: updated } });
-  };
-
-  const removeRule = (source, index) => {
-    const updated = (rules[source] || []).filter((_, i) => i !== index);
-    updateSettings({ allocationRules: { ...rules, [source]: updated } });
-  };
-
-  return (
-    <Card
-      id="allocation-rules"
-      eyebrow="Transfers"
-      title="Income allocation defaults"
-      description="Suggested splits that pre-fill the Distribute dialog on income entries. You always adjust before confirming."
-      className={rise(4)}
-    >
-      <p className="mb-5 text-xs text-ink-muted">
-        Set up default amounts or percentages per income source. When you click{' '}
-        <span className="font-medium text-ink">Distribute</span> on an income entry, these are pre-filled — but you
-        can change them in the moment.
-      </p>
-
-      {Object.keys(rules).length === 0 && (
-        <p className="mb-4 text-sm text-ink-faint">No sources defined yet.</p>
-      )}
-
-      <div className="grid gap-6">
-        {Object.entries(rules).map(([source, sourceRules]) => (
-          <div key={source} className="rounded-md border border-rule bg-surface-raised p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="font-medium text-sm text-ink">{source}</p>
-              <button
-                type="button"
-                onClick={() => removeSource(source)}
-                className="text-xs text-ink-faint hover:text-danger transition-colors"
-              >
-                Remove source
-              </button>
-            </div>
-
-            {sourceRules.length === 0 && (
-              <p className="mb-3 text-xs text-ink-faint">No rules yet — add one below.</p>
-            )}
-
-            <div className="grid gap-2">
-              {sourceRules.map((rule, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
-                  <FormField label={i === 0 ? 'Destination' : undefined} htmlFor={`rule-${source}-${i}-to`}>
-                    <Select
-                      id={`rule-${source}-${i}-to`}
-                      value={rule.toModule}
-                      onChange={(e) => updateRule(source, i, { toModule: e.target.value })}
-                    >
-                      <option value="savings">Savings</option>
-                      <option value="portfolio">Portfolio</option>
-                    </Select>
-                  </FormField>
-                  <FormField label={i === 0 ? 'Type' : undefined} htmlFor={`rule-${source}-${i}-kind`}>
-                    <Select
-                      id={`rule-${source}-${i}-kind`}
-                      value={rule.kind}
-                      onChange={(e) => updateRule(source, i, { kind: e.target.value })}
-                    >
-                      <option value="fixed">Fixed amount</option>
-                      <option value="percent">Percentage</option>
-                    </Select>
-                  </FormField>
-                  <FormField
-                    label={i === 0 ? (rule.kind === 'percent' ? 'Percent (%)' : `Amount (${settings.baseCurrency})`) : undefined}
-                    htmlFor={`rule-${source}-${i}-val`}
-                  >
-                    <Input
-                      id={`rule-${source}-${i}-val`}
-                      type="number"
-                      numeric
-                      min="0"
-                      max={rule.kind === 'percent' ? 100 : undefined}
-                      step={rule.kind === 'percent' ? 1 : 0.01}
-                      placeholder={rule.kind === 'percent' ? '0' : '0.00'}
-                      value={rule.kind === 'percent' ? (rule.percent || '') : (rule.amountCents ? (rule.amountCents / 100).toFixed(2) : '')}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value || '0');
-                        updateRule(source, i, rule.kind === 'percent'
-                          ? { percent: v }
-                          : { amountCents: Math.round(v * 100) });
-                      }}
-                    />
-                  </FormField>
-                  <button
-                    type="button"
-                    onClick={() => removeRule(source, i)}
-                    className="mb-px flex h-10 w-10 items-center justify-center text-ink-faint hover:text-danger transition-colors"
-                    aria-label="Remove rule"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => addRule(source)}
-              className="mt-3 text-xs text-accent hover:underline"
-            >
-              + Add rule
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-end gap-3">
-        <FormField label="Add income source" htmlFor="new-alloc-source" className="flex-1 min-w-[200px]">
-          <Input
-            id="new-alloc-source"
-            type="text"
-            placeholder="e.g. Main salary"
-            value={newSource}
-            onChange={(e) => setNewSource(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addSource()}
-          />
-        </FormField>
-        <Button onClick={addSource}>Add source</Button>
-      </div>
-    </Card>
-  );
-}
-
 const sections = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'categories', label: 'Categories' },
   { id: 'targets', label: 'Allocation targets' },
-  { id: 'allocation-rules', label: 'Income allocation' },
   { id: 'sync', label: 'Sync' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'backup', label: 'Backup' },
@@ -417,8 +258,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </Card>
-
-          <AllocationRulesCard settings={settings} updateSettings={updateSettings} />
 
           <Card
             id="sync"

@@ -153,7 +153,7 @@ export default function DashboardPage() {
             label: 'Monthly cashflow',
             value: dashboard.cashflowCents,
             mode: 'currency',
-            hint: dashboard.cashflowCents >= 0 ? 'saving' : 'overspend',
+            hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
           },
           {
             label: 'Savings rate',
@@ -275,8 +275,8 @@ export default function DashboardPage() {
       {hasDistribution && (
         <Card
           eyebrow="This month"
-          title="Income distribution"
-          description="How your income was split between savings, portfolio, and discretionary spending."
+          title="Cashflow distribution"
+          description="How your monthly cashflow was split between savings, portfolio, and discretionary spending."
           className={rise(5)}
           action={
             <Button variant="link" size="sm" asChild>

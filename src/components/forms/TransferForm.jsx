@@ -9,14 +9,13 @@ const TO_OPTIONS = {
     { value: 'expenses', label: 'Expenses (pay from savings)' },
     { value: 'portfolio', label: 'Portfolio (invest from savings)' },
   ],
-  income: [
+  cashflow: [
     { value: 'savings', label: 'Savings' },
     { value: 'portfolio', label: 'Portfolio' },
   ],
 };
 
 export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings' }) {
-  const incomes = useFinanceStore((s) => s.incomes);
   const holdings = useFinanceStore((s) => s.holdings);
   const settings = useFinanceStore((s) => s.settings);
   const savingsEntries = useFinanceStore((s) => s.savingsEntries);
@@ -26,7 +25,6 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
   const locale = settings.locale;
 
   const [fromModule, setFromModule] = useState(defaultFromModule);
-  const [fromId, setFromId] = useState('');
   const [toModule, setToModule] = useState(TO_OPTIONS[defaultFromModule][0].value);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(normalizeDateInput(new Date()));
@@ -42,10 +40,10 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
 
   const amountCents = Math.round(parseFloat(amount || '0') * 100);
   const overdrawnSavings = fromModule === 'savings' && amountCents > savingsBalance && savingsBalance > 0;
+  const toOptions = TO_OPTIONS[fromModule] || TO_OPTIONS['savings'];
 
   const handleFromModuleChange = (mod) => {
     setFromModule(mod);
-    setFromId('');
     setToModule(TO_OPTIONS[mod][0].value);
   };
 
@@ -58,7 +56,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
         date,
         amountCents,
         fromModule,
-        fromId: fromModule === 'income' ? fromId : null,
+        fromId: null,
         toModule,
         description: description.trim(),
         category: toModule === 'expenses' ? category : null,
@@ -68,9 +66,6 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
       setSubmitting(false);
     }
   };
-
-  // When switching from-module, reset to-module to first valid option
-  const toOptions = TO_OPTIONS[fromModule] || [];
 
   return (
     <div className="grid gap-5">
@@ -82,28 +77,14 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
           onChange={(e) => handleFromModuleChange(e.target.value)}
         >
           <option value="savings">Savings</option>
-          <option value="income">Income entry</option>
+          <option value="cashflow">Monthly cashflow</option>
         </Select>
       </FormField>
 
-      {/* Income picker */}
-      {fromModule === 'income' && (
-        <FormField label="Income entry" htmlFor="trf-from-id">
-          <Select
-            id="trf-from-id"
-            value={fromId}
-            onChange={(e) => setFromId(e.target.value)}
-          >
-            <option value="">Select an income entry…</option>
-            {[...incomes]
-              .sort((a, b) => b.date.localeCompare(a.date))
-              .map((inc) => (
-                <option key={inc.id} value={inc.id}>
-                  {inc.date} — {inc.source} ({formatCurrency(inc.amountCents, inc.currency || currency, locale)})
-                </option>
-              ))}
-          </Select>
-        </FormField>
+      {fromModule === 'cashflow' && (
+        <p className="text-xs text-ink-muted">
+          This moves money from your available cashflow (income − expenses) into savings or your portfolio.
+        </p>
       )}
 
       {/* Savings balance info */}
@@ -217,7 +198,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
           variant="primary"
           onClick={handleSubmit}
           loading={submitting}
-          disabled={!amountCents || amountCents <= 0 || (fromModule === 'income' && !fromId)}
+          disabled={!amountCents || amountCents <= 0}
         >
           Create transfer
         </Button>

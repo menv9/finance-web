@@ -18,7 +18,8 @@ function PlusIcon() {
 function FlowPill({ from, to }) {
   const labels = {
     savings: 'Savings',
-    income: 'Income',
+    income: 'Cashflow',
+    cashflow: 'Cashflow',
     expenses: 'Expenses',
     portfolio: 'Portfolio',
   };
@@ -140,9 +141,9 @@ export default function TransfersPage() {
             from: 'savings',
           },
           {
-            label: 'Income → Savings / Portfolio',
-            desc: 'Allocate part of an income entry',
-            from: 'income',
+            label: 'Cashflow → Savings / Portfolio',
+            desc: 'Allocate part of your monthly cashflow',
+            from: 'cashflow',
           },
         ].map((action, i) => (
           <button

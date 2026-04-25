@@ -148,7 +148,21 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   // double-counts recurring bills that were already saved as expense entries.
   const totalExpensesCents = sumAmount(currentMonthExpenses);
   const totalIncomeCents   = sumAmount(currentMonthIncomes);
-  const cashflowCents      = totalIncomeCents - totalExpensesCents;
+
+  // Distributions this month (income → savings / portfolio) are money you've
+  // deliberately set aside — they're no longer "usable" discretionary cash.
+  const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth));
+  const isCashflowSource = (t) => t.fromModule === 'income' || t.fromModule === 'cashflow';
+  const distributedToSavingsCents = thisMonthTransfers
+    .filter((t) => isCashflowSource(t) && t.toModule === 'savings')
+    .reduce((s, t) => s + t.amountCents, 0);
+  const distributedToPortfolioCents = thisMonthTransfers
+    .filter((t) => isCashflowSource(t) && t.toModule === 'portfolio')
+    .reduce((s, t) => s + t.amountCents, 0);
+
+  // Cashflow = money actually left to spend (income − expenses − saved − invested).
+  const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
+  const cashflowCents      = totalIncomeCents - totalExpensesCents - distributedTotalCents;
   const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
   const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
 
@@ -204,15 +218,6 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
       }))
       .filter((event) => isWithinInterval(event.dueDate, { start: new Date(), end: new Date(Date.now() + 7 * 86400000) })),
   ];
-
-  // Income distribution this month (transfers from income → savings/portfolio)
-  const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth));
-  const distributedToSavingsCents = thisMonthTransfers
-    .filter((t) => t.fromModule === 'income' && t.toModule === 'savings')
-    .reduce((s, t) => s + t.amountCents, 0);
-  const distributedToPortfolioCents = thisMonthTransfers
-    .filter((t) => t.fromModule === 'income' && t.toModule === 'portfolio')
-    .reduce((s, t) => s + t.amountCents, 0);
 
   return {
     netWorthCents,
