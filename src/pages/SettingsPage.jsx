@@ -107,6 +107,20 @@ export default function SettingsPage() {
             className={rise(1)}
           >
             <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                label="Alpha Vantage API key"
+                hint="Used for portfolio price refresh. Free key at alphavantage.co"
+                htmlFor="av-key"
+                className="md:col-span-2"
+              >
+                <Input
+                  id="av-key"
+                  type="password"
+                  placeholder="e.g. ABCDEF123456"
+                  value={settings.alphaVantageApiKey || ''}
+                  onChange={(e) => updateSettings({ alphaVantageApiKey: e.target.value.trim() })}
+                />
+              </FormField>
               <FormField label="Base currency" htmlFor="base-currency">
                 <Select
                   id="base-currency"

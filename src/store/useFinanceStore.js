@@ -726,11 +726,12 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   refreshPrices: async () => {
-    const holdings = get().holdings;
+    const { holdings, settings } = get();
+    const apiKey = settings.alphaVantageApiKey || '';
     const refreshed = await Promise.all(
       holdings.map(async (holding) => ({
         ...holding,
-        currentPriceCents: await fetchTickerPriceCents(holding.ticker),
+        currentPriceCents: await fetchTickerPriceCents(holding.ticker, apiKey),
       })),
     );
 

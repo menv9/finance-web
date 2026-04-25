@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   locale: 'de-AT',
   theme: 'light',
   categories: DEFAULT_CATEGORIES,
+  alphaVantageApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
   allocationTargets: [
