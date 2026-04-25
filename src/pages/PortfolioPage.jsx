@@ -160,7 +160,7 @@ export default function PortfolioPage() {
               <span className="text-xs text-danger">{refreshError}</span>
             )}
             <Button variant="secondary" size="sm" loading={refreshing} onClick={onRefresh}>
-              Refresh prices
+              {refreshing ? `Refreshing… (${holdings.length} tickers, ~${Math.ceil(holdings.length * 13 / 60)} min)` : 'Refresh prices'}
             </Button>
             <Button variant="primary" size="sm" onClick={openNewHolding}>
               <PlusIcon /> New holding

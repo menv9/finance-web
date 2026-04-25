@@ -735,9 +735,14 @@ export const useFinanceStore = create((set, get) => ({
     const { holdings, settings } = get();
     const apiKey = settings.alphaVantageApiKey || '';
 
-    const results = await Promise.allSettled(
-      holdings.map((holding) => fetchTickerPriceCents(holding.ticker, apiKey)),
-    );
+    // Alpha Vantage free tier = 5 req/min. Fetch sequentially with a gap to avoid
+    // rate-limiting when the user has many holdings.
+    const DELAY_MS = apiKey ? 13000 : 0; // 13 s between requests when using AV
+    const results = [];
+    for (let i = 0; i < holdings.length; i++) {
+      if (i > 0 && DELAY_MS) await new Promise((r) => setTimeout(r, DELAY_MS));
+      results.push(await Promise.allSettled([fetchTickerPriceCents(holdings[i].ticker, apiKey)]).then((r) => r[0]));
+    }
 
     const failures = [];
     const refreshed = holdings.map((holding, index) => {
