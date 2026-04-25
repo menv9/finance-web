@@ -4,9 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* iOS WebKit sets a minimum intrinsic width on date inputs that overrides
+/* iOS WebKit sets a minimum intrinsic width on date/month inputs that overrides
    width: 100%. -webkit-fill-available bypasses this and fills the container. */
-input[type="date"] {
+input[type="date"],
+input[type="month"] {
   width: -webkit-fill-available;
 }
 
