@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Card, Button, FormField, Input, Select, Table, EmptyState } from '../components/ui';
@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
   const [targetInput, setTargetInput] = useState({ ticker: '', targetWeight: '' });
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const targetColumns = [
     { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono">{r.ticker}</span> },
@@ -113,13 +114,24 @@ export default function SettingsPage() {
                 htmlFor="av-key"
                 className="md:col-span-2"
               >
-                <Input
-                  id="av-key"
-                  type="password"
-                  placeholder="e.g. ABCDEF123456"
-                  value={settings.alphaVantageApiKey || ''}
-                  onChange={(e) => updateSettings({ alphaVantageApiKey: e.target.value.trim() })}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="av-key"
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder="e.g. ABCDEF123456"
+                    value={settings.alphaVantageApiKey || ''}
+                    onChange={(e) => updateSettings({ alphaVantageApiKey: e.target.value.trim() })}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    type="button"
+                  >
+                    {showApiKey ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
               </FormField>
               <FormField label="Base currency" htmlFor="base-currency">
                 <Select
