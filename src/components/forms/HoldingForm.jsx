@@ -96,7 +96,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         )}
       </FormField>
 
-      <FormField label="Current price" htmlFor="holding-current" hint="Refreshed via Yahoo Finance" className="md:col-span-2">
+      <FormField label="Current price" htmlFor="holding-current" hint="Updated via Refresh prices" className="md:col-span-2">
         {(props) => (
           <Input
             {...props}

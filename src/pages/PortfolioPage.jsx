@@ -268,7 +268,7 @@ export default function PortfolioPage() {
       <Card
         eyebrow="Register"
         title="Holdings"
-        description="Refresh prices manually to fetch the latest from Yahoo Finance."
+        description="Refresh prices manually to fetch the latest market prices."
         action={
           <Button variant="primary" size="sm" onClick={openNewHolding}>
             <PlusIcon /> Add holding
