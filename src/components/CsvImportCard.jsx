@@ -1,6 +1,39 @@
 import { useState } from 'react';
-import { parseAmountToCents, parseCsv } from '../utils/csv';
+import { parseAmountToCents, parseCsv, parseCsvDate } from '../utils/csv';
 import { FormField, Input, Select, Button } from './ui';
+
+const HEADER_ALIASES = {
+  date: ['date', 'fecha', 'datum', 'booking date', 'transaction date', 'value date', 'valuta', 'buchungstag'],
+  amount: ['amount', 'importe', 'betrag', 'monto', 'valor', 'debit', 'credit', 'transaction amount'],
+  category: ['category', 'categoria', 'categoría', 'kategorie'],
+  description: ['description', 'descripcion', 'descripción', 'concepto', 'details', 'merchant', 'name', 'text', 'verwendungszweck'],
+  currency: ['currency', 'moneda', 'wahrung', 'währung', 'ccy'],
+};
+
+function normalizeHeader(header) {
+  return `${header ?? ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function detectMapping(headers, fallbackMapping) {
+  const normalizedHeaders = headers.map((header) => ({ header, normalized: normalizeHeader(header) }));
+  return Object.fromEntries(
+    Object.entries(fallbackMapping).map(([field, fallbackColumn]) => {
+      const aliases = HEADER_ALIASES[field] || [field];
+      const exact = normalizedHeaders.find((item) =>
+        aliases.some((alias) => item.normalized === normalizeHeader(alias)),
+      );
+      const partial = normalizedHeaders.find((item) =>
+        aliases.some((alias) => item.normalized.includes(normalizeHeader(alias))),
+      );
+      return [field, exact?.header || partial?.header || (headers.includes(fallbackColumn) ? fallbackColumn : headers[0] || fallbackColumn)];
+    }),
+  );
+}
 
 export function CsvImportCard({ mapping, categories, onImport }) {
   const [preview, setPreview] = useState([]);
@@ -13,20 +46,21 @@ export function CsvImportCard({ mapping, categories, onImport }) {
   const buildRows = (rows) =>
     rows.map((row, index) => {
       const parsedAmount = parseAmountToCents(row[localMapping.amount]);
+      const normalizedDate = parseCsvDate(row[localMapping.date]);
       const normalizedAmount =
         amountMode === 'expense-positive'
           ? Math.abs(parsedAmount)
           : amountMode === 'income-negative'
             ? -Math.abs(parsedAmount)
             : parsedAmount;
-      const hasValidDate = /^\d{4}-\d{2}-\d{2}$/.test((row[localMapping.date] || '').trim());
+      const hasValidDate = Boolean(normalizedDate);
       const hasValidAmount = Number.isFinite(normalizedAmount) && normalizedAmount !== 0;
 
       return {
         row,
         index,
         normalized: {
-          date: row[localMapping.date],
+          date: normalizedDate,
           amountCents: normalizedAmount,
           currency: row[localMapping.currency] || 'EUR',
           category:
@@ -39,7 +73,7 @@ export function CsvImportCard({ mapping, categories, onImport }) {
         },
         valid: hasValidDate && hasValidAmount,
         issues: [
-          !hasValidDate ? 'Invalid date format, expected YYYY-MM-DD' : null,
+          !hasValidDate ? 'Invalid date. Accepted: YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY, or DD-MM-YYYY' : null,
           !hasValidAmount ? 'Amount could not be parsed or resolved to zero' : null,
         ].filter(Boolean),
       };
@@ -62,6 +96,8 @@ export function CsvImportCard({ mapping, categories, onImport }) {
               setPreview(parsed.rows);
               setHeaders(parsed.headers);
               setDelimiter(parsed.delimiter);
+              setLocalMapping(detectMapping(parsed.headers, mapping));
+              setValidation([]);
             }}
           />
         )}
