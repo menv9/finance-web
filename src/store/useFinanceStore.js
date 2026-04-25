@@ -479,12 +479,18 @@ export const useFinanceStore = create((set, get) => ({
       if (!fe.active) continue;
       if (fe.chargeDay > todayDay) continue; // not charged yet this month
 
-      // Dedup: check by fixedExpenseId (new entries) or fuzzy match (legacy entries)
+      // Dedup: check by fixedExpenseId (new entries) or fuzzy match for entries
+      // that pre-date the fixedExpenseId link. Scope the fuzzy match to entries
+      // WITHOUT a fixedExpenseId so two distinct fixed expenses sharing
+      // amount+category don't shadow each other's auto-creation.
       const alreadyExists = expenses.some(
         (e) =>
           e.date?.startsWith(currentMonth) &&
           (e.fixedExpenseId === fe.id ||
-            (e.isRecurring && e.amountCents === fe.amountCents && e.category === fe.category)),
+            (!e.fixedExpenseId &&
+              e.isRecurring &&
+              e.amountCents === fe.amountCents &&
+              e.category === fe.category)),
       );
       if (alreadyExists) continue;
 
@@ -728,18 +734,38 @@ export const useFinanceStore = create((set, get) => ({
   refreshPrices: async () => {
     const { holdings, settings } = get();
     const apiKey = settings.alphaVantageApiKey || '';
-    const refreshed = await Promise.all(
-      holdings.map(async (holding) => ({
-        ...holding,
-        currentPriceCents: await fetchTickerPriceCents(holding.ticker, apiKey),
-      })),
+
+    const results = await Promise.allSettled(
+      holdings.map((holding) => fetchTickerPriceCents(holding.ticker, apiKey)),
     );
 
-    await Promise.all(refreshed.map((holding) => putRecord('holdings', holding)));
+    const failures = [];
+    const refreshed = holdings.map((holding, index) => {
+      const result = results[index];
+      if (result.status === 'fulfilled') {
+        return { ...holding, currentPriceCents: result.value };
+      }
+      failures.push({ ticker: holding.ticker, message: result.reason?.message || 'unknown error' });
+      return holding;
+    });
+
+    const updated = refreshed.filter((holding, index) => results[index].status === 'fulfilled');
+    await Promise.all(updated.map((holding) => putRecord('holdings', holding)));
     set((state) => {
       const nextState = { ...state, holdings: refreshed };
       return { holdings: refreshed, derived: buildDerived(nextState) };
     });
+
+    if (failures.length === holdings.length && holdings.length > 0) {
+      throw new Error(`Price refresh failed for all tickers: ${failures.map((f) => f.ticker).join(', ')}`);
+    }
+    if (failures.length) {
+      throw new Error(
+        `Updated ${updated.length}/${holdings.length}. Failed: ${failures
+          .map((f) => `${f.ticker} (${f.message})`)
+          .join(', ')}`,
+      );
+    }
   },
 
   exportBackup: async () => exportDatabaseSnapshot(get().settings),

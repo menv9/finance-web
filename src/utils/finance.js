@@ -69,7 +69,12 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
   };
 }
 
+// "TWRR" here is an approximation: true time-weighted return needs periodic
+// portfolio snapshots which we don't store. We use simple price-return on cost
+// basis — (current value − cost basis) / cost basis — which removes the impact
+// of additional contributions because cost basis already grew with each buy.
 export function computeTWRR(holdings, cashflows) {
+  void cashflows;
   const investedCents = holdings.reduce(
     (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)),
     0,
@@ -78,20 +83,22 @@ export function computeTWRR(holdings, cashflows) {
     (total, holding) => total + Math.round(holding.quantity * (holding.currentPriceCents || 0)),
     0,
   );
-  const externalFlows = cashflows.reduce((total, flow) => total + flow.amountCents, 0);
   if (!investedCents) return 0;
-  return ((currentValueCents + externalFlows) / investedCents - 1) * 100;
+  return ((currentValueCents - investedCents) / investedCents) * 100;
 }
 
 export function computeXIRR(cashflows, endingValueCents) {
   if (!cashflows.length || !endingValueCents) return 0;
 
   // Convention: deposits (money in) are negative; ending value (money back) is positive.
-  // Flip stored deposit signs so Newton's method has opposite signs to converge on.
+  // Stored portfolioCashflows already follow this convention (executeTransfer
+  // writes deposits as negative). Preserve the original sign so that any future
+  // withdrawal entries (positive stored amount) don't get flipped back to a
+  // deposit by a blanket -Math.abs(...).
   const datedFlows = [
     ...cashflows.map((flow) => ({
       date: flow.date,
-      amountCents: -Math.abs(flow.amountCents),
+      amountCents: flow.amountCents,
     })),
     { date: new Date().toISOString().slice(0, 10), amountCents: Math.abs(endingValueCents) },
   ].sort((a, b) => new Date(a.date) - new Date(b.date));

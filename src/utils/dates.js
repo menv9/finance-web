@@ -41,8 +41,23 @@ export function lastTwelveMonths() {
 
 export function upcomingWithinDays(dayOfMonth, daysAhead = 7) {
   const now = new Date();
-  const currentMonthCandidate = new Date(now.getFullYear(), now.getMonth(), dayOfMonth);
-  const nextMonthCandidate = new Date(now.getFullYear(), now.getMonth() + 1, dayOfMonth);
+  // Clamp dayOfMonth to the last valid day of the target month so a chargeDay of
+  // 31 in February resolves to Feb 28/29, not Mar 3 via JS Date overflow.
+  const clampedDay = (year, monthIndex) => {
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+    return Math.min(dayOfMonth, lastDay);
+  };
+  const currentMonthCandidate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    clampedDay(now.getFullYear(), now.getMonth()),
+  );
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthCandidate = new Date(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth(),
+    clampedDay(nextMonth.getFullYear(), nextMonth.getMonth()),
+  );
   const dueDate = isBefore(currentMonthCandidate, now) ? nextMonthCandidate : currentMonthCandidate;
   return differenceInCalendarDays(dueDate, now) <= daysAhead ? dueDate : null;
 }
