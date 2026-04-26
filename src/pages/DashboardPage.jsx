@@ -77,7 +77,7 @@ function RecentActivity({ items, currency, locale }) {
           ? 'text-danger'
           : item.direction === 'in'
             ? 'text-positive'
-            : 'text-ink';
+            : 'text-danger';
         return (
         <li key={`${item.type}-${item.id}`} className="flex items-baseline justify-between gap-4 py-3">
           <div className="min-w-0 flex-1">

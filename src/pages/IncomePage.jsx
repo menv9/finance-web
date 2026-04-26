@@ -156,7 +156,7 @@ export default function IncomePage() {
               ? r.amountCents > 0
                 ? 'text-positive'
                 : 'text-danger'
-              : undefined
+              : 'text-positive'
           }
         >
           {formatCurrency(r.amountCents, r.currency, locale)}

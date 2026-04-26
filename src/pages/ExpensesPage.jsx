@@ -163,7 +163,7 @@ export default function ExpensesPage() {
       header: 'Amount',
       numeric: true,
       sortable: true,
-      render: (r) => formatCurrency(r.amountCents, r.currency, locale),
+      render: (r) => <span className="text-danger">{formatCurrency(r.amountCents, r.currency, locale)}</span>,
     },
     {
       key: 'isRecurring',
@@ -213,7 +213,7 @@ export default function ExpensesPage() {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
-      render: (r) => formatCurrency(r.amountCents, r.currency, locale),
+      render: (r) => <span className="text-danger">{formatCurrency(r.amountCents, r.currency, locale)}</span>,
     },
     {
       key: 'active',
