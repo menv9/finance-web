@@ -135,7 +135,7 @@ export function AppShell({ children }) {
       {/* Gorka: full-page liquid chrome background fixed behind everything */}
       {appliedTheme === 'gorka' && (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
-          <LiquidChrome baseColor={[0.06, 0.02, 0.15]} speed={0.06} amplitude={0.45} interactive={true} />
+          <LiquidChrome baseColor={[0.427, 0, 1.0]} speed={0.12} amplitude={0.3} interactive={false} />
         </div>
       )}
 
