@@ -394,7 +394,9 @@ export const useFinanceStore = create((set, get) => ({
     }
 
     const prefix = storeName.slice(0, 3);
-    const record = ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }, new Date().toISOString());
+    // Always stamp a fresh updatedAt — existing records carry their old timestamp which
+    // would make ensureEntitySyncFields keep it, causing other devices to miss the edit.
+    const record = { ...ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }), updatedAt: new Date().toISOString() };
     await putRecord(storeName, record);
     set((state) => {
       const nextList = upsertItem(state[storeName], record);
