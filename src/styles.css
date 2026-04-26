@@ -64,29 +64,47 @@ input[type="month"] {
 }
 
 /* ——————————————————————————————————————————————
-   Tokens — Eris (secret lavender mode 🌸)
+   Tokens — Eris (cherry blossom mode 🌸)
 —————————————————————————————————————————————— */
 [data-theme='eris'] {
-  --canvas: #EDE8FB;
-  --surface: #F4F0FE;
-  --surface-raised: #FDFCFF;
-  --surface-sunken: #E2DAFC;
-  --rule: rgba(100, 80, 180, 0.09);
-  --rule-strong: rgba(100, 80, 180, 0.20);
-  --ink: #2A1F50;
-  --ink-muted: #6B5A90;
-  --ink-faint: #A89CC8;
-  --ink-inverse: #F4F0FE;
-  --accent: #9B7FD4;
-  --accent-strong: #7B5CB4;
-  --accent-soft: rgba(155, 127, 212, 0.18);
-  --accent-ink: #FDFCFF;
-  --danger: #C47A8A;
-  --danger-soft: rgba(196, 122, 138, 0.15);
-  --positive: #7ABDA0;
-  --positive-soft: rgba(122, 189, 160, 0.15);
-  --grain: 0.03;
+  --canvas: #FEF0F5;
+  --surface: #FFF6FA;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: #F9E3EC;
+  --rule: rgba(200, 90, 120, 0.09);
+  --rule-strong: rgba(200, 90, 120, 0.20);
+  --ink: #2A1218;
+  --ink-muted: #8A4F65;
+  --ink-faint: #C491A5;
+  --ink-inverse: #FFF6FA;
+  --accent: #D4607A;
+  --accent-strong: #B84362;
+  --accent-soft: rgba(212, 96, 122, 0.14);
+  --accent-ink: #FFFFFF;
+  --danger: #C04C6A;
+  --danger-soft: rgba(192, 76, 106, 0.12);
+  --positive: #6BAD93;
+  --positive-soft: rgba(107, 173, 147, 0.14);
+  --grain: 0.02;
   color-scheme: light;
+}
+
+/* Body — soft sakura gradient orbs with lavender echo */
+[data-theme='eris'] body {
+  background:
+    radial-gradient(ellipse at 15% -10%, rgba(255, 168, 192, 0.55) 0%, transparent 52%),
+    radial-gradient(ellipse at 82% 8%,  rgba(210, 168, 255, 0.38) 0%, transparent 48%),
+    radial-gradient(ellipse at 55% 98%, rgba(255, 192, 210, 0.45) 0%, transparent 55%),
+    var(--canvas);
+}
+
+/* Header — frosted sakura glass */
+[data-theme='eris'] header.sticky {
+  background: rgba(254, 240, 245, 0.82);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  border-bottom: 1px solid rgba(212, 96, 122, 0.15) !important;
+  box-shadow: 0 1px 0 rgba(232, 130, 154, 0.1), 0 2px 20px -4px rgba(180, 60, 90, 0.08);
 }
 
 /* ——————————————————————————————————————————————

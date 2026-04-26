@@ -5,6 +5,7 @@ import { formatCurrency } from '../utils/formatters';
 import { cn } from './ui/cn';
 import LiquidChrome from './LiquidChrome';
 import ElectricBorder from './ElectricBorder';
+import SakuraPetals from './SakuraPetals';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', num: '01' },
@@ -123,6 +124,9 @@ export function AppShell({ children }) {
 
   return (
     <div className="min-h-screen">
+      {/* Eris: falling sakura petals */}
+      {appliedTheme === 'eris' && <SakuraPetals />}
+
       {/* Gorka: full-page liquid chrome background fixed behind everything.
           Background colour prevents the white flash before WebGL first renders. */}
       {appliedTheme === 'gorka' && (

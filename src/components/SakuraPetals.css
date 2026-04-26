@@ -1,0 +1,29 @@
+.sakura-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.sakura-petal {
+  position: absolute;
+  top: -16px;
+  border-radius: 50% 2px 50% 2px;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: sakura-fall linear infinite;
+}
+
+@keyframes sakura-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) translateX(0) rotate(var(--rot-start, 0deg));
+  }
+  8% { opacity: 0.55; }
+  88% { opacity: 0.45; }
+  100% {
+    opacity: 0;
+    transform: translateY(104vh) translateX(var(--drift, 0px)) rotate(calc(var(--rot-start, 0deg) + 540deg));
+  }
+}
