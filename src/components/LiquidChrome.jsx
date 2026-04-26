@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+import './LiquidChrome.css';
 
 export const LiquidChrome = ({
   baseColor = [0.1, 0.1, 0.1],
@@ -153,7 +154,7 @@ export const LiquidChrome = ({
     };
   }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive]);
 
-  return <div ref={containerRef} className="w-full h-full" {...props} />;
+  return <div ref={containerRef} className="liquidChrome-container" {...props} />;
 };
 
 export default LiquidChrome;
