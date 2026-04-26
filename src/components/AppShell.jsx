@@ -103,11 +103,19 @@ export function AppShell({ children }) {
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
 
+  // Explicit picks ('dark', 'light', 'eris', 'gorka') always win.
+  // The factory default is 'dark' — for special users that falls through to their theme.
+  const appliedTheme =
+    theme === 'eris' ? 'eris'
+    : theme === 'gorka' ? 'gorka'
+    : theme === 'light' ? 'light'
+    : theme === 'dark' ? (isEris ? 'eris' : isGorka ? 'gorka' : 'dark')
+    : isEris ? 'eris' : isGorka ? 'gorka' : 'dark';
+
   useEffect(() => {
-    const appliedTheme = isEris ? 'eris' : isGorka ? 'gorka' : theme;
     document.documentElement.dataset.theme = appliedTheme;
     document.body.dataset.theme = appliedTheme;
-  }, [theme, isEris, isGorka]);
+  }, [appliedTheme]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -196,10 +204,10 @@ export function AppShell({ children }) {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              aria-label={appliedTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
-              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+              {appliedTheme === 'light' ? <MoonIcon /> : <SunIcon />}
             </button>
             <button
               type="button"

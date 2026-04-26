@@ -395,6 +395,12 @@ export const useFinanceStore = create((set, get) => ({
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
   },
 
+  setTheme: (theme) => {
+    const settings = { ...get().settings, theme };
+    saveSettings(settings);
+    set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
+  },
+
   updateSettings: (partial) => {
     const settings = { ...get().settings, ...partial };
     saveSettings(settings);

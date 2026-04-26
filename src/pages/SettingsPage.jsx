@@ -6,6 +6,7 @@ import { Card, Button, FormField, Input, Select, Table, EmptyState, Modal } from
 import { rise } from '../utils/motion';
 
 const sections = [
+  { id: 'appearance', label: 'Appearance' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'categories', label: 'Categories' },
   { id: 'platforms', label: 'Platforms' },
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   const resolveConflictUseRemote = useFinanceStore((state) => state.resolveConflictUseRemote);
   const resolveConflictKeepLocal = useFinanceStore((state) => state.resolveConflictKeepLocal);
 
+  const setTheme = useFinanceStore((state) => state.setTheme);
   const wipeAllData = useFinanceStore((state) => state.wipeAllData);
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
   const [wipeConfirmText, setWipeConfirmText] = useState('');
@@ -58,6 +60,23 @@ export default function SettingsPage() {
     setWipeModalOpen(false);
     setWipeConfirmText('');
   };
+
+  const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
+  const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
+  const theme = settings.theme || 'dark';
+  const appliedTheme =
+    theme === 'eris' ? 'eris'
+    : theme === 'gorka' ? 'gorka'
+    : theme === 'light' ? 'light'
+    : theme === 'dark' ? (isEris ? 'eris' : isGorka ? 'gorka' : 'dark')
+    : isEris ? 'eris' : isGorka ? 'gorka' : 'dark';
+
+  const themeOptions = [
+    ...(isEris ? [{ value: 'eris', label: 'Eris', emoji: '🌸', description: 'Lavender dreams' }] : []),
+    ...(isGorka ? [{ value: 'gorka', label: 'Gorka', emoji: '🪩', description: 'Liquid chrome' }] : []),
+    { value: 'dark', label: 'Dark', emoji: '🌑', description: 'Deep & minimal' },
+    { value: 'light', label: 'Light', emoji: '☀️', description: 'Clean & bright' },
+  ];
 
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
@@ -123,6 +142,42 @@ export default function SettingsPage() {
 
         {/* content */}
         <div className="lg:col-span-9 grid gap-10">
+          <Card
+            id="appearance"
+            eyebrow="Display"
+            title="Appearance"
+            description="Choose how the app looks. Special themes are tied to your account."
+            className={rise(1)}
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {themeOptions.map((opt) => {
+                const isActive = appliedTheme === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTheme(opt.value)}
+                    className={[
+                      'group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all duration-180',
+                      isActive
+                        ? 'border-accent bg-accent-soft text-ink'
+                        : 'border-rule bg-surface-raised text-ink-muted hover:border-rule-strong hover:text-ink',
+                    ].join(' ')}
+                  >
+                    <span className="text-xl leading-none">{opt.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink leading-tight">{opt.label}</p>
+                      <p className="eyebrow text-[0.6rem] mt-0.5 leading-tight">{opt.description}</p>
+                    </div>
+                    {isActive && (
+                      <span className="absolute top-2.5 right-2.5 h-1.5 w-1.5 rounded-full bg-accent" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
           <Card
             id="preferences"
             eyebrow="General"
