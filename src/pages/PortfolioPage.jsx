@@ -653,7 +653,7 @@ export default function PortfolioPage() {
         <Card eyebrow="Split" title="Allocation" className={'lg:col-span-5 ' + rise(2)}>
           {portfolio.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
-              <div className="relative mx-auto h-[200px] w-full max-w-[220px] min-w-0">
+              <div className="relative mx-auto h-[220px] w-full max-w-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -671,35 +671,28 @@ export default function PortfolioPage() {
                     </Pie>
                     <Tooltip
                       formatter={(value, name, entry) => [
-                        `${formatCurrency(value, currency, locale)} · actual ${entry.payload.actualWeight.toFixed(
-                          1,
-                        )}% / target ${entry.payload.targetWeight.toFixed(1)}%`,
+                        `${formatCurrency(value, currency, locale)} · actual ${entry.payload.actualWeight.toFixed(1)}% / target ${entry.payload.targetWeight.toFixed(1)}%`,
                         name,
                       ]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <ul className="grid gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {portfolio.allocationActual
                   .slice()
                   .sort((a, b) => b.valueCents - a.valueCents)
                   .map((item) => {
-                    const originalIndex = portfolio.allocationActual.findIndex(
-                      (s) => s.ticker === item.ticker,
-                    );
+                    const originalIndex = portfolio.allocationActual.findIndex((s) => s.ticker === item.ticker);
+                    const color = COLORS[originalIndex % COLORS.length];
                     return (
-                      <li key={item.ticker} className="flex items-baseline gap-3">
-                        <span
-                          aria-hidden
-                          className="mt-1.5 h-2 w-2 shrink-0 rounded-sm"
-                          style={{ background: COLORS[originalIndex % COLORS.length] }}
-                        />
-                        <div className="min-w-0 flex-1 flex items-baseline justify-between gap-3">
-                          <span className="truncate font-mono text-sm text-ink">{item.ticker}</span>
-                          <span className="font-mono tabular text-xs text-ink-muted shrink-0">
-                            {item.actualWeight.toFixed(1)}%
-                          </span>
+                      <li key={item.ticker} className="flex items-center gap-2 min-w-0">
+                        <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
+                        <span className="w-16 shrink-0 font-mono text-xs font-medium text-ink truncate">{item.ticker}</span>
+                        <span className="w-20 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.valueCents, currency, locale)}</span>
+                        <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{item.actualWeight.toFixed(1)}%</span>
+                        <div className="flex-1 h-1 rounded-full bg-rule overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${item.actualWeight}%`, background: color }} />
                         </div>
                       </li>
                     );
