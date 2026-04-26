@@ -180,14 +180,11 @@ input[type="month"] {
   --ink-faint: rgba(255, 255, 255, 0.42);
 }
 
-/* Footer — dark panel so it stays legible over the chrome background */
+/* Footer — transparent, just darker text so it reads over the chrome */
 [data-theme='gorka'] footer {
-  background: rgba(4, 2, 12, 0.78);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
   border-top-color: rgba(109, 0, 255, 0.2) !important;
-  --ink-muted: rgba(255, 255, 255, 0.65);
-  --ink-faint: rgba(255, 255, 255, 0.38);
+  --ink-muted: rgba(192, 132, 252, 0.75);
+  --ink-faint: rgba(192, 132, 252, 0.45);
 }
 
 /* Logo circle — glowing chrome orb */
