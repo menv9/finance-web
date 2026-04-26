@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -17,6 +17,36 @@ import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { rise } from '../utils/motion';
+import ShinyText from '../components/ShinyText';
+
+// Gorka-only: cursor spotlight overlay for KPI cells
+function GorkaSpotlight({ children, className = '' }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
+  return (
+    <div
+      ref={ref}
+      className={`relative ${className}`}
+      onMouseMove={e => {
+        const r = ref.current.getBoundingClientRect();
+        setPos({ x: e.clientX - r.left, y: e.clientY - r.top });
+      }}
+      onMouseEnter={() => setOpacity(1)}
+      onMouseLeave={() => setOpacity(0)}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 transition-opacity duration-500"
+        style={{
+          opacity,
+          background: `radial-gradient(circle at ${pos.x}px ${pos.y}px, rgba(192,132,252,0.18), transparent 65%)`,
+          zIndex: 1,
+        }}
+      />
+      {children}
+    </div>
+  );
+}
 
 function greeting(date = new Date()) {
   const h = date.getHours();
@@ -80,6 +110,9 @@ export default function DashboardPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const incomes = useFinanceStore((state) => state.incomes);
 
+  const supabaseUser = useFinanceStore((state) => state.supabaseUser);
+  const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
+
   const currency = settings.baseCurrency;
   const locale = settings.locale || 'de-AT';
 
@@ -132,7 +165,10 @@ export default function DashboardPage() {
       <PageHeader
         number="01"
         eyebrow={formatLongDate()}
-        title={`${greeting()}.`}
+        title={isGorka
+          ? <ShinyText text={`${greeting()}.`} speed={4} color="#A89EC8" shineColor="#e0c8ff" spread={100} />
+          : `${greeting()}.`
+        }
         actions={
           <>
             <Button
@@ -180,18 +216,33 @@ export default function DashboardPage() {
             hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
           },
         ].map((k, i) => (
-          <div key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
-            <Stat
-              label={k.label}
-              value={k.value}
-              mode={k.mode}
-              currency={currency}
-              locale={locale}
-              hint={k.hint}
-              delta={k.delta}
-              deltaMode={k.deltaMode}
-            />
-          </div>
+          isGorka ? (
+            <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
+              <Stat
+                label={k.label}
+                value={k.value}
+                mode={k.mode}
+                currency={currency}
+                locale={locale}
+                hint={k.hint}
+                delta={k.delta}
+                deltaMode={k.deltaMode}
+              />
+            </GorkaSpotlight>
+          ) : (
+            <div key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
+              <Stat
+                label={k.label}
+                value={k.value}
+                mode={k.mode}
+                currency={currency}
+                locale={locale}
+                hint={k.hint}
+                delta={k.delta}
+                deltaMode={k.deltaMode}
+              />
+            </div>
+          )
         ))}
       </section>
 

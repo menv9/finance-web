@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { cn } from './ui/cn';
+import LiquidChrome from './LiquidChrome';
+import ElectricBorder from './ElectricBorder';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', num: '01' },
@@ -48,15 +50,25 @@ function MenuIcon({ open }) {
   );
 }
 
-function Logo() {
+function Logo({ isGorka }) {
   return (
     <NavLink to="/dashboard" className="flex items-center gap-2.5 group" aria-label="Finance Tracker — home">
-      <span
-        aria-hidden
-        className="relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-rule-strong bg-surface-raised"
-      >
-        <span className="font-display text-sm leading-none text-ink">ƒ</span>
-      </span>
+      {isGorka ? (
+        <span aria-hidden className="relative inline-flex h-7 w-7 items-center justify-center">
+          <ElectricBorder color="#C084FC" speed={0.7} chaos={0.06} borderRadius={999}>
+            <span className="inline-flex h-7 w-7 items-center justify-center">
+              <span className="font-display text-sm leading-none text-ink">ƒ</span>
+            </span>
+          </ElectricBorder>
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className="relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-rule-strong bg-surface-raised"
+        >
+          <span className="font-display text-sm leading-none text-ink">ƒ</span>
+        </span>
+      )}
       <span className="hidden sm:flex flex-col leading-none">
         <span className="font-display text-sm text-ink tracking-tight">Finance</span>
         <span className="eyebrow text-[0.6rem] mt-0.5">Quarterly Ledger</span>
@@ -113,10 +125,15 @@ export function AppShell({ children }) {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
+      <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md relative overflow-hidden">
+        {isGorka && (
+          <div className="absolute inset-0 pointer-events-none z-0 opacity-20">
+            <LiquidChrome baseColor={[0.08, 0.03, 0.16]} speed={0.12} amplitude={0.35} interactive={false} />
+          </div>
+        )}
+        <div className="relative z-10 mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
           <div className="flex items-center gap-6 min-w-0">
-            <Logo />
+            <Logo isGorka={isGorka} />
           </div>
 
           <nav aria-label="Primary" className="hidden lg:flex items-center gap-1">
