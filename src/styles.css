@@ -90,6 +90,142 @@ input[type="month"] {
 }
 
 /* ——————————————————————————————————————————————
+   Tokens — Gorka (secret chrome metal mode 🪩)
+—————————————————————————————————————————————— */
+[data-theme='gorka'] {
+  --canvas: #060412;
+  --surface: #0D0920;
+  --surface-raised: #150E2E;
+  --surface-sunken: #030209;
+  --rule: rgba(192, 132, 252, 0.08);
+  --rule-strong: rgba(192, 132, 252, 0.20);
+  --ink: #EDE8FF;
+  --ink-muted: #A89EC8;
+  --ink-faint: #6B5E90;
+  --ink-inverse: #060412;
+  --accent: #C084FC;
+  --accent-strong: #A855F7;
+  --accent-soft: rgba(192, 132, 252, 0.16);
+  --accent-ink: #0A0318;
+  --danger: #F472B6;
+  --danger-soft: rgba(244, 114, 182, 0.15);
+  --positive: #60A5FA;
+  --positive-soft: rgba(96, 165, 250, 0.15);
+  --grain: 0.025;
+  color-scheme: dark;
+}
+
+/* Multi-orb chrome background — purple / blue / pink blobs */
+[data-theme='gorka'] body {
+  background-image:
+    radial-gradient(900px 750px at -8% -5%,   rgba(192, 132, 252, 0.22) 0%, transparent 65%),
+    radial-gradient(700px 600px at 108% -8%,  rgba(96,  165, 250, 0.18) 0%, transparent 65%),
+    radial-gradient(600px 500px at -6% 108%,  rgba(244, 114, 182, 0.14) 0%, transparent 65%),
+    radial-gradient(500px 450px at 108% 106%, rgba(129, 140, 248, 0.14) 0%, transparent 65%),
+    radial-gradient(400px 350px at 52%  52%,  rgba(192, 132, 252, 0.06) 0%, transparent 70%);
+}
+
+/* Slowly rotating conic shimmer — gives the living-chrome feel */
+[data-theme='gorka'] body::after {
+  content: '';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 200vmax;
+  height: 200vmax;
+  transform: translate(-50%, -50%) rotate(0deg);
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.038;
+  mix-blend-mode: color-dodge;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    #c084fc 0deg,
+    #818cf8 60deg,
+    #60a5fa 120deg,
+    #f472b6 180deg,
+    #a855f7 240deg,
+    #818cf8 300deg,
+    #c084fc 360deg
+  );
+  animation: gorka-spin 24s linear infinite;
+}
+
+@keyframes gorka-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Chrome header — silver liquid metal bar */
+[data-theme='gorka'] header.sticky {
+  background: linear-gradient(
+    110deg,
+    rgba(22, 10, 52, 0.90) 0%,
+    rgba(10,  6, 32, 0.94) 35%,
+    rgba(16,  8, 44, 0.92) 65%,
+    rgba(22, 10, 52, 0.90) 100%
+  ) !important;
+  backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
+  border-bottom: none !important;
+  box-shadow:
+    0 1px 0 0 rgba(192, 132, 252, 0.35),
+    0 1px 0 0.5px rgba(96, 165, 250, 0.15),
+    0 6px 32px -6px rgba(129, 140, 248, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(192, 132, 252, 0.08);
+}
+
+/* Logo circle — glowing chrome orb */
+[data-theme='gorka'] [aria-label="Finance Tracker — home"] [aria-hidden="true"] {
+  background: linear-gradient(135deg,
+    rgba(192, 132, 252, 0.18) 0%,
+    rgba(96,  165, 250, 0.12) 50%,
+    rgba(244, 114, 182, 0.10) 100%
+  ) !important;
+  border-color: rgba(192, 132, 252, 0.45) !important;
+  box-shadow:
+    0 0 14px rgba(192, 132, 252, 0.35),
+    0 0  5px rgba(129, 140, 248, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Nav active underline inherits --accent automatically */
+
+/* Cards & panels — iridescent chrome border glow */
+[data-theme='gorka'] .rounded-lg.border,
+[data-theme='gorka'] .rounded-xl.border,
+[data-theme='gorka'] .rounded-2xl.border {
+  border-color: rgba(192, 132, 252, 0.18) !important;
+  box-shadow:
+    0 0 0 1px rgba(129, 140, 248, 0.08),
+    0 4px 28px -8px rgba(192, 132, 252, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Chrome scrollbar — purple → blue gradient */
+[data-theme='gorka'] *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+    rgba(192, 132, 252, 0.5) 0%,
+    rgba(96,  165, 250, 0.5) 100%
+  );
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+[data-theme='gorka'] *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+    rgba(192, 132, 252, 0.75) 0%,
+    rgba(244, 114, 182, 0.60) 100%
+  );
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+[data-theme='gorka'] * {
+  scrollbar-color: rgba(192, 132, 252, 0.45) transparent;
+}
+
+/* ——————————————————————————————————————————————
    Reset + base
 —————————————————————————————————————————————— */
 * { box-sizing: border-box; }
@@ -236,6 +372,7 @@ p { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .rise, .rise-1, .rise-2, .rise-3, .rise-4, .rise-5, .rise-6 { animation: none; }
+  [data-theme='gorka'] body::after { animation: none; }
   * { transition: none !important; }
 }
 
