@@ -88,8 +88,12 @@ function RecentActivity({ items, currency, locale }) {
           </div>
           <span
             className={
-              'numeric text-sm tabular ' +
-              amountClass
+              'numeric text-sm tabular rounded px-1.5 py-0.5 ' +
+              (amountClass === 'text-danger'
+                ? 'text-danger bg-danger-soft'
+                : amountClass === 'text-positive'
+                  ? 'text-positive bg-positive-soft'
+                  : amountClass)
             }
           >
             {item.direction === 'in' ? '+' : '−'}
