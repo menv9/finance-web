@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
@@ -19,7 +19,7 @@ import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { computeIncomeSeries, yearlySideIncome } from '../utils/finance';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
-import { Card, Button, Stat, Table, EmptyState, Modal } from '../components/ui';
+import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const COLORS = ['var(--accent)', '#8FB97E', '#C9A96E', '#7A9CC6', '#B48EAD'];
@@ -48,7 +48,25 @@ export default function IncomePage() {
   const openEdit = (id) => setModal({ open: true, id });
   const close = () => setModal({ open: false, id: null });
 
-  const batchSelect = useBatchSelect(incomes);
+  // ── Filters ──
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterKind, setFilterKind] = useState('all');
+  const [sourceSearch, setSourceSearch] = useState('');
+
+  const filteredIncomes = useMemo(
+    () =>
+      incomes.filter(
+        (i) =>
+          (!filterMonth || i.date.startsWith(filterMonth)) &&
+          (filterKind === 'all' || i.incomeKind === filterKind) &&
+          (!sourceSearch || (i.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
+      ),
+    [incomes, filterMonth, filterKind, sourceSearch],
+  );
+
+  const batchSelect = useBatchSelect(filteredIncomes);
+
+  useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBatchDeleteIncomes = async () => {
     const ids = [...batchSelect.selectedIds];
@@ -259,7 +277,7 @@ export default function IncomePage() {
         title="All income records"
         description="Each entry has type-specific details; dividends flow in from the Portfolio module."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 Select
@@ -272,16 +290,43 @@ export default function IncomePage() {
         }
         className={rise(5)}
       >
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <FormField label="Month" htmlFor="income-month">
+            <Input
+              id="income-month"
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Kind" htmlFor="income-kind">
+            <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
+              <option value="all">All kinds</option>
+              <option value="fixed">Fixed (salary)</option>
+              <option value="variable">Variable (freelance)</option>
+              <option value="dividend">Dividend</option>
+            </Select>
+          </FormField>
+          <FormField label="Source" htmlFor="income-source">
+            <Input
+              id="income-source"
+              type="text"
+              placeholder="Search…"
+              value={sourceSearch}
+              onChange={(e) => setSourceSearch(e.target.value)}
+            />
+          </FormField>
+        </div>
         <BatchDeleteBar
           selecting={batchSelect.selecting}
           selectedCount={batchSelect.selectedIds.size}
           onDelete={handleBatchDeleteIncomes}
           onCancel={batchSelect.cancel}
         />
-        {incomes.length ? (
+        {filteredIncomes.length ? (
           <Table
             columns={incomeColumns}
-            rows={incomes}
+            rows={filteredIncomes}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
@@ -289,12 +334,14 @@ export default function IncomePage() {
           />
         ) : (
           <EmptyState
-            title="No income records yet"
-            description="Add salary, freelance invoices, or dividends to get started."
+            title={incomes.length ? 'No results for this filter' : 'No income records yet'}
+            description={incomes.length ? 'Try adjusting the month, kind, or source.' : 'Add salary, freelance invoices, or dividends to get started.'}
             action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add income
-              </Button>
+              !incomes.length && (
+                <Button variant="secondary" size="sm" onClick={openNew}>
+                  <PlusIcon /> Add income
+                </Button>
+              )
             }
           />
         )}

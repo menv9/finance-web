@@ -60,6 +60,7 @@ export default function ExpensesPage() {
   const removeAttachment = useFinanceStore((state) => state.removeAttachment);
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [descSearch, setDescSearch] = useState('');
   const [activeTab, setActiveTab] = useState('expenses');
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
@@ -74,14 +75,15 @@ export default function ExpensesPage() {
       expenses.filter(
         (expense) =>
           expense.date.startsWith(selectedMonth) &&
-          (selectedCategory === 'all' || expense.category === selectedCategory),
+          (selectedCategory === 'all' || expense.category === selectedCategory) &&
+          (!descSearch || (expense.description || '').toLowerCase().includes(descSearch.toLowerCase())),
       ),
-    [expenses, selectedCategory, selectedMonth],
+    [expenses, selectedMonth, selectedCategory, descSearch],
   );
   const batchSelect = useBatchSelect(filteredExpenses);
 
-  // Clear selection when the filter changes so stale IDs can't be batch-deleted
-  useEffect(() => { batchSelect.cancel(); }, [selectedMonth, selectedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Clear selection when any filter changes so stale IDs can't be batch-deleted
+  useEffect(() => { batchSelect.cancel(); }, [selectedMonth, selectedCategory, descSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = computeExpenseSeries(expenses);
   const breakdown = categoryBreakdown(filteredExpenses);
@@ -390,7 +392,7 @@ export default function ExpensesPage() {
         title="Transactions"
         description="Filter by month and category."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 Select
@@ -425,6 +427,15 @@ export default function ExpensesPage() {
                 </option>
               ))}
             </Select>
+          </FormField>
+          <FormField label="Description" htmlFor="expenses-desc">
+            <Input
+              id="expenses-desc"
+              type="text"
+              placeholder="Search…"
+              value={descSearch}
+              onChange={(e) => setDescSearch(e.target.value)}
+            />
           </FormField>
         </div>
         <div className="mb-4 flex justify-end">

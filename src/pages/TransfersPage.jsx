@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
@@ -6,7 +6,7 @@ import { TransferForm } from '../components/forms/TransferForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { useConfirm } from '../components/ConfirmContext';
 import { formatCurrency } from '../utils/formatters';
-import { Card, Button, Table, EmptyState, Modal } from '../components/ui';
+import { Card, Button, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 
 function PlusIcon() {
@@ -57,7 +57,25 @@ export default function TransfersPage() {
 
   const sortedTransfers = [...transfers].sort((a, b) => b.date.localeCompare(a.date));
 
-  const batchSelect = useBatchSelect(sortedTransfers);
+  // ── Filters ──
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterFrom, setFilterFrom] = useState('all');
+  const [filterTo, setFilterTo] = useState('all');
+
+  const filteredTransfers = useMemo(
+    () =>
+      sortedTransfers.filter(
+        (t) =>
+          (!filterMonth || t.date.startsWith(filterMonth)) &&
+          (filterFrom === 'all' || t.fromModule === filterFrom) &&
+          (filterTo === 'all' || t.toModule === filterTo),
+      ),
+    [sortedTransfers, filterMonth, filterFrom, filterTo],
+  );
+
+  const batchSelect = useBatchSelect(filteredTransfers);
+
+  useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterFrom, filterTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBatchDeleteTransfers = async () => {
     const ids = [...batchSelect.selectedIds];
@@ -187,6 +205,32 @@ export default function TransfersPage() {
           ) : null
         }
       >
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <FormField label="Month" htmlFor="trf-month">
+            <Input
+              id="trf-month"
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </FormField>
+          <FormField label="From" htmlFor="trf-from">
+            <Select id="trf-from" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}>
+              <option value="all">All sources</option>
+              <option value="savings">Savings</option>
+              <option value="cashflow">Cashflow</option>
+              <option value="income">Income</option>
+            </Select>
+          </FormField>
+          <FormField label="To" htmlFor="trf-to">
+            <Select id="trf-to" value={filterTo} onChange={(e) => setFilterTo(e.target.value)}>
+              <option value="all">All destinations</option>
+              <option value="expenses">Expenses</option>
+              <option value="savings">Savings</option>
+              <option value="portfolio">Portfolio</option>
+            </Select>
+          </FormField>
+        </div>
         <BatchDeleteBar
           selecting={batchSelect.selecting}
           selectedCount={batchSelect.selectedIds.size}
@@ -196,11 +240,17 @@ export default function TransfersPage() {
         {sortedTransfers.length ? (
           <Table
             columns={columns}
-            rows={sortedTransfers}
+            rows={filteredTransfers}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
             onToggleAll={batchSelect.toggleAll}
+            empty={
+              <EmptyState
+                title="No results for this filter"
+                description="Try a different month, source, or destination."
+              />
+            }
           />
         ) : (
           <EmptyState

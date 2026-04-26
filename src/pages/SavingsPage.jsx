@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
@@ -21,7 +21,7 @@ import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { monthKey } from '../utils/dates';
-import { Card, Button, Stat, FormField, Input, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
+import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -167,9 +167,29 @@ export default function SavingsPage() {
   const goalYear      = yearsToGoal(projection, goalCents);
   const goalProgress  = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
 
+  // ── Filters ──
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'deposit' | 'withdrawal'
+
+  const filteredEntries = useMemo(
+    () =>
+      [...savingsEntries]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .filter(
+          (e) =>
+            (!filterMonth || e.date.startsWith(filterMonth)) &&
+            (filterType === 'all' ||
+              (filterType === 'deposit' && e.amountCents >= 0) ||
+              (filterType === 'withdrawal' && e.amountCents < 0)),
+        ),
+    [savingsEntries, filterMonth, filterType],
+  );
+
   // Transfer-linked entries can only be removed via the Transfers page
   const isEntrySelectable = (e) => !e.transferId;
-  const batchSelect = useBatchSelect(savingsEntries, isEntrySelectable);
+  const batchSelect = useBatchSelect(filteredEntries, isEntrySelectable);
+
+  useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBatchDeleteEntries = async () => {
     const ids = [...batchSelect.selectedIds];
@@ -306,7 +326,7 @@ export default function SavingsPage() {
         description="Every time you put money aside, log it here."
         className={rise(2)}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 Select
@@ -318,6 +338,23 @@ export default function SavingsPage() {
           </div>
         }
       >
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <FormField label="Month" htmlFor="savings-month">
+            <Input
+              id="savings-month"
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Type" htmlFor="savings-type">
+            <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">All entries</option>
+              <option value="deposit">Deposits only</option>
+              <option value="withdrawal">Withdrawals only</option>
+            </Select>
+          </FormField>
+        </div>
         <BatchDeleteBar
           selecting={batchSelect.selecting}
           selectedCount={batchSelect.selectedIds.size}
@@ -327,12 +364,18 @@ export default function SavingsPage() {
         {savingsEntries.length ? (
           <Table
             columns={entryColumns}
-            rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
+            rows={filteredEntries}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
             onToggleAll={batchSelect.toggleAll}
             isRowSelectable={isEntrySelectable}
+            empty={
+              <EmptyState
+                title="No results for this filter"
+                description="Try a different month or type."
+              />
+            }
           />
         ) : (
           <EmptyState
