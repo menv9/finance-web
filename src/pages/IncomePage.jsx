@@ -112,8 +112,10 @@ export default function IncomePage() {
   };
 
   const sourceBreakdown = useMemo(() => {
+    const portfolioKinds = new Set(['dividend', 'portfolio_sale', 'portfolio_sale_cashflow']);
     const totals = incomes.reduce((acc, i) => {
-      acc[i.source] = (acc[i.source] || 0) + i.amountCents;
+      const key = portfolioKinds.has(i.incomeKind) ? 'Holdings' : i.source;
+      acc[key] = (acc[key] || 0) + i.amountCents;
       return acc;
     }, {});
     return Object.entries(totals).map(([name, value]) => ({ name, value }));
@@ -261,7 +263,7 @@ export default function IncomePage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <ul className="grid w-full gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="flex w-full flex-col gap-2">
               {(() => {
                 const total = sourceBreakdown.reduce((s, i) => s + i.value, 0);
                 return sourceBreakdown
@@ -269,23 +271,16 @@ export default function IncomePage() {
                   .sort((a, b) => b.value - a.value)
                   .map((item) => {
                     const originalIndex = sourceBreakdown.findIndex((s) => s.name === item.name);
+                    const color = COLORS[originalIndex % COLORS.length];
                     const share = total ? (item.value / total) * 100 : 0;
                     return (
-                      <li key={item.name} className="flex items-baseline gap-3">
-                        <span
-                          aria-hidden
-                          className="mt-1.5 h-2 w-2 shrink-0 rounded-sm"
-                          style={{ background: COLORS[originalIndex % COLORS.length] }}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-ink">{item.name || 'Unnamed'}</p>
-                          <p className="eyebrow mt-0.5">
-                            <span className="font-mono tabular text-ink-muted">
-                              {formatCurrency(item.value, currency, locale)}
-                            </span>
-                            <span className="mx-1.5 text-ink-faint">·</span>
-                            <span className="font-mono tabular">{share.toFixed(1)}%</span>
-                          </p>
+                      <li key={item.name} className="flex items-center gap-2 min-w-0">
+                        <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
+                        <span className="min-w-0 flex-1 truncate text-xs text-ink">{item.name || 'Unnamed'}</span>
+                        <span className="w-24 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.value, currency, locale)}</span>
+                        <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{share.toFixed(1)}%</span>
+                        <div className="w-16 shrink-0 h-1 rounded-full bg-rule overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${share}%`, background: color }} />
                         </div>
                       </li>
                     );
