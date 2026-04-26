@@ -27,7 +27,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments'];
 let authSubscription = null;
 let autoPushTimer = null;
 let focusHandler = null;
@@ -70,9 +70,83 @@ function buildDividendIncome(dividend, existingIncomeId) {
   };
 }
 
+function buildPortfolioSaleIncome(sale, existingIncomeId, currency = 'EUR') {
+  const gainCents = Math.max(sale.realizedPnlCents || 0, 0);
+  return {
+    id: existingIncomeId || sale.linkedIncomeId || makeId('inc'),
+    date: sale.date,
+    amountCents: gainCents,
+    currency,
+    incomeKind: 'portfolio_sale',
+    source: `${sale.name || sale.ticker} sale`,
+    assetTicker: sale.ticker,
+    linkedSaleId: sale.id,
+    realizedPnlCents: sale.realizedPnlCents || 0,
+  };
+}
+
+function portfolioSaleCashflowCents(sale) {
+  return Math.max(sale.proceedsCents || 0, 0);
+}
+
 function upsertItem(items, nextItem) {
   const index = items.findIndex((item) => item.id === nextItem.id);
   return index >= 0 ? items.map((item) => (item.id === nextItem.id ? nextItem : item)) : [nextItem, ...items];
+}
+
+function buildSaleUpdate({ holding, sale, percent, salePriceCents, date, timestamp, cashflowId }) {
+  const salePercent = Math.min(Math.max(Number(percent || 0), 0), 100);
+  if (salePercent <= 0) throw new Error('Sale percent must be greater than 0');
+
+  const currentQuantity = Number(holding.quantity || 0);
+  if (currentQuantity <= 0) throw new Error('Holding has no quantity to sell');
+
+  const soldQuantity = Math.min(currentQuantity, currentQuantity * (salePercent / 100));
+  const isFullSale = currentQuantity - soldQuantity <= 10 ** -12 || salePercent >= 100;
+  const nextQuantity = isFullSale ? 0 : currentQuantity - soldQuantity;
+  const effectivePriceCents = Math.round(Number(salePriceCents || holding.currentPriceCents || 0));
+  const proceedsCents = Math.round(soldQuantity * effectivePriceCents);
+  const costBasisCents = Math.round(soldQuantity * (holding.averageBuyPriceCents || 0));
+  const saleDate = date || timestamp.slice(0, 10);
+  const saleId = sale?.id || makeId('psl');
+
+  const nextHolding = ensureEntitySyncFields({
+    ...holding,
+    quantity: nextQuantity,
+    archivedAt: isFullSale ? saleDate : null,
+    updatedAt: timestamp,
+  }, timestamp);
+  const nextSale = ensureEntitySyncFields({
+    id: saleId,
+    date: saleDate,
+    holdingId: holding.id,
+    ticker: holding.ticker,
+    name: holding.name,
+    platform: holding.platform,
+    percent: salePercent,
+    quantity: soldQuantity,
+    quantityDecimals: holding.quantityDecimals,
+    averageBuyPriceCents: holding.averageBuyPriceCents || 0,
+    salePriceCents: effectivePriceCents,
+    proceedsCents,
+    costBasisCents,
+    realizedPnlCents: proceedsCents - costBasisCents,
+    cashflowCents: portfolioSaleCashflowCents({ proceedsCents, realizedPnlCents: proceedsCents - costBasisCents }),
+    linkedIncomeId: sale?.linkedIncomeId || null,
+    updatedAt: timestamp,
+  }, timestamp);
+  const nextCashflow = ensureEntitySyncFields({
+    id: cashflowId || makeId('pcf'),
+    date: saleDate,
+    amountCents: proceedsCents,
+    holdingId: holding.id,
+    ticker: holding.ticker,
+    kind: 'sell',
+    linkedSaleId: nextSale.id,
+    updatedAt: timestamp,
+  }, timestamp);
+
+  return { nextHolding, nextSale, nextCashflow };
 }
 
 // The 'savings' IndexedDB store holds a single config object, but Zustand
@@ -127,6 +201,7 @@ export const useFinanceStore = create((set, get) => ({
   holdings: [],
   dividends: [],
   portfolioCashflows: [],
+  portfolioSales: [],
   savingsConfig: SAVINGS_DEFAULT,
   savingsEntries: [],
   budgets: [],
@@ -174,15 +249,17 @@ export const useFinanceStore = create((set, get) => ({
         holdings: normalizedRecords[3],
         dividends: normalizedRecords[4],
         portfolioCashflows: normalizedRecords[5],
-        savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
-        savingsEntries: normalizedRecords[7],
-        budgets: normalizedRecords[8],
-        rollovers: normalizedRecords[9],
-        transfers: normalizedRecords[10],
-        attachments: normalizedRecords[11],
+        portfolioSales: normalizedRecords[6],
+        savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
+        savingsEntries: normalizedRecords[8],
+        budgets: normalizedRecords[9],
+        rollovers: normalizedRecords[10],
+        transfers: normalizedRecords[11],
+        attachments: normalizedRecords[12],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
+    await get().ensurePortfolioSaleIncomes();
   },
 
   bootstrap: async () => {
@@ -205,17 +282,19 @@ export const useFinanceStore = create((set, get) => ({
       holdings: normalizedRecords[3],
       dividends: normalizedRecords[4],
       portfolioCashflows: normalizedRecords[5],
-      savingsConfig: normalizedRecords[6][0] || SAVINGS_DEFAULT,
-      savingsEntries: normalizedRecords[7],
-      budgets: normalizedRecords[8],
-      rollovers: normalizedRecords[9],
-      transfers: normalizedRecords[10],
-      attachments: normalizedRecords[11],
+      portfolioSales: normalizedRecords[6],
+      savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
+      savingsEntries: normalizedRecords[8],
+      budgets: normalizedRecords[9],
+      rollovers: normalizedRecords[10],
+      transfers: normalizedRecords[11],
+      attachments: normalizedRecords[12],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
     };
     set({ ...nextState, derived: buildDerived(nextState) });
+    await get().ensurePortfolioSaleIncomes();
     await get().autoCreateFixedExpenses();
     await get().initializeSupabase();
     set({ hydrated: true });
@@ -431,7 +510,11 @@ export const useFinanceStore = create((set, get) => ({
       const holding = get().holdings.find((h) => h.id === id);
       const cashflows = get().portfolioCashflows.filter((c) => c.holdingId === id);
       for (const cf of cashflows) {
-        await get().removeEntity('portfolioCashflows', cf.id);
+        if (cf.transferId) {
+          await get().removeTransfer(cf.transferId);
+        } else {
+          await get().removeEntity('portfolioCashflows', cf.id);
+        }
       }
       if (holding?.ticker) {
         const dividends = get().dividends.filter((d) => d.ticker === holding.ticker);
@@ -460,6 +543,312 @@ export const useFinanceStore = create((set, get) => ({
       saveSyncMeta(nextSyncMeta);
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    });
+    get().triggerAutoPush();
+  },
+
+  sellHolding: async ({ holdingId, percent, salePriceCents, date }) => {
+    const holding = get().holdings.find((item) => item.id === holdingId);
+    if (!holding) throw new Error('Holding not found');
+
+    const timestamp = new Date().toISOString();
+    const { nextHolding, nextSale: rawSale, nextCashflow: cashflow } = buildSaleUpdate({
+      holding,
+      percent,
+      salePriceCents,
+      date,
+      timestamp,
+    });
+    const income = ensureEntitySyncFields(buildPortfolioSaleIncome(rawSale, null, get().settings.baseCurrency), timestamp);
+    const sale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+
+    await putRecord('holdings', nextHolding);
+    await putRecord('portfolioSales', sale);
+    await putRecord('portfolioCashflows', cashflow);
+    await putRecord('incomes', income);
+
+    set((state) => {
+      const nextHoldings = upsertItem(state.holdings, nextHolding);
+      const nextPortfolioSales = upsertItem(state.portfolioSales, sale);
+      const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, cashflow);
+      const nextIncomes = upsertItem(state.incomes, income);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
+        portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
+        portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
+        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter(
+          (item) =>
+            item.id !== `holdings:${nextHolding.id}` &&
+            item.id !== `portfolioSales:${sale.id}` &&
+            item.id !== `portfolioCashflows:${cashflow.id}` &&
+            item.id !== `incomes:${income.id}`,
+        ),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = {
+        ...state,
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+      };
+      return {
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
+    });
+
+    get().triggerAutoPush();
+    return sale;
+  },
+
+  updatePortfolioSale: async ({ saleId, percent, salePriceCents, date }) => {
+    const currentSale = get().portfolioSales.find((item) => item.id === saleId);
+    if (!currentSale) throw new Error('Sale not found');
+
+    const holding = get().holdings.find((item) => item.id === currentSale.holdingId);
+    if (!holding) throw new Error('Holding not found');
+
+    const timestamp = new Date().toISOString();
+    const restoredHolding = ensureEntitySyncFields({
+      ...holding,
+      quantity: Number(holding.quantity || 0) + Number(currentSale.quantity || 0),
+      archivedAt: null,
+      updatedAt: timestamp,
+    }, timestamp);
+    const currentCashflow = get().portfolioCashflows.find((item) => item.linkedSaleId === currentSale.id);
+    const { nextHolding, nextSale: rawSale, nextCashflow } = buildSaleUpdate({
+      holding: restoredHolding,
+      sale: currentSale,
+      percent,
+      salePriceCents,
+      date,
+      timestamp,
+      cashflowId: currentCashflow?.id,
+    });
+    const income = ensureEntitySyncFields(
+      buildPortfolioSaleIncome(rawSale, currentSale.linkedIncomeId, get().settings.baseCurrency),
+      timestamp,
+    );
+    const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+
+    await putRecord('holdings', nextHolding);
+    await putRecord('portfolioSales', nextSale);
+    await putRecord('portfolioCashflows', nextCashflow);
+    await putRecord('incomes', income);
+
+    set((state) => {
+      const nextHoldings = upsertItem(state.holdings, nextHolding);
+      const nextPortfolioSales = upsertItem(state.portfolioSales, nextSale);
+      const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, nextCashflow);
+      const nextIncomes = upsertItem(state.incomes, income);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
+        portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== nextSale.id),
+        portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== nextCashflow.id),
+        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter(
+          (item) =>
+            item.id !== `holdings:${nextHolding.id}` &&
+            item.id !== `portfolioSales:${nextSale.id}` &&
+            item.id !== `portfolioCashflows:${nextCashflow.id}` &&
+            item.id !== `incomes:${income.id}`,
+        ),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = {
+        ...state,
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+      };
+      return {
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
+    });
+
+    get().triggerAutoPush();
+    return nextSale;
+  },
+
+  removePortfolioSale: async (saleId) => {
+    const sale = get().portfolioSales.find((item) => item.id === saleId);
+    if (!sale) return;
+
+    const holding = get().holdings.find((item) => item.id === sale.holdingId);
+    const cashflow = get().portfolioCashflows.find((item) => item.linkedSaleId === sale.id);
+    const income = sale.linkedIncomeId
+      ? get().incomes.find((item) => item.id === sale.linkedIncomeId)
+      : get().incomes.find((item) => item.linkedSaleId === sale.id);
+    const timestamp = new Date().toISOString();
+    const restoredHolding = holding
+      ? ensureEntitySyncFields({
+          ...holding,
+          quantity: Number(holding.quantity || 0) + Number(sale.quantity || 0),
+          archivedAt: null,
+          updatedAt: timestamp,
+        }, timestamp)
+      : null;
+
+    if (restoredHolding) await putRecord('holdings', restoredHolding);
+    await deleteRecord('portfolioSales', sale.id);
+    if (cashflow) await deleteRecord('portfolioCashflows', cashflow.id);
+    if (income) await deleteRecord('incomes', income.id);
+
+    set((state) => {
+      const nextHoldings = restoredHolding ? upsertItem(state.holdings, restoredHolding) : state.holdings;
+      const nextPortfolioSales = state.portfolioSales.filter((item) => item.id !== sale.id);
+      const nextPortfolioCashflows = cashflow
+        ? state.portfolioCashflows.filter((item) => item.id !== cashflow.id)
+        : state.portfolioCashflows;
+      const nextIncomes = income ? state.incomes.filter((item) => item.id !== income.id) : state.incomes;
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        portfolioSales: [
+          ...(state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
+          { id: sale.id, updatedAt: timestamp, deletedAt: timestamp },
+        ],
+        portfolioCashflows: cashflow
+          ? [
+              ...(state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
+              { id: cashflow.id, updatedAt: timestamp, deletedAt: timestamp },
+            ]
+          : state.syncMeta.deletedRecords.portfolioCashflows || [],
+        incomes: income
+          ? [
+              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+              { id: income.id, updatedAt: timestamp, deletedAt: timestamp },
+            ]
+          : state.syncMeta.deletedRecords.incomes || [],
+      };
+      if (restoredHolding) {
+        nextDeletedRecords.holdings = (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== restoredHolding.id);
+      }
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter(
+          (item) =>
+            item.id !== `portfolioSales:${sale.id}` &&
+            item.id !== `portfolioCashflows:${cashflow?.id}` &&
+            item.id !== `holdings:${restoredHolding?.id}` &&
+            item.id !== `incomes:${income?.id}`,
+        ),
+      };
+      saveSyncMeta(nextSyncMeta);
+      const nextState = {
+        ...state,
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+      };
+      return {
+        holdings: nextHoldings,
+        portfolioSales: nextPortfolioSales,
+        portfolioCashflows: nextPortfolioCashflows,
+        incomes: nextIncomes,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
+    });
+
+    get().triggerAutoPush();
+  },
+
+  ensurePortfolioSaleIncomes: async () => {
+    const { portfolioSales, incomes, settings } = get();
+    const timestamp = new Date().toISOString();
+    const toPut = [];
+
+    for (const sale of portfolioSales) {
+      const saleWithCashflow = {
+        ...sale,
+        cashflowCents: portfolioSaleCashflowCents(sale),
+      };
+      const existingIncome = sale.linkedIncomeId
+        ? incomes.find((item) => item.id === sale.linkedIncomeId)
+        : incomes.find((item) => item.linkedSaleId === sale.id);
+      if (existingIncome) {
+        const updatedIncome = ensureEntitySyncFields(
+          buildPortfolioSaleIncome(saleWithCashflow, existingIncome.id, settings.baseCurrency),
+          timestamp,
+        );
+        if (
+          existingIncome.amountCents !== updatedIncome.amountCents ||
+          existingIncome.date !== updatedIncome.date ||
+          existingIncome.currency !== updatedIncome.currency ||
+          existingIncome.incomeKind !== updatedIncome.incomeKind ||
+          existingIncome.source !== updatedIncome.source ||
+          existingIncome.linkedSaleId !== updatedIncome.linkedSaleId ||
+          existingIncome.realizedPnlCents !== updatedIncome.realizedPnlCents
+        ) {
+          toPut.push({ storeName: 'incomes', record: updatedIncome });
+        }
+        if (sale.linkedIncomeId !== existingIncome.id || sale.cashflowCents !== saleWithCashflow.cashflowCents) {
+          toPut.push({
+            storeName: 'portfolioSales',
+            record: ensureEntitySyncFields({
+              ...saleWithCashflow,
+              linkedIncomeId: existingIncome.id,
+              updatedAt: timestamp,
+            }, timestamp),
+          });
+        }
+        continue;
+      }
+
+      const income = ensureEntitySyncFields(
+        buildPortfolioSaleIncome(saleWithCashflow, null, settings.baseCurrency),
+        timestamp,
+      );
+      toPut.push({ storeName: 'incomes', record: income });
+      toPut.push({
+        storeName: 'portfolioSales',
+        record: ensureEntitySyncFields({ ...saleWithCashflow, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp),
+      });
+    }
+
+    if (!toPut.length) return;
+
+    await Promise.all(toPut.map(({ storeName, record }) => putRecord(storeName, record)));
+    set((state) => {
+      let nextState = { ...state };
+      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
+      let nextConflicts = state.syncMeta.conflicts;
+      for (const { storeName, record } of toPut) {
+        nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], record) };
+        nextDeletedRecords[storeName] = (nextDeletedRecords[storeName] || []).filter((item) => item.id !== record.id);
+        nextConflicts = nextConflicts.filter((item) => item.id !== `${storeName}:${record.id}`);
+      }
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: nextConflicts,
+      };
+      saveSyncMeta(nextSyncMeta);
+      return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
     get().triggerAutoPush();
   },
@@ -613,7 +1002,7 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   executeTransfer: async (spec) => {
-    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker } = spec;
+    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId } = spec;
     const timestamp = new Date().toISOString();
     const currency = get().settings.baseCurrency;
     const trfId = `trf-${crypto.randomUUID()}`;
@@ -656,7 +1045,7 @@ export const useFinanceStore = create((set, get) => ({
         date,
         amountCents: -Math.abs(amountCents), // negative = capital deposit
         ticker: ticker || null,
-        holdingId: null,
+        holdingId: holdingId || null,
         kind: 'transfer_in',
         transferId: trfId,
       }, timestamp);
@@ -742,6 +1131,8 @@ export const useFinanceStore = create((set, get) => ({
 
   refreshPrices: async () => {
     const { holdings, settings } = get();
+    const refreshableHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
+    const refreshableTickers = [...new Set(refreshableHoldings.map((holding) => holding.ticker))];
     const apiKey = settings.alphaVantageApiKey || '';
     const baseCurrency = settings.baseCurrency || 'EUR';
 
@@ -749,12 +1140,14 @@ export const useFinanceStore = create((set, get) => ({
     // rate-limiting when the user has many holdings.
     const DELAY_MS = apiKey ? 13000 : 0; // 13 s between requests when using AV
 
-    // Step 1: fetch { priceCents, currency } for each holding
+    // Step 1: fetch { priceCents, currency } once per ticker, then apply it to
+    // every operation/lot with that ticker.
     const results = [];
-    for (let i = 0; i < holdings.length; i++) {
+    for (let i = 0; i < refreshableTickers.length; i++) {
       if (i > 0 && DELAY_MS) await new Promise((r) => setTimeout(r, DELAY_MS));
-      results.push(await Promise.allSettled([fetchTickerPrice(holdings[i].ticker, apiKey)]).then((r) => r[0]));
+      results.push(await Promise.allSettled([fetchTickerPrice(refreshableTickers[i], apiKey)]).then((r) => r[0]));
     }
+    const resultsByTicker = new Map(refreshableTickers.map((ticker, index) => [ticker, results[index]]));
 
     // Step 2: collect unique foreign currencies that need FX conversion
     const foreignCurrencies = [
@@ -780,8 +1173,8 @@ export const useFinanceStore = create((set, get) => ({
 
     // Step 4: build refreshed holdings, converting prices to baseCurrency where possible
     const failures = [];
-    const refreshed = holdings.map((holding, index) => {
-      const result = results[index];
+    const refreshedActive = refreshableHoldings.map((holding) => {
+      const result = resultsByTicker.get(holding.ticker);
       if (result.status === 'fulfilled') {
         const { priceCents, currency } = result.value;
         let convertedPriceCents = priceCents;
@@ -790,23 +1183,30 @@ export const useFinanceStore = create((set, get) => ({
         }
         return { ...holding, currentPriceCents: convertedPriceCents };
       }
-      failures.push({ ticker: holding.ticker, message: result.reason?.message || 'unknown error' });
       return holding;
     });
+    for (const ticker of refreshableTickers) {
+      const result = resultsByTicker.get(ticker);
+      if (result?.status === 'rejected') {
+        failures.push({ ticker, message: result.reason?.message || 'unknown error' });
+      }
+    }
+    const refreshedById = new Map(refreshedActive.map((holding) => [holding.id, holding]));
+    const refreshed = holdings.map((holding) => refreshedById.get(holding.id) || holding);
 
-    const updated = refreshed.filter((holding, index) => results[index].status === 'fulfilled');
+    const updated = refreshedActive.filter((holding) => resultsByTicker.get(holding.ticker)?.status === 'fulfilled');
     await Promise.all(updated.map((holding) => putRecord('holdings', holding)));
     set((state) => {
       const nextState = { ...state, holdings: refreshed };
       return { holdings: refreshed, derived: buildDerived(nextState) };
     });
 
-    if (failures.length === holdings.length && holdings.length > 0) {
+    if (failures.length === refreshableTickers.length && refreshableTickers.length > 0) {
       throw new Error(`Price refresh failed for all tickers: ${failures.map((f) => f.ticker).join(', ')}`);
     }
     if (failures.length) {
       throw new Error(
-        `Updated ${updated.length}/${holdings.length}. Failed: ${failures
+        `Updated ${refreshableTickers.length - failures.length}/${refreshableTickers.length}. Failed: ${failures
           .map((f) => `${f.ticker} (${f.message})`)
           .join(', ')}`,
       );

@@ -8,6 +8,7 @@ import { rise } from '../utils/motion';
 const sections = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'categories', label: 'Categories' },
+  { id: 'platforms', label: 'Platforms' },
   { id: 'targets', label: 'Allocation targets' },
   { id: 'import', label: 'Bank import' },
   { id: 'sync', label: 'Sync' },
@@ -46,8 +47,13 @@ export default function SettingsPage() {
 
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
+  const [platformInput, setPlatformInput] = useState('');
+  const [editingPlatform, setEditingPlatform] = useState('');
   const [targetInput, setTargetInput] = useState({ ticker: '', targetWeight: '' });
   const [showApiKey, setShowApiKey] = useState(false);
+  const holdingPlatforms = settings.holdingPlatforms?.length
+    ? settings.holdingPlatforms
+    : ['Trade Republic', 'IBKR', 'DEGIRO'];
 
   const targetColumns = [
     { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono">{r.ticker}</span> },
@@ -195,7 +201,7 @@ export default function SettingsPage() {
                         })
                       }
                     >
-                      ×
+                      x
                     </button>
                   ) : null}
                 </span>
@@ -241,11 +247,89 @@ export default function SettingsPage() {
           </Card>
 
           <Card
+            id="platforms"
+            eyebrow="Portfolio"
+            title="Portfolio platforms"
+            description="Edit, add, or remove the platform options shown when creating or editing holdings."
+            className={rise(3)}
+          >
+            <div className="flex flex-wrap gap-2">
+              {holdingPlatforms.map((platform) => (
+                <span
+                  key={platform}
+                  className="inline-flex items-center gap-2 rounded-full border border-rule bg-surface-raised px-3 py-1 text-xs text-ink"
+                >
+                  <span>{platform}</span>
+                  <button
+                    type="button"
+                    className="text-ink-faint hover:text-ink transition-colors"
+                    onClick={() => {
+                      setEditingPlatform(platform);
+                      setPlatformInput(platform);
+                    }}
+                  >
+                    edit
+                  </button>
+                  {holdingPlatforms.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-ink-faint hover:text-danger transition-colors"
+                      onClick={() =>
+                        updateSettings({
+                          holdingPlatforms: holdingPlatforms.filter((item) => item !== platform),
+                        })
+                      }
+                    >
+                      x
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap items-end gap-3">
+              <FormField label={editingPlatform ? 'Edit platform' : 'Add platform'} className="flex-1 min-w-[220px]">
+                <Input
+                  value={platformInput}
+                  placeholder="e.g. Trade Republic"
+                  onChange={(e) => setPlatformInput(e.target.value)}
+                />
+              </FormField>
+              <Button
+                onClick={() => {
+                  if (!platformInput.trim()) return;
+                  const next = platformInput.trim();
+                  if (editingPlatform) {
+                    const renamed = holdingPlatforms.map((item) => (item === editingPlatform ? next : item));
+                    updateSettings({ holdingPlatforms: [...new Set(renamed)] });
+                    setEditingPlatform('');
+                  } else if (!holdingPlatforms.includes(next)) {
+                    updateSettings({ holdingPlatforms: [...holdingPlatforms, next] });
+                  }
+                  setPlatformInput('');
+                }}
+              >
+                {editingPlatform ? 'Save' : 'Add'}
+              </Button>
+              {editingPlatform ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEditingPlatform('');
+                    setPlatformInput('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card
             id="targets"
             eyebrow="Portfolio"
             title="Allocation targets"
             description="Used for the actual-vs-target comparison in the Portfolio module."
-            className={rise(3)}
+            className={rise(4)}
           >
             {settings.allocationTargets?.length ? (
               <Table columns={targetColumns} rows={settings.allocationTargets.map((t) => ({ ...t, id: t.ticker }))} density="compact" />
@@ -293,7 +377,7 @@ export default function SettingsPage() {
             eyebrow="Import"
             title="Bank import"
             description="Upload a CSV export from your bank. Detects income vs expenses by amount sign, and auto-categorizes using MCC codes."
-            className={rise(4)}
+            className={rise(5)}
           >
             <SmartBankImport
               categories={settings.categories}
@@ -317,7 +401,7 @@ export default function SettingsPage() {
                 {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'Not signed in'}
               </span>
             }
-            className={rise(4)}
+            className={rise(6)}
           >
             <div className="flex flex-wrap gap-2">
               <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
@@ -358,7 +442,7 @@ export default function SettingsPage() {
             eyebrow="Sync"
             title="Conflicts"
             description="Shown when the same record changed locally and remotely after the last sync."
-            className={rise(5)}
+            className={rise(7)}
           >
             {conflicts.length ? (
               <div className="grid gap-4">
@@ -416,7 +500,7 @@ export default function SettingsPage() {
             eyebrow="Portability"
             title="Backup and restore"
             description="Complete JSON dump for migration, device transfer, or pre-sync insurance."
-            className={rise(6)}
+            className={rise(8)}
           >
             <div className="flex flex-wrap gap-2">
               <Button

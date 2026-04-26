@@ -41,7 +41,14 @@ function RecentActivity({ items, currency, locale }) {
   }
   return (
     <ul className="divide-y divide-rule">
-      {items.map((item) => (
+      {items.map((item) => {
+        const isPortfolioSaleLoss = item.incomeKind === 'portfolio_sale' && (item.realizedPnlCents || 0) < 0;
+        const amountClass = isPortfolioSaleLoss
+          ? 'text-danger'
+          : item.direction === 'in'
+            ? 'text-positive'
+            : 'text-ink';
+        return (
         <li key={`${item.type}-${item.id}`} className="flex items-baseline justify-between gap-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-ink">{item.label}</p>
@@ -52,14 +59,15 @@ function RecentActivity({ items, currency, locale }) {
           <span
             className={
               'numeric text-sm tabular ' +
-              (item.direction === 'in' ? 'text-positive' : 'text-ink')
+              amountClass
             }
           >
             {item.direction === 'in' ? '+' : '−'}
             {formatCurrency(Math.abs(item.amountCents), currency, locale).replace(/^[−-]/, '')}
           </span>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
@@ -103,6 +111,8 @@ export default function DashboardPage() {
       amountCents: i.amountCents,
       date: i.date,
       direction: 'in',
+      incomeKind: i.incomeKind,
+      realizedPnlCents: i.realizedPnlCents,
     }));
     return [...expenseRows, ...incomeRows]
       .sort((a, b) => new Date(b.date) - new Date(a.date))

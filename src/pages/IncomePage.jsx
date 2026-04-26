@@ -26,6 +26,10 @@ import { rise } from '../utils/motion';
 
 const COLORS = ['var(--accent)', '#8FB97E', '#C9A96E', '#7A9CC6', '#B48EAD'];
 
+function saleCashflowCents(sale) {
+  return Math.max(sale.proceedsCents || 0, 0);
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
@@ -36,6 +40,7 @@ function PlusIcon() {
 
 export default function IncomePage() {
   const incomes = useFinanceStore((state) => state.incomes);
+  const portfolioSales = useFinanceStore((state) => state.portfolioSales);
   const dashboard = useFinanceStore((state) => state.derived.dashboard);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
@@ -55,24 +60,43 @@ export default function IncomePage() {
   const [filterKind, setFilterKind] = useState('all');
   const [sourceSearch, setSourceSearch] = useState('');
 
-  const filteredIncomes = useMemo(
+  const incomeLedgerRows = useMemo(
+    () => [
+      ...incomes.map((income) => ({ ...income, ledgerType: 'income' })),
+      ...(portfolioSales || [])
+        .map((sale) => ({
+          id: `portfolio-sale-cashflow-${sale.id}`,
+          date: sale.date,
+          source: `${sale.ticker} sale cashflow`,
+          incomeKind: 'portfolio_sale_cashflow',
+          amountCents: sale.cashflowCents ?? saleCashflowCents(sale),
+          currency,
+          assetTicker: `Returned capital - ${sale.ticker}`,
+          ledgerType: 'portfolio-sale-cashflow',
+        }))
+        .filter((row) => row.amountCents > 0),
+    ],
+    [currency, incomes, portfolioSales],
+  );
+
+  const filteredIncomeRows = useMemo(
     () =>
-      incomes.filter(
-        (i) =>
-          (!filterMonth || i.date.startsWith(filterMonth)) &&
-          (filterKind === 'all' || i.incomeKind === filterKind) &&
-          (!sourceSearch || (i.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
+      incomeLedgerRows.filter(
+        (row) =>
+          (!filterMonth || row.date.startsWith(filterMonth)) &&
+          (filterKind === 'all' || row.incomeKind === filterKind) &&
+          (!sourceSearch || (row.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
       ),
-    [incomes, filterMonth, filterKind, sourceSearch],
+    [filterKind, filterMonth, incomeLedgerRows, sourceSearch],
   );
 
   const { sortKey: incSortKey, sortDir: incSortDir, onSort: onIncSort } = useSortable('date', 'desc');
-  const sortedIncomes = useMemo(
-    () => sortRows(filteredIncomes, incSortKey, incSortDir),
-    [filteredIncomes, incSortKey, incSortDir],
+  const sortedIncomeRows = useMemo(
+    () => sortRows(filteredIncomeRows, incSortKey, incSortDir),
+    [filteredIncomeRows, incSortKey, incSortDir],
   );
 
-  const batchSelect = useBatchSelect(sortedIncomes);
+  const batchSelect = useBatchSelect(sortedIncomeRows.filter((row) => row.ledgerType === 'income'));
 
   useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -125,20 +149,36 @@ export default function IncomePage() {
       header: 'Amount',
       numeric: true,
       sortable: true,
-      render: (r) => formatCurrency(r.amountCents, r.currency, locale),
+      render: (r) => (
+        <span
+          className={
+            r.incomeKind === 'portfolio_sale'
+              ? r.amountCents > 0
+                ? 'text-positive'
+                : 'text-danger'
+              : undefined
+          }
+        >
+          {formatCurrency(r.amountCents, r.currency, locale)}
+        </span>
+      ),
     },
     {
       key: 'actions',
       header: '',
       align: 'right',
       render: (r) => (
-        <div className="flex justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
-              removeEntity('incomes', r.id);
-          }}>Delete</Button>
-        </div>
+        r.ledgerType === 'income' ? (
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
+                removeEntity('incomes', r.id);
+            }}>Delete</Button>
+          </div>
+        ) : (
+          <span className="text-xs text-ink-faint px-2 py-1">via Portfolio</span>
+        )
       ),
     },
   ];
@@ -288,7 +328,7 @@ export default function IncomePage() {
         description="Each entry has type-specific details; dividends flow in from the Portfolio module."
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            {!batchSelect.selecting && (
+            {!batchSelect.selecting && sortedIncomeRows.some((row) => row.ledgerType === 'income') && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 Select
               </Button>
@@ -315,6 +355,8 @@ export default function IncomePage() {
               <option value="fixed">Fixed (salary)</option>
               <option value="variable">Variable (freelance)</option>
               <option value="dividend">Dividend</option>
+              <option value="portfolio_sale">Portfolio sale</option>
+              <option value="portfolio_sale_cashflow">Portfolio sale cashflow</option>
             </Select>
           </FormField>
           <FormField label="Source" htmlFor="income-source">
@@ -333,10 +375,10 @@ export default function IncomePage() {
           onDelete={handleBatchDeleteIncomes}
           onCancel={batchSelect.cancel}
         />
-        {filteredIncomes.length ? (
+        {filteredIncomeRows.length ? (
           <Table
             columns={incomeColumns}
-            rows={sortedIncomes}
+            rows={sortedIncomeRows}
             sortKey={incSortKey}
             sortDir={incSortDir}
             onSort={onIncSort}
@@ -344,13 +386,14 @@ export default function IncomePage() {
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
             onToggleAll={batchSelect.toggleAll}
+            isRowSelectable={(row) => row.ledgerType === 'income'}
           />
         ) : (
           <EmptyState
-            title={incomes.length ? 'No results for this filter' : 'No income records yet'}
+            title={incomeLedgerRows.length ? 'No results for this filter' : 'No income records yet'}
             description={incomes.length ? 'Try adjusting the month, kind, or source.' : 'Add salary, freelance invoices, or dividends to get started.'}
             action={
-              !incomes.length && (
+              !incomeLedgerRows.length && (
                 <Button variant="secondary" size="sm" onClick={openNew}>
                   <PlusIcon /> Add income
                 </Button>

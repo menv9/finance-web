@@ -31,11 +31,12 @@ export function categoryBreakdown(expenses) {
 }
 
 export function computePortfolioMetrics(holdings, dividends, cashflows, targets = []) {
-  const currentValueCents = holdings.reduce(
+  const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
+  const currentValueCents = activeHoldings.reduce(
     (total, holding) => total + Math.round(holding.quantity * (holding.currentPriceCents || 0)),
     0,
   );
-  const investedCents = holdings.reduce(
+  const investedCents = activeHoldings.reduce(
     (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)),
     0,
   );
@@ -44,14 +45,25 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
   const dividendIncomeCents = sumAmount(dividends);
   const dividendYield = currentValueCents ? (dividendIncomeCents / currentValueCents) * 100 : 0;
 
-  const allocationActual = holdings.map((holding) => {
+  const allocationByTicker = activeHoldings.reduce((groups, holding) => {
     const valueCents = Math.round(holding.quantity * (holding.currentPriceCents || 0));
-    const target = targets.find((item) => item.ticker === holding.ticker || item.ticker === holding.ticker.split('.')[0]);
-    return {
+    const current = groups.get(holding.ticker) || {
       ticker: holding.ticker,
       name: holding.name,
-      valueCents,
-      actualWeight: currentValueCents ? (valueCents / currentValueCents) * 100 : 0,
+      valueCents: 0,
+    };
+    groups.set(holding.ticker, {
+      ...current,
+      valueCents: current.valueCents + valueCents,
+    });
+    return groups;
+  }, new Map());
+
+  const allocationActual = [...allocationByTicker.values()].map((holding) => {
+    const target = targets.find((item) => item.ticker === holding.ticker || item.ticker === holding.ticker.split('.')[0]);
+    return {
+      ...holding,
+      actualWeight: currentValueCents ? (holding.valueCents / currentValueCents) * 100 : 0,
       targetWeight: target?.targetWeight || 0,
     };
   });
@@ -75,11 +87,12 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
 // of additional contributions because cost basis already grew with each buy.
 export function computeTWRR(holdings, cashflows) {
   void cashflows;
-  const investedCents = holdings.reduce(
+  const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
+  const investedCents = activeHoldings.reduce(
     (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)),
     0,
   );
-  const currentValueCents = holdings.reduce(
+  const currentValueCents = activeHoldings.reduce(
     (total, holding) => total + Math.round(holding.quantity * (holding.currentPriceCents || 0)),
     0,
   );
@@ -145,16 +158,25 @@ export function computeXIRR(cashflows, endingValueCents) {
   return null;
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, savingsConfig, savingsEntries, transfers = [] }) {
+function portfolioSaleCashflowCents(sale) {
+  return Math.max(sale.proceedsCents || 0, 0);
+}
+
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [] }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
   const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth && item.date <= today);
+  const currentMonthCashflowIncomes = currentMonthIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
+  const currentMonthSaleCashflowCents = (portfolioSales || [])
+    .filter((sale) => monthKey(sale.date) === currentMonth && sale.date <= today)
+    .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
 
   // Fix: only count actually-logged expenses. Adding fixedMonthlyCents on top
   // double-counts recurring bills that were already saved as expense entries.
   const totalExpensesCents = sumAmount(currentMonthExpenses);
   const totalIncomeCents   = sumAmount(currentMonthIncomes);
+  const cashflowIncomeCents = sumAmount(currentMonthCashflowIncomes);
 
   // Distributions this month (income → savings / portfolio) are money you've
   // deliberately set aside — they're no longer "usable" discretionary cash.
@@ -169,7 +191,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
 
   // Cashflow = money actually left to spend (income − expenses − saved − invested).
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
-  const cashflowCents      = totalIncomeCents - totalExpensesCents - distributedTotalCents;
+  const cashflowCents      = cashflowIncomeCents + currentMonthSaleCashflowCents - totalExpensesCents - distributedTotalCents;
   const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
   const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
 
@@ -183,6 +205,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
 
   const monthlyExpenses = computeExpenseSeries(expenses);
   const monthlyIncome   = computeIncomeSeries(incomes);
+  const monthlyCashflowIncome = computeIncomeSeries(incomes.filter((item) => item.incomeKind !== 'portfolio_sale'));
 
   // Fix: build the net worth series by working BACKWARDS from the real current
   // net worth, subtracting each subsequent month's logged cashflow. This gives
@@ -198,11 +221,17 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     };
   });
 
-  const cashflowSeries = monthlyIncome.map((incomePoint, index) => ({
-    month: incomePoint.month,
-    incomeCents: incomePoint.amountCents,
-    expenseCents: monthlyExpenses[index]?.amountCents || 0,
-  }));
+  const cashflowSeries = monthlyCashflowIncome.map((incomePoint, index) => {
+    const month = lastTwelveMonths()[index];
+    const saleCashflowCents = (portfolioSales || [])
+      .filter((sale) => monthKey(sale.date) === month.key)
+      .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
+    return {
+      month: incomePoint.month,
+      incomeCents: incomePoint.amountCents + saleCashflowCents,
+      expenseCents: monthlyExpenses[index]?.amountCents || 0,
+    };
+  });
 
   const upcomingEvents = [
     ...fixedExpenses
@@ -237,6 +266,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     cashflowSeries,
     upcomingEvents,
     totalIncomeCents,
+    portfolioSaleCashflowCents: currentMonthSaleCashflowCents,
     distributedToSavingsCents,
     distributedToPortfolioCents,
   };

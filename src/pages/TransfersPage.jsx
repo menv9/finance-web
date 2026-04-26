@@ -169,16 +169,11 @@ export default function TransfersPage() {
       />
 
       {/* Quick actions */}
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-2">
         {[
           {
-            label: 'Savings → Expenses',
+            label: 'Savings -> Expenses',
             desc: 'Pay an expense from savings',
-            from: 'savings',
-          },
-          {
-            label: 'Savings → Portfolio',
-            desc: 'Invest savings into portfolio',
             from: 'savings',
           },
           {
@@ -191,7 +186,7 @@ export default function TransfersPage() {
             key={action.label}
             type="button"
             onClick={() => openTransfer(action.from)}
-            className={'text-left rounded-lg border border-rule bg-surface p-4 hover:border-ink-faint hover:bg-surface-raised transition-colors duration-180 ' + rise(i + 1)}
+            className={'text-left rounded-lg border-2 border-rule-strong bg-surface p-4 shadow-[0_1px_0_rgba(32,26,18,0.07)] hover:border-ink-faint hover:bg-surface-raised transition-colors duration-180 ' + rise(i + 1)}
           >
             <p className="text-sm font-medium text-ink">{action.label}</p>
             <p className="mt-1 text-xs text-ink-muted">{action.desc}</p>
@@ -297,3 +292,4 @@ export default function TransfersPage() {
     </div>
   );
 }
+

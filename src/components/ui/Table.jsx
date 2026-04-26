@@ -170,6 +170,7 @@ export function Table({
                   'border-b border-rule last:border-b-0 transition-colors duration-120',
                   isChecked ? 'bg-accent-soft' : 'hover:bg-surface-raised',
                   onRowClick && 'cursor-pointer',
+                  row.rowClassName,
                 )}
               >
                 {selectable && (

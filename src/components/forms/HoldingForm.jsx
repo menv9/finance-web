@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { FormField, Input, Select, Button } from '../ui';
+import { useFinanceStore } from '../../store/useFinanceStore';
 
 const defaultValue = {
   ticker: '',
   name: '',
   platform: 'Trade Republic',
+  fundingSource: 'cashflow',
+  purchaseAmountCents: '',
   quantity: '',
   quantityDecimals: 0,
   averageBuyPriceCents: '',
@@ -29,9 +32,17 @@ function formatQuantityForInput(value) {
 }
 
 export function HoldingForm({ initialValue, onSubmit, onCancel }) {
+  const settings = useFinanceStore((state) => state.settings);
+  const configuredPlatforms = settings.holdingPlatforms?.length
+    ? settings.holdingPlatforms
+    : ['Trade Republic', 'IBKR', 'DEGIRO'];
+  const platformOptions = initialValue?.platform && !configuredPlatforms.includes(initialValue.platform)
+    ? [...configuredPlatforms, initialValue.platform]
+    : configuredPlatforms;
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
+    platform: initialValue?.platform || configuredPlatforms[0] || '',
     quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
       ? `${initialValue.averageBuyPriceCents / 100}`
@@ -43,6 +54,15 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  const averageBuyPriceCents = Math.round(Number(form.averageBuyPriceCents || 0) * 100);
+  const purchaseAmountCents = Math.round(Number(form.purchaseAmountCents || 0) * 100);
+  const hasPurchaseAmount = !initialValue && purchaseAmountCents > 0;
+  const resolvedQuantity = hasPurchaseAmount && averageBuyPriceCents > 0
+    ? purchaseAmountCents / averageBuyPriceCents
+    : Number(form.quantity || 0);
+  const resolvedQuantityDecimals = hasPurchaseAmount
+    ? countDecimals(resolvedQuantity.toFixed(12).replace(/0+$/, '').replace(/\.$/, ''))
+    : countDecimals(form.quantity);
 
   return (
     <form
@@ -52,9 +72,10 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         onSubmit({
           ...initialValue,
           ...form,
-          quantity: Number(form.quantity || 0),
-          quantityDecimals: countDecimals(form.quantity),
-          averageBuyPriceCents: Math.round(Number(form.averageBuyPriceCents || 0) * 100),
+          quantity: resolvedQuantity,
+          quantityDecimals: resolvedQuantityDecimals,
+          purchaseAmountCents,
+          averageBuyPriceCents,
           currentPriceCents: Math.round(Number(form.currentPriceCents || 0) * 100),
         });
       }}
@@ -82,15 +103,46 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
       <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
         {(props) => (
           <Select {...props} value={form.platform} onChange={set('platform')}>
-            <option value="Trade Republic">Trade Republic</option>
-            <option value="IBKR">Interactive Brokers</option>
-            <option value="DEGIRO">DEGIRO</option>
-            <option value="Other">Other</option>
+            {platformOptions.map((platform) => (
+              <option key={platform} value={platform}>{platform}</option>
+            ))}
           </Select>
         )}
       </FormField>
 
-      <FormField label="Quantity" htmlFor="holding-quantity" required>
+      {!initialValue ? (
+        <>
+          <FormField label="Purchase funded from" htmlFor="holding-funding-source">
+            {(props) => (
+              <Select {...props} value={form.fundingSource} onChange={set('fundingSource')}>
+                <option value="cashflow">Monthly cashflow</option>
+                <option value="savings">Savings</option>
+              </Select>
+            )}
+          </FormField>
+
+          <FormField label="Total spent" htmlFor="holding-purchase-amount" hint="If set, quantity is calculated from average buy price.">
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.purchaseAmountCents}
+                onChange={set('purchaseAmountCents')}
+                placeholder="0.00"
+              />
+            )}
+          </FormField>
+        </>
+      ) : null}
+
+      <FormField
+        label="Quantity"
+        htmlFor="holding-quantity"
+        required={!hasPurchaseAmount}
+        hint={hasPurchaseAmount && averageBuyPriceCents > 0 ? `Calculated: ${resolvedQuantity.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}` : undefined}
+      >
         {(props) => (
           <Input
             {...props}
@@ -99,6 +151,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
             value={form.quantity}
             onChange={set('quantity')}
             placeholder="0"
+            required={!hasPurchaseAmount}
           />
         )}
       </FormField>

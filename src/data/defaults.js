@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   locale: 'de-AT',
   theme: 'light',
   categories: DEFAULT_CATEGORIES,
+  holdingPlatforms: ['Trade Republic', 'IBKR', 'DEGIRO'],
   alphaVantageApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
