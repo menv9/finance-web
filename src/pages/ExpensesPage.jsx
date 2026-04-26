@@ -183,13 +183,13 @@ export default function ExpensesPage() {
       key: 'actions',
       header: '',
       align: 'right',
-      hideOnMobile: true,
+      noTruncate: true,
       render: (r) => {
         const attCount = attachments.filter((a) => a.expenseId === r.id).length;
         return (
-          <div className="flex justify-end gap-1">
+          <div className="flex flex-wrap justify-end gap-1">
             {attCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => openAttachments(r.id)}>
+              <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => openAttachments(r.id)}>
                 📎 {attCount}
               </Button>
             )}
@@ -210,8 +210,8 @@ export default function ExpensesPage() {
 
   const fixedColumns = [
     { key: 'name', header: 'Name' },
-    { key: 'category', header: 'Category' },
-    { key: 'chargeDay', header: 'Day', numeric: true, width: 70 },
+    { key: 'category', header: 'Category', hideOnMobile: true },
+    { key: 'chargeDay', header: 'Day', numeric: true, width: 70, hideOnMobile: true },
     {
       key: 'amountCents',
       header: 'Amount',
@@ -221,6 +221,7 @@ export default function ExpensesPage() {
     {
       key: 'active',
       header: 'Status',
+      hideOnMobile: true,
       render: (r) => (
         <span
           className={
@@ -242,14 +243,16 @@ export default function ExpensesPage() {
     {
       key: 'alerts',
       header: 'Alerts',
+      hideOnMobile: true,
       render: (r) => <span className="text-xs text-ink-muted">{r.alerts ? 'On' : 'Off'}</span>,
     },
     {
       key: 'actions',
       header: '',
       align: 'right',
+      noTruncate: true,
       render: (r) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditFixed(r.id)}>
             Edit
           </Button>

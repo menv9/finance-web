@@ -202,7 +202,10 @@ export function Table({
                         c.hideOnMobile && 'hidden sm:table-cell',
                       )}
                     >
-                      <div className={cn('min-w-0 max-w-full', c.numeric ? 'truncate text-right' : 'truncate')}>
+                      <div className={cn(
+                        'min-w-0 max-w-full',
+                        c.noTruncate ? 'overflow-visible whitespace-normal' : c.numeric ? 'truncate text-right' : 'truncate',
+                      )}>
                         {content}
                       </div>
                     </td>

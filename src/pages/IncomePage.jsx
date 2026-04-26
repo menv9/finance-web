@@ -140,7 +140,7 @@ export default function IncomePage() {
       key: 'incomeKind',
       header: 'Kind',
       sortable: true,
-      hideOnMobile: true,
+      noTruncate: true,
       render: (r) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {r.incomeKind}
@@ -185,10 +185,10 @@ export default function IncomePage() {
       key: 'actions',
       header: '',
       align: 'right',
-      hideOnMobile: true,
+      noTruncate: true,
       render: (r) => (
         r.ledgerType === 'income' ? (
-          <div className="flex justify-end gap-1">
+          <div className="flex flex-wrap justify-end gap-1">
             <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
             <Button variant="ghost" size="sm" onClick={async () => {
               if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
