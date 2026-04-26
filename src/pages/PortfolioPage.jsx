@@ -31,6 +31,14 @@ const COLORS = [
   'var(--danger)',
 ];
 
+function quantityDigits(holding) {
+  if (Number.isInteger(holding.quantityDecimals)) {
+    return Math.min(Math.max(holding.quantityDecimals, 0), 20);
+  }
+  const [, decimals = ''] = `${holding.quantity ?? ''}`.split('.');
+  return Math.min(decimals.length, 20);
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
@@ -116,7 +124,7 @@ export default function PortfolioPage() {
     { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono text-sm text-ink">{r.ticker}</span> },
     { key: 'name', header: 'Name' },
     { key: 'platform', header: 'Platform', render: (r) => <span className="text-xs text-ink-muted">{r.platform}</span> },
-    { key: 'quantity', header: 'Qty', numeric: true, render: (r) => formatNumber(r.quantity, locale, 4) },
+    { key: 'quantity', header: 'Qty', numeric: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
     { key: 'avg', header: 'Avg buy', numeric: true, render: (r) => formatCurrency(r.averageBuyPriceCents, currency, locale) },
     { key: 'price', header: 'Price', numeric: true, render: (r) => formatCurrency(r.currentPriceCents, currency, locale) },
     { key: 'value', header: 'Value', numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },

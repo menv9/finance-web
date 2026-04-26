@@ -6,14 +6,33 @@ const defaultValue = {
   name: '',
   platform: 'Trade Republic',
   quantity: '',
+  quantityDecimals: 0,
   averageBuyPriceCents: '',
   currentPriceCents: '',
 };
+
+function countDecimals(value) {
+  const text = `${value ?? ''}`.trim();
+  if (!text || text.toLowerCase().includes('e')) return 0;
+  return Math.min((text.split('.')[1] || '').length, 20);
+}
+
+function formatQuantityForInput(value) {
+  if (!value) return '';
+  const decimals = Number.isInteger(value.quantityDecimals)
+    ? Math.min(Math.max(value.quantityDecimals, 0), 20)
+    : null;
+  if (decimals !== null && Number.isFinite(value.quantity)) {
+    return value.quantity.toFixed(decimals);
+  }
+  return `${value.quantity ?? ''}`;
+}
 
 export function HoldingForm({ initialValue, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
+    quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
       ? `${initialValue.averageBuyPriceCents / 100}`
       : '',
@@ -34,6 +53,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
           ...initialValue,
           ...form,
           quantity: Number(form.quantity || 0),
+          quantityDecimals: countDecimals(form.quantity),
           averageBuyPriceCents: Math.round(Number(form.averageBuyPriceCents || 0) * 100),
           currentPriceCents: Math.round(Number(form.currentPriceCents || 0) * 100),
         });
@@ -75,7 +95,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
           <Input
             {...props}
             type="number"
-            step="0.0001"
+            step="any"
             value={form.quantity}
             onChange={set('quantity')}
             placeholder="0"

@@ -25,6 +25,28 @@ describe('finance metrics', () => {
     expect(metrics.allocationActual[0].actualWeight).toBe(100);
   });
 
+  it('uses the full holding quantity precision when computing value', () => {
+    const metrics = computePortfolioMetrics(
+      [
+        {
+          id: 'hold-precise',
+          ticker: 'BTC',
+          name: 'Bitcoin',
+          quantity: 0.12345678,
+          quantityDecimals: 8,
+          averageBuyPriceCents: 1000000,
+          currentPriceCents: 1234567,
+        },
+      ],
+      [],
+      [],
+      [],
+    );
+
+    expect(metrics.currentValueCents).toBe(Math.round(0.12345678 * 1234567));
+    expect(metrics.allocationActual[0].valueCents).toBe(Math.round(0.12345678 * 1234567));
+  });
+
   it('counts only variable income in side income ytd', () => {
     const result = yearlySideIncome([
       { incomeKind: 'variable', amountCents: 20000, date: '2026-01-02' },
