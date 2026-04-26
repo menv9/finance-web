@@ -688,10 +688,11 @@ export default function PortfolioPage() {
                     return (
                       <li key={item.ticker} className="flex items-center gap-2 min-w-0">
                         <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
-                        <span className="w-16 shrink-0 font-mono text-xs font-medium text-ink truncate">{item.ticker}</span>
+                        <span className="w-16 shrink-0 font-mono text-xs font-medium text-ink">{item.ticker}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">{item.name}</span>
                         <span className="w-20 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.valueCents, currency, locale)}</span>
                         <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{item.actualWeight.toFixed(1)}%</span>
-                        <div className="flex-1 h-1 rounded-full bg-rule overflow-hidden">
+                        <div className="w-16 shrink-0 h-1 rounded-full bg-rule overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-300" style={{ width: `${item.actualWeight}%`, background: color }} />
                         </div>
                       </li>
