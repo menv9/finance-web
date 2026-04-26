@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
+import { useSortable } from '../hooks/useSortable';
+import { sortRows } from '../utils/sort';
 import { TransferForm } from '../components/forms/TransferForm';
 import {
   Area,
@@ -173,21 +175,25 @@ export default function SavingsPage() {
 
   const filteredEntries = useMemo(
     () =>
-      [...savingsEntries]
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .filter(
-          (e) =>
-            (!filterMonth || e.date.startsWith(filterMonth)) &&
-            (filterType === 'all' ||
-              (filterType === 'deposit' && e.amountCents >= 0) ||
-              (filterType === 'withdrawal' && e.amountCents < 0)),
-        ),
+      savingsEntries.filter(
+        (e) =>
+          (!filterMonth || e.date.startsWith(filterMonth)) &&
+          (filterType === 'all' ||
+            (filterType === 'deposit' && e.amountCents >= 0) ||
+            (filterType === 'withdrawal' && e.amountCents < 0)),
+      ),
     [savingsEntries, filterMonth, filterType],
+  );
+
+  const { sortKey: savSortKey, sortDir: savSortDir, onSort: onSavSort } = useSortable('date', 'desc');
+  const sortedEntries = useMemo(
+    () => sortRows(filteredEntries, savSortKey, savSortDir),
+    [filteredEntries, savSortKey, savSortDir],
   );
 
   // Transfer-linked entries can only be removed via the Transfers page
   const isEntrySelectable = (e) => !e.transferId;
-  const batchSelect = useBatchSelect(filteredEntries, isEntrySelectable);
+  const batchSelect = useBatchSelect(sortedEntries, isEntrySelectable);
 
   useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,7 +210,7 @@ export default function SavingsPage() {
 
   // ── Table columns ──
   const entryColumns = [
-    { key: 'date', header: 'Date', width: 110 },
+    { key: 'date', header: 'Date', width: 110, sortable: true },
     {
       key: 'type',
       header: 'Type',
@@ -225,6 +231,7 @@ export default function SavingsPage() {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
+      sortable: true,
       render: (r) => (
         <span className={r.amountCents < 0 ? 'text-danger font-mono tabular' : 'font-mono tabular'}>
           {r.amountCents < 0 ? '−' : '+'}
@@ -364,7 +371,10 @@ export default function SavingsPage() {
         {savingsEntries.length ? (
           <Table
             columns={entryColumns}
-            rows={filteredEntries}
+            rows={sortedEntries}
+            sortKey={savSortKey}
+            sortDir={savSortDir}
+            onSort={onSavSort}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}

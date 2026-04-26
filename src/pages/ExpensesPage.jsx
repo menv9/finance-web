@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
+import { useSortable } from '../hooks/useSortable';
+import { sortRows } from '../utils/sort';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
@@ -80,7 +82,13 @@ export default function ExpensesPage() {
       ),
     [expenses, selectedMonth, selectedCategory, descSearch],
   );
-  const batchSelect = useBatchSelect(filteredExpenses);
+  const { sortKey: expSortKey, sortDir: expSortDir, onSort: onExpSort } = useSortable('date', 'desc');
+  const sortedExpenses = useMemo(
+    () => sortRows(filteredExpenses, expSortKey, expSortDir),
+    [filteredExpenses, expSortKey, expSortDir],
+  );
+
+  const batchSelect = useBatchSelect(sortedExpenses);
 
   // Clear selection when any filter changes so stale IDs can't be batch-deleted
   useEffect(() => { batchSelect.cancel(); }, [selectedMonth, selectedCategory, descSearch]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -137,11 +145,12 @@ export default function ExpensesPage() {
   };
 
   const expenseColumns = [
-    { key: 'date', header: 'Date', width: 110 },
-    { key: 'description', header: 'Description' },
+    { key: 'date', header: 'Date', width: 110, sortable: true },
+    { key: 'description', header: 'Description', sortable: true },
     {
       key: 'category',
       header: 'Category',
+      sortable: true,
       render: (row) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {row.category}
@@ -153,6 +162,7 @@ export default function ExpensesPage() {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
+      sortable: true,
       render: (r) => formatCurrency(r.amountCents, r.currency, locale),
     },
     {
@@ -457,7 +467,10 @@ export default function ExpensesPage() {
         {filteredExpenses.length ? (
           <Table
             columns={expenseColumns}
-            rows={filteredExpenses}
+            rows={sortedExpenses}
+            sortKey={expSortKey}
+            sortDir={expSortDir}
+            onSort={onExpSort}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}

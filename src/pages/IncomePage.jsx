@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
+import { useSortable } from '../hooks/useSortable';
+import { sortRows } from '../utils/sort';
 import {
   Bar,
   BarChart,
@@ -64,7 +66,13 @@ export default function IncomePage() {
     [incomes, filterMonth, filterKind, sourceSearch],
   );
 
-  const batchSelect = useBatchSelect(filteredIncomes);
+  const { sortKey: incSortKey, sortDir: incSortDir, onSort: onIncSort } = useSortable('date', 'desc');
+  const sortedIncomes = useMemo(
+    () => sortRows(filteredIncomes, incSortKey, incSortDir),
+    [filteredIncomes, incSortKey, incSortDir],
+  );
+
+  const batchSelect = useBatchSelect(sortedIncomes);
 
   useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,11 +98,12 @@ export default function IncomePage() {
   const topSource = sourceBreakdown.sort((a, b) => b.value - a.value)[0];
 
   const incomeColumns = [
-    { key: 'date', header: 'Date', width: 110 },
-    { key: 'source', header: 'Source' },
+    { key: 'date', header: 'Date', width: 110, sortable: true },
+    { key: 'source', header: 'Source', sortable: true },
     {
       key: 'incomeKind',
       header: 'Kind',
+      sortable: true,
       render: (r) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {r.incomeKind}
@@ -115,6 +124,7 @@ export default function IncomePage() {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
+      sortable: true,
       render: (r) => formatCurrency(r.amountCents, r.currency, locale),
     },
     {
@@ -326,7 +336,10 @@ export default function IncomePage() {
         {filteredIncomes.length ? (
           <Table
             columns={incomeColumns}
-            rows={filteredIncomes}
+            rows={sortedIncomes}
+            sortKey={incSortKey}
+            sortDir={incSortDir}
+            onSort={onIncSort}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}

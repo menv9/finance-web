@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
+import { useSortable } from '../hooks/useSortable';
+import { sortRows } from '../utils/sort';
 import { TransferForm } from '../components/forms/TransferForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { useConfirm } from '../components/ConfirmContext';
@@ -55,8 +57,6 @@ export default function TransfersPage() {
     setModal({ open: true, defaultFromModule });
   const closeTransfer = () => setModal({ open: false, defaultFromModule: 'savings' });
 
-  const sortedTransfers = [...transfers].sort((a, b) => b.date.localeCompare(a.date));
-
   // ── Filters ──
   const [filterMonth, setFilterMonth] = useState('');
   const [filterFrom, setFilterFrom] = useState('all');
@@ -64,16 +64,23 @@ export default function TransfersPage() {
 
   const filteredTransfers = useMemo(
     () =>
-      sortedTransfers.filter(
-        (t) =>
-          (!filterMonth || t.date.startsWith(filterMonth)) &&
-          (filterFrom === 'all' || t.fromModule === filterFrom) &&
-          (filterTo === 'all' || t.toModule === filterTo),
-      ),
-    [sortedTransfers, filterMonth, filterFrom, filterTo],
+      transfers
+        .filter(
+          (t) =>
+            (!filterMonth || t.date.startsWith(filterMonth)) &&
+            (filterFrom === 'all' || t.fromModule === filterFrom) &&
+            (filterTo === 'all' || t.toModule === filterTo),
+        ),
+    [transfers, filterMonth, filterFrom, filterTo],
   );
 
-  const batchSelect = useBatchSelect(filteredTransfers);
+  const { sortKey: trfSortKey, sortDir: trfSortDir, onSort: onTrfSort } = useSortable('date', 'desc');
+  const sortedTransfers = useMemo(
+    () => sortRows(filteredTransfers, trfSortKey, trfSortDir),
+    [filteredTransfers, trfSortKey, trfSortDir],
+  );
+
+  const batchSelect = useBatchSelect(sortedTransfers);
 
   useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterFrom, filterTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -89,7 +96,7 @@ export default function TransfersPage() {
   };
 
   const columns = [
-    { key: 'date', header: 'Date', width: 110 },
+    { key: 'date', header: 'Date', width: 110, sortable: true },
     {
       key: 'flow',
       header: 'Transfer',
@@ -114,6 +121,7 @@ export default function TransfersPage() {
       key: 'amountCents',
       header: 'Amount',
       numeric: true,
+      sortable: true,
       render: (r) => (
         <span className="font-mono tabular">
           {formatCurrency(r.amountCents, currency, locale)}
@@ -240,7 +248,10 @@ export default function TransfersPage() {
         {sortedTransfers.length ? (
           <Table
             columns={columns}
-            rows={filteredTransfers}
+            rows={sortedTransfers}
+            sortKey={trfSortKey}
+            sortDir={trfSortDir}
+            onSort={onTrfSort}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}

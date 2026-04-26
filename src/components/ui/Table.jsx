@@ -1,16 +1,61 @@
 import { cn } from './cn';
 
 /**
- * columns: Array<{ key, header, align?: 'left'|'right'|'center', width?, numeric?, render?(row), hideOnMobile? }>
+ * columns: Array<{
+ *   key, header,
+ *   align?: 'left'|'right'|'center',
+ *   width?, numeric?,
+ *   render?(row),
+ *   hideOnMobile?,
+ *   sortable?,        ← makes the header clickable for sorting
+ * }>
  * rows: Array<{ id, ...data }>
+ *
+ * Sort props (all optional — pass together to enable):
+ *   sortKey:      string               — currently active sort column key
+ *   sortDir:      'asc' | 'desc'       — current sort direction
+ *   onSort:       (key: string) => void
  *
  * Batch-select props (all optional — pass together to enable):
  *   selectable:     boolean              — show checkbox column
  *   selectedIds:    Set<string>          — set of currently checked row ids
- *   onToggleRow:    (id: string) => void — called when a row checkbox changes
- *   onToggleAll:    () => void           — called when the header checkbox changes
- *   isRowSelectable:(row) => boolean     — rows returning false get an empty cell instead of a checkbox
+ *   onToggleRow:    (id: string) => void
+ *   onToggleAll:    () => void
+ *   isRowSelectable:(row) => boolean     — rows returning false get an empty cell
  */
+
+function SortIcon({ active, dir }) {
+  if (!active) {
+    return (
+      <svg
+        aria-hidden
+        viewBox="0 0 8 12"
+        className="ml-1 inline-block h-2.5 w-1.5 shrink-0 text-ink-faint opacity-40"
+      >
+        <path d="M4 0L1 4h6L4 0z" fill="currentColor" />
+        <path d="M4 12L1 8h6L4 12z" fill="currentColor" />
+      </svg>
+    );
+  }
+  return dir === 'asc' ? (
+    <svg
+      aria-hidden
+      viewBox="0 0 8 8"
+      className="ml-1 inline-block h-2 w-1.5 shrink-0 text-accent"
+    >
+      <path d="M4 0L1 6h6L4 0z" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg
+      aria-hidden
+      viewBox="0 0 8 8"
+      className="ml-1 inline-block h-2 w-1.5 shrink-0 text-accent"
+    >
+      <path d="M4 8L1 2h6L4 8z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function Table({
   columns,
   rows,
@@ -20,6 +65,10 @@ export function Table({
   caption,
   className,
   onRowClick,
+  // sort
+  sortKey,
+  sortDir,
+  onSort,
   // batch select
   selectable,
   selectedIds,
@@ -79,22 +128,33 @@ export function Table({
                 />
               </th>
             )}
-            {columns.map((c) => (
-              <th
-                key={c.key}
-                scope="col"
-                style={{ width: c.width, textAlign: c.align || (c.numeric ? 'right' : 'left') }}
-                className={cn(
-                  'sticky top-0 z-10 bg-surface',
-                  'border-b border-rule',
-                  'eyebrow font-medium',
-                  pad,
-                  c.hideOnMobile && 'hidden sm:table-cell',
-                )}
-              >
-                {c.header}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const isSortable = c.sortable && onSort;
+              const isActive = sortKey === c.key;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  style={{ width: c.width, textAlign: c.align || (c.numeric ? 'right' : 'left') }}
+                  onClick={isSortable ? () => onSort(c.key) : undefined}
+                  title={isSortable ? `Sort by ${c.header}` : undefined}
+                  className={cn(
+                    'sticky top-0 z-10 bg-surface',
+                    'border-b border-rule',
+                    'eyebrow font-medium',
+                    pad,
+                    isSortable && 'cursor-pointer select-none hover:text-ink transition-colors duration-120',
+                    isActive && 'text-ink',
+                    c.hideOnMobile && 'hidden sm:table-cell',
+                  )}
+                >
+                  <span className="inline-flex items-center">
+                    {c.header}
+                    {isSortable && <SortIcon active={isActive} dir={sortDir} />}
+                  </span>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
