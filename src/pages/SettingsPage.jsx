@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Card, Button, FormField, Input, Select, Table, EmptyState } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -8,6 +9,7 @@ const sections = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'categories', label: 'Categories' },
   { id: 'targets', label: 'Allocation targets' },
+  { id: 'import', label: 'Bank import' },
   { id: 'sync', label: 'Sync' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'backup', label: 'Backup' },
@@ -27,6 +29,7 @@ function SectionLink({ id, label }) {
 export default function SettingsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
+  const saveEntity = useFinanceStore((state) => state.saveEntity);
   const exportBackup = useFinanceStore((state) => state.exportBackup);
   const importBackup = useFinanceStore((state) => state.importBackup);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
@@ -283,6 +286,24 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
+          </Card>
+
+          <Card
+            id="import"
+            eyebrow="Import"
+            title="Bank import"
+            description="Upload a CSV export from your bank. Detects income vs expenses by amount sign, and auto-categorizes using MCC codes."
+            className={rise(4)}
+          >
+            <SmartBankImport
+              categories={settings.categories}
+              onImportExpenses={async (rows) => {
+                for (const row of rows) await saveEntity('expenses', row);
+              }}
+              onImportIncomes={async (rows) => {
+                for (const row of rows) await saveEntity('incomes', row);
+              }}
+            />
           </Card>
 
           <Card

@@ -7,7 +7,7 @@ import { sortRows } from '../utils/sort';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
-import { CsvImportCard } from '../components/CsvImportCard';
+import { SmartBankImport } from '../components/SmartBankImport';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { PageHeader } from '../components/PageHeader';
 import { ExpenseForm } from '../components/forms/ExpenseForm';
@@ -493,14 +493,16 @@ export default function ExpensesPage() {
       <Card
         eyebrow="Import"
         title="Bank extract CSV"
-        description="Map columns from Austrian bank exports. Preview before committing."
+        description="Supports Revolut, N26, ING, and most standard exports. Splits rows into expenses and income automatically."
         className={rise(4)}
       >
-        <CsvImportCard
-          mapping={settings.csvMapping}
+        <SmartBankImport
           categories={settings.categories}
-          onImport={async (rows) => {
+          onImportExpenses={async (rows) => {
             for (const row of rows) await saveEntity('expenses', row);
+          }}
+          onImportIncomes={async (rows) => {
+            for (const row of rows) await saveEntity('incomes', row);
           }}
         />
       </Card>
