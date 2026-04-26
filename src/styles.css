@@ -229,6 +229,11 @@ p { margin: 0; }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Mobile: suspend off-screen animations can freeze cards at opacity:0 — just skip them */
+@media (max-width: 767px) {
+  .rise, .rise-1, .rise-2, .rise-3, .rise-4, .rise-5, .rise-6 { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rise, .rise-1, .rise-2, .rise-3, .rise-4, .rise-5, .rise-6 { animation: none; }
   * { transition: none !important; }
