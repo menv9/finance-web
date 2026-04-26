@@ -73,6 +73,7 @@ function RecentActivity({ items, currency, locale }) {
     <ul className="divide-y divide-rule">
       {items.map((item) => {
         const isPortfolioSaleLoss = item.incomeKind === 'portfolio_sale' && (item.realizedPnlCents || 0) < 0;
+        const visualAmountCents = isPortfolioSaleLoss ? item.realizedPnlCents : item.amountCents;
         const amountClass = isPortfolioSaleLoss
           ? 'text-danger'
           : item.direction === 'in'
@@ -96,8 +97,8 @@ function RecentActivity({ items, currency, locale }) {
                   : amountClass)
             }
           >
-            {item.direction === 'in' ? '+' : '−'}
-            {formatCurrency(Math.abs(item.amountCents), currency, locale).replace(/^[−-]/, '')}
+            {isPortfolioSaleLoss ? '−' : item.direction === 'in' ? '+' : '−'}
+            {formatCurrency(Math.abs(visualAmountCents), currency, locale).replace(/^[−-]/, '')}
           </span>
         </li>
         );

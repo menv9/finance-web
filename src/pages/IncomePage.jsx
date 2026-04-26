@@ -151,19 +151,23 @@ export default function IncomePage() {
       header: 'Amount',
       numeric: true,
       sortable: true,
-      render: (r) => (
-        <span
-          className={
-            r.incomeKind === 'portfolio_sale'
-              ? r.amountCents > 0
-                ? 'text-positive'
-                : 'text-danger'
-              : 'text-positive'
-          }
-        >
-          {formatCurrency(r.amountCents, r.currency, locale)}
-        </span>
-      ),
+      render: (r) => {
+        const isPortfolioSaleLoss = r.incomeKind === 'portfolio_sale' && (r.realizedPnlCents || 0) < 0;
+        const displayAmountCents = isPortfolioSaleLoss ? r.realizedPnlCents : r.amountCents;
+        return (
+          <span
+            className={
+              r.incomeKind === 'portfolio_sale'
+                ? displayAmountCents > 0
+                  ? 'text-positive'
+                  : 'text-danger'
+                : 'text-positive'
+            }
+          >
+            {formatCurrency(displayAmountCents, r.currency, locale)}
+          </span>
+        );
+      },
     },
     {
       key: 'actions',

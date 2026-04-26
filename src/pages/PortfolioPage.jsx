@@ -55,9 +55,10 @@ function groupHoldingsByTicker(holdings) {
       0,
     );
     const costCents = lots.reduce(
-      (sum, holding) => sum + Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)),
+      (sum, holding) => sum + Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
       0,
     );
+    const feeCents = lots.reduce((sum, holding) => sum + (holding.feeCents || 0), 0);
     const quantityDecimals = Math.max(...lots.map((holding) => quantityDigits(holding)), 0);
     return {
       id: `group-${ticker}`,
@@ -71,6 +72,7 @@ function groupHoldingsByTicker(holdings) {
       currentPriceCents: quantity ? Math.round(valueCents / quantity) : 0,
       valueCents,
       costCents,
+      feeCents,
       pnlCents: valueCents - costCents,
       pnlPct: costCents ? ((valueCents - costCents) / costCents) * 100 : 0,
       rowClassName: 'bg-surface-raised',
@@ -83,7 +85,7 @@ function buildHoldingRows(holdings) {
   return groupHoldingsByTicker(holdings).flatMap((group) => {
     const lotRows = group.lots.map((holding, index) => {
       const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
-      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0));
+      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
       const pnlCents = valueCents - costCents;
       return {
         ...holding,
@@ -110,6 +112,8 @@ function groupSalesByTicker(sales) {
   return [...groups.entries()].map(([ticker, lots]) => {
     const quantity = lots.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0);
     const proceedsCents = lots.reduce((sum, sale) => sum + (sale.proceedsCents || 0), 0);
+    const feeCents = lots.reduce((sum, sale) => sum + (sale.feeCents || 0), 0);
+    const grossProceedsCents = lots.reduce((sum, sale) => sum + (sale.grossProceedsCents || sale.proceedsCents || 0), 0);
     const costBasisCents = lots.reduce((sum, sale) => sum + (sale.costBasisCents || 0), 0);
     const realizedPnlCents = lots.reduce((sum, sale) => sum + (sale.realizedPnlCents || 0), 0);
     const quantityDecimals = Math.max(...lots.map((sale) => quantityDigits(sale)), 0);
@@ -123,8 +127,9 @@ function groupSalesByTicker(sales) {
       quantity,
       quantityDecimals,
       percent: sortedLots.length,
-      salePriceCents: quantity ? Math.round(proceedsCents / quantity) : 0,
+      salePriceCents: quantity ? Math.round(grossProceedsCents / quantity) : 0,
       proceedsCents,
+      feeCents,
       costBasisCents,
       realizedPnlCents,
       realizedPnlPct: costBasisCents ? (realizedPnlCents / costBasisCents) * 100 : 0,
@@ -150,14 +155,18 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
       : holding?.currentPriceCents
         ? `${holding.currentPriceCents / 100}`
         : '',
+    fee: sale?.feeCents ? `${sale.feeCents / 100}` : '',
     date: sale?.date || normalizeDateInput(new Date()),
   });
 
   const percent = Math.min(Math.max(Number(form.percent || 0), 0), 100);
   const salePriceCents = Math.round(Number(form.salePrice || 0) * 100);
+  const feeCents = Math.round(Number(form.fee || 0) * 100);
   const soldQuantity = (holding?.quantity || 0) * (percent / 100);
-  const proceedsCents = Math.round(soldQuantity * salePriceCents);
-  const costBasisCents = Math.round(soldQuantity * (holding?.averageBuyPriceCents || 0));
+  const grossProceedsCents = Math.round(soldQuantity * salePriceCents);
+  const proceedsCents = Math.max(0, grossProceedsCents - feeCents);
+  const holdingFeeCents = Math.round((holding?.feeCents || 0) * (percent / 100));
+  const costBasisCents = Math.round(soldQuantity * (holding?.averageBuyPriceCents || 0)) + holdingFeeCents;
   const realizedPnlCents = proceedsCents - costBasisCents;
   const realizedPnlPct = costBasisCents ? (realizedPnlCents / costBasisCents) * 100 : 0;
 
@@ -174,6 +183,7 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
           saleId: sale?.id,
           percent,
           salePriceCents,
+          feeCents,
           date: form.date,
         });
       }}
@@ -219,6 +229,20 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
             type="date"
             value={form.date}
             onChange={set('date')}
+          />
+        )}
+      </FormField>
+
+      <FormField label="Commission" htmlFor="sell-fee">
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.fee}
+            onChange={set('fee')}
+            placeholder="0.00"
           />
         )}
       </FormField>
@@ -405,7 +429,7 @@ export default function PortfolioPage() {
   const holdingRows = holdingGroups.flatMap((group) => {
     const lotRows = group.lots.map((holding, index) => {
       const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
-      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0));
+      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
       const pnlCents = valueCents - costCents;
       return {
         ...holding,
@@ -432,6 +456,7 @@ export default function PortfolioPage() {
         holdingId: lot.id,
         percent: 100,
         salePriceCents: lot.currentPriceCents || group.currentPriceCents || 0,
+        feeCents: 0,
         date: normalizeDateInput(new Date()),
       });
     }
@@ -468,6 +493,7 @@ export default function PortfolioPage() {
     { key: 'quantity', header: 'Qty', numeric: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
     { key: 'avg', header: 'Avg buy', numeric: true, render: (r) => formatCurrency(r.averageBuyPriceCents, currency, locale) },
     { key: 'price', header: 'Price', numeric: true, render: (r) => formatCurrency(r.currentPriceCents, currency, locale) },
+    { key: 'fee', header: 'Fees', numeric: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
     { key: 'value', header: 'Value', numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
     {
       key: 'pnl',
@@ -582,6 +608,7 @@ export default function PortfolioPage() {
       render: (r) => r.rowType === 'group' ? `${r.percent} operations` : `${formatNumber(r.percent, locale, 2)}%`,
     },
     { key: 'salePrice', header: 'Sale price', numeric: true, render: (r) => formatCurrency(r.salePriceCents, currency, locale) },
+    { key: 'fee', header: 'Fees', numeric: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
     { key: 'proceeds', header: 'Proceeds', numeric: true, render: (r) => formatCurrency(r.proceedsCents, currency, locale) },
     {
       key: 'realizedPnl',
@@ -879,9 +906,10 @@ export default function PortfolioPage() {
             const { fundingSource, purchaseAmountCents, ...holdingValue } = value;
             const saved = await saveEntity('holdings', holdingValue);
             if (isNew) {
-              const cost = purchaseAmountCents > 0
+              const baseCost = purchaseAmountCents > 0
                 ? purchaseAmountCents
                 : Math.round(saved.quantity * saved.averageBuyPriceCents);
+              const cost = baseCost + (saved.feeCents || 0);
               if (cost > 0) {
                 await executeTransfer({
                   date: normalizeDateInput(new Date()),

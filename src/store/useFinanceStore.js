@@ -95,7 +95,7 @@ function upsertItem(items, nextItem) {
   return index >= 0 ? items.map((item) => (item.id === nextItem.id ? nextItem : item)) : [nextItem, ...items];
 }
 
-function buildSaleUpdate({ holding, sale, percent, salePriceCents, date, timestamp, cashflowId }) {
+function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, date, timestamp, cashflowId }) {
   const salePercent = Math.min(Math.max(Number(percent || 0), 0), 100);
   if (salePercent <= 0) throw new Error('Sale percent must be greater than 0');
 
@@ -103,17 +103,23 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, date, timesta
   if (currentQuantity <= 0) throw new Error('Holding has no quantity to sell');
 
   const soldQuantity = Math.min(currentQuantity, currentQuantity * (salePercent / 100));
+  const soldRatio = currentQuantity ? soldQuantity / currentQuantity : 0;
   const isFullSale = currentQuantity - soldQuantity <= 10 ** -12 || salePercent >= 100;
   const nextQuantity = isFullSale ? 0 : currentQuantity - soldQuantity;
   const effectivePriceCents = Math.round(Number(salePriceCents || holding.currentPriceCents || 0));
-  const proceedsCents = Math.round(soldQuantity * effectivePriceCents);
-  const costBasisCents = Math.round(soldQuantity * (holding.averageBuyPriceCents || 0));
+  const saleFeeCents = Math.round(Number(feeCents ?? sale?.feeCents ?? 0));
+  const holdingFeeCents = Math.round((holding.feeCents || 0) * soldRatio);
+  const remainingHoldingFeeCents = Math.max(0, (holding.feeCents || 0) - holdingFeeCents);
+  const grossProceedsCents = Math.round(soldQuantity * effectivePriceCents);
+  const proceedsCents = Math.max(0, grossProceedsCents - saleFeeCents);
+  const costBasisCents = Math.round(soldQuantity * (holding.averageBuyPriceCents || 0)) + holdingFeeCents;
   const saleDate = date || timestamp.slice(0, 10);
   const saleId = sale?.id || makeId('psl');
 
   const nextHolding = ensureEntitySyncFields({
     ...holding,
     quantity: nextQuantity,
+    feeCents: remainingHoldingFeeCents,
     archivedAt: isFullSale ? saleDate : null,
     updatedAt: timestamp,
   }, timestamp);
@@ -129,6 +135,9 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, date, timesta
     quantityDecimals: holding.quantityDecimals,
     averageBuyPriceCents: holding.averageBuyPriceCents || 0,
     salePriceCents: effectivePriceCents,
+    grossProceedsCents,
+    feeCents: saleFeeCents,
+    buyFeeCents: holdingFeeCents,
     proceedsCents,
     costBasisCents,
     realizedPnlCents: proceedsCents - costBasisCents,
@@ -554,7 +563,7 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
-  sellHolding: async ({ holdingId, percent, salePriceCents, date }) => {
+  sellHolding: async ({ holdingId, percent, salePriceCents, feeCents, date }) => {
     const holding = get().holdings.find((item) => item.id === holdingId);
     if (!holding) throw new Error('Holding not found');
 
@@ -563,6 +572,7 @@ export const useFinanceStore = create((set, get) => ({
       holding,
       percent,
       salePriceCents,
+      feeCents,
       date,
       timestamp,
     });
@@ -619,7 +629,7 @@ export const useFinanceStore = create((set, get) => ({
     return sale;
   },
 
-  updatePortfolioSale: async ({ saleId, percent, salePriceCents, date }) => {
+  updatePortfolioSale: async ({ saleId, percent, salePriceCents, feeCents, date }) => {
     const currentSale = get().portfolioSales.find((item) => item.id === saleId);
     if (!currentSale) throw new Error('Sale not found');
 
@@ -630,6 +640,7 @@ export const useFinanceStore = create((set, get) => ({
     const restoredHolding = ensureEntitySyncFields({
       ...holding,
       quantity: Number(holding.quantity || 0) + Number(currentSale.quantity || 0),
+      feeCents: (holding.feeCents || 0) + (currentSale.buyFeeCents || 0),
       archivedAt: null,
       updatedAt: timestamp,
     }, timestamp);
@@ -639,6 +650,7 @@ export const useFinanceStore = create((set, get) => ({
       sale: currentSale,
       percent,
       salePriceCents,
+      feeCents,
       date,
       timestamp,
       cashflowId: currentCashflow?.id,
@@ -713,6 +725,7 @@ export const useFinanceStore = create((set, get) => ({
       ? ensureEntitySyncFields({
           ...holding,
           quantity: Number(holding.quantity || 0) + Number(sale.quantity || 0),
+          feeCents: (holding.feeCents || 0) + (sale.buyFeeCents || 0),
           archivedAt: null,
           updatedAt: timestamp,
         }, timestamp)

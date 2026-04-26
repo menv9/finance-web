@@ -37,7 +37,7 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
     0,
   );
   const investedCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)),
+    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
     0,
   );
   const pnlCents = currentValueCents - investedCents;
@@ -89,7 +89,7 @@ export function computeTWRR(holdings, cashflows) {
   void cashflows;
   const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
   const investedCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)),
+    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
     0,
   );
   const currentValueCents = activeHoldings.reduce(

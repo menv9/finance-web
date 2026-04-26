@@ -12,6 +12,7 @@ const defaultValue = {
   quantityDecimals: 0,
   averageBuyPriceCents: '',
   currentPriceCents: '',
+  feeCents: '',
 };
 
 function countDecimals(value) {
@@ -50,6 +51,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
     currentPriceCents: initialValue?.currentPriceCents
       ? `${initialValue.currentPriceCents / 100}`
       : '',
+    feeCents: initialValue?.feeCents ? `${initialValue.feeCents / 100}` : '',
   });
 
   const set = (key) => (event) =>
@@ -77,6 +79,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
           purchaseAmountCents,
           averageBuyPriceCents,
           currentPriceCents: Math.round(Number(form.currentPriceCents || 0) * 100),
+          feeCents: Math.round(Number(form.feeCents || 0) * 100),
         });
       }}
     >
@@ -121,7 +124,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
             )}
           </FormField>
 
-          <FormField label="Total spent" htmlFor="holding-purchase-amount" hint="If set, quantity is calculated from average buy price.">
+          <FormField label="Amount invested" htmlFor="holding-purchase-amount" hint="Before commission. If set, quantity is calculated from average buy price.">
             {(props) => (
               <Input
                 {...props}
@@ -169,7 +172,21 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         )}
       </FormField>
 
-      <FormField label="Current price" htmlFor="holding-current" hint="Updated via Refresh prices" className="md:col-span-2">
+      <FormField label="Commission" htmlFor="holding-fee" hint="Broker fee for this operation.">
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.feeCents}
+            onChange={set('feeCents')}
+            placeholder="0.00"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Current price" htmlFor="holding-current" hint="Updated via Refresh prices">
         {(props) => (
           <Input
             {...props}
