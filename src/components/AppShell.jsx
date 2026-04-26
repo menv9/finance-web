@@ -122,9 +122,10 @@ export function AppShell({ children }) {
 
   return (
     <div className="min-h-screen">
-      {/* Gorka: full-page liquid chrome background fixed behind everything */}
+      {/* Gorka: full-page liquid chrome background fixed behind everything.
+          Background colour prevents the white flash before WebGL first renders. */}
       {appliedTheme === 'gorka' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#060412' }}>
           <LiquidChrome baseColor={[0.427, 0, 1.0]} speed={0.12} amplitude={0.3} interactive={false} />
         </div>
       )}
