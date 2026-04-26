@@ -283,9 +283,9 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           {/* ── Expense preview ── */}
           {split.expenses.length > 0 && (
             <div>
-              <p className="eyebrow mb-2">Expense preview <span className="text-ink-faint normal-case font-normal">(first 5)</span></p>
+              <p className="eyebrow mb-2">Expense preview</p>
               <PreviewTable
-                rows={finalExpenses.slice(0, 5)}
+                rows={finalExpenses}
                 columns={[
                   { key: 'date', label: 'Date' },
                   { key: 'description', label: 'Description' },
@@ -299,9 +299,9 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           {/* ── Income preview ── */}
           {split.incomes.length > 0 && (
             <div>
-              <p className="eyebrow mb-2">Income preview <span className="text-ink-faint normal-case font-normal">(first 5)</span></p>
+              <p className="eyebrow mb-2">Income preview</p>
               <PreviewTable
-                rows={split.incomes.slice(0, 5)}
+                rows={split.incomes}
                 columns={[
                   { key: 'date', label: 'Date' },
                   { key: 'source', label: 'Source' },
@@ -334,33 +334,81 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
   );
 }
 
-// ── Shared mini preview table ─────────────────────────────────────────────────
+// ── Shared mini preview table with pagination ─────────────────────────────────
+
+const PAGE_SIZE = 10;
 
 function PreviewTable({ rows, columns }) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const visible = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-rule">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} className="eyebrow border-b border-rule bg-surface px-3 py-2 text-left">
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-rule last:border-0 hover:bg-surface-raised">
+    <div className="grid gap-2">
+      <div className="overflow-x-auto rounded-lg border border-rule">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr>
               {columns.map((c) => (
-                <td key={c.key} className="px-3 py-2 text-ink-muted">
-                  {c.render ? c.render(row) : row[c.key]}
-                </td>
+                <th key={c.key} className="eyebrow border-b border-rule bg-surface px-3 py-2 text-left">
+                  {c.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {visible.map((row, i) => (
+              <tr key={i} className="border-b border-rule last:border-0 hover:bg-surface-raised">
+                {columns.map((c) => (
+                  <td key={c.key} className="px-3 py-2 text-ink-muted">
+                    {c.render ? c.render(row) : row[c.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 px-1">
+          <span className="text-xs text-ink-faint">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setPage(i)}
+                className={
+                  'rounded px-2 py-1 text-xs transition-colors ' +
+                  (i === page
+                    ? 'bg-ink text-ink-inverse font-medium'
+                    : 'text-ink-muted hover:text-ink hover:bg-surface-raised')
+                }
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={page === totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
