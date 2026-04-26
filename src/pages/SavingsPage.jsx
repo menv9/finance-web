@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
+import { BatchDeleteBar } from '../components/BatchDeleteBar';
+import { useBatchSelect } from '../hooks/useBatchSelect';
 import { TransferForm } from '../components/forms/TransferForm';
 import {
   Area,
@@ -165,6 +167,21 @@ export default function SavingsPage() {
   const goalYear      = yearsToGoal(projection, goalCents);
   const goalProgress  = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
 
+  // Transfer-linked entries can only be removed via the Transfers page
+  const isEntrySelectable = (e) => !e.transferId;
+  const batchSelect = useBatchSelect(savingsEntries, isEntrySelectable);
+
+  const handleBatchDeleteEntries = async () => {
+    const ids = [...batchSelect.selectedIds];
+    const ok = await confirm({
+      title: `Delete ${ids.length} savings entr${ids.length !== 1 ? 'ies' : 'y'}`,
+      description: 'These entries will be permanently removed from your log.',
+    });
+    if (!ok) return;
+    for (const id of ids) await removeSavingsEntry(id);
+    batchSelect.cancel();
+  };
+
   // ── Table columns ──
   const entryColumns = [
     { key: 'date', header: 'Date', width: 110 },
@@ -289,15 +306,33 @@ export default function SavingsPage() {
         description="Every time you put money aside, log it here."
         className={rise(2)}
         action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add saving
-          </Button>
+          <div className="flex gap-2">
+            {!batchSelect.selecting && (
+              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+                Select
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add saving
+            </Button>
+          </div>
         }
       >
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteEntries}
+          onCancel={batchSelect.cancel}
+        />
         {savingsEntries.length ? (
           <Table
             columns={entryColumns}
             rows={[...savingsEntries].sort((a, b) => b.date.localeCompare(a.date))}
+            selectable={batchSelect.selecting}
+            selectedIds={batchSelect.selectedIds}
+            onToggleRow={batchSelect.toggle}
+            onToggleAll={batchSelect.toggleAll}
+            isRowSelectable={isEntrySelectable}
           />
         ) : (
           <EmptyState

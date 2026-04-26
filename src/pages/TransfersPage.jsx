@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { BatchDeleteBar } from '../components/BatchDeleteBar';
+import { useBatchSelect } from '../hooks/useBatchSelect';
 import { TransferForm } from '../components/forms/TransferForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { useConfirm } from '../components/ConfirmContext';
@@ -54,6 +56,19 @@ export default function TransfersPage() {
   const closeTransfer = () => setModal({ open: false, defaultFromModule: 'savings' });
 
   const sortedTransfers = [...transfers].sort((a, b) => b.date.localeCompare(a.date));
+
+  const batchSelect = useBatchSelect(sortedTransfers);
+
+  const handleBatchDeleteTransfers = async () => {
+    const ids = [...batchSelect.selectedIds];
+    const ok = await confirm({
+      title: `Delete ${ids.length} transfer${ids.length !== 1 ? 's' : ''}`,
+      description: 'All linked records (savings entries, expenses, portfolio cashflows) will also be removed.',
+    });
+    if (!ok) return;
+    for (const id of ids) await removeTransfer(id);
+    batchSelect.cancel();
+  };
 
   const columns = [
     { key: 'date', header: 'Date', width: 110 },
@@ -164,9 +179,29 @@ export default function TransfersPage() {
         title="All transfers"
         description="Deleting a transfer also removes the linked records from savings, expenses, or portfolio."
         className={rise(2)}
+        action={
+          !batchSelect.selecting && sortedTransfers.length > 0 ? (
+            <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+              Select
+            </Button>
+          ) : null
+        }
       >
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteTransfers}
+          onCancel={batchSelect.cancel}
+        />
         {sortedTransfers.length ? (
-          <Table columns={columns} rows={sortedTransfers} />
+          <Table
+            columns={columns}
+            rows={sortedTransfers}
+            selectable={batchSelect.selecting}
+            selectedIds={batchSelect.selectedIds}
+            onToggleRow={batchSelect.toggle}
+            onToggleAll={batchSelect.toggleAll}
+          />
         ) : (
           <EmptyState
             title="No transfers yet"

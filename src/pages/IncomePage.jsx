@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
+import { BatchDeleteBar } from '../components/BatchDeleteBar';
+import { useBatchSelect } from '../hooks/useBatchSelect';
 import {
   Bar,
   BarChart,
@@ -45,6 +47,19 @@ export default function IncomePage() {
   const openNew = () => setModal({ open: true, id: null });
   const openEdit = (id) => setModal({ open: true, id });
   const close = () => setModal({ open: false, id: null });
+
+  const batchSelect = useBatchSelect(incomes);
+
+  const handleBatchDeleteIncomes = async () => {
+    const ids = [...batchSelect.selectedIds];
+    const ok = await confirm({
+      title: `Delete ${ids.length} income record${ids.length !== 1 ? 's' : ''}`,
+      description: 'These income entries will be permanently removed. This cannot be undone.',
+    });
+    if (!ok) return;
+    for (const id of ids) await removeEntity('incomes', id);
+    batchSelect.cancel();
+  };
 
   const sourceBreakdown = useMemo(() => {
     const totals = incomes.reduce((acc, i) => {
@@ -244,14 +259,34 @@ export default function IncomePage() {
         title="All income records"
         description="Each entry has type-specific details; dividends flow in from the Portfolio module."
         action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add income
-          </Button>
+          <div className="flex gap-2">
+            {!batchSelect.selecting && (
+              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+                Select
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add income
+            </Button>
+          </div>
         }
         className={rise(5)}
       >
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteIncomes}
+          onCancel={batchSelect.cancel}
+        />
         {incomes.length ? (
-          <Table columns={incomeColumns} rows={incomes} />
+          <Table
+            columns={incomeColumns}
+            rows={incomes}
+            selectable={batchSelect.selecting}
+            selectedIds={batchSelect.selectedIds}
+            onToggleRow={batchSelect.toggle}
+            onToggleAll={batchSelect.toggleAll}
+          />
         ) : (
           <EmptyState
             title="No income records yet"

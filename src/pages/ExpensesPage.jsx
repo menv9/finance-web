@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
+import { BatchDeleteBar } from '../components/BatchDeleteBar';
+import { useBatchSelect } from '../hooks/useBatchSelect';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
@@ -76,6 +78,11 @@ export default function ExpensesPage() {
       ),
     [expenses, selectedCategory, selectedMonth],
   );
+  const batchSelect = useBatchSelect(filteredExpenses);
+
+  // Clear selection when the filter changes so stale IDs can't be batch-deleted
+  useEffect(() => { batchSelect.cancel(); }, [selectedMonth, selectedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const chartData = computeExpenseSeries(expenses);
   const breakdown = categoryBreakdown(filteredExpenses);
   const editingExpense = expenses.find((item) => item.id === expenseModal.id);
@@ -114,6 +121,17 @@ export default function ExpensesPage() {
     anchor.download = 'expenses.csv';
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleBatchDeleteExpenses = async () => {
+    const ids = [...batchSelect.selectedIds];
+    const ok = await confirm({
+      title: `Delete ${ids.length} expense${ids.length !== 1 ? 's' : ''}`,
+      description: 'These expenses will be permanently removed. This cannot be undone.',
+    });
+    if (!ok) return;
+    for (const id of ids) await removeEntity('expenses', id);
+    batchSelect.cancel();
   };
 
   const expenseColumns = [
@@ -372,9 +390,16 @@ export default function ExpensesPage() {
         title="Transactions"
         description="Filter by month and category."
         action={
-          <Button variant="primary" size="sm" onClick={openNewExpense}>
-            <PlusIcon /> Add expense
-          </Button>
+          <div className="flex gap-2">
+            {!batchSelect.selecting && (
+              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+                Select
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={openNewExpense}>
+              <PlusIcon /> Add expense
+            </Button>
+          </div>
         }
         className={rise(3)}
       >
@@ -412,8 +437,21 @@ export default function ExpensesPage() {
           </button>
         </div>
 
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteExpenses}
+          onCancel={batchSelect.cancel}
+        />
         {filteredExpenses.length ? (
-          <Table columns={expenseColumns} rows={filteredExpenses} />
+          <Table
+            columns={expenseColumns}
+            rows={filteredExpenses}
+            selectable={batchSelect.selecting}
+            selectedIds={batchSelect.selectedIds}
+            onToggleRow={batchSelect.toggle}
+            onToggleAll={batchSelect.toggleAll}
+          />
         ) : (
           <EmptyState
             title="No expenses for this filter"
