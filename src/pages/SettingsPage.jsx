@@ -563,44 +563,63 @@ export default function SettingsPage() {
             id="backup"
             eyebrow="Portability"
             title="Backup and restore"
-            description="Complete JSON dump for migration, device transfer, or pre-sync insurance."
+            description="Export or import data as JSON — full backup or per module."
             className={rise(8)}
           >
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  const backup = await exportBackup();
-                  const blob = new Blob([JSON.stringify(backup, null, 2)], {
-                    type: 'application/json',
-                  });
-                  const url = URL.createObjectURL(blob);
-                  const anchor = document.createElement('a');
-                  anchor.href = url;
-                  anchor.download = 'finance-tracker-backup.json';
-                  anchor.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Export JSON
-              </Button>
-              <label className="inline-flex">
-                <Button as="span" variant="primary">
-                  Import JSON
-                </Button>
-                <input
-                  type="file"
-                  accept="application/json"
-                  className="hidden"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    const snapshot = JSON.parse(await file.text());
-                    await importBackup(snapshot);
-                  }}
-                />
-              </label>
-            </div>
+            {(() => {
+              const doExport = async (stores, filename) => {
+                const backup = await exportBackup(stores);
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename; a.click();
+                URL.revokeObjectURL(url);
+              };
+              const doImport = async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                event.target.value = '';
+                await importBackup(JSON.parse(await file.text()));
+              };
+              const modules = [
+                { label: 'Expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
+                { label: 'Income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
+                { label: 'Portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
+                { label: 'Savings',   stores: ['savings', 'savingsEntries'],                                             file: 'savings-backup.json' },
+                { label: 'Transfers', stores: ['transfers'],                                                             file: 'transfers-backup.json' },
+              ];
+              return (
+                <div className="flex flex-col gap-5">
+                  <div>
+                    <p className="eyebrow mb-2">Full backup</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" onClick={() => doExport(null, 'finance-tracker-backup.json')}>Export all</Button>
+                      <label className="inline-flex">
+                        <Button as="span" variant="primary">Import</Button>
+                        <input type="file" accept="application/json" className="hidden" onChange={doImport} />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="eyebrow mb-3">By module</p>
+                    <div className="flex flex-col divide-y divide-rule rounded-md border border-rule">
+                      {modules.map(({ label, stores, file }) => (
+                        <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                          <span className="text-sm text-ink">{label}</span>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => doExport(stores, file)}>Export</Button>
+                            <label className="inline-flex">
+                              <Button as="span" variant="ghost" size="sm">Import</Button>
+                              <input type="file" accept="application/json" className="hidden" onChange={doImport} />
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </Card>
           <Card
             id="danger"

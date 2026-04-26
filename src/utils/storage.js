@@ -163,9 +163,10 @@ export function ensureEntitySyncFields(entity, fallbackTimestamp = new Date().to
   };
 }
 
-export async function exportDatabaseSnapshot(settings) {
+export async function exportDatabaseSnapshot(settings, storeFilter = null) {
+  const names = storeFilter ? STORE_NAMES.filter((n) => storeFilter.includes(n)) : STORE_NAMES;
   const stores = await Promise.all(
-    STORE_NAMES.map(async (storeName) => [storeName, await getAllRecords(storeName)]),
+    names.map(async (storeName) => [storeName, await getAllRecords(storeName)]),
   );
   return {
     version: 1,

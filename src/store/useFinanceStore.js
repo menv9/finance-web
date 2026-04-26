@@ -1220,7 +1220,7 @@ export const useFinanceStore = create((set, get) => ({
     }
   },
 
-  exportBackup: async () => exportDatabaseSnapshot(get().settings),
+  exportBackup: async (storeFilter = null) => exportDatabaseSnapshot(get().settings, storeFilter),
 
   wipeAllData: async () => {
     await clearAllStores();
