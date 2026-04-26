@@ -16,10 +16,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
 import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { computeIncomeSeries, yearlySideIncome } from '../utils/finance';
+import { computeIncomeSeries } from '../utils/finance';
+import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -41,7 +43,6 @@ function PlusIcon() {
 export default function IncomePage() {
   const incomes = useFinanceStore((state) => state.incomes);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
-  const dashboard = useFinanceStore((state) => state.derived.dashboard);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -56,7 +57,7 @@ export default function IncomePage() {
   const close = () => setModal({ open: false, id: null });
 
   // ── Filters ──
-  const [filterMonth, setFilterMonth] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [filterKind, setFilterKind] = useState('all');
   const [sourceSearch, setSourceSearch] = useState('');
 
@@ -83,11 +84,16 @@ export default function IncomePage() {
     () =>
       incomeLedgerRows.filter(
         (row) =>
-          (!filterMonth || row.date.startsWith(filterMonth)) &&
+          row.date.startsWith(selectedMonth) &&
           (filterKind === 'all' || row.incomeKind === filterKind) &&
           (!sourceSearch || (row.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
       ),
-    [filterKind, filterMonth, incomeLedgerRows, sourceSearch],
+    [filterKind, incomeLedgerRows, selectedMonth, sourceSearch],
+  );
+
+  const selectedMonthRows = useMemo(
+    () => incomeLedgerRows.filter((row) => row.date.startsWith(selectedMonth)),
+    [incomeLedgerRows, selectedMonth],
   );
 
   const { sortKey: incSortKey, sortDir: incSortDir, onSort: onIncSort } = useSortable('date', 'desc');
@@ -98,7 +104,7 @@ export default function IncomePage() {
 
   const batchSelect = useBatchSelect(sortedIncomeRows.filter((row) => row.ledgerType === 'income'));
 
-  useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { batchSelect.cancel(); }, [selectedMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBatchDeleteIncomes = async () => {
     const ids = [...batchSelect.selectedIds];
@@ -113,15 +119,19 @@ export default function IncomePage() {
 
   const sourceBreakdown = useMemo(() => {
     const portfolioKinds = new Set(['dividend', 'portfolio_sale', 'portfolio_sale_cashflow']);
-    const totals = incomes.reduce((acc, i) => {
+    const totals = selectedMonthRows.reduce((acc, i) => {
       const key = portfolioKinds.has(i.incomeKind) ? 'Holdings' : i.source;
       acc[key] = (acc[key] || 0) + i.amountCents;
       return acc;
     }, {});
     return Object.entries(totals).map(([name, value]) => ({ name, value }));
-  }, [incomes]);
+  }, [selectedMonthRows]);
 
-  const topSource = sourceBreakdown.sort((a, b) => b.value - a.value)[0];
+  const selectedMonthIncome = selectedMonthRows.reduce((sum, row) => sum + row.amountCents, 0);
+  const selectedMonthSideIncome = selectedMonthRows
+    .filter((row) => row.incomeKind === 'variable')
+    .reduce((sum, row) => sum + row.amountCents, 0);
+  const topSource = sourceBreakdown.slice().sort((a, b) => b.value - a.value)[0];
 
   const incomeColumns = [
     { key: 'date', header: 'Date', width: 110, sortable: true },
@@ -130,6 +140,7 @@ export default function IncomePage() {
       key: 'incomeKind',
       header: 'Kind',
       sortable: true,
+      hideOnMobile: true,
       render: (r) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {r.incomeKind}
@@ -139,6 +150,7 @@ export default function IncomePage() {
     {
       key: 'details',
       header: 'Details',
+      hideOnMobile: true,
       render: (r) =>
         r.incomeKind === 'fixed'
           ? `${r.frequency} · day ${r.payDay}`
@@ -173,6 +185,7 @@ export default function IncomePage() {
       key: 'actions',
       header: '',
       align: 'right',
+      hideOnMobile: true,
       render: (r) => (
         r.ledgerType === 'income' ? (
           <div className="flex justify-end gap-1">
@@ -197,9 +210,17 @@ export default function IncomePage() {
         title="Income"
         description="Salary, freelance, dividends — three models rolled into a single monthly cashflow view."
         actions={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> New income
-          </Button>
+          <>
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> New income
+            </Button>
+            <MonthSelector
+              id="income-view-month"
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              className="mt-8 w-full"
+            />
+          </>
         }
       />
 
@@ -207,26 +228,22 @@ export default function IncomePage() {
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
-            label="Net cashflow"
-            value={dashboard.cashflowCents}
+            label="Selected month"
+            value={selectedMonthIncome}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={
-              dashboard.cashflowCents >= 0
-                ? 'available to spend this month'
-                : 'expenses exceed income'
-            }
+            hint={`${selectedMonthRows.length} records`}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat
-            label="Side income YTD"
-            value={yearlySideIncome(incomes)}
+            label="Side income"
+            value={selectedMonthSideIncome}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="freelance & variable"
+            hint="freelance & variable this month"
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
@@ -316,7 +333,7 @@ export default function IncomePage() {
       <Card
         eyebrow="Ledger"
         title="All income records"
-        description="Each entry has type-specific details; dividends flow in from the Portfolio module."
+        description="Filter the selected month by kind and source."
         action={
           <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && sortedIncomeRows.some((row) => row.ledgerType === 'income') && (
@@ -331,15 +348,7 @@ export default function IncomePage() {
         }
         className={rise(5)}
       >
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <FormField label="Month" htmlFor="income-month">
-            <Input
-              id="income-month"
-              type="month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-            />
-          </FormField>
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label="Kind" htmlFor="income-kind">
             <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
               <option value="all">All kinds</option>

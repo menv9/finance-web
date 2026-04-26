@@ -23,7 +23,7 @@ export function Card({
   return (
     <Tag
       className={cn(
-        'relative rounded-lg border border-rule bg-surface',
+        'relative min-w-0 overflow-hidden rounded-lg border border-rule bg-surface',
         'transition-colors duration-180',
         isChart && 'flex flex-col',
         className,
@@ -33,12 +33,12 @@ export function Card({
       {(eyebrow || title || description || action) && (
         <header
           className={cn(
-            'flex flex-wrap items-start justify-between gap-4',
+            'flex flex-wrap items-start justify-between gap-4 min-w-0',
             flush ? 'px-0 pt-0' : `${padX} pt-5`,
             'pb-4 border-b border-rule',
           )}
         >
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
             {title ? (
               <h2 className="mt-1 font-display text-xl font-medium text-ink">{title}</h2>
@@ -47,10 +47,10 @@ export function Card({
               <p className="mt-1 max-w-prose text-sm text-ink-muted">{description}</p>
             ) : null}
           </div>
-          {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+          {action ? <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
         </header>
       )}
-      <div className={cn(flush ? '' : `${padX} ${padY}`, chartBody, bodyClassName)}>{children}</div>
+      <div className={cn('min-w-0', flush ? '' : `${padX} ${padY}`, chartBody, chartBody && 'overflow-hidden', bodyClassName)}>{children}</div>
       {footer ? (
         <footer className={cn('border-t border-rule', flush ? '' : `${padX} py-3`)}>
           {footer}

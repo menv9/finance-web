@@ -107,8 +107,8 @@ export function Table({
   const someChecked = selectable && !allChecked && selectableRows.some((r) => selectedIds?.has(r.id));
 
   return (
-    <div className={cn('rounded-lg border border-rule bg-surface overflow-auto', className)}>
-      <table className="w-full border-collapse">
+    <div className={cn('min-w-0 rounded-lg border border-rule bg-surface overflow-x-auto overflow-y-hidden', className)}>
+      <table className="w-full min-w-full table-fixed border-collapse sm:table-auto">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
           <tr>
@@ -148,7 +148,7 @@ export function Table({
                     c.hideOnMobile && 'hidden sm:table-cell',
                   )}
                 >
-                  <span className="inline-flex items-center">
+                  <span className="inline-flex min-w-0 max-w-full items-center truncate">
                     {c.header}
                     {isSortable && <SortIcon active={isActive} dir={sortDir} />}
                   </span>
@@ -197,12 +197,14 @@ export function Table({
                       style={{ textAlign: c.align || (c.numeric ? 'right' : 'left') }}
                       className={cn(
                         pad,
-                        'text-sm text-ink',
+                        'min-w-0 overflow-hidden text-sm text-ink',
                         c.numeric && 'font-mono tabular text-ink',
                         c.hideOnMobile && 'hidden sm:table-cell',
                       )}
                     >
-                      {content}
+                      <div className={cn('min-w-0 max-w-full', c.numeric ? 'truncate text-right' : 'truncate')}>
+                        {content}
+                      </div>
                     </td>
                   );
                 })}

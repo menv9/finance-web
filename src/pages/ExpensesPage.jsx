@@ -9,6 +9,7 @@ import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
+import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
 import { ExpenseForm } from '../components/forms/ExpenseForm';
 import { FixedExpenseForm } from '../components/forms/FixedExpenseForm';
@@ -151,6 +152,7 @@ export default function ExpensesPage() {
       key: 'category',
       header: 'Category',
       sortable: true,
+      hideOnMobile: true,
       render: (row) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {row.category}
@@ -181,6 +183,7 @@ export default function ExpensesPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      hideOnMobile: true,
       render: (r) => {
         const attCount = attachments.filter((a) => a.expenseId === r.id).length;
         return (
@@ -279,6 +282,12 @@ export default function ExpensesPage() {
             <Button variant="primary" size="sm" onClick={openNewExpense}>
               <PlusIcon /> New expense
             </Button>
+            <MonthSelector
+              id="expenses-view-month"
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              className="mt-8 w-full"
+            />
           </>
         }
       />
@@ -310,7 +319,7 @@ export default function ExpensesPage() {
       {/* summary stats */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
-          <Stat label="This month" value={monthTotal} mode="currency" currency={currency} locale={locale} hint={`${filteredExpenses.length} transactions`} />
+          <Stat label="Selected month" value={monthTotal} mode="currency" currency={currency} locale={locale} hint={`${filteredExpenses.length} transactions`} />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat label="Fixed monthly" value={fixedMonthly} mode="currency" currency={currency} locale={locale} hint={`${fixedExpenses.filter((f) => f.active).length} active`} />
@@ -400,7 +409,7 @@ export default function ExpensesPage() {
       <Card
         eyebrow="Ledger"
         title="Transactions"
-        description="Filter by month and category."
+        description="Filter the selected month by category and description."
         action={
           <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
@@ -415,15 +424,7 @@ export default function ExpensesPage() {
         }
         className={rise(3)}
       >
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <FormField label="Month" htmlFor="expenses-month">
-            <Input
-              id="expenses-month"
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
-          </FormField>
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label="Category" htmlFor="expenses-category">
             <Select
               id="expenses-category"

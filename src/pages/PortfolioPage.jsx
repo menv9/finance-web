@@ -484,16 +484,17 @@ export default function PortfolioPage() {
     {
       key: 'platform',
       header: 'Platform',
+      hideOnMobile: true,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'text-xs text-ink' : 'text-xs text-ink-muted'}>
           {r.platform}
         </span>
       ),
     },
-    { key: 'quantity', header: 'Qty', numeric: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
-    { key: 'avg', header: 'Avg buy', numeric: true, render: (r) => formatCurrency(r.averageBuyPriceCents, currency, locale) },
-    { key: 'price', header: 'Price', numeric: true, render: (r) => formatCurrency(r.currentPriceCents, currency, locale) },
-    { key: 'fee', header: 'Fees', numeric: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
+    { key: 'quantity', header: 'Qty', numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
+    { key: 'avg', header: 'Avg buy', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.averageBuyPriceCents, currency, locale) },
+    { key: 'price', header: 'Price', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.currentPriceCents, currency, locale) },
+    { key: 'fee', header: 'Fees', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
     { key: 'value', header: 'Value', numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
     {
       key: 'pnl',
@@ -510,6 +511,7 @@ export default function PortfolioPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      hideOnMobile: true,
       render: (r) => r.rowType === 'group' ? (
         <div className="flex justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditHoldingGroup(r.ticker)}>Edit</Button>
@@ -600,16 +602,17 @@ export default function PortfolioPage() {
         </span>
       ),
     },
-    { key: 'quantity', header: 'Qty sold', numeric: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
+    { key: 'quantity', header: 'Qty sold', numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
     {
       key: 'percent',
       header: 'Sold',
       numeric: true,
+      hideOnMobile: true,
       render: (r) => r.rowType === 'group' ? `${r.percent} operations` : `${formatNumber(r.percent, locale, 2)}%`,
     },
-    { key: 'salePrice', header: 'Sale price', numeric: true, render: (r) => formatCurrency(r.salePriceCents, currency, locale) },
-    { key: 'fee', header: 'Fees', numeric: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
-    { key: 'proceeds', header: 'Proceeds', numeric: true, render: (r) => formatCurrency(r.proceedsCents, currency, locale) },
+    { key: 'salePrice', header: 'Sale price', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.salePriceCents, currency, locale) },
+    { key: 'fee', header: 'Fees', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
+    { key: 'proceeds', header: 'Proceeds', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.proceedsCents, currency, locale) },
     {
       key: 'realizedPnl',
       header: 'Realized P&L',
@@ -625,6 +628,7 @@ export default function PortfolioPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      hideOnMobile: true,
       render: (r) => r.rowType === 'group' ? (
         <span className="eyebrow text-ink-faint">Total</span>
       ) : (
@@ -680,7 +684,7 @@ export default function PortfolioPage() {
         <Card eyebrow="Split" title="Allocation" className={'lg:col-span-5 ' + rise(2)}>
           {portfolio.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
-              <div className="relative mx-auto h-[220px] w-full max-w-[220px]">
+              <div className="relative mx-auto h-[190px] w-full max-w-[190px] sm:h-[220px] sm:max-w-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -717,9 +721,9 @@ export default function PortfolioPage() {
                         <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
                         <span className="w-16 shrink-0 font-mono text-xs font-medium text-ink">{item.ticker}</span>
                         <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">{item.name}</span>
-                        <span className="w-20 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.valueCents, currency, locale)}</span>
+                        <span className="hidden w-20 shrink-0 font-mono tabular text-xs text-ink-muted sm:inline">{formatCurrency(item.valueCents, currency, locale)}</span>
                         <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{item.actualWeight.toFixed(1)}%</span>
-                        <div className="w-16 shrink-0 h-1 rounded-full bg-rule overflow-hidden">
+                        <div className="hidden w-16 shrink-0 h-1 rounded-full bg-rule overflow-hidden sm:block">
                           <div className="h-full rounded-full transition-all duration-300" style={{ width: `${item.actualWeight}%`, background: color }} />
                         </div>
                       </li>
