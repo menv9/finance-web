@@ -164,14 +164,16 @@ export function ensureEntitySyncFields(entity, fallbackTimestamp = new Date().to
 }
 
 export async function exportDatabaseSnapshot(settings, storeFilter = null) {
-  const names = storeFilter ? STORE_NAMES.filter((n) => storeFilter.includes(n)) : STORE_NAMES;
+  const isModule = storeFilter !== null;
+  const names = isModule ? STORE_NAMES.filter((n) => storeFilter.includes(n)) : STORE_NAMES;
   const stores = await Promise.all(
     names.map(async (storeName) => [storeName, await getAllRecords(storeName)]),
   );
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    settings,
+    // Module backups omit settings — they're device-local and identity-managed
+    ...(isModule ? {} : { settings }),
     data: Object.fromEntries(stores),
   };
 }
@@ -205,6 +207,8 @@ export async function importDatabaseSnapshot(snapshot) {
     saveSettings({
       ...DEFAULT_SETTINGS,
       ...snapshot.settings,
+      // Never restore device-local / identity-managed fields from a backup
+      theme: currentSettings.theme,
       supabaseUrl: currentSettings.supabaseUrl || '',
       supabaseAnonKey: currentSettings.supabaseAnonKey || '',
     });
