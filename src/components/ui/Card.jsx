@@ -33,7 +33,7 @@ export function Card({
       {(eyebrow || title || description || action) && (
         <header
           className={cn(
-            'flex flex-wrap items-start justify-between gap-4 min-w-0',
+            'flex flex-col items-stretch gap-4 min-w-0 sm:flex-row sm:items-start sm:justify-between',
             flush ? 'px-0 pt-0' : `${padX} pt-5`,
             'pb-4 border-b border-rule',
           )}
@@ -47,7 +47,7 @@ export function Card({
               <p className="mt-1 max-w-prose text-sm text-ink-muted">{description}</p>
             ) : null}
           </div>
-          {action ? <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
+          {action ? <div className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">{action}</div> : null}
         </header>
       )}
       <div className={cn('min-w-0', flush ? '' : `${padX} ${padY}`, chartBody, chartBody && 'overflow-hidden', bodyClassName)}>{children}</div>

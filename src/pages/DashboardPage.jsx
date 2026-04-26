@@ -60,6 +60,25 @@ function formatLongDate(date = new Date()) {
   return new Intl.DateTimeFormat('en-GB', { dateStyle: 'full' }).format(date);
 }
 
+function EyeIcon({ hidden }) {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <path
+        d="M2.5 10s2.7-5 7.5-5 7.5 5 7.5 5-2.7 5-7.5 5-7.5-5-7.5-5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="10" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      {hidden ? (
+        <path d="M4 16 16 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      ) : null}
+    </svg>
+  );
+}
+
 function RecentActivity({ items, currency, locale }) {
   if (!items.length) {
     return (
@@ -109,6 +128,7 @@ function RecentActivity({ items, currency, locale }) {
 
 export default function DashboardPage() {
   const reportRef = useRef(null);
+  const [hideKpis, setHideKpis] = useState(false);
   const dashboard = useFinanceStore((state) => state.derived.dashboard);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
   const settings = useFinanceStore((state) => state.settings);
@@ -188,65 +208,78 @@ export default function DashboardPage() {
       />
 
       {/* KPIs */}
-      <section
-        aria-label="Key figures"
-        className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4"
-      >
-        {[
-          {
-            label: 'Net worth',
-            value: dashboard.netWorthCents,
-            mode: 'currency',
-            delta: netWorthDelta,
-            deltaMode: 'percent',
-          },
-          {
-            label: 'Monthly cashflow',
-            value: dashboard.cashflowCents,
-            mode: 'currency',
-            hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
-          },
-          {
-            label: 'Savings rate',
-            value: dashboard.savingsRate,
-            mode: 'percent',
-          },
-          {
-            label: 'Portfolio value',
-            value: portfolio.currentValueCents,
-            mode: 'currency',
-            hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
-          },
-        ].map((k, i) => (
-          isGorka ? (
-            <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
-              <Stat
-                label={k.label}
-                value={k.value}
-                mode={k.mode}
-                currency={currency}
-                locale={locale}
-                hint={k.hint}
-                delta={k.delta}
-                deltaMode={k.deltaMode}
-              />
-            </GorkaSpotlight>
-          ) : (
-            <div key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
-              <Stat
-                label={k.label}
-                value={k.value}
-                mode={k.mode}
-                currency={currency}
-                locale={locale}
-                hint={k.hint}
-                delta={k.delta}
-                deltaMode={k.deltaMode}
-              />
-            </div>
-          )
-        ))}
-      </section>
+      <div className="relative mt-12">
+        <button
+          type="button"
+          className="kpi-eye-blob"
+          aria-label={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
+          title={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
+          onClick={() => setHideKpis((value) => !value)}
+        >
+          <EyeIcon hidden={hideKpis} />
+        </button>
+        <section
+          aria-label="Key figures"
+          className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {[
+            {
+              label: 'Net worth',
+              value: dashboard.netWorthCents,
+              mode: 'currency',
+              delta: netWorthDelta,
+              deltaMode: 'percent',
+            },
+            {
+              label: 'Monthly cashflow',
+              value: dashboard.cashflowCents,
+              mode: 'currency',
+              hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
+            },
+            {
+              label: 'Savings rate',
+              value: dashboard.savingsRate,
+              mode: 'percent',
+            },
+            {
+              label: 'Portfolio value',
+              value: portfolio.currentValueCents,
+              mode: 'currency',
+              hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
+            },
+          ].map((k, i) => (
+            isGorka ? (
+              <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
+                <Stat
+                  label={k.label}
+                  value={hideKpis ? '****' : k.value}
+                  mode={hideKpis ? 'custom' : k.mode}
+                  currency={currency}
+                  locale={locale}
+                  hint={hideKpis && k.hint ? '****' : k.hint}
+                  delta={hideKpis ? undefined : k.delta}
+                  deltaMode={k.deltaMode}
+                  animate={!hideKpis}
+                />
+              </GorkaSpotlight>
+            ) : (
+              <div key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
+                <Stat
+                  label={k.label}
+                  value={hideKpis ? '****' : k.value}
+                  mode={hideKpis ? 'custom' : k.mode}
+                  currency={currency}
+                  locale={locale}
+                  hint={hideKpis && k.hint ? '****' : k.hint}
+                  delta={hideKpis ? undefined : k.delta}
+                  deltaMode={k.deltaMode}
+                  animate={!hideKpis}
+                />
+              </div>
+            )
+          ))}
+        </section>
+      </div>
 
       {/* Primary chart */}
       <Card

@@ -15,6 +15,9 @@ export function Stat({
   className,
   align = 'left',
   animate = true,
+  size = 'default',
+  tone = 'default',
+  valueClassName,
 }) {
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : null;
   const live = useCountUp(numericValue ?? 0, { enabled: animate && numericValue !== null });
@@ -40,15 +43,36 @@ export function Stat({
       : null;
 
   return (
-    <div className={cn('flex flex-col gap-2 min-w-0', align === 'right' && 'items-end text-right', className)}>
+    <div
+      className={cn(
+        'flex flex-col min-w-0',
+        size === 'compact' ? 'gap-1' : 'gap-2',
+        align === 'right' && 'items-end text-right',
+        align === 'center' && 'items-center text-center',
+        className,
+      )}
+    >
       <p className="eyebrow">{label}</p>
       <p
-        className="font-display text-2xl sm:text-3xl leading-none text-ink tabular numeric truncate"
+        className={cn(
+          'font-display leading-none tabular numeric',
+          tone === 'muted' ? 'text-ink-muted' : 'text-ink',
+          align === 'center' ? 'whitespace-nowrap' : 'truncate',
+          size === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl',
+          valueClassName,
+        )}
         title={typeof display === 'string' ? display : undefined}
       >
         {display}
       </p>
-      <div className="flex items-center gap-2 text-xs text-ink-muted min-h-[1rem]">
+      <div
+        className={cn(
+          'flex items-center gap-2 text-ink-muted min-h-[1rem]',
+          tone === 'muted' && 'text-ink-faint',
+          align === 'center' && 'justify-center',
+          size === 'compact' ? 'text-[10px]' : 'text-xs',
+        )}
+      >
         {deltaDisplay ? (
           <span
             className={cn(

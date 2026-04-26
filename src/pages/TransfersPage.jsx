@@ -8,6 +8,7 @@ import { TransferForm } from '../components/forms/TransferForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { useConfirm } from '../components/ConfirmContext';
 import { formatCurrency } from '../utils/formatters';
+import { normalizeDateInput } from '../utils/dates';
 import { Card, Button, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 
@@ -58,7 +59,7 @@ export default function TransfersPage() {
   const closeTransfer = () => setModal({ open: false, defaultFromModule: 'savings' });
 
   // ── Filters ──
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterMonth, setFilterMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [filterFrom, setFilterFrom] = useState('all');
   const [filterTo, setFilterTo] = useState('all');
 
@@ -105,6 +106,7 @@ export default function TransfersPage() {
     {
       key: 'description',
       header: 'Description',
+      hideOnMobile: true,
       render: (r) => {
         const linkedIncome = r.fromId ? incomes.find((i) => i.id === r.fromId) : null;
         return (
@@ -132,6 +134,7 @@ export default function TransfersPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      noTruncate: true,
       render: (r) => (
         <Button
           variant="ghost"

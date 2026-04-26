@@ -108,7 +108,7 @@ export function Table({
 
   return (
     <div className={cn('min-w-0 rounded-lg border border-rule bg-surface overflow-x-auto overflow-y-hidden', className)}>
-      <table className="w-full min-w-full table-fixed border-collapse sm:table-auto">
+      <table className="w-full min-w-[520px] table-fixed border-collapse sm:min-w-full sm:table-auto">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
           <tr>
@@ -197,7 +197,8 @@ export function Table({
                       style={{ textAlign: c.align || (c.numeric ? 'right' : 'left') }}
                       className={cn(
                         pad,
-                        'min-w-0 overflow-hidden text-sm text-ink',
+                        'min-w-0 text-sm text-ink',
+                        c.noTruncate ? 'overflow-visible' : 'overflow-hidden',
                         c.numeric && 'font-mono tabular text-ink',
                         c.hideOnMobile && 'hidden sm:table-cell',
                       )}

@@ -90,8 +90,9 @@ export default function SettingsPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      noTruncate: true,
       render: (r) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button
             variant="ghost"
             size="sm"

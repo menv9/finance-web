@@ -140,7 +140,7 @@ export default function IncomePage() {
       key: 'incomeKind',
       header: 'Kind',
       sortable: true,
-      noTruncate: true,
+      hideOnMobile: true,
       render: (r) => (
         <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
           {r.incomeKind}

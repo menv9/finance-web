@@ -9,9 +9,9 @@ import { TransferForm } from '../components/forms/TransferForm';
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -22,7 +22,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
-import { monthKey } from '../utils/dates';
+import { monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
@@ -143,7 +143,6 @@ export default function SavingsPage() {
 
   const realAvgCents = useMemo(() => computeMonthlyAvg(savingsEntries), [savingsEntries]);
 
-  // Monthly entries chart data — grouped by month
   const monthlyChartData = useMemo(() => {
     const map = {};
     savingsEntries.forEach((e) => {
@@ -159,18 +158,63 @@ export default function SavingsPage() {
       }));
   }, [savingsEntries, locale]);
 
+  const monthlySavingSegments = useMemo(
+    () =>
+      monthlyChartData.slice(1).map((point, index) => {
+        const previous = monthlyChartData[index];
+        return {
+          key: `${previous.month}-${point.month}`,
+          color: point.amountCents >= previous.amountCents ? 'var(--accent)' : 'var(--danger)',
+          data: monthlyChartData.map((item, itemIndex) => ({
+            ...item,
+            segmentAmountCents:
+              itemIndex === index || itemIndex === index + 1 ? item.amountCents : null,
+          })),
+        };
+      }),
+    [monthlyChartData],
+  );
+
+  const savingsTrendData = useMemo(() => {
+    const map = {};
+    savingsEntries.forEach((e) => {
+      const key = monthKey(e.date);
+      map[key] = (map[key] || 0) + e.amountCents;
+    });
+
+    const months = Object.keys(map).sort((a, b) => a.localeCompare(b));
+    if (!months.length) {
+      return currentBalanceCents
+        ? [{
+            month: thisMonthKey,
+            label: new Date(thisMonthKey + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+            savedCents: currentBalanceCents,
+          }]
+        : [];
+    }
+
+    let runningTotal = currentBalanceCents;
+    return months.map((month) => {
+      runningTotal += map[month];
+      return {
+        month,
+        label: new Date(month + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+        savedCents: runningTotal,
+      };
+    });
+  }, [currentBalanceCents, savingsEntries, thisMonthKey, locale]);
+
   // Projection uses only explicitly set monthly savings — entries are historical records
   const projection = useMemo(
     () => projectSavings(totalSavedCents, monthlySavingsCents, annualReturnRate, projectionYears),
     [totalSavedCents, monthlySavingsCents, annualReturnRate, projectionYears],
   );
 
-  const projectionEnd = projection.at(-1)?.valueCents ?? 0;
   const goalYear      = yearsToGoal(projection, goalCents);
   const goalProgress  = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
 
   // ── Filters ──
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterMonth, setFilterMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [filterType, setFilterType] = useState('all'); // 'all' | 'deposit' | 'withdrawal'
 
   const filteredEntries = useMemo(
@@ -215,6 +259,7 @@ export default function SavingsPage() {
       key: 'type',
       header: 'Type',
       width: 90,
+      hideOnMobile: true,
       render: (r) =>
         r.amountCents < 0 ? (
           <span className="inline-flex items-center rounded-sm bg-danger-soft border border-danger/20 px-2 py-0.5 text-xs text-danger">
@@ -226,7 +271,7 @@ export default function SavingsPage() {
           </span>
         ),
     },
-    { key: 'note', header: 'Note', render: (r) => r.note || <span className="text-ink-faint">—</span> },
+    { key: 'note', header: 'Note', hideOnMobile: true, render: (r) => r.note || <span className="text-ink-faint">—</span> },
     {
       key: 'amountCents',
       header: 'Amount',
@@ -243,8 +288,9 @@ export default function SavingsPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      noTruncate: true,
       render: (r) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           {!r.transferId && (
             <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
           )}
@@ -281,8 +327,8 @@ export default function SavingsPage() {
       />
 
       {/* KPIs */}
-      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
-        <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
+      <section className="flex w-full flex-col gap-5 md:h-[172px] md:flex-row md:items-stretch md:justify-center">
+        <div className={'min-w-0 rounded-lg border border-rule bg-surface p-6 md:flex md:min-w-[360px] md:flex-col md:items-center md:justify-center ' + rise(1)}>
           <Stat
             label="Total saved"
             value={totalSavedCents}
@@ -290,37 +336,76 @@ export default function SavingsPage() {
             currency={currency}
             locale={locale}
             hint="starting balance + logged entries"
+            align="center"
+            valueClassName="text-accent-strong"
           />
         </div>
-        <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
-          <Stat
-            label="This month"
-            value={savedThisMonthCents}
-            mode="currency"
-            currency={currency}
-            locale={locale}
-            hint="saved so far this month"
-          />
+        <div className={'min-w-0 overflow-hidden rounded-lg border border-rule bg-surface p-3 md:w-[420px] ' + rise(2)}>
+          <p className="eyebrow mb-2 text-center">Savings evolution</p>
+          <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
+            {savingsTrendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={savingsTrendData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <defs>
+                    <linearGradient id="savingsKpiArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="2 4" vertical={false} />
+                  <XAxis dataKey="label" tick={false} tickLine={false} axisLine={false} />
+                  <YAxis
+                    tick={false}
+                    tickLine={false}
+                    axisLine={false}
+                    width={0}
+                  />
+                  <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
+                  <Area
+                    type="monotone"
+                    dataKey="savedCents"
+                    stroke="var(--accent)"
+                    strokeWidth={1.75}
+                    fill="url(#savingsKpiArea)"
+                    dot={false}
+                    activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-center text-xs text-ink-faint">
+                Add savings to see the curve.
+              </div>
+            )}
+          </div>
         </div>
-        <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
-          <Stat
-            label="Monthly avg"
-            value={realAvgCents}
-            mode="currency"
-            currency={currency}
-            locale={locale}
-            hint="avg per month from your log"
-          />
-        </div>
-        <div className={'min-w-0 bg-surface p-6 ' + rise(4)}>
-          <Stat
-            label={`In ${projectionYears} years`}
-            value={projectionEnd}
-            mode="currency"
-            currency={currency}
-            locale={locale}
-            hint={annualReturnRate > 0 ? `at ${annualReturnRate}% p.a.` : 'set up projection below'}
-          />
+        <div className="grid min-w-0 gap-px overflow-hidden rounded-lg border border-rule bg-rule md:grid-cols-2">
+          <div className={'min-w-0 bg-surface p-4 md:flex md:min-w-[260px] md:flex-col md:items-center md:justify-center md:px-6 md:py-2 ' + rise(3)}>
+            <Stat
+              label="This month"
+              value={savedThisMonthCents}
+              mode="currency"
+              currency={currency}
+              locale={locale}
+              hint="saved so far this month"
+              size="compact"
+              align="center"
+              tone="muted"
+            />
+          </div>
+          <div className={'min-w-0 bg-surface p-4 md:flex md:min-w-[260px] md:flex-col md:items-center md:justify-center md:px-6 md:py-2 ' + rise(4)}>
+            <Stat
+              label="Monthly avg"
+              value={realAvgCents}
+              mode="currency"
+              currency={currency}
+              locale={locale}
+              hint="avg per month from your log"
+              size="compact"
+              align="center"
+              tone="muted"
+            />
+          </div>
         </div>
       </section>
 
@@ -415,16 +500,44 @@ export default function SavingsPage() {
       >
         {monthlyChartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <LineChart data={monthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <XAxis dataKey="label" type="category" tickLine={false} axisLine={false} />
               <YAxis
+                dataKey="amountCents"
+                type="number"
                 tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
                 tickLine={false} axisLine={false} width={60}
               />
-              <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
-              <Bar dataKey="amountCents" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Tooltip
+                formatter={(v) => [formatCurrency(v, currency, locale), 'Saved this month']}
+                labelFormatter={(label) => label}
+              />
+              {monthlySavingSegments.map((segment) => (
+                <Line
+                  key={segment.key}
+                  data={segment.data}
+                  type="linear"
+                  dataKey="segmentAmountCents"
+                  stroke={segment.color}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                />
+              ))}
+              <Line
+                dataKey="amountCents"
+                type="linear"
+                stroke="transparent"
+                strokeWidth={0}
+                dot={{ r: 5, fill: 'var(--accent)', stroke: 'var(--canvas)', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--canvas)', strokeWidth: 2 }}
+                legendType="none"
+              />
+            </LineChart>
           </ResponsiveContainer>
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -518,8 +631,8 @@ export default function SavingsPage() {
           <AreaChart data={projection} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--accent)" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.32} />
+                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -540,11 +653,11 @@ export default function SavingsPage() {
             <Area
               type="monotone"
               dataKey="valueCents"
-              stroke="var(--accent)"
+              stroke="#f59e0b"
               strokeWidth={2}
               fill="url(#savingsGradient)"
               dot={false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--accent)' }}
+              activeDot={{ r: 4, strokeWidth: 0, fill: '#fbbf24' }}
             />
           </AreaChart>
         </ResponsiveContainer>

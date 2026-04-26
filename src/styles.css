@@ -11,6 +11,41 @@ input[type="month"] {
   width: -webkit-fill-available;
 }
 
+.kpi-eye-blob {
+  position: absolute;
+  right: -18px;
+  top: -18px;
+  z-index: 10;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-muted);
+  box-shadow: 0 14px 28px -20px rgba(0, 0, 0, 0.78);
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.kpi-eye-blob:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.kpi-eye-blob:focus-visible {
+  outline: none;
+  box-shadow:
+    0 14px 28px -20px rgba(0, 0, 0, 0.78),
+    0 0 0 2px var(--canvas),
+    0 0 0 4px var(--accent);
+}
+
 /* ——————————————————————————————————————————————
    Tokens — Dark (default)
 —————————————————————————————————————————————— */

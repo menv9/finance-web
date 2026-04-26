@@ -231,13 +231,6 @@ export function BudgetTab() {
           Budgets repeat every month — viewing{' '}
           <span className="font-medium text-ink">{monthLabel(selectedMonth)}</span>
         </p>
-        <div className="w-44">
-          <Input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-          />
-        </div>
       </div>
 
       {/* budget cards */}
@@ -246,13 +239,20 @@ export function BudgetTab() {
         title="Category budgets"
         description="Your monthly limits for variable spending. These repeat automatically — no need to set them each month."
         action={
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
-              Manage categories
-            </Button>
-            <Button variant="primary" size="sm" onClick={openNew}>
-              <PlusIcon /> Add budget
-            </Button>
+          <div className="grid w-full gap-3 sm:w-64">
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
+                Manage categories
+              </Button>
+              <Button variant="primary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add budget
+              </Button>
+            </div>
+            <Input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
           </div>
         }
         className={rise(2)}

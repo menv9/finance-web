@@ -50,6 +50,48 @@ function PlusIcon() {
   );
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M9.8 3.2 12.8 6 6 12.8l-3.4.7.7-3.4 6.5-6.9Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m8.7 4.4 2.9 2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M3.5 4.5h9M6.5 2.5h3l.5 2M5 4.5l.5 9h5l.5-9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 7v4M9 7v4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PaperclipIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="m6 8 3.5-3.5a2.2 2.2 0 0 1 3.1 3.1l-4.8 4.8a3.3 3.3 0 0 1-4.7-4.7l4.8-4.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M5.5 4v8M10.5 4v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M5.5 3.8v8.4L12 8 5.5 3.8Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function ExpensesPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
@@ -147,7 +189,17 @@ export default function ExpensesPage() {
 
   const expenseColumns = [
     { key: 'date', header: 'Date', width: 110, sortable: true },
-    { key: 'description', header: 'Description', sortable: true },
+    {
+      key: 'description',
+      header: 'Description',
+      sortable: true,
+      noTruncate: true,
+      render: (r) => (
+        <span className="block whitespace-normal break-words leading-snug">
+          {r.description || <span className="text-ink-faint">—</span>}
+        </span>
+      ),
+    },
     {
       key: 'category',
       header: 'Category',
@@ -184,7 +236,7 @@ export default function ExpensesPage() {
       header: '',
       align: 'right',
       noTruncate: true,
-      render: (r) => {
+      _render: (r) => {
         const attCount = attachments.filter((a) => a.expenseId === r.id).length;
         return (
           <div className="flex flex-wrap justify-end gap-1">
@@ -201,6 +253,48 @@ export default function ExpensesPage() {
                 removeEntity('expenses', r.id);
             }}>
               Delete
+            </Button>
+          </div>
+        );
+      },
+      render: (r) => {
+        const attCount = attachments.filter((a) => a.expenseId === r.id).length;
+        return (
+          <div className="flex flex-wrap justify-end gap-1">
+            {attCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 w-10 px-0"
+                aria-label={`Open ${attCount} attachment${attCount !== 1 ? 's' : ''}`}
+                title={`Attachments (${attCount})`}
+                onClick={() => openAttachments(r.id)}
+              >
+                <PaperclipIcon />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-10 w-10 px-0"
+              aria-label="Edit expense"
+              title="Edit"
+              onClick={() => openEditExpense(r.id)}
+            >
+              <EditIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-10 w-10 px-0"
+              aria-label="Delete expense"
+              title="Delete"
+              onClick={async () => {
+                if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                  removeEntity('expenses', r.id);
+              }}
+            >
+              <TrashIcon />
             </Button>
           </div>
         );
@@ -251,7 +345,7 @@ export default function ExpensesPage() {
       header: '',
       align: 'right',
       noTruncate: true,
-      render: (r) => (
+      _render: (r) => (
         <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditFixed(r.id)}>
             Edit
@@ -264,6 +358,43 @@ export default function ExpensesPage() {
               removeEntity('fixedExpenses', r.id);
           }}>
             Delete
+          </Button>
+        </div>
+      ),
+      render: (r) => (
+        <div className="flex flex-wrap justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 px-0"
+            aria-label="Edit recurring bill"
+            title="Edit"
+            onClick={() => openEditFixed(r.id)}
+          >
+            <EditIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 px-0"
+            aria-label={r.active ? 'Pause recurring bill' : 'Resume recurring bill'}
+            title={r.active ? 'Pause' : 'Resume'}
+            onClick={() => toggleFixedExpenseStatus(r.id)}
+          >
+            {r.active ? <PauseIcon /> : <PlayIcon />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 px-0"
+            aria-label="Delete recurring bill"
+            title="Delete"
+            onClick={async () => {
+              if (await confirm({ title: 'Delete recurring bill', description: `"${r.name}" will be permanently removed.` }))
+                removeEntity('fixedExpenses', r.id);
+            }}
+          >
+            <TrashIcon />
           </Button>
         </div>
       ),

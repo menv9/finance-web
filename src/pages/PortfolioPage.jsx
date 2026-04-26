@@ -414,8 +414,9 @@ export default function PortfolioPage() {
       key: 'actions',
       header: '',
       align: 'right',
+      noTruncate: true,
       render: (r) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditDividend(r.id)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
             if (await confirm({ title: 'Delete dividend', description: `Remove the ${r.ticker} dividend entry? This will also remove it from the income ledger.` }))
@@ -475,6 +476,7 @@ export default function PortfolioPage() {
     {
       key: 'name',
       header: 'Name',
+      hideOnMobile: true,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-medium text-ink' : 'text-ink-muted'}>
           {r.rowType === 'group' ? r.name : r.ticker}
@@ -511,14 +513,14 @@ export default function PortfolioPage() {
       key: 'actions',
       header: '',
       align: 'right',
-      hideOnMobile: true,
+      noTruncate: true,
       render: (r) => r.rowType === 'group' ? (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditHoldingGroup(r.ticker)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => sellAllHoldingGroup(r)}>Sell all</Button>
         </div>
       ) : (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditHolding(r.id)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => openSellHolding(r.id)}>Sell</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
@@ -628,11 +630,11 @@ export default function PortfolioPage() {
       key: 'actions',
       header: '',
       align: 'right',
-      hideOnMobile: true,
+      noTruncate: true,
       render: (r) => r.rowType === 'group' ? (
         <span className="eyebrow text-ink-faint">Total</span>
       ) : (
-        <div className="flex justify-end gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => openEditSale(r.id)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
             if (await confirm({ title: 'Delete sale', description: `Remove the ${r.ticker} sale and restore the sold quantity to the holding?` }))
