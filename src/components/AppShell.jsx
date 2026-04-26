@@ -88,6 +88,7 @@ export function AppShell({ children }) {
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const locale = useMemo(() => 'de-AT', []);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
 
   const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
 
@@ -126,7 +127,7 @@ export function AppShell({ children }) {
           Background colour prevents the white flash before WebGL first renders. */}
       {appliedTheme === 'gorka' && (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#060412' }}>
-          <LiquidChrome baseColor={[0.427, 0, 1.0]} speed={0.12} amplitude={0.3} interactive={false} />
+          <LiquidChrome baseColor={gorkaBaseColor} speed={0.12} amplitude={0.3} interactive={false} />
         </div>
       )}
 
