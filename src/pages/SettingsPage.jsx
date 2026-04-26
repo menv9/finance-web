@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { Card, Button, FormField, Input, Select, Table, EmptyState } from '../components/ui';
+import { Card, Button, FormField, Input, Select, Table, EmptyState, Modal } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const sections = [
@@ -14,6 +14,7 @@ const sections = [
   { id: 'sync', label: 'Sync' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'backup', label: 'Backup' },
+  { id: 'danger', label: 'Danger zone' },
 ];
 
 function SectionLink({ id, label }) {
@@ -44,6 +45,19 @@ export default function SettingsPage() {
   const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
   const resolveConflictUseRemote = useFinanceStore((state) => state.resolveConflictUseRemote);
   const resolveConflictKeepLocal = useFinanceStore((state) => state.resolveConflictKeepLocal);
+
+  const wipeAllData = useFinanceStore((state) => state.wipeAllData);
+  const [wipeModalOpen, setWipeModalOpen] = useState(false);
+  const [wipeConfirmText, setWipeConfirmText] = useState('');
+  const [wiping, setWiping] = useState(false);
+
+  const handleWipe = async () => {
+    setWiping(true);
+    await wipeAllData();
+    setWiping(false);
+    setWipeModalOpen(false);
+    setWipeConfirmText('');
+  };
 
   const [categoryInput, setCategoryInput] = useState('');
   const [editingCategory, setEditingCategory] = useState('');
@@ -538,8 +552,58 @@ export default function SettingsPage() {
               </label>
             </div>
           </Card>
+          <Card
+            id="danger"
+            eyebrow="Danger zone"
+            title="Wipe all data"
+            description="Permanently deletes all financial records from this device. Settings (currency, locale, API keys) are kept. This cannot be undone."
+            className={rise(9)}
+          >
+            <Button variant="danger" size="sm" onClick={() => { setWipeModalOpen(true); setWipeConfirmText(''); }}>
+              Erase all data
+            </Button>
+          </Card>
         </div>
       </div>
+
+      <Modal
+        open={wipeModalOpen}
+        onClose={() => { setWipeModalOpen(false); setWipeConfirmText(''); }}
+        eyebrow="Danger zone"
+        title="Erase all data"
+        description="This will permanently delete every expense, income, saving, holding, and transfer on this device. It cannot be undone."
+        size="sm"
+      >
+        <div className="grid gap-4">
+          <p className="text-sm text-ink-muted">
+            Type <span className="font-mono font-medium text-danger select-all">ERASE ALL DATA</span> to confirm.
+          </p>
+          <Input
+            autoFocus
+            placeholder="ERASE ALL DATA"
+            value={wipeConfirmText}
+            onChange={(e) => setWipeConfirmText(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setWipeModalOpen(false); setWipeConfirmText(''); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={wipeConfirmText !== 'ERASE ALL DATA' || wiping}
+              loading={wiping}
+              onClick={handleWipe}
+            >
+              Erase all data
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

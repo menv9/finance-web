@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_SETTINGS } from '../data/defaults';
 import {
+  clearAllStores,
   deleteRecord,
   ensureEntitySyncFields,
   ensureSeedData,
@@ -1214,6 +1215,14 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   exportBackup: async () => exportDatabaseSnapshot(get().settings),
+
+  wipeAllData: async () => {
+    await clearAllStores();
+    localStorage.removeItem('pft-seeded');
+    localStorage.removeItem('pft-sync-meta');
+    // Keep settings (currency, locale, API keys) — only nuke financial records
+    await get().bootstrap();
+  },
 
   importBackup: async (snapshot) => {
     await importDatabaseSnapshot(snapshot);

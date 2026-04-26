@@ -72,6 +72,12 @@ export async function deleteRecord(storeName, id) {
   await withStore(storeName, 'readwrite', (store) => store.delete(id));
 }
 
+export async function clearAllStores() {
+  await Promise.all(
+    STORE_NAMES.map((storeName) => withStore(storeName, 'readwrite', (store) => store.clear())),
+  );
+}
+
 export function loadSettings() {
   const raw = localStorage.getItem(SETTINGS_KEY);
   if (!raw) return DEFAULT_SETTINGS;
