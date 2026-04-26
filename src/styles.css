@@ -117,9 +117,9 @@ input[type="month"] {
   --surface-sunken: #030209;
   --rule: rgba(192, 132, 252, 0.08);
   --rule-strong: rgba(192, 132, 252, 0.20);
-  --ink: #EDE8FF;
-  --ink-muted: #A89EC8;
-  --ink-faint: #6B5E90;
+  --ink: #FFFFFF;
+  --ink-muted: rgba(255, 255, 255, 0.85);
+  --ink-faint: rgba(255, 255, 255, 0.55);
   --ink-inverse: #060412;
   --accent: #C084FC;
   --accent-strong: #A855F7;
@@ -146,7 +146,7 @@ input[type="month"] {
 /* Surface cards need some transparency so LiquidChrome bleeds through */
 [data-theme='gorka'] .bg-surface,
 [data-theme='gorka'] .bg-surface-raised {
-  background-color: rgba(13, 9, 32, 0.72) !important;
+  background-color: rgba(13, 9, 32, 0.48) !important;
   backdrop-filter: blur(12px) saturate(140%);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
@@ -198,11 +198,11 @@ input[type="month"] {
   --ink-faint: rgba(255, 255, 255, 0.42);
 }
 
-/* Footer — transparent, just darker text so it reads over the chrome */
+/* Footer — transparent, white text so it reads over the chrome */
 [data-theme='gorka'] footer {
   border-top-color: rgba(109, 0, 255, 0.2) !important;
-  --ink-muted: rgba(192, 132, 252, 0.75);
-  --ink-faint: rgba(192, 132, 252, 0.45);
+  --ink-muted: rgba(255, 255, 255, 0.80);
+  --ink-faint: rgba(255, 255, 255, 0.55);
 }
 
 /* Logo circle — glowing chrome orb */
