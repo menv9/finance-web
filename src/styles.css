@@ -115,14 +115,22 @@ input[type="month"] {
   color-scheme: dark;
 }
 
-/* Multi-orb chrome background — purple / blue / pink blobs */
+/* Body background is handled by the fixed LiquidChrome canvas in AppShell.
+   These orb gradients serve as a CSS fallback if WebGL is unavailable. */
 [data-theme='gorka'] body {
   background-image:
     radial-gradient(900px 750px at -8% -5%,   rgba(192, 132, 252, 0.22) 0%, transparent 65%),
     radial-gradient(700px 600px at 108% -8%,  rgba(96,  165, 250, 0.18) 0%, transparent 65%),
     radial-gradient(600px 500px at -6% 108%,  rgba(244, 114, 182, 0.14) 0%, transparent 65%),
-    radial-gradient(500px 450px at 108% 106%, rgba(129, 140, 248, 0.14) 0%, transparent 65%),
-    radial-gradient(400px 350px at 52%  52%,  rgba(192, 132, 252, 0.06) 0%, transparent 70%);
+    radial-gradient(500px 450px at 108% 106%, rgba(129, 140, 248, 0.14) 0%, transparent 65%);
+}
+
+/* Surface cards need some transparency so LiquidChrome bleeds through */
+[data-theme='gorka'] .bg-surface,
+[data-theme='gorka'] .bg-surface-raised {
+  background-color: rgba(13, 9, 32, 0.72) !important;
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
 /* Slowly rotating conic shimmer — gives the living-chrome feel */
@@ -157,24 +165,15 @@ input[type="month"] {
   to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-/* Chrome header — silver liquid metal bar */
+/* Chrome header — frosted glass refraction over LiquidChrome background */
 [data-theme='gorka'] header.sticky {
-  background: linear-gradient(
-    110deg,
-    rgba(22, 10, 52, 0.90) 0%,
-    rgba(10,  6, 32, 0.94) 35%,
-    rgba(16,  8, 44, 0.92) 65%,
-    rgba(22, 10, 52, 0.90) 100%
-  ) !important;
-  backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
-  border-bottom: none !important;
+  background: rgba(6, 4, 18, 0.38) !important;
+  backdrop-filter: blur(28px) saturate(260%) brightness(1.12) hue-rotate(8deg) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(260%) brightness(1.12) hue-rotate(8deg) !important;
+  border-bottom: 1px solid rgba(192, 132, 252, 0.22) !important;
   box-shadow:
-    0 1px 0 0 rgba(192, 132, 252, 0.35),
-    0 1px 0 0.5px rgba(96, 165, 250, 0.15),
-    0 6px 32px -6px rgba(129, 140, 248, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -1px 0 rgba(192, 132, 252, 0.08);
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 32px -8px rgba(0, 0, 0, 0.5);
 }
 
 /* Logo circle — glowing chrome orb */

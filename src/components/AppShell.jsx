@@ -90,6 +90,7 @@ function SignOutIcon() {
 export function AppShell({ children }) {
   const theme = useFinanceStore((state) => state.settings.theme);
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
+  const setTheme = useFinanceStore((state) => state.setTheme);
   const metrics = useFinanceStore((state) => state.derived.dashboard);
   const baseCurrency = useFinanceStore((state) => state.settings.baseCurrency);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
@@ -103,14 +104,19 @@ export function AppShell({ children }) {
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
 
-  // Explicit picks ('dark', 'light', 'eris', 'gorka') always win.
-  // The factory default is 'dark' — for special users that falls through to their theme.
-  const appliedTheme =
-    theme === 'eris' ? 'eris'
-    : theme === 'gorka' ? 'gorka'
-    : theme === 'light' ? 'light'
-    : theme === 'dark' ? (isEris ? 'eris' : isGorka ? 'gorka' : 'dark')
-    : isEris ? 'eris' : isGorka ? 'gorka' : 'dark';
+  // One-time auto-init: when a special user logs in for the first time on this device,
+  // save their theme so 'dark' and 'light' remain explicitly selectable afterward.
+  useEffect(() => {
+    if (!isEris && !isGorka) return;
+    const initialized = localStorage.getItem('pft-theme-identity-set');
+    if (initialized) return;
+    if (isEris) setTheme('eris');
+    else if (isGorka) setTheme('gorka');
+    localStorage.setItem('pft-theme-identity-set', '1');
+  }, [isEris, isGorka, setTheme]);
+
+  // Simple: theme value is applied directly. No mapping.
+  const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
 
   useEffect(() => {
     document.documentElement.dataset.theme = appliedTheme;
@@ -126,6 +132,13 @@ export function AppShell({ children }) {
 
   return (
     <div className="min-h-screen">
+      {/* Gorka: full-page liquid chrome background fixed behind everything */}
+      {appliedTheme === 'gorka' && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
+          <LiquidChrome baseColor={[0.1, 0.04, 0.22]} speed={0.15} amplitude={0.45} interactive={true} />
+        </div>
+      )}
+
       <a
         href="#main"
         className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-3 focus-visible:left-3 focus-visible:z-50 focus-visible:rounded-md focus-visible:bg-accent focus-visible:px-3 focus-visible:py-2 focus-visible:text-accent-ink"
@@ -133,13 +146,8 @@ export function AppShell({ children }) {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md relative overflow-hidden">
-        {isGorka && (
-          <div className="absolute inset-0 pointer-events-none z-0 opacity-20">
-            <LiquidChrome baseColor={[0.08, 0.03, 0.16]} speed={0.12} amplitude={0.35} interactive={false} />
-          </div>
-        )}
-        <div className="relative z-10 mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
+      <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
           <div className="flex items-center gap-6 min-w-0">
             <Logo isGorka={isGorka} />
           </div>

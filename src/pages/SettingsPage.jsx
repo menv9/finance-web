@@ -64,12 +64,7 @@ export default function SettingsPage() {
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
   const theme = settings.theme || 'dark';
-  const appliedTheme =
-    theme === 'eris' ? 'eris'
-    : theme === 'gorka' ? 'gorka'
-    : theme === 'light' ? 'light'
-    : theme === 'dark' ? (isEris ? 'eris' : isGorka ? 'gorka' : 'dark')
-    : isEris ? 'eris' : isGorka ? 'gorka' : 'dark';
+  const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
 
   const themeOptions = [
     ...(isEris ? [{ value: 'eris', label: 'Eris', emoji: '🌸', description: 'Lavender dreams' }] : []),
