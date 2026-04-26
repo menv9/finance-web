@@ -242,8 +242,8 @@ export default function IncomePage() {
         className={rise(3)}
       >
         {sourceBreakdown.length ? (
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative h-[260px] w-full max-w-[260px]">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-10">
+            <div className="relative mx-auto h-[220px] w-[220px] shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -263,7 +263,7 @@ export default function IncomePage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <ul className="flex w-full flex-col gap-2">
+            <ul className="flex min-w-0 flex-1 flex-col gap-2">
               {(() => {
                 const total = sourceBreakdown.reduce((s, i) => s + i.value, 0);
                 return sourceBreakdown
