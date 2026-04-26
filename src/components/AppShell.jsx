@@ -53,22 +53,12 @@ function MenuIcon({ open }) {
 function Logo({ isGorka }) {
   return (
     <NavLink to="/dashboard" className="flex items-center gap-2.5 group" aria-label="Finance Tracker — home">
-      {isGorka ? (
-        <span aria-hidden className="relative inline-flex h-7 w-7 items-center justify-center">
-          <ElectricBorder color="#C084FC" speed={0.7} chaos={0.06} borderRadius={999}>
-            <span className="inline-flex h-7 w-7 items-center justify-center">
-              <span className="font-display text-sm leading-none text-ink">ƒ</span>
-            </span>
-          </ElectricBorder>
-        </span>
-      ) : (
-        <span
-          aria-hidden
-          className="relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-rule-strong bg-surface-raised"
-        >
-          <span className="font-display text-sm leading-none text-ink">ƒ</span>
-        </span>
-      )}
+      <span
+        aria-hidden
+        className="relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-rule-strong bg-surface-raised"
+      >
+        <span className="font-display text-sm leading-none text-ink">ƒ</span>
+      </span>
       <span className="hidden sm:flex flex-col leading-none">
         <span className="font-display text-sm text-ink tracking-tight">Finance</span>
         <span className="eyebrow text-[0.6rem] mt-0.5">Quarterly Ledger</span>

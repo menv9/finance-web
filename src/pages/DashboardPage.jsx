@@ -165,10 +165,7 @@ export default function DashboardPage() {
       <PageHeader
         number="01"
         eyebrow={formatLongDate()}
-        title={isGorka
-          ? <ShinyText text={`${greeting()}.`} speed={4} color="#A89EC8" shineColor="#e0c8ff" spread={100} />
-          : `${greeting()}.`
-        }
+        title={`${greeting()}.`}
         actions={
           <>
             <Button
