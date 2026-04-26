@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Finges</title>
+  <rect width="512" height="512" rx="108" fill="#f7f1e7"/>
+  <rect x="76" y="76" width="360" height="360" rx="84" fill="#fffaf1" stroke="#d8cfc0" stroke-width="10"/>
+  <path d="M128 330 L190 268 L244 290 L324 194 L394 138 V374 H128 Z" fill="#2f6f45" opacity="0.16"/>
+  <path d="M128 330 L190 268 L244 290 L324 194 L394 138" fill="none" stroke="#2f6f45" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="394" cy="138" r="28" fill="#2f6f45"/>
+</svg>
