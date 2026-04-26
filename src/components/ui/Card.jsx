@@ -16,7 +16,8 @@ export function Card({
 }) {
   const padY = density === 'compact' ? 'py-4' : 'py-6';
   const padX = density === 'compact' ? 'px-4' : 'px-6';
-  const chartBody = variant === 'chart' ? 'h-[220px] sm:h-[260px] lg:h-[300px]' : '';
+  const isChart = variant === 'chart';
+  const chartBody = isChart ? 'flex-1 min-h-[240px]' : '';
   const flush = variant === 'flush';
 
   return (
@@ -24,6 +25,7 @@ export function Card({
       className={cn(
         'relative rounded-lg border border-rule bg-surface',
         'transition-colors duration-180',
+        isChart && 'flex flex-col',
         className,
       )}
       {...rest}

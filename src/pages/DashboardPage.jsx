@@ -294,8 +294,8 @@ export default function DashboardPage() {
         <Card
           eyebrow="Monthly rhythm"
           title="Income vs. expenses"
-          className={'lg:col-span-7 flex flex-col h-full ' + rise(3)}
-          bodyClassName="flex-1 min-h-0"
+          variant="chart"
+          className={'lg:col-span-7 h-full ' + rise(3)}
         >
           {dashboard.cashflowSeries?.length ? (
             <ResponsiveContainer width="100%" height="100%">
