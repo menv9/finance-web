@@ -374,14 +374,17 @@ export const useFinanceStore = create((set, get) => ({
     }, 1000);
   },
 
-  saveEntity: async (storeName, entity) => {
+  saveEntity: async (storeName, entity, { skipAutoCreate = false } = {}) => {
     let value = entity;
 
     // When an expense is flagged recurring, mirror it into the Recurring bills store
     // and keep a back-reference so repeat saves don't spawn duplicates.
     if (storeName === 'expenses' && value.isRecurring && !value.fixedExpenseId) {
       const chargeDay = Number((value.date || '').slice(-2)) || 1;
-      const fixed = await get().saveFixedExpense({
+      // skipAutoCreate=true: the expense state hasn't been written yet, so
+      // autoCreateFixedExpenses would see the old isRecurring:false and create a
+      // duplicate. The outer expense save triggers autoCreateFixedExpenses itself.
+      const fixed = await get().saveEntity('fixedExpenses', {
         name: value.description || value.category || 'Recurring charge',
         amountCents: value.amountCents,
         currency: value.currency,
@@ -389,7 +392,7 @@ export const useFinanceStore = create((set, get) => ({
         category: value.category,
         active: true,
         alerts: true,
-      });
+      }, { skipAutoCreate: true });
       value = { ...value, fixedExpenseId: fixed.id };
     }
 
@@ -415,7 +418,7 @@ export const useFinanceStore = create((set, get) => ({
     });
     get().triggerAutoPush();
     // When a fixed expense is saved, immediately check if it needs an expense entry this month
-    if (storeName === 'fixedExpenses') {
+    if (storeName === 'fixedExpenses' && !skipAutoCreate) {
       await get().autoCreateFixedExpenses();
     }
     return record;
