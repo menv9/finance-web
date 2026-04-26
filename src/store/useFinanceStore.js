@@ -1260,6 +1260,22 @@ export const useFinanceStore = create((set, get) => ({
     set({ supabaseSyncStatus: 'auth-email-sent' });
   },
 
+  signInWithGoogle: async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'auth-pending', supabaseError: '' });
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://www.finges.xyz',
+      },
+    });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+  },
+
   signOutSupabase: async () => {
     const client = getSupabaseBrowserClient();
     if (!client) return;
