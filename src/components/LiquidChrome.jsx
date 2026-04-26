@@ -5,9 +5,9 @@ import './LiquidChrome.css';
 export const LiquidChrome = ({
   baseColor = [0.1, 0.1, 0.1],
   speed = 0.2,
-  amplitude = 0.5,
+  amplitude = 0.3,
   frequencyX = 3,
-  frequencyY = 2,
+  frequencyY = 3,
   interactive = true,
   ...props
 }) => {
