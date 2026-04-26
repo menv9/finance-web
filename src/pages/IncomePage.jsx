@@ -235,86 +235,78 @@ export default function IncomePage() {
         </div>
       </section>
 
-      {/* source split */}
-      <Card
-        eyebrow="Split"
-        title="By source"
-        className={rise(3)}
-      >
-        {sourceBreakdown.length ? (
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-10">
-            <div className="relative mx-auto h-[220px] w-[220px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={sourceBreakdown}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="55%"
-                    outerRadius="95%"
-                    paddingAngle={2}
-                    strokeWidth={0}
-                  >
-                    {sourceBreakdown.map((item, index) => (
-                      <Cell key={item.name} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-                </PieChart>
-              </ResponsiveContainer>
+      {/* split + trend — same grid pattern as portfolio */}
+      <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
+        <Card eyebrow="Split" title="By source" className="lg:col-span-5">
+          {sourceBreakdown.length ? (
+            <div className="flex flex-col gap-5">
+              <div className="relative mx-auto h-[200px] w-full max-w-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={sourceBreakdown}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="55%"
+                      outerRadius="95%"
+                      paddingAngle={2}
+                      strokeWidth={0}
+                    >
+                      {sourceBreakdown.map((item, index) => (
+                        <Cell key={item.name} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {(() => {
+                  const total = sourceBreakdown.reduce((s, i) => s + i.value, 0);
+                  return sourceBreakdown
+                    .slice()
+                    .sort((a, b) => b.value - a.value)
+                    .map((item) => {
+                      const originalIndex = sourceBreakdown.findIndex((s) => s.name === item.name);
+                      const color = COLORS[originalIndex % COLORS.length];
+                      const share = total ? (item.value / total) * 100 : 0;
+                      return (
+                        <li key={item.name} className="flex items-center gap-2 min-w-0">
+                          <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink">{item.name || 'Unnamed'}</span>
+                          <span className="w-20 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.value, currency, locale)}</span>
+                          <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{share.toFixed(1)}%</span>
+                          <div className="w-14 shrink-0 h-1 rounded-full bg-rule overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${share}%`, background: color }} />
+                          </div>
+                        </li>
+                      );
+                    });
+                })()}
+              </ul>
             </div>
-            <ul className="flex min-w-0 flex-1 flex-col gap-2">
-              {(() => {
-                const total = sourceBreakdown.reduce((s, i) => s + i.value, 0);
-                return sourceBreakdown
-                  .slice()
-                  .sort((a, b) => b.value - a.value)
-                  .map((item) => {
-                    const originalIndex = sourceBreakdown.findIndex((s) => s.name === item.name);
-                    const color = COLORS[originalIndex % COLORS.length];
-                    const share = total ? (item.value / total) * 100 : 0;
-                    return (
-                      <li key={item.name} className="flex items-center gap-2 min-w-0">
-                        <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
-                        <span className="min-w-0 flex-1 truncate text-xs text-ink">{item.name || 'Unnamed'}</span>
-                        <span className="w-24 shrink-0 font-mono tabular text-xs text-ink-muted">{formatCurrency(item.value, currency, locale)}</span>
-                        <span className="w-9 shrink-0 font-mono tabular text-xs text-ink-faint text-right">{share.toFixed(1)}%</span>
-                        <div className="w-16 shrink-0 h-1 rounded-full bg-rule overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${share}%`, background: color }} />
-                        </div>
-                      </li>
-                    );
-                  });
-              })()}
-            </ul>
-          </div>
-        ) : (
-          <EmptyState title="No data yet" description="Log income to see the source split." />
-        )}
-      </Card>
+          ) : (
+            <EmptyState title="No data yet" description="Log income to see the source split." />
+          )}
+        </Card>
 
-      {/* trend */}
-      <Card
-        eyebrow="Twelve months"
-        title="Monthly income"
-        variant="chart"
-        className={rise(4)}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="2 4" vertical={false} />
-            <XAxis dataKey="month" tickLine={false} axisLine={false} />
-            <YAxis
-              tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-              tickLine={false}
-              axisLine={false}
-              width={60}
-            />
-            <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-            <Bar dataKey="amountCents" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
+        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-7">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} />
+              <YAxis
+                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
+              <Bar dataKey="amountCents" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </section>
 
       {/* ledger */}
       <Card
