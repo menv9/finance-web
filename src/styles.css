@@ -145,14 +145,19 @@ input[type="month"] {
 
 /* Surface cards need some transparency so LiquidChrome bleeds through */
 [data-theme='gorka'] .bg-surface {
-  background-color: rgba(13, 9, 32, 0.32) !important;
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  background-color: rgba(13, 9, 32, 0.68) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 [data-theme='gorka'] .bg-surface-raised {
-  background-color: rgba(45, 28, 90, 0.52) !important;
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  background-color: rgba(45, 28, 90, 0.78) !important;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+/* Boost soft badge colors so they're readable on the dark gorka surface */
+[data-theme='gorka'] {
+  --danger-soft: rgba(255, 83, 112, 0.30);
+  --positive-soft: rgba(80, 250, 123, 0.28);
 }
 
 /* Slowly rotating conic shimmer — gives the living-chrome feel */
