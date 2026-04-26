@@ -159,6 +159,15 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
     setStatus(null);
   };
 
+  const handleReset = () => {
+    setHeaders([]);
+    setRawRows([]);
+    setMapping(null);
+    setIsRevolut(false);
+    setCategoryOverrides({});
+    setStatus(null);
+  };
+
   const handleImport = async () => {
     setStatus('importing');
     for (const row of finalExpenses) await onImportExpenses([row]);
@@ -283,7 +292,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           {/* ── Expense preview ── */}
           {split.expenses.length > 0 && (
             <div>
-              <p className="eyebrow mb-2">Expense preview</p>
+              <p className="eyebrow mb-2">Expenses <span className="text-ink-faint normal-case font-normal">({finalExpenses.length})</span></p>
               <PreviewTable
                 rows={finalExpenses}
                 columns={[
@@ -299,7 +308,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           {/* ── Income preview ── */}
           {split.incomes.length > 0 && (
             <div>
-              <p className="eyebrow mb-2">Income preview</p>
+              <p className="eyebrow mb-2">Incomes <span className="text-ink-faint normal-case font-normal">({split.incomes.length})</span></p>
               <PreviewTable
                 rows={split.incomes}
                 columns={[
@@ -312,7 +321,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           )}
 
           {/* ── Import button + status ── */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="primary"
               size="sm"
@@ -320,11 +329,21 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
               loading={status === 'importing'}
               onClick={handleImport}
             >
-              Import {totalToImport > 0 ? `${totalToImport} entries` : ''}
+              {totalToImport > 0
+                ? `Import ${finalExpenses.length > 0 ? `${finalExpenses.length} expense${finalExpenses.length !== 1 ? 's' : ''}` : ''}${finalExpenses.length > 0 && split.incomes.length > 0 ? ' + ' : ''}${split.incomes.length > 0 ? `${split.incomes.length} income${split.incomes.length !== 1 ? 's' : ''}` : ''}`
+                : 'Import'}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={status === 'importing'}
+              onClick={handleReset}
+            >
+              Cancel
             </Button>
             {status && status !== 'importing' && (
               <p className="text-sm text-positive">
-                ✓ Imported {status.expenses} expense{status.expenses !== 1 ? 's' : ''} and {status.incomes} income entr{status.incomes !== 1 ? 'ies' : 'y'}
+                ✓ Imported {status.expenses} expense{status.expenses !== 1 ? 's' : ''} and {status.incomes} income{status.incomes !== 1 ? 's' : ''}
               </p>
             )}
           </div>
