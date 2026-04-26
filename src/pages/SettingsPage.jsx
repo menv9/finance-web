@@ -646,7 +646,7 @@ export default function SettingsPage() {
       >
         <div className="grid gap-4">
           <p className="text-sm text-ink-muted">
-            Type <span className="font-mono font-medium text-danger select-all">ERASE ALL DATA</span> to confirm.
+            Type <span className="font-mono font-medium text-danger select-all"> ERASE ALL DATA </span> to confirm.
           </p>
           <Input
             autoFocus
