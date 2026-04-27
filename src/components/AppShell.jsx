@@ -51,19 +51,211 @@ function MenuIcon({ open }) {
   );
 }
 
-function Logo({ isGorka }) {
+function FinanceIcon({ theme }) {
+  const isDark = theme === 'dark' || theme === 'gorka';
+  const isGorka = theme === 'gorka';
+  const isEris = theme === 'eris';
+
+  // Card background
+  const cardFrom = isDark ? '#1B2434' : isEris ? '#FFF6FA' : '#FFFFFF';
+  const cardTo   = isDark ? '#141B26' : isEris ? '#FEF0F5' : '#E8EFFE';
+
+  // Coin face
+  const coinFrom = isDark ? '#232E42' : isEris ? '#FFF0F7' : '#FFFFFF';
+  const coinTo   = isDark ? '#1B2434' : isEris ? '#FFE0EE' : '#EEF2FF';
+
+  // Coin ring
+  const ringFrom = isDark ? '#2A3A58' : isEris ? '#FFD6EA' : '#E0E8FF';
+  const ringTo   = isDark ? '#1E2C46' : isEris ? '#FFBAD8' : '#C8D8F8';
+
+  // Euro stroke color
+  const euroColor     = isGorka ? '#C084FC' : isEris ? '#D4607A' : '#1B3A7A';
+  const euroShadow    = isGorka ? 'rgba(80,0,120,0.4)' : isEris ? 'rgba(80,0,30,0.25)' : 'rgba(0,20,60,0.35)';
+  const euroHighlight = isGorka ? 'rgba(220,180,255,0.4)' : isEris ? 'rgba(255,140,180,0.35)' : 'rgba(100,160,255,0.35)';
+
+  // Card drop shadow color
+  const cardShadow = isGorka ? '#9060D8' : isEris ? '#E8A0B8' : '#8AAAD8';
+
   return (
-    <NavLink to="/dashboard" className="flex items-center gap-2.5 group" aria-label="Finance Tracker — home">
-      <span
-        aria-hidden
-        className="relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-rule-strong bg-surface-raised"
-      >
-        <span className="font-display text-sm leading-none text-ink">ƒ</span>
-      </span>
-      <span className="hidden sm:flex flex-col leading-none">
-        <span className="font-display text-sm text-ink tracking-tight">Finance</span>
-        <span className="eyebrow text-[0.6rem] mt-0.5">Quarterly Ledger</span>
-      </span>
+    <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" className="h-7 w-7">
+      <defs>
+        <linearGradient id="fi-bg" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0%" stopColor={cardFrom} />
+          <stop offset="100%" stopColor={cardTo} />
+        </linearGradient>
+        <linearGradient id="fi-g1" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stopColor="#52E8A8" />
+          <stop offset="100%" stopColor="#28B87A" />
+        </linearGradient>
+        <linearGradient id="fi-g2" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stopColor="#3ED8E8" />
+          <stop offset="100%" stopColor="#1A9ECC" />
+        </linearGradient>
+        <linearGradient id="fi-g3" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stopColor="#60A8FF" />
+          <stop offset="100%" stopColor="#1A5FE8" />
+        </linearGradient>
+        <linearGradient id="fi-sh" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.52)" />
+          <stop offset="55%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        <linearGradient id="fi-bsh" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.14)" />
+        </linearGradient>
+        <linearGradient id="fi-coinbg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={coinFrom} />
+          <stop offset="100%" stopColor={coinTo} />
+        </linearGradient>
+        <linearGradient id="fi-coinring" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={ringFrom} />
+          <stop offset="100%" stopColor={ringTo} />
+        </linearGradient>
+        <filter id="fi-cardshadow" x="-10%" y="-10%" width="120%" height="130%">
+          <feDropShadow dx="0" dy="20" stdDeviation="32" floodColor={cardShadow} floodOpacity="0.28" />
+        </filter>
+        <filter id="fi-bardepth" x="-20%" y="-10%" width="150%" height="130%">
+          <feDropShadow dx="4" dy="8" stdDeviation="10" floodColor="#000" floodOpacity="0.16" />
+        </filter>
+        <filter id="fi-coinshadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="8" stdDeviation="14" floodColor="#5577BB" floodOpacity="0.22" />
+        </filter>
+        <filter id="fi-lineglow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="fi-dotglow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="8" floodColor="#fff" floodOpacity="0.9" />
+        </filter>
+      </defs>
+
+      <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#fi-bg)" filter="url(#fi-cardshadow)" />
+
+      <g filter="url(#fi-bardepth)">
+        <rect x="230" y="530" width="155" height="325" rx="36" fill="url(#fi-g1)" />
+        <rect x="230" y="530" width="155" height="325" rx="36" fill="url(#fi-bsh)" />
+        <rect x="230" y="530" width="52"  height="325" rx="36" fill="url(#fi-sh)" opacity="0.9" />
+      </g>
+      <g filter="url(#fi-bardepth)">
+        <rect x="415" y="390" width="155" height="465" rx="36" fill="url(#fi-g2)" />
+        <rect x="415" y="390" width="155" height="465" rx="36" fill="url(#fi-bsh)" />
+        <rect x="415" y="390" width="52"  height="465" rx="36" fill="url(#fi-sh)" opacity="0.9" />
+      </g>
+      <g filter="url(#fi-bardepth)">
+        <rect x="600" y="210" width="160" height="645" rx="36" fill="url(#fi-g3)" />
+        <rect x="600" y="210" width="160" height="645" rx="36" fill="url(#fi-bsh)" />
+        <rect x="600" y="210" width="54"  height="645" rx="36" fill="url(#fi-sh)" opacity="0.9" />
+      </g>
+
+      <path d="M307 668 C390 600 460 450 492 432 C530 412 590 358 680 310"
+            stroke="rgba(255,255,255,0.32)" strokeWidth="32" fill="none" strokeLinecap="round" filter="url(#fi-lineglow)" />
+      <path d="M307 668 C390 600 460 450 492 432 C530 412 590 358 680 310"
+            stroke="white" strokeWidth="18" fill="none" strokeLinecap="round" />
+
+      <circle cx="307" cy="668" r="30" fill="white" filter="url(#fi-dotglow)" />
+      <circle cx="307" cy="668" r="15" fill="#3ABDE0" />
+      <circle cx="492" cy="432" r="30" fill="white" filter="url(#fi-dotglow)" />
+      <circle cx="492" cy="432" r="15" fill="#3ABDE0" />
+      <circle cx="680" cy="310" r="30" fill="white" filter="url(#fi-dotglow)" />
+      <circle cx="680" cy="310" r="15" fill="#4B8EF5" />
+
+      <g filter="url(#fi-coinshadow)">
+        <circle cx="724" cy="748" r="118" fill="url(#fi-coinring)" />
+        <circle cx="724" cy="748" r="100" fill="url(#fi-coinbg)" />
+        <circle cx="724" cy="748" r="100" fill="none" stroke="rgba(100,130,200,0.18)" strokeWidth="12" />
+        <circle cx="724" cy="748" r="109" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="3"
+                strokeDasharray="180 600" strokeDashoffset="-60" strokeLinecap="round" />
+        <ellipse cx="690" cy="712" rx="52" ry="36" fill="rgba(255,255,255,0.18)" />
+        <circle cx="724" cy="748" r="100" fill="none" stroke="rgba(180,200,240,0.6)" strokeWidth="2" />
+        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroShadow} strokeWidth="28" strokeLinecap="round" />
+        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroColor} strokeWidth="22" strokeLinecap="round" />
+        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroHighlight} strokeWidth="8" strokeLinecap="round" />
+        <line x1="650" y1="732" x2="725" y2="732" stroke={euroShadow} strokeWidth="22" strokeLinecap="round" />
+        <line x1="650" y1="732" x2="725" y2="732" stroke={euroColor} strokeWidth="16" strokeLinecap="round" />
+        <line x1="650" y1="729" x2="725" y2="729" stroke={euroHighlight} strokeWidth="5" strokeLinecap="round" />
+        <line x1="650" y1="764" x2="725" y2="764" stroke={euroShadow} strokeWidth="22" strokeLinecap="round" />
+        <line x1="650" y1="764" x2="725" y2="764" stroke={euroColor} strokeWidth="16" strokeLinecap="round" />
+        <line x1="650" y1="761" x2="725" y2="761" stroke={euroHighlight} strokeWidth="5" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+const LOGO_GRADIENTS = {
+  dark:  [{ o: '0%', c: '#28B87A' }, { o: '45%', c: '#1A9ECC' }, { o: '100%', c: '#2563EB' }],
+  light: [{ o: '0%', c: '#1F4B3A' }, { o: '45%', c: '#0F6E56' }, { o: '100%', c: '#085041' }],
+  eris:  [{ o: '0%', c: '#D4607A' }, { o: '45%', c: '#B84362' }, { o: '100%', c: '#8A1A45' }],
+  gorka: [{ o: '0%', c: '#C084FC' }, { o: '45%', c: '#818CF8' }, { o: '100%', c: '#60A5FA' }],
+};
+
+const FIN_COLORS = {
+  dark:  '#FAF9F5',
+  light: '#1B1712',
+  eris:  '#2A1218',
+  gorka: '#FFFFFF',
+};
+
+const TAGLINE_COLORS = {
+  dark:  '#C2C0B6',
+  light: '#524A40',
+  eris:  '#8A4F65',
+  gorka: 'rgba(255,255,255,0.55)',
+};
+
+function FinGesWordmark({ theme }) {
+  const stops = LOGO_GRADIENTS[theme] ?? LOGO_GRADIENTS.dark;
+  const finColor = FIN_COLORS[theme] ?? FIN_COLORS.dark;
+  const taglineColor = TAGLINE_COLORS[theme] ?? TAGLINE_COLORS.dark;
+  const id = `lgw-${theme}`;
+
+  return (
+    <svg viewBox="50 75 530 160" role="img" xmlns="http://www.w3.org/2000/svg" className="h-11 w-auto">
+      <title>FinGes</title>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+          {stops.map(s => <stop key={s.o} offset={s.o} stopColor={s.c} />)}
+        </linearGradient>
+        <filter id={`glow-g-${theme}`} x="-80%" y="-80%" width="260%" height="260%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#28E87A" floodOpacity="0.7"/>
+        </filter>
+        <filter id={`glow-r-${theme}`} x="-80%" y="-80%" width="260%" height="260%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#FF4444" floodOpacity="0.7"/>
+        </filter>
+        <filter id={`lglow-${theme}`} x="-10%" y="-40%" width="120%" height="180%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* 6→7 behind, red */}
+      <line x1="301" y1="99" x2="364" y2="185" stroke="rgba(255,68,68,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
+      <line x1="301" y1="99" x2="364" y2="185" stroke="#E74C3C" strokeWidth="4" strokeLinecap="round"/>
+      {/* 8→9 behind, red */}
+      <line x1="395" y1="127" x2="457" y2="185" stroke="rgba(255,68,68,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
+      <line x1="395" y1="127" x2="457" y2="185" stroke="#E74C3C" strokeWidth="4" strokeLinecap="round"/>
+
+      <text x="60" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="400" fill={finColor} opacity="0.9" letterSpacing="-3">Fin</text>
+      <text x="253" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="600" fill={`url(#${id})`} letterSpacing="-3">Ges</text>
+
+      {/* 7→8 in front, green */}
+      <line x1="364" y1="185" x2="395" y2="127" stroke="rgba(40,232,122,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
+      <line x1="364" y1="185" x2="395" y2="127" stroke="#2ECC71" strokeWidth="4" strokeLinecap="round"/>
+
+      {/* Dots */}
+      <circle cx="301" cy="99"  r="10" fill="white" filter={`url(#glow-g-${theme})`}/><circle cx="301" cy="99"  r="6" fill="#2ECC71"/>
+      <circle cx="364" cy="185" r="10" fill="white" filter={`url(#glow-r-${theme})`}/><circle cx="364" cy="185" r="6" fill="#E74C3C"/>
+      <circle cx="395" cy="127" r="10" fill="white" filter={`url(#glow-g-${theme})`}/><circle cx="395" cy="127" r="6" fill="#2ECC71"/>
+      <circle cx="457" cy="185" r="10" fill="white" filter={`url(#glow-r-${theme})`}/><circle cx="457" cy="185" r="6" fill="#E74C3C"/>
+
+      <text x="61" y="220" fontFamily="'Instrument Sans', system-ui, sans-serif" fontSize="15" fontWeight="500" letterSpacing="6" fill={taglineColor}>QUARTERLY LEDGER</text>
+    </svg>
+  );
+}
+
+function Logo({ theme }) {
+  return (
+    <NavLink to="/dashboard" className="flex items-center group" aria-label="Finance Tracker — home">
+      <FinGesWordmark theme={theme} />
     </NavLink>
   );
 }
@@ -145,7 +337,7 @@ export function AppShell({ children }) {
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
           <div className="flex items-center gap-6 min-w-0">
-            <Logo isGorka={isGorka} />
+            <Logo theme={appliedTheme} />
           </div>
 
           <nav aria-label="Primary" className="hidden lg:flex items-center gap-1">
