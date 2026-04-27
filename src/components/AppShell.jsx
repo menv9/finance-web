@@ -209,43 +209,16 @@ function FinGesWordmark({ theme }) {
   const id = `lgw-${theme}`;
 
   return (
-    <svg viewBox="50 75 530 160" role="img" xmlns="http://www.w3.org/2000/svg" className="h-11 w-auto">
+    <svg viewBox="50 55 540 175" role="img" xmlns="http://www.w3.org/2000/svg" className="h-9 w-auto">
       <title>FinGes</title>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
           {stops.map(s => <stop key={s.o} offset={s.o} stopColor={s.c} />)}
         </linearGradient>
-        <filter id={`glow-g-${theme}`} x="-80%" y="-80%" width="260%" height="260%">
-          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#28E87A" floodOpacity="0.7"/>
-        </filter>
-        <filter id={`glow-r-${theme}`} x="-80%" y="-80%" width="260%" height="260%">
-          <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#FF4444" floodOpacity="0.7"/>
-        </filter>
-        <filter id={`lglow-${theme}`} x="-10%" y="-40%" width="120%" height="180%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
       </defs>
-
-      {/* 6→7 behind, red */}
-      <line x1="301" y1="99" x2="364" y2="185" stroke="rgba(255,68,68,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
-      <line x1="301" y1="99" x2="364" y2="185" stroke="#E74C3C" strokeWidth="4" strokeLinecap="round"/>
-      {/* 8→9 behind, red */}
-      <line x1="395" y1="127" x2="457" y2="185" stroke="rgba(255,68,68,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
-      <line x1="395" y1="127" x2="457" y2="185" stroke="#E74C3C" strokeWidth="4" strokeLinecap="round"/>
 
       <text x="60" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="400" fill={finColor} opacity="0.9" letterSpacing="-3">Fin</text>
       <text x="253" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="600" fill={`url(#${id})`} letterSpacing="-3">Ges</text>
-
-      {/* 7→8 in front, green */}
-      <line x1="364" y1="185" x2="395" y2="127" stroke="rgba(40,232,122,0.22)" strokeWidth="12" strokeLinecap="round" filter={`url(#lglow-${theme})`}/>
-      <line x1="364" y1="185" x2="395" y2="127" stroke="#2ECC71" strokeWidth="4" strokeLinecap="round"/>
-
-      {/* Dots */}
-      <circle cx="301" cy="99"  r="10" fill="white" filter={`url(#glow-g-${theme})`}/><circle cx="301" cy="99"  r="6" fill="#2ECC71"/>
-      <circle cx="364" cy="185" r="10" fill="white" filter={`url(#glow-r-${theme})`}/><circle cx="364" cy="185" r="6" fill="#E74C3C"/>
-      <circle cx="395" cy="127" r="10" fill="white" filter={`url(#glow-g-${theme})`}/><circle cx="395" cy="127" r="6" fill="#2ECC71"/>
-      <circle cx="457" cy="185" r="10" fill="white" filter={`url(#glow-r-${theme})`}/><circle cx="457" cy="185" r="6" fill="#E74C3C"/>
 
       <text x="61" y="220" fontFamily="'Instrument Sans', system-ui, sans-serif" fontSize="15" fontWeight="500" letterSpacing="6" fill={taglineColor}>QUARTERLY LEDGER</text>
     </svg>
