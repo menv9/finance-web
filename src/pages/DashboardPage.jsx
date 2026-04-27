@@ -196,13 +196,6 @@ export default function DashboardPage() {
         className="mb-0 pb-6"
         actions={
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => exportElementToPdf(reportRef.current)}
-            >
-              Export PDF
-            </Button>
             <Button variant="primary" size="sm" asChild>
               <Link to="/expenses">Log expense</Link>
             </Button>
@@ -211,16 +204,19 @@ export default function DashboardPage() {
       />
 
       {/* KPIs */}
-      <div className="relative">
-        <button
-          type="button"
-          className="kpi-eye-blob"
-          aria-label={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
-          title={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
-          onClick={() => setHideKpis((value) => !value)}
-        >
-          <EyeIcon hidden={hideKpis} />
-        </button>
+      <div>
+        <div className="mb-3 flex justify-center">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-3 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink transition-colors"
+            aria-label={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
+            title={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
+            onClick={() => setHideKpis((value) => !value)}
+          >
+            <EyeIcon hidden={hideKpis} />
+            {hideKpis ? 'Show' : 'Hide'}
+          </button>
+        </div>
         <section
           aria-label="Key figures"
           className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4"

@@ -28,6 +28,35 @@ import { rise } from '../utils/motion';
 
 const COLORS = ['var(--accent)', '#8FB97E', '#C9A96E', '#7A9CC6', '#B48EAD'];
 
+const PAGE_SIZE = 5;
+
+function Pagination({ page, totalPages, onPrev, onNext }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={page === 1}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        ‹ Previous
+      </button>
+      <span className="tabular text-ink-muted">
+        {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        Next ›
+      </button>
+    </div>
+  );
+}
+
 function saleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
@@ -154,6 +183,7 @@ export default function IncomePage() {
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const confirm = useConfirm();
   const [modal, setModal] = useState({ open: false, id: null });
+  const [incomePage, setIncomePage] = useState(1);
   const currency = settings.baseCurrency;
   const locale = settings.locale;
   const editingIncome = incomes.find((income) => income.id === modal.id);
@@ -211,6 +241,7 @@ export default function IncomePage() {
   const batchSelect = useBatchSelect(sortedIncomeRows.filter((row) => row.ledgerType === 'income'));
 
   useEffect(() => { batchSelect.cancel(); }, [selectedMonth, filterKind, sourceSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setIncomePage(1); }, [selectedMonth, filterKind, sourceSearch]);
 
   const handleBatchDeleteIncomes = async () => {
     const ids = [...batchSelect.selectedIds];
@@ -482,19 +513,27 @@ export default function IncomePage() {
           onCancel={batchSelect.cancel}
         />
         {filteredIncomeRows.length ? (
-          <IncomeLedgerList
-            rows={sortedIncomeRows}
-            currency={currency}
-            locale={locale}
-            selectable={batchSelect.selecting}
-            selectedIds={batchSelect.selectedIds}
-            onToggleRow={batchSelect.toggle}
-            openEdit={openEdit}
-            onDeleteIncome={async (id) => {
-              if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
-                removeEntity('incomes', id);
-            }}
-          />
+          <>
+            <IncomeLedgerList
+              rows={sortedIncomeRows.slice((incomePage - 1) * PAGE_SIZE, incomePage * PAGE_SIZE)}
+              currency={currency}
+              locale={locale}
+              selectable={batchSelect.selecting}
+              selectedIds={batchSelect.selectedIds}
+              onToggleRow={batchSelect.toggle}
+              openEdit={openEdit}
+              onDeleteIncome={async (id) => {
+                if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
+                  removeEntity('incomes', id);
+              }}
+            />
+            <Pagination
+              page={incomePage}
+              totalPages={Math.ceil(sortedIncomeRows.length / PAGE_SIZE)}
+              onPrev={() => setIncomePage((p) => Math.max(1, p - 1))}
+              onNext={() => setIncomePage((p) => Math.min(Math.ceil(sortedIncomeRows.length / PAGE_SIZE), p + 1))}
+            />
+          </>
         ) : (
           <EmptyState
             title={incomeLedgerRows.length ? 'No results for this filter' : 'No income records yet'}

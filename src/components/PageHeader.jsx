@@ -25,7 +25,7 @@ export function PageHeader({ eyebrow, title, description, actions, number, class
         </div>
       </div>
       {actions ? (
-        <div className="lg:col-span-4 flex flex-wrap items-start gap-2 lg:justify-end lg:pt-2">
+        <div className="lg:col-span-4 flex flex-wrap items-start gap-2 justify-end lg:pt-2">
           {actions}
         </div>
       ) : null}

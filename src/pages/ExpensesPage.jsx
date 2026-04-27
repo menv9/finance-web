@@ -21,7 +21,6 @@ import { rowsToCsv } from '../utils/csv';
 import {
   Card,
   Button,
-  Table,
   EmptyState,
   FormField,
   Input,
@@ -31,6 +30,35 @@ import {
   Modal,
 } from '../components/ui';
 import { rise } from '../utils/motion';
+
+const PAGE_SIZE = 5;
+
+function Pagination({ page, totalPages, onPrev, onNext }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={page === 1}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        ‹ Previous
+      </button>
+      <span className="tabular text-ink-muted">
+        {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        Next ›
+      </button>
+    </div>
+  );
+}
 
 const DONUT_COLORS = [
   'var(--accent)',
@@ -178,6 +206,86 @@ function ExpenseLedgerList({
   );
 }
 
+function FixedExpenseLedgerList({
+  rows,
+  currency,
+  locale,
+  onEdit,
+  onToggleStatus,
+  onDelete,
+}) {
+  return (
+    <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+      {rows.map((row) => {
+        const meta = [row.category, row.chargeDay ? `day ${row.chargeDay}` : null]
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          <li
+            key={row.id}
+            className="transition-colors duration-120 hover:bg-surface-raised"
+          >
+            <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline justify-between gap-4">
+                  <p className="min-w-0 truncate text-sm text-ink">
+                    {row.name || 'Recurring bill'}
+                  </p>
+                  <span className="shrink-0 font-mono text-sm tabular text-danger">
+                    -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
+                  </span>
+                </div>
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
+                  <p className="min-w-0 truncate eyebrow flex items-center gap-1.5">
+                    {meta}
+                    <span
+                      aria-label={row.active ? 'Active' : 'Paused'}
+                      title={row.active ? 'Active' : 'Paused'}
+                      className={
+                        'inline-block h-1.5 w-1.5 rounded-full ' +
+                        (row.active ? 'bg-positive' : 'bg-ink-faint')
+                      }
+                    />
+                  </p>
+                  <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                      aria-label="Edit recurring bill"
+                      title="Edit"
+                      onClick={() => onEdit(row.id)}
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                      aria-label={row.active ? 'Pause recurring bill' : 'Resume recurring bill'}
+                      title={row.active ? 'Pause' : 'Resume'}
+                      onClick={() => onToggleStatus(row.id)}
+                    >
+                      {row.active ? <PauseIcon /> : <PlayIcon />}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                      aria-label="Delete recurring bill"
+                      title="Delete"
+                      onClick={() => onDelete(row.id)}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function ExpensesPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
@@ -197,6 +305,7 @@ export default function ExpensesPage() {
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
   const [attachmentModal, setAttachmentModal] = useState({ open: false, expenseId: null });
+  const [expensePage, setExpensePage] = useState(1);
 
   const confirm = useConfirm();
   const locale = settings.locale;
@@ -221,6 +330,7 @@ export default function ExpensesPage() {
 
   // Clear selection when any filter changes so stale IDs can't be batch-deleted
   useEffect(() => { batchSelect.cancel(); }, [selectedMonth, selectedCategory, descSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setExpensePage(1); }, [selectedMonth, selectedCategory, descSearch]);
 
   const chartData = computeExpenseSeries(expenses);
   const breakdown = categoryBreakdown(filteredExpenses);
@@ -385,105 +495,6 @@ export default function ExpensesPage() {
           </div>
         );
       },
-    },
-  ];
-
-  const fixedColumns = [
-    { key: 'name', header: 'Name' },
-    { key: 'category', header: 'Category', hideOnMobile: true },
-    { key: 'chargeDay', header: 'Day', numeric: true, width: 70, hideOnMobile: true },
-    {
-      key: 'amountCents',
-      header: 'Amount',
-      numeric: true,
-      render: (r) => <span className="text-danger">{formatCurrency(r.amountCents, r.currency, locale)}</span>,
-    },
-    {
-      key: 'active',
-      header: 'Status',
-      hideOnMobile: true,
-      render: (r) => (
-        <span
-          className={
-            'inline-flex items-center gap-1.5 text-xs ' +
-            (r.active ? 'text-positive' : 'text-ink-faint')
-          }
-        >
-          <span
-            aria-hidden
-            className={
-              'inline-block h-1.5 w-1.5 rounded-full ' +
-              (r.active ? 'bg-positive' : 'bg-ink-faint')
-            }
-          />
-          {r.active ? 'Active' : 'Paused'}
-        </span>
-      ),
-    },
-    {
-      key: 'alerts',
-      header: 'Alerts',
-      hideOnMobile: true,
-      render: (r) => <span className="text-xs text-ink-muted">{r.alerts ? 'On' : 'Off'}</span>,
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      noTruncate: true,
-      _render: (r) => (
-        <div className="flex flex-wrap justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditFixed(r.id)}>
-            Edit
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => toggleFixedExpenseStatus(r.id)}>
-            {r.active ? 'Pause' : 'Resume'}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete recurring bill', description: `"${r.name}" will be permanently removed.` }))
-              removeEntity('fixedExpenses', r.id);
-          }}>
-            Delete
-          </Button>
-        </div>
-      ),
-      render: (r) => (
-        <div className="flex flex-wrap justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-10 w-10 px-0"
-            aria-label="Edit recurring bill"
-            title="Edit"
-            onClick={() => openEditFixed(r.id)}
-          >
-            <EditIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-10 w-10 px-0"
-            aria-label={r.active ? 'Pause recurring bill' : 'Resume recurring bill'}
-            title={r.active ? 'Pause' : 'Resume'}
-            onClick={() => toggleFixedExpenseStatus(r.id)}
-          >
-            {r.active ? <PauseIcon /> : <PlayIcon />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-10 w-10 px-0"
-            aria-label="Delete recurring bill"
-            title="Delete"
-            onClick={async () => {
-              if (await confirm({ title: 'Delete recurring bill', description: `"${r.name}" will be permanently removed.` }))
-                removeEntity('fixedExpenses', r.id);
-            }}
-          >
-            <TrashIcon />
-          </Button>
-        </div>
-      ),
     },
   ];
 
@@ -686,21 +697,29 @@ export default function ExpensesPage() {
           onCancel={batchSelect.cancel}
         />
         {filteredExpenses.length ? (
-          <ExpenseLedgerList
-            rows={sortedExpenses}
-            attachments={attachments}
-            currency={currency}
-            locale={locale}
-            selectable={batchSelect.selecting}
-            selectedIds={batchSelect.selectedIds}
-            onToggleRow={batchSelect.toggle}
-            openAttachments={openAttachments}
-            openEditExpense={openEditExpense}
-            onDeleteExpense={async (id) => {
-              if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
-                removeEntity('expenses', id);
-            }}
-          />
+          <>
+            <ExpenseLedgerList
+              rows={sortedExpenses.slice((expensePage - 1) * PAGE_SIZE, expensePage * PAGE_SIZE)}
+              attachments={attachments}
+              currency={currency}
+              locale={locale}
+              selectable={batchSelect.selecting}
+              selectedIds={batchSelect.selectedIds}
+              onToggleRow={batchSelect.toggle}
+              openAttachments={openAttachments}
+              openEditExpense={openEditExpense}
+              onDeleteExpense={async (id) => {
+                if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                  removeEntity('expenses', id);
+              }}
+            />
+            <Pagination
+              page={expensePage}
+              totalPages={Math.ceil(sortedExpenses.length / PAGE_SIZE)}
+              onPrev={() => setExpensePage((p) => Math.max(1, p - 1))}
+              onNext={() => setExpensePage((p) => Math.min(Math.ceil(sortedExpenses.length / PAGE_SIZE), p + 1))}
+            />
+          </>
         ) : (
           <EmptyState
             title="No expenses for this filter"
@@ -747,7 +766,18 @@ export default function ExpensesPage() {
         className={rise(5)}
       >
         {fixedExpenses.length ? (
-          <Table columns={fixedColumns} rows={fixedExpenses} density="compact" />
+          <FixedExpenseLedgerList
+            rows={fixedExpenses}
+            currency={currency}
+            locale={locale}
+            onEdit={openEditFixed}
+            onToggleStatus={toggleFixedExpenseStatus}
+            onDelete={async (id) => {
+              const row = fixedExpenses.find((f) => f.id === id);
+              if (await confirm({ title: 'Delete recurring bill', description: `"${row?.name}" will be permanently removed.` }))
+                removeEntity('fixedExpenses', id);
+            }}
+          />
         ) : (
           <EmptyState
             title="No recurring bills yet"
