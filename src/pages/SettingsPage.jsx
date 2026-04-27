@@ -63,14 +63,15 @@ export default function SettingsPage() {
 
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
+  const isPrivileged = isEris || isGorka;
   const theme = settings.theme || 'dark';
   const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
 
   const themeOptions = [
-    ...(isEris ? [{ value: 'eris', label: 'Eris', emoji: '🌸', description: 'Lavender dreams' }] : []),
-    ...(isGorka ? [{ value: 'gorka', label: 'Gorka', emoji: '🪩', description: 'Liquid chrome' }] : []),
-    { value: 'dark', label: 'Dark', emoji: '🌑', description: 'Deep & minimal' },
+    { value: 'dark',  label: 'Dark',  emoji: '🌑', description: 'Deep & minimal' },
     { value: 'light', label: 'Light', emoji: '☀️', description: 'Clean & bright' },
+    ...(isPrivileged ? [{ value: 'eris',  label: 'Eris',  emoji: '🌸', description: 'Lavender dreams' }] : []),
+    ...(isPrivileged ? [{ value: 'gorka', label: 'Gorka', emoji: '🪩', description: 'Liquid chrome'   }] : []),
   ];
 
   const [categoryInput, setCategoryInput] = useState('');

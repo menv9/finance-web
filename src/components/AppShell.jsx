@@ -379,6 +379,7 @@ export function AppShell({ children }) {
 
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
+  const isPrivileged = isEris || isGorka;
 
   // One-time auto-init: when a special user logs in for the first time on this device,
   // save their theme so 'dark' and 'light' remain explicitly selectable afterward.
