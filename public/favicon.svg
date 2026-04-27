@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1024 1024" role="img">
+  <title>FinGes</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#EFF6FF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+    <linearGradient id="lg-word" gradientUnits="userSpaceOnUse" x1="498" y1="0" x2="950" y2="0">
+      <stop offset="0%"   stop-color="#38BDF8"/>
+      <stop offset="50%"  stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7DD3FC"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="sh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.52)"/>
+      <stop offset="55%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <linearGradient id="bsh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.22)"/>
+    </linearGradient>
+    <filter id="cardshadow" x="-12%" y="-12%" width="124%" height="136%">
+      <feDropShadow dx="0" dy="28" stdDeviation="40" flood-color="#1E40AF" flood-opacity="0.25"/>
+    </filter>
+    <clipPath id="card-clip">
+      <rect x="72" y="72" width="880" height="880" rx="196"/>
+    </clipPath>
+  </defs>
+
+  <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#bg)" filter="url(#cardshadow)"/>
+
+  <g clip-path="url(#card-clip)">
+
+    <!-- Grid lines -->
+    <line x1="72" y1="560" x2="952" y2="560" stroke="#BFDBFE" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <line x1="72" y1="660" x2="952" y2="660" stroke="#BFDBFE" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <line x1="72" y1="760" x2="952" y2="760" stroke="#BFDBFE" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <line x1="72" y1="860" x2="952" y2="860" stroke="#BFDBFE" stroke-width="1.5" stroke-dasharray="6 6"/>
+
+    <!-- Bar 1: sky blue, h=300 -->
+    <rect x="553" y="658" width="118" height="300" rx="32" fill="rgba(0,0,0,0.10)"/>
+    <rect x="548" y="652" width="118" height="300" rx="32" fill="url(#g1)" stroke="white" stroke-width="5"/>
+    <rect x="548" y="652" width="118" height="300" rx="32" fill="url(#bsh)"/>
+    <rect x="548" y="652" width="40"  height="300" rx="32" fill="url(#sh)" opacity="0.9"/>
+
+    <!-- Bar 2: royal blue, h=370 -->
+    <rect x="695" y="588" width="118" height="370" rx="32" fill="rgba(0,0,0,0.10)"/>
+    <rect x="690" y="582" width="118" height="370" rx="32" fill="url(#g2)" stroke="white" stroke-width="5"/>
+    <rect x="690" y="582" width="118" height="370" rx="32" fill="url(#bsh)"/>
+    <rect x="690" y="582" width="40"  height="370" rx="32" fill="url(#sh)" opacity="0.9"/>
+
+    <!-- Bar 3: navy, h=430 -->
+    <rect x="837" y="528" width="164" height="430" rx="32" fill="rgba(0,0,0,0.10)"/>
+    <rect x="832" y="522" width="164" height="430" rx="32" fill="url(#g3)" stroke="white" stroke-width="5"/>
+    <rect x="832" y="522" width="164" height="430" rx="32" fill="url(#bsh)"/>
+    <rect x="832" y="522" width="54"  height="430" rx="32" fill="url(#sh)" opacity="0.9"/>
+
+    <!-- Fin -->
+    <text x="118" y="532" font-family="'Fraunces', Georgia, serif" font-size="220" font-weight="400" fill="#0F172A" stroke="white" stroke-width="5" paint-order="stroke" opacity="0.92" letter-spacing="-2">Fin</text>
+
+    <!-- Navy trend line (stays behind text) -->
+    <!-- Navy line: white stroke behind, colored on top -->
+    <path d="M72 950 C200 930 340 895 480 848 C620 798 750 730 952 640" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M72 950 C200 930 340 895 480 848 C620 798 750 730 952 640" stroke="#1E3A8A" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Dots navy -->
+    <circle cx="200" cy="930" r="14" fill="white"/>
+    <circle cx="200" cy="930" r="8"  fill="#1E3A8A"/>
+    <circle cx="480" cy="848" r="14" fill="white"/>
+    <circle cx="480" cy="848" r="8"  fill="#1E3A8A"/>
+    <circle cx="750" cy="730" r="14" fill="white"/>
+    <circle cx="750" cy="730" r="8"  fill="#1E3A8A"/>
+
+    <!-- Sky blue line: white stroke behind, colored on top -->
+    <path d="M72 870 C200 845 340 800 480 745 C620 688 750 610 952 510" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M72 870 C200 845 340 800 480 745 C620 688 750 610 952 510" stroke="#38BDF8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="200" cy="846" r="14" fill="white"/>
+    <circle cx="200" cy="846" r="8"  fill="#38BDF8"/>
+    <circle cx="480" cy="745" r="14" fill="white"/>
+    <circle cx="480" cy="745" r="8"  fill="#38BDF8"/>
+    <circle cx="750" cy="610" r="14" fill="white"/>
+    <circle cx="750" cy="610" r="8"  fill="#38BDF8"/>
+
+    <!-- Ges — on top of everything -->
+    <text x="498" y="532" font-family="'Fraunces', Georgia, serif" font-size="220" font-weight="700" fill="url(#lg-word)" stroke="white" stroke-width="5" paint-order="stroke" letter-spacing="-2">Ges</text>
+
+  </g>
+</svg>
