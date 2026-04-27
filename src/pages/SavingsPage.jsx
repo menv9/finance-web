@@ -22,7 +22,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
-import { monthKey, normalizeDateInput } from '../utils/dates';
+import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
@@ -62,6 +62,12 @@ function yearsToGoal(projection, goalCents) {
   return hit ? hit.year : null;
 }
 
+function monthKeyOffset(monthsBack) {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  return monthKey(date);
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
@@ -71,6 +77,21 @@ function PlusIcon() {
 }
 
 // ── Page ────────────────────────────────────────────────────────────────────
+
+function SavingsTooltip({ active, payload, label, currency, locale }) {
+  if (!active || !payload?.length) return null;
+  const amountCents = payload.find((item) => item.dataKey === 'amountCents')?.value ?? payload[0]?.payload?.amountCents;
+  if (amountCents == null) return null;
+
+  return (
+    <div className="rounded-md border border-rule-strong bg-surface-raised px-3 py-2 shadow-card">
+      <p className="text-xs uppercase tracking-wide text-ink-muted">{label}</p>
+      <p className="mt-1 text-sm font-medium text-ink">
+        Saved this month: {formatCurrency(amountCents, currency, locale)}
+      </p>
+    </div>
+  );
+}
 
 export default function SavingsPage() {
   const savingsConfig      = useFinanceStore((state) => state.savingsConfig);
@@ -118,6 +139,7 @@ export default function SavingsPage() {
   const close    = () => setModal({ open: false, id: null });
   const editingEntry = savingsEntries.find((e) => e.id === modal.id);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [savingsChartPeriod, setSavingsChartPeriod] = useState('12');
 
   // ── Derived values ──
   const currentBalanceCents  = savingsConfig.currentBalanceCents  || 0;
@@ -153,26 +175,31 @@ export default function SavingsPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, amountCents]) => ({
         month,
-        label: new Date(month + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+        label: chartMonthLabel(month + '-15'),
         amountCents,
       }));
-  }, [savingsEntries, locale]);
+  }, [savingsEntries]);
+
+  const visibleMonthlyChartData = useMemo(() => {
+    const cutoffMonth = monthKeyOffset(Number(savingsChartPeriod) - 1);
+    return monthlyChartData.filter((item) => item.month >= cutoffMonth);
+  }, [monthlyChartData, savingsChartPeriod]);
 
   const monthlySavingSegments = useMemo(
     () =>
-      monthlyChartData.slice(1).map((point, index) => {
-        const previous = monthlyChartData[index];
+      visibleMonthlyChartData.slice(1).map((point, index) => {
+        const previous = visibleMonthlyChartData[index];
         return {
           key: `${previous.month}-${point.month}`,
           color: point.amountCents >= previous.amountCents ? 'var(--accent)' : 'var(--danger)',
-          data: monthlyChartData.map((item, itemIndex) => ({
+          data: visibleMonthlyChartData.map((item, itemIndex) => ({
             ...item,
             segmentAmountCents:
               itemIndex === index || itemIndex === index + 1 ? item.amountCents : null,
           })),
         };
       }),
-    [monthlyChartData],
+    [visibleMonthlyChartData],
   );
 
   const savingsTrendData = useMemo(() => {
@@ -187,7 +214,7 @@ export default function SavingsPage() {
       return currentBalanceCents
         ? [{
             month: thisMonthKey,
-            label: new Date(thisMonthKey + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+            label: chartMonthLabel(thisMonthKey + '-15'),
             savedCents: currentBalanceCents,
           }]
         : [];
@@ -198,11 +225,11 @@ export default function SavingsPage() {
       runningTotal += map[month];
       return {
         month,
-        label: new Date(month + '-15').toLocaleDateString(locale, { month: 'short', year: '2-digit' }),
+        label: chartMonthLabel(month + '-15'),
         savedCents: runningTotal,
       };
     });
-  }, [currentBalanceCents, savingsEntries, thisMonthKey, locale]);
+  }, [currentBalanceCents, savingsEntries, thisMonthKey]);
 
   // Projection uses only explicitly set monthly savings — entries are historical records
   const projection = useMemo(
@@ -308,7 +335,7 @@ export default function SavingsPage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="05"
         eyebrow="Module"
@@ -493,16 +520,35 @@ export default function SavingsPage() {
         variant="chart"
         className={rise(3)}
         action={
-          <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add saving
-          </Button>
+          <>
+            <Select
+              aria-label="Savings chart period"
+              value={savingsChartPeriod}
+              onChange={(e) => setSavingsChartPeriod(e.target.value)}
+              className="h-10 min-w-[150px] py-2 text-sm"
+            >
+              <option value="6">Last 6 months</option>
+              <option value="12">Last year</option>
+              <option value="24">Last 2 years</option>
+            </Select>
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add saving
+            </Button>
+          </>
         }
       >
-        {monthlyChartData.length > 0 ? (
+        {visibleMonthlyChartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <LineChart data={visibleMonthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="label" type="category" tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="label"
+                type="category"
+                allowDuplicatedCategory={false}
+                interval={visibleMonthlyChartData.length <= 12 ? 0 : 'preserveStartEnd'}
+                tickLine={false}
+                axisLine={false}
+              />
               <YAxis
                 dataKey="amountCents"
                 type="number"
@@ -510,8 +556,9 @@ export default function SavingsPage() {
                 tickLine={false} axisLine={false} width={60}
               />
               <Tooltip
-                formatter={(v) => [formatCurrency(v, currency, locale), 'Saved this month']}
-                labelFormatter={(label) => label}
+                content={(props) => (
+                  <SavingsTooltip {...props} currency={currency} locale={locale} />
+                )}
               />
               {monthlySavingSegments.map((segment) => (
                 <Line

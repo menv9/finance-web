@@ -40,6 +40,112 @@ function PlusIcon() {
   );
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M9.8 3.2 12.8 6 6 12.8l-3.4.7.7-3.4 6.5-6.9Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m8.7 4.4 2.9 2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M3.5 4.5h9M6.5 2.5h3l.5 2M5 4.5l.5 9h5l.5-9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 7v4M9 7v4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IncomeLedgerList({
+  rows,
+  currency,
+  locale,
+  selectable,
+  selectedIds,
+  onToggleRow,
+  openEdit,
+  onDeleteIncome,
+}) {
+  return (
+    <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+      {rows.map((row) => {
+        const isEditable = row.ledgerType === 'income';
+        const isPortfolioSaleLoss = row.incomeKind === 'portfolio_sale' && (row.realizedPnlCents || 0) < 0;
+        const displayAmountCents = isPortfolioSaleLoss ? row.realizedPnlCents : row.amountCents;
+        const amountClass = row.incomeKind === 'portfolio_sale'
+          ? displayAmountCents > 0
+            ? 'text-positive'
+            : 'text-danger'
+          : 'text-positive';
+        return (
+          <li
+            key={row.id}
+            className={selectable && selectedIds?.has(row.id) ? 'bg-accent-soft' : 'transition-colors duration-120 hover:bg-surface-raised'}
+          >
+            <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+              {selectable ? (
+                isEditable ? (
+                  <input
+                    type="checkbox"
+                    aria-label="Select income"
+                    checked={selectedIds?.has(row.id)}
+                    onChange={() => onToggleRow?.(row.id)}
+                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
+                  />
+                ) : (
+                  <span className="mt-1 block h-4 w-4 shrink-0" />
+                )
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline justify-between gap-4">
+                  <p className="min-w-0 truncate text-sm text-ink">
+                    {row.source || 'Income'}
+                  </p>
+                  <span className={`shrink-0 font-mono text-sm tabular ${amountClass}`}>
+                    {displayAmountCents >= 0 ? '+' : '-'}
+                    {formatCurrency(Math.abs(displayAmountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
+                  </span>
+                </div>
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
+                  <p className="min-w-0 truncate eyebrow">
+                    {row.incomeKind || 'income'} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(row.date))}
+                  </p>
+                  {isEditable ? (
+                    <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                        aria-label="Edit income"
+                        title="Edit"
+                        onClick={() => openEdit(row.id)}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                        aria-label="Delete income"
+                        title="Delete"
+                        onClick={() => onDeleteIncome(row.id)}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-xs text-ink-faint">via Portfolio</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function IncomePage() {
   const incomes = useFinanceStore((state) => state.incomes);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
@@ -203,7 +309,7 @@ export default function IncomePage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="03"
         eyebrow="Module"
@@ -258,6 +364,23 @@ export default function IncomePage() {
 
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
+        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-7">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} />
+              <YAxis
+                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
+              <Bar dataKey="amountCents" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
         <Card eyebrow="Split" title="By source" className="lg:col-span-5">
           {sourceBreakdown.length ? (
             <div className="flex flex-col gap-5">
@@ -310,29 +433,12 @@ export default function IncomePage() {
             <EmptyState title="No data yet" description="Log income to see the source split." />
           )}
         </Card>
-
-        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-7">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-              <Bar dataKey="amountCents" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
       </section>
 
       {/* ledger */}
       <Card
         eyebrow="Ledger"
-        title="All income records"
+        title="Income"
         description="Filter the selected month by kind and source."
         action={
           <div className="flex flex-wrap justify-end gap-2">
@@ -376,17 +482,18 @@ export default function IncomePage() {
           onCancel={batchSelect.cancel}
         />
         {filteredIncomeRows.length ? (
-          <Table
-            columns={incomeColumns}
+          <IncomeLedgerList
             rows={sortedIncomeRows}
-            sortKey={incSortKey}
-            sortDir={incSortDir}
-            onSort={onIncSort}
+            currency={currency}
+            locale={locale}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
-            onToggleAll={batchSelect.toggleAll}
-            isRowSelectable={(row) => row.ledgerType === 'income'}
+            openEdit={openEdit}
+            onDeleteIncome={async (id) => {
+              if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
+                removeEntity('incomes', id);
+            }}
           />
         ) : (
           <EmptyState

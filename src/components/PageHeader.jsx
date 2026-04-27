@@ -1,6 +1,8 @@
-export function PageHeader({ eyebrow, title, description, actions, number }) {
+import { cn } from './ui';
+
+export function PageHeader({ eyebrow, title, description, actions, number, className }) {
   return (
-    <header className="mb-10 grid gap-6 border-b border-rule pb-8 lg:grid-cols-12 lg:gap-8">
+    <header className={cn('mb-0 grid gap-6 border-b border-rule pb-6 lg:grid-cols-12 lg:gap-8', className)}>
       <div className="lg:col-span-8 flex gap-4 lg:gap-6">
         {number ? (
           <span

@@ -165,7 +165,7 @@ function portfolioSaleCashflowCents(sale) {
 export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [] }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
-  const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth);
+  const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth && item.date <= today);
   const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth && item.date <= today);
   const currentMonthCashflowIncomes = currentMonthIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
   const currentMonthSaleCashflowCents = (portfolioSales || [])

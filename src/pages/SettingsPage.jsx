@@ -118,7 +118,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="07"
         eyebrow="Module"

@@ -92,6 +92,92 @@ function PlayIcon() {
   );
 }
 
+function ExpenseLedgerList({
+  rows,
+  attachments,
+  currency,
+  locale,
+  selectable,
+  selectedIds,
+  onToggleRow,
+  openAttachments,
+  openEditExpense,
+  onDeleteExpense,
+}) {
+  return (
+    <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+      {rows.map((row) => {
+        const attCount = attachments.filter((a) => a.expenseId === row.id).length;
+        const meta = [row.category, row.subcategory].filter(Boolean).join(' / ') || 'Expense';
+        return (
+          <li
+            key={row.id}
+            className={selectable && selectedIds?.has(row.id) ? 'bg-accent-soft' : 'transition-colors duration-120 hover:bg-surface-raised'}
+          >
+            <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+              {selectable ? (
+                <input
+                  type="checkbox"
+                  aria-label="Select expense"
+                  checked={selectedIds?.has(row.id)}
+                  onChange={() => onToggleRow?.(row.id)}
+                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline justify-between gap-4">
+                  <p className="min-w-0 truncate text-sm text-ink">
+                    {row.description || row.category || 'Expense'}
+                  </p>
+                  <span className="shrink-0 font-mono text-sm tabular text-danger">
+                    -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
+                  </span>
+                </div>
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
+                  <p className="min-w-0 truncate eyebrow">
+                    {meta} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(row.date))}
+                  </p>
+                  <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                    {attCount > 0 ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
+                        aria-label={`Open ${attCount} attachment${attCount !== 1 ? 's' : ''}`}
+                        title={`Attachments (${attCount})`}
+                        onClick={() => openAttachments(row.id)}
+                      >
+                        <PaperclipIcon />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                      aria-label="Edit expense"
+                      title="Edit"
+                      onClick={() => openEditExpense(row.id)}
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                      aria-label="Delete expense"
+                      title="Delete"
+                      onClick={() => onDeleteExpense(row.id)}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function ExpensesPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
@@ -402,7 +488,7 @@ export default function ExpensesPage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="02"
         eyebrow="Module"
@@ -542,7 +628,7 @@ export default function ExpensesPage() {
       {/* transactions */}
       <Card
         eyebrow="Ledger"
-        title="Transactions"
+        title="Expenses"
         description="Filter the selected month by category and description."
         action={
           <div className="flex flex-wrap justify-end gap-2">
@@ -600,16 +686,20 @@ export default function ExpensesPage() {
           onCancel={batchSelect.cancel}
         />
         {filteredExpenses.length ? (
-          <Table
-            columns={expenseColumns}
+          <ExpenseLedgerList
             rows={sortedExpenses}
-            sortKey={expSortKey}
-            sortDir={expSortDir}
-            onSort={onExpSort}
+            attachments={attachments}
+            currency={currency}
+            locale={locale}
             selectable={batchSelect.selecting}
             selectedIds={batchSelect.selectedIds}
             onToggleRow={batchSelect.toggle}
-            onToggleAll={batchSelect.toggleAll}
+            openAttachments={openAttachments}
+            openEditExpense={openEditExpense}
+            onDeleteExpense={async (id) => {
+              if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                removeEntity('expenses', id);
+            }}
           />
         ) : (
           <EmptyState

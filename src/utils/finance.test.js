@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { computePortfolioMetrics, yearlySideIncome } from './finance';
+import { describe, expect, it, vi } from 'vitest';
+import { computeDashboardData, computePortfolioMetrics, yearlySideIncome } from './finance';
 
 describe('finance metrics', () => {
   it('computes portfolio totals and allocation weights', () => {
@@ -56,5 +56,33 @@ describe('finance metrics', () => {
     ]);
 
     expect(result).toBe(35000);
+  });
+
+  it('excludes future expenses from current dashboard totals', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-27T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [
+          { id: 'exp-past', amountCents: 1000, date: '2026-04-20' },
+          { id: 'exp-future', amountCents: 2000, date: '2026-04-30' },
+          { id: 'exp-next-month', amountCents: 3000, date: '2026-05-01' },
+        ],
+        incomes: [{ id: 'inc-1', amountCents: 5000, date: '2026-04-01' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+      });
+
+      expect(result.cashflowCents).toBe(4000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

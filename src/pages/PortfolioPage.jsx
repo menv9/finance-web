@@ -147,6 +147,168 @@ function PlusIcon() {
   );
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M9.8 3.2 12.8 6 6 12.8l-3.4.7.7-3.4 6.5-6.9Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m8.7 4.4 2.9 2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M3.5 4.5h9M6.5 2.5h3l.5 2M5 4.5l.5 9h5l.5-9" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 7v4M9 7v4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SellIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden>
+      <path d="M3 8h9M9 5l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 12.5h10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PortfolioHoldingList({
+  groups,
+  currency,
+  locale,
+  openEditHoldingGroup,
+  openEditHolding,
+  openSellHolding,
+  sellAllHoldingGroup,
+  onDeleteHolding,
+}) {
+  return (
+    <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+      {groups.map((group) => (
+        <li key={group.ticker}>
+          <div className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface-sunken px-4 py-5 sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
+            <span aria-hidden className="hidden min-w-0 sm:block" />
+            <div className="min-w-0 pr-3 sm:col-span-1 sm:pr-0">
+              <div className="min-w-0 text-left">
+                <p className="truncate text-sm font-medium text-ink">
+                  <span className="font-mono">{group.ticker}</span>
+                  <span className="ml-2 hidden text-ink-muted sm:inline">{group.name}</span>
+                  <span className="ml-2 font-mono text-xs tabular text-ink-faint">
+                    {formatNumber(group.quantity, locale, quantityDigits(group))} total units
+                  </span>
+                </p>
+                <p className="mt-3 font-mono text-sm tabular text-ink">
+                  {formatCurrency(group.valueCents, currency, locale)}
+                  <span className={group.pnlCents >= 0 ? 'ml-3 text-positive' : 'ml-3 text-danger'}>
+                    {formatCurrency(group.pnlCents, currency, locale)} ({formatNumber(group.pnlPct, locale, 2)}%)
+                  </span>
+                </p>
+                <p className="mt-3 min-w-0 text-xs text-ink-muted">
+                  <span className="block truncate sm:inline">
+                    Avg {formatCurrency(group.averageBuyPriceCents, currency, locale)} · Price {formatCurrency(group.currentPriceCents, currency, locale)}
+                  </span>
+                  <span className="mt-1 block truncate sm:mt-0 sm:inline">
+                    <span className="hidden sm:inline"> · </span>Fees {formatCurrency(group.feeCents || 0, currency, locale)}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="min-w-0 justify-self-end">
+              <div className="inline-flex shrink-0 flex-col items-center gap-1 text-xs text-ink-muted">
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-ink"
+                  aria-label={`Edit ${group.ticker}`}
+                  title="Edit"
+                  onClick={() => openEditHoldingGroup(group.ticker)}
+                >
+                  <EditIcon />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
+                  aria-label={`Sell all ${group.ticker}`}
+                  title="Sell all"
+                  onClick={() => sellAllHoldingGroup(group)}
+                >
+                  <SellIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+          <ul className="divide-y divide-rule">
+            {group.lots.map((holding, index) => {
+              const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
+              const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
+              const pnlCents = valueCents - costCents;
+              const pnlPct = costCents ? (pnlCents / costCents) * 100 : 0;
+              return (
+                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
+                  <div className="min-w-0 pr-3 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:pr-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink">
+                        {holding.ticker}
+                        <span className="ml-2 font-mono text-xs tabular text-ink-faint">
+                          {formatNumber(holding.quantity, locale, quantityDigits(holding))} units
+                        </span>
+                      </p>
+                      <p className="mt-1 truncate text-xs text-ink-muted">{holding.platform || 'Platform'}</p>
+                    </div>
+                    <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
+                      <p className="font-mono text-sm tabular">
+                        <span className="text-ink">{formatCurrency(valueCents, currency, locale)}</span>
+                        <span className={pnlCents >= 0 ? 'ml-2 text-positive sm:ml-0 sm:mt-1 sm:block' : 'ml-2 text-danger sm:ml-0 sm:mt-1 sm:block'}>
+                        {formatCurrency(pnlCents, currency, locale)} ({formatNumber(pnlPct, locale, 2)}%)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 justify-end">
+                    <div className="inline-flex min-w-0 shrink-0 flex-col items-center justify-center gap-1 text-xs text-ink-muted sm:flex-row">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                        aria-label={`Edit ${holding.ticker} operation ${index + 1}`}
+                        title="Edit"
+                        onClick={() => openEditHolding(holding.id)}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
+                        aria-label={`Sell ${holding.ticker} operation ${index + 1}`}
+                        title="Sell"
+                        onClick={() => openSellHolding(holding.id)}
+                      >
+                        <SellIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                        aria-label={`Delete ${holding.ticker} operation ${index + 1}`}
+                        title="Delete"
+                        onClick={() => onDeleteHolding(holding)}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
+                    Price {formatCurrency(holding.currentPriceCents, currency, locale)} · Fees {formatCurrency(holding.feeCents || 0, currency, locale)}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     percent: sale?.percent != null ? `${sale.percent}` : '100',
@@ -646,7 +808,7 @@ export default function PortfolioPage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="04"
         eyebrow="Module"
@@ -683,7 +845,7 @@ export default function PortfolioPage() {
 
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
-        <Card eyebrow="Split" title="Allocation" className={'lg:col-span-5 ' + rise(2)}>
+        <Card eyebrow="Split" title="Allocation" className={'order-2 lg:col-span-5 ' + rise(2)}>
           {portfolio.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[190px] w-full max-w-[190px] sm:h-[220px] sm:max-w-[220px]">
@@ -738,7 +900,7 @@ export default function PortfolioPage() {
           )}
         </Card>
 
-        <Card eyebrow="Rebalance" title="Target vs actual" variant="chart" className={'lg:col-span-7 ' + rise(3)}>
+        <Card eyebrow="Rebalance" title="Target vs actual" variant="chart" className={'order-1 lg:col-span-7 ' + rise(3)}>
           {portfolio.allocationActual?.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={portfolio.allocationActual} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
@@ -768,8 +930,20 @@ export default function PortfolioPage() {
         }
         className={rise(4)}
       >
-        {holdingRows.length ? (
-          <Table columns={holdingColumns} rows={holdingRows} density="compact" />
+        {holdingGroups.length ? (
+          <PortfolioHoldingList
+            groups={holdingGroups}
+            currency={currency}
+            locale={locale}
+            openEditHoldingGroup={openEditHoldingGroup}
+            openEditHolding={openEditHolding}
+            openSellHolding={openSellHolding}
+            sellAllHoldingGroup={sellAllHoldingGroup}
+            onDeleteHolding={async (holding) => {
+              if (await confirm({ title: 'Delete holding', description: `Remove ${holding.ticker} from your portfolio? This cannot be undone.` }))
+                removeEntity('holdings', holding.id);
+            }}
+          />
         ) : (
           <EmptyState
             title="No holdings yet"

@@ -158,7 +158,7 @@ export default function TransfersPage() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-12">
+    <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="06"
         eyebrow="Module"

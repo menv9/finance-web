@@ -18,8 +18,12 @@ export function monthKey(dateLike) {
   return format(toDate(dateLike), 'yyyy-MM');
 }
 
+export function chartMonthLabel(dateLike) {
+  return new Intl.DateTimeFormat('en-GB', { month: 'short', year: '2-digit' }).format(toDate(dateLike));
+}
+
 export function monthLabel(dateLike) {
-  return format(toDate(dateLike), 'MMM yy');
+  return chartMonthLabel(dateLike);
 }
 
 export function isWithinMonth(dateLike, month) {

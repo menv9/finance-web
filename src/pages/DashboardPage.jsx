@@ -154,6 +154,7 @@ export default function DashboardPage() {
   }, [dashboard.netWorthSeries]);
 
   const recentActivity = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
     const expenseRows = expenses.map((e) => ({
       id: e.id,
       type: 'expense',
@@ -173,6 +174,7 @@ export default function DashboardPage() {
       realizedPnlCents: i.realizedPnlCents,
     }));
     return [...expenseRows, ...incomeRows]
+      .filter((item) => item.date <= today)
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 8);
   }, [expenses, incomes]);
@@ -186,11 +188,12 @@ export default function DashboardPage() {
   const hasDistribution = distributedTotalCents > 0;
 
   return (
-    <div ref={reportRef} className="grid grid-cols-1 gap-12">
+    <div ref={reportRef} className="grid grid-cols-1 gap-8">
       <PageHeader
         number="01"
         eyebrow={formatLongDate()}
         title={`${greeting()}.`}
+        className="mb-0 pb-6"
         actions={
           <>
             <Button
@@ -208,7 +211,7 @@ export default function DashboardPage() {
       />
 
       {/* KPIs */}
-      <div className="relative mt-12">
+      <div className="relative">
         <button
           type="button"
           className="kpi-eye-blob"
