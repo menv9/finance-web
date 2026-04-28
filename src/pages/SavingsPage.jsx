@@ -23,7 +23,7 @@ import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
-import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, Table, SectionDivider } from '../components/ui';
+import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,6 +72,22 @@ function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
       <path d="M6 1v10M1 6h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11.5 2.5a2.121 2.121 0 0 1 3 3L5 15H2v-3L11.5 2.5z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" />
     </svg>
   );
 }
@@ -279,60 +295,86 @@ export default function SavingsPage() {
     batchSelect.cancel();
   };
 
-  // ── Table columns ──
-  const entryColumns = [
-    { key: 'date', header: 'Date', width: 110, sortable: true },
-    {
-      key: 'type',
-      header: 'Type',
-      width: 90,
-      hideOnMobile: true,
-      render: (r) =>
-        r.amountCents < 0 ? (
-          <span className="inline-flex items-center rounded-sm bg-danger-soft border border-danger/20 px-2 py-0.5 text-xs text-danger">
-            Withdrawal
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-sm bg-surface-sunken border border-rule px-2 py-0.5 text-xs text-ink-muted">
-            Deposit
-          </span>
-        ),
-    },
-    { key: 'note', header: 'Note', hideOnMobile: true, render: (r) => r.note || <span className="text-ink-faint">—</span> },
-    {
-      key: 'amountCents',
-      header: 'Amount',
-      numeric: true,
-      sortable: true,
-      render: (r) => (
-        <span className={r.amountCents < 0 ? 'text-danger font-mono tabular' : 'font-mono tabular'}>
-          {r.amountCents < 0 ? '−' : '+'}
-          {formatCurrency(Math.abs(r.amountCents), currency, locale).replace(/^[−-]/, '')}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      noTruncate: true,
-      render: (r) => (
-        <div className="flex flex-wrap justify-end gap-1">
-          {!r.transferId && (
-            <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-          )}
-          {r.transferId ? (
-            <span className="text-xs text-ink-faint px-2 py-1">via transfer</span>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={async () => {
-              if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
-                removeSavingsEntry(r.id);
-            }}>Delete</Button>
-          )}
-        </div>
-      ),
-    },
-  ];
+  // ── Entry list (card-list style matching Income / Expenses) ──
+  function SavingsEntryList({ rows }) {
+    if (!rows.length) {
+      return (
+        <EmptyState
+          title="No results for this filter"
+          description="Try a different month or type."
+        />
+      );
+    }
+    return (
+      <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className={batchSelect.selecting && batchSelect.selectedIds.has(r.id) ? 'bg-accent-soft' : 'transition-colors duration-120 hover:bg-surface-raised'}
+          >
+            <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+              {batchSelect.selecting && (
+                isEntrySelectable(r) ? (
+                  <input
+                    type="checkbox"
+                    aria-label="Select entry"
+                    checked={batchSelect.selectedIds.has(r.id)}
+                    onChange={() => batchSelect.toggle(r.id)}
+                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
+                  />
+                ) : (
+                  <span className="mt-1 block h-4 w-4 shrink-0" />
+                )
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline justify-between gap-4">
+                  <p className="min-w-0 truncate text-sm text-ink">
+                    {r.note || <span className="text-ink-faint">—</span>}
+                  </p>
+                  <span className={`numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular ${r.amountCents < 0 ? 'text-danger bg-danger-soft' : 'text-positive bg-positive-soft'}`}>
+                    {r.amountCents < 0 ? '−' : '+'}
+                    {formatCurrency(Math.abs(r.amountCents), currency, locale).replace(/^[−-]/, '')}
+                  </span>
+                </div>
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
+                  <p className="min-w-0 truncate eyebrow">
+                    {r.amountCents < 0 ? 'withdrawal' : 'deposit'} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(r.date))}
+                  </p>
+                  {r.transferId ? (
+                    <span className="shrink-0 text-xs text-ink-faint">via transfer</span>
+                  ) : (
+                    <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                        aria-label="Edit entry"
+                        title="Edit"
+                        onClick={() => openEdit(r.id)}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                        aria-label="Delete entry"
+                        title="Delete"
+                        onClick={async () => {
+                          if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
+                            removeSavingsEntry(r.id);
+                        }}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-8">
@@ -436,89 +478,13 @@ export default function SavingsPage() {
         </div>
       </section>
 
-      {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
-
-      {/* Entries log */}
-      <Card
-        eyebrow="Log"
-        title="Savings entries"
-        description="Every time you put money aside, log it here."
-        className={rise(2)}
-        action={
-          <div className="flex flex-wrap justify-end gap-2">
-            {!batchSelect.selecting && (
-              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
-                Select
-              </Button>
-            )}
-            <Button variant="primary" size="sm" onClick={openNew}>
-              <PlusIcon /> Add saving
-            </Button>
-          </div>
-        }
-      >
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label="Month" htmlFor="savings-month">
-            <Input
-              id="savings-month"
-              type="month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-            />
-          </FormField>
-          <FormField label="Type" htmlFor="savings-type">
-            <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">All entries</option>
-              <option value="deposit">Deposits only</option>
-              <option value="withdrawal">Withdrawals only</option>
-            </Select>
-          </FormField>
-        </div>
-        <BatchDeleteBar
-          selecting={batchSelect.selecting}
-          selectedCount={batchSelect.selectedIds.size}
-          onDelete={handleBatchDeleteEntries}
-          onCancel={batchSelect.cancel}
-        />
-        {savingsEntries.length ? (
-          <Table
-            columns={entryColumns}
-            rows={sortedEntries}
-            sortKey={savSortKey}
-            sortDir={savSortDir}
-            onSort={onSavSort}
-            selectable={batchSelect.selecting}
-            selectedIds={batchSelect.selectedIds}
-            onToggleRow={batchSelect.toggle}
-            onToggleAll={batchSelect.toggleAll}
-            isRowSelectable={isEntrySelectable}
-            empty={
-              <EmptyState
-                title="No results for this filter"
-                description="Try a different month or type."
-              />
-            }
-          />
-        ) : (
-          <EmptyState
-            title="No savings logged yet"
-            description="Start logging what you put aside each month."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add saving
-              </Button>
-            }
-          />
-        )}
-      </Card>
-
       {/* Entries chart */}
       <Card
         eyebrow="History"
         title="Savings over time"
         description="Monthly totals from your logged entries."
         variant="chart"
-        className={rise(3)}
+        className={rise(2)}
         action={
           <>
             <Select
@@ -590,6 +556,65 @@ export default function SavingsPage() {
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-ink-faint">No entries yet — add your first saving to see the chart.</p>
           </div>
+        )}
+      </Card>
+
+      {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
+
+      {/* Entries log */}
+      <Card
+        eyebrow="Log"
+        title="Savings entries"
+        description="Every time you put money aside, log it here."
+        className={rise(3)}
+        action={
+          <div className="flex flex-wrap justify-end gap-2">
+            {!batchSelect.selecting && (
+              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+                Select
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add saving
+            </Button>
+          </div>
+        }
+      >
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <FormField label="Month" htmlFor="savings-month">
+            <Input
+              id="savings-month"
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Type" htmlFor="savings-type">
+            <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">All entries</option>
+              <option value="deposit">Deposits only</option>
+              <option value="withdrawal">Withdrawals only</option>
+            </Select>
+          </FormField>
+        </div>
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteEntries}
+          onCancel={batchSelect.cancel}
+        />
+        {savingsEntries.length ? (
+          <SavingsEntryList rows={sortedEntries} />
+        ) : (
+          <EmptyState
+            title="No savings logged yet"
+            description="Start logging what you put aside each month."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add saving
+              </Button>
+            }
+          />
         )}
       </Card>
 
