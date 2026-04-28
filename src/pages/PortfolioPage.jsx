@@ -185,9 +185,9 @@ function PortfolioHoldingList({
   onDeleteHolding,
 }) {
   return (
-    <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
+    <ul className="space-y-4">
       {groups.map((group) => (
-        <li key={group.ticker}>
+        <li key={group.ticker} className="overflow-hidden rounded-lg border border-rule bg-surface">
           <div className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface-sunken px-4 py-5 sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
             <span aria-hidden className="hidden min-w-0 sm:block" />
             <div className="min-w-0 pr-3 sm:col-span-1 sm:pr-0">
@@ -245,31 +245,31 @@ function PortfolioHoldingList({
               const pnlCents = valueCents - costCents;
               const pnlPct = costCents ? (pnlCents / costCents) * 100 : 0;
               return (
-                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-6 sm:py-4">
+                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:gap-8 sm:px-6 sm:py-5">
                   <div className="min-w-0 pr-3 sm:contents">
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-ink">
+                      <p className="truncate text-sm font-semibold text-ink">
                         {holding.ticker}
                         <span className="ml-2 font-mono text-xs tabular text-ink-faint">
                           {formatNumber(holding.quantity, locale, quantityDigits(holding))} units
                         </span>
                       </p>
-                      <p className="mt-1 truncate text-xs text-ink-muted">{holding.platform || 'Platform'}</p>
+                      <p className="mt-2 truncate text-sm text-ink-muted sm:text-xs">{holding.platform || 'Platform'}</p>
                       <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
                         Price {formatCurrency(holding.currentPriceCents, currency, locale)} · Fees {formatCurrency(holding.feeCents || 0, currency, locale)}
                       </p>
                     </div>
                     <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
-                      <p className="font-mono text-sm tabular">
-                        <span className="text-ink">{formatCurrency(valueCents, currency, locale)}</span>
-                        <span className={pnlCents >= 0 ? 'ml-2 text-positive sm:ml-0 sm:mt-1 sm:block' : 'ml-2 text-danger sm:ml-0 sm:mt-1 sm:block'}>
-                        {formatCurrency(pnlCents, currency, locale)} ({formatNumber(pnlPct, locale, 2)}%)
+                      <p className="font-mono text-sm font-semibold tabular">
+                        <span className="text-ink sm:block">{formatCurrency(valueCents, currency, locale)}</span>
+                        <span className={pnlCents >= 0 ? 'ml-2 text-positive sm:ml-0 sm:mt-2 sm:block' : 'ml-2 text-danger sm:ml-0 sm:mt-2 sm:block'}>
+                          {formatCurrency(pnlCents, currency, locale)} ({formatNumber(pnlPct, locale, 2)}%)
                         </span>
                       </p>
                     </div>
                   </div>
-                  <div className="flex min-w-0 justify-end">
-                    <div className="inline-flex min-w-0 shrink-0 flex-col items-center justify-center gap-1 text-xs text-ink-muted sm:flex-row">
+                  <div className="flex min-w-0 justify-end sm:shrink-0">
+                    <div className="inline-flex min-w-0 shrink-0 flex-col items-center justify-center gap-1 text-xs text-ink-muted sm:flex-row sm:gap-3">
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
