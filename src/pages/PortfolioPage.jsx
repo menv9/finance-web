@@ -245,8 +245,8 @@ function PortfolioHoldingList({
               const pnlCents = valueCents - costCents;
               const pnlPct = costCents ? (pnlCents / costCents) * 100 : 0;
               return (
-                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
-                  <div className="min-w-0 pr-3 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:pr-0">
+                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-6 sm:py-4">
+                  <div className="min-w-0 pr-3 sm:contents">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-ink">
                         {holding.ticker}
@@ -255,6 +255,9 @@ function PortfolioHoldingList({
                         </span>
                       </p>
                       <p className="mt-1 truncate text-xs text-ink-muted">{holding.platform || 'Platform'}</p>
+                      <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
+                        Price {formatCurrency(holding.currentPriceCents, currency, locale)} · Fees {formatCurrency(holding.feeCents || 0, currency, locale)}
+                      </p>
                     </div>
                     <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
                       <p className="font-mono text-sm tabular">
@@ -296,9 +299,6 @@ function PortfolioHoldingList({
                       </button>
                     </div>
                   </div>
-                  <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
-                    Price {formatCurrency(holding.currentPriceCents, currency, locale)} · Fees {formatCurrency(holding.feeCents || 0, currency, locale)}
-                  </p>
                 </li>
               );
             })}
