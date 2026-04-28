@@ -432,18 +432,20 @@ export const useFinanceStore = create((set, get) => ({
       new Date().toISOString(),
     );
     await putRecord('savingsEntries', record);
-    set((state) => ({
-      savingsEntries: upsertItem(state.savingsEntries, record),
-    }));
+    set((state) => {
+      const nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record) };
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
     get().triggerAutoPush();
     return record;
   },
 
   removeSavingsEntry: async (id) => {
     await deleteRecord('savingsEntries', id);
-    set((state) => ({
-      savingsEntries: state.savingsEntries.filter((e) => e.id !== id),
-    }));
+    set((state) => {
+      const nextState = { ...state, savingsEntries: state.savingsEntries.filter((e) => e.id !== id) };
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
     get().triggerAutoPush();
   },
 

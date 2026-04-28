@@ -189,9 +189,17 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     .filter((t) => isCashflowSource(t) && t.toModule === 'portfolio')
     .reduce((s, t) => s + t.amountCents, 0);
 
+  // Directly-logged savings entries this month are money set aside from cashflow,
+  // just like transfers to savings — deduct them so cashflow reflects what's
+  // actually left to spend. Exclude transfer-linked entries (transferId is set)
+  // since those are already captured by distributedToSavingsCents above.
+  const savedThisMonthCents = (savingsEntries || [])
+    .filter((e) => e.date?.startsWith(currentMonth) && e.date <= today && !e.transferId)
+    .reduce((s, e) => s + (e.amountCents || 0), 0);
+
   // Cashflow = money actually left to spend (income − expenses − saved − invested).
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
-  const cashflowCents      = cashflowIncomeCents + currentMonthSaleCashflowCents - totalExpensesCents - distributedTotalCents;
+  const cashflowCents      = cashflowIncomeCents + currentMonthSaleCashflowCents - totalExpensesCents - distributedTotalCents - savedThisMonthCents;
   const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
   const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
 
