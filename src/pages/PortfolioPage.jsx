@@ -848,13 +848,13 @@ export default function PortfolioPage() {
       {/* KPIs */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Market value', value: portfolio.currentValueCents, mode: 'currency', hint: `${activeHoldings.length} holdings` },
-          { label: 'TWRR', value: portfolio.twrr, mode: 'percent', hint: 'time-weighted' },
-          { label: 'XIRR', value: portfolio.xirr, mode: 'percent', hint: 'cashflow-adjusted' },
-          { label: 'Dividend yield', value: portfolio.dividendYield, mode: 'percent', hint: 'portfolio-wide' },
+          { label: 'Market value', value: portfolio.currentValueCents, mode: 'currency', hint: `${activeHoldings.length} holdings`, info: 'Current value of all active holdings using their latest stored prices.' },
+          { label: 'TWRR', value: portfolio.twrr, mode: 'percent', hint: 'time-weighted', info: 'Time-weighted rate of return. It measures portfolio performance while reducing the effect of deposits and withdrawals.' },
+          { label: 'XIRR', value: portfolio.xirr, mode: 'percent', hint: 'cashflow-adjusted', info: 'Annualized return based on the timing and size of your actual portfolio cashflows.' },
+          { label: 'Dividend yield', value: portfolio.dividendYield, mode: 'percent', hint: 'portfolio-wide', info: 'Dividend income as a percentage of the current portfolio value.' },
         ].map((k, i) => (
           <div key={k.label} className={'min-w-0 bg-surface p-6 ' + rise(i + 1)}>
-            <Stat label={k.label} value={k.value} mode={k.mode} currency={currency} locale={locale} hint={k.hint} />
+            <Stat label={k.label} value={k.value} mode={k.mode} currency={currency} locale={locale} hint={k.hint} info={k.info} />
           </div>
         ))}
       </section>

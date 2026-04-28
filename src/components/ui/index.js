@@ -4,7 +4,7 @@ export { FormField } from './FormField';
 export { Input, Textarea, Select } from './Input';
 export { Toggle, Checkbox } from './Toggle';
 export { Table } from './Table';
-export { Stat } from './Stat';
+export { Stat, InfoPopover } from './Stat';
 export { EmptyState } from './EmptyState';
 export { Skeleton, StatSkeleton, RowSkeleton } from './Skeleton';
 export { SectionDivider } from './SectionDivider';

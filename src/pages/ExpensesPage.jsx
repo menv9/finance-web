@@ -7,7 +7,6 @@ import { sortRows } from '../utils/sort';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttachmentViewer } from '../components/AttachmentViewer';
 import { BudgetTab } from '../components/BudgetTab';
-import { SmartBankImport } from '../components/SmartBankImport';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
@@ -25,7 +24,6 @@ import {
   FormField,
   Input,
   Select,
-  SectionDivider,
   Stat,
   Modal,
 } from '../components/ui';
@@ -337,6 +335,7 @@ export default function ExpensesPage() {
   const editingExpense = expenses.find((item) => item.id === expenseModal.id);
   const editingFixedExpense = fixedExpenses.find((item) => item.id === fixedModal.id);
 
+  const budgets = useFinanceStore((state) => state.budgets);
   const monthTotal = filteredExpenses.reduce((s, e) => s + e.amountCents, 0);
   const fixedMonthly = fixedExpenses.filter((f) => f.active).reduce((s, f) => s + f.amountCents, 0);
 
@@ -504,7 +503,7 @@ export default function ExpensesPage() {
         number="02"
         eyebrow="Module"
         title="Expenses"
-        description="Variable and recurring outflows. Log transactions, import bank statements, and see where the month goes."
+        description="Variable and recurring outflows. Log transactions and see where the month goes."
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={exportCsv}>
@@ -544,19 +543,83 @@ export default function ExpensesPage() {
         ))}
       </div>
 
-      {activeTab === 'budget' && <BudgetTab />}
+      {activeTab === 'budget' && (
+        <>
+          <BudgetTab />
+          {budgets && budgets.length ? (
+            <section className="grid gap-6">
+              <Card
+                eyebrow="Budget"
+                title="Budget overview"
+                description="Limit per budget category."
+                variant="chart"
+                className={rise(2)}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={budgets.map((b) => ({ name: b.category, amount: (b.monthlyCents || 0) / 100 }))}
+                    margin={{ top: 10, right: 8, left: 0, bottom: 40 }}
+                  >
+                    <CartesianGrid strokeDasharray="2 4" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      angle={-35}
+                      textAnchor="end"
+                      interval={0}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis
+                      tickFormatter={(v) => formatCurrencyCompact(v * 100, currency, locale)}
+                      tickLine={false}
+                      axisLine={false}
+                      width={60}
+                    />
+                    <Tooltip formatter={(v) => formatCurrency(v * 100, currency, locale)} />
+                    <Bar dataKey="amount" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </section>
+          ) : null}
+        </>
+      )}
 
       {activeTab === 'expenses' && <>
       {/* summary stats */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
-          <Stat label="Selected month" value={monthTotal} mode="currency" currency={currency} locale={locale} hint={`${filteredExpenses.length} transactions`} />
+          <Stat
+            label="Selected month"
+            value={monthTotal}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint={`${filteredExpenses.length} transactions`}
+            info="Total expenses in the selected month after the current category and search filters are applied."
+          />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
-          <Stat label="Fixed monthly" value={fixedMonthly} mode="currency" currency={currency} locale={locale} hint={`${fixedExpenses.filter((f) => f.active).length} active`} />
+          <Stat
+            label="Fixed monthly"
+            value={fixedMonthly}
+            mode="currency"
+            currency={currency}
+            locale={locale}
+            hint={`${fixedExpenses.filter((f) => f.active).length} active`}
+            info="Sum of active recurring bills configured in the recurring expenses schedule."
+          />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
-          <Stat label="Tracked" value={expenses.length} mode="number" locale={locale} hint="all-time entries" />
+          <Stat
+            label="Tracked"
+            value={expenses.length}
+            mode="number"
+            locale={locale}
+            hint="all-time entries"
+            info="Total number of expense records stored in the app."
+          />
         </div>
       </section>
 
@@ -636,8 +699,9 @@ export default function ExpensesPage() {
         </Card>
       </section>
 
-      {/* transactions */}
-      <Card
+      {/* ledgers */}
+      <section className="grid gap-6 lg:grid-cols-12">
+        <Card
         eyebrow="Ledger"
         title="Expenses"
         description="Filter the selected month by category and description."
@@ -653,7 +717,7 @@ export default function ExpensesPage() {
             </Button>
           </div>
         }
-        className={rise(3)}
+        className={'lg:col-span-8 ' + rise(3)}
       >
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label="Category" htmlFor="expenses-category">
@@ -723,7 +787,7 @@ export default function ExpensesPage() {
         ) : (
           <EmptyState
             title="No expenses for this filter"
-            description="Try another month, clear the category, or import a bank extract."
+            description="Try another month, clear the category, or add a new expense."
             action={
               <Button variant="secondary" size="sm" onClick={openNewExpense}>
                 <PlusIcon /> Add expense
@@ -733,28 +797,8 @@ export default function ExpensesPage() {
         )}
       </Card>
 
-      {/* CSV import */}
-      <Card
-        eyebrow="Import"
-        title="Bank extract CSV"
-        description="Supports Revolut, N26, ING, and most standard exports. Splits rows into expenses and income automatically."
-        className={rise(4)}
-      >
-        <SmartBankImport
-          categories={settings.categories}
-          onImportExpenses={async (rows) => {
-            for (const row of rows) await saveEntity('expenses', row);
-          }}
-          onImportIncomes={async (rows) => {
-            for (const row of rows) await saveEntity('incomes', row);
-          }}
-        />
-      </Card>
-
-      <SectionDivider label="Recurring" />
-
       {/* fixed expenses */}
-      <Card
+        <Card
         eyebrow="Schedule"
         title="Recurring bills"
         description="Rent, utilities, subscriptions. Pause, resume, or remove — paused bills drop out of projections."
@@ -763,7 +807,7 @@ export default function ExpensesPage() {
             <PlusIcon /> Add recurring
           </Button>
         }
-        className={rise(5)}
+        className={'lg:col-span-4 ' + rise(4)}
       >
         {fixedExpenses.length ? (
           <FixedExpenseLedgerList
@@ -789,7 +833,8 @@ export default function ExpensesPage() {
             }
           />
         )}
-      </Card>
+        </Card>
+      </section>
 
       <ManageCategoriesModal open={catModalOpen} onClose={() => setCatModalOpen(false)} />
 

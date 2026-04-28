@@ -3,7 +3,7 @@ import { useConfirm } from './ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
-import { Card, Button, FormField, Input, EmptyState, Modal } from './ui';
+import { Card, Button, FormField, Input, EmptyState, Modal, Stat } from './ui';
 import { cn } from './ui/cn';
 import { rise } from '../utils/motion';
 import { ManageCategoriesModal } from './ManageCategoriesModal';
@@ -88,6 +88,7 @@ export function BudgetTab() {
   const rollovers = useFinanceStore((s) => s.rollovers);
   const expenses = useFinanceStore((s) => s.expenses);
   const settings = useFinanceStore((s) => s.settings);
+  const monthlyCashflowCents = useFinanceStore((s) => s.derived.dashboard.cashflowCents);
   const saveEntity = useFinanceStore((s) => s.saveEntity);
   const removeEntity = useFinanceStore((s) => s.removeEntity);
   const saveSavingsEntry = useFinanceStore((s) => s.saveSavingsEntry);
@@ -107,6 +108,8 @@ export function BudgetTab() {
 
   const prevMonth = getPrevMonth(selectedMonth);
   const isEditing = modal.open && modal.category !== null;
+  const totalBudgetCents = budgets.reduce((sum, budget) => sum + (budget.monthlyCents || 0), 0);
+  const budgetVsCashflowCents = totalBudgetCents - (monthlyCashflowCents || 0);
 
   // Expense categories not yet budgeted (for datalist suggestions)
   const unbудgetedSuggestions = expenseCategories.filter(
@@ -233,6 +236,28 @@ export function BudgetTab() {
         </p>
       </div>
 
+      <section className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule sm:grid-cols-2">
+        <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
+          <Stat
+            label="Total budgets"
+            value={totalBudgetCents}
+            formatter={(value) => formatCurrency(value, currency, locale)}
+            hint={`${budgets.length} planned ${budgets.length === 1 ? 'category' : 'categories'}`}
+            info="The sum of every planned monthly category budget."
+          />
+        </div>
+        <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
+          <Stat
+            label="Budgets - cashflow"
+            value={budgetVsCashflowCents}
+            formatter={(value) => formatCurrency(value, currency, locale)}
+            hint={budgetVsCashflowCents > 0 ? 'over monthly cashflow' : 'within monthly cashflow'}
+            tone={budgetVsCashflowCents > 0 ? 'danger' : 'positive'}
+            info="Total monthly budgets minus current monthly cashflow."
+          />
+        </div>
+      </section>
+
       {/* budget cards */}
       <Card
         eyebrow="Plan"
@@ -255,7 +280,7 @@ export function BudgetTab() {
             />
           </div>
         }
-        className={rise(2)}
+        className={rise(4)}
       >
         {budgets.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -293,7 +318,7 @@ export function BudgetTab() {
         <Card
           eyebrow="Month-end"
           title={`Leftovers from ${monthLabel(prevMonth)}`}
-          description="You stayed under budget in these categories. Roll the surplus forward or stash it in savings."
+          description="You stayed under budget in these categories. Roll the surplus forward, move it to savings, or release it back to total balance."
           className={rise(3)}
         >
           <ul className="divide-y divide-rule">
@@ -314,6 +339,9 @@ export function BudgetTab() {
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => handleRollover(item, 'savings')}>
                     Move to savings
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleRollover(item, 'balance')}>
+                    Roll to total balance
                   </Button>
                 </div>
               </li>

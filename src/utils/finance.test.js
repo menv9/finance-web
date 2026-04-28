@@ -85,4 +85,84 @@ describe('finance metrics', () => {
       vi.useRealTimers();
     }
   });
+
+  it('carries past cashflow into total balance', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-02T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [
+          { id: 'exp-apr', amountCents: 90000, date: '2026-04-20' },
+          { id: 'exp-may', amountCents: 3000, date: '2026-05-01' },
+        ],
+        incomes: [{ id: 'inc-apr', amountCents: 100000, date: '2026-04-01' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+      });
+
+      expect(result.cashflowCents).toBe(-3000);
+      expect(result.availableBalanceCents).toBe(7000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses accounting month for monthly income while counting received cash immediately', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-28T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [{ id: 'inc-may-salary', amountCents: 100000, date: '2026-04-28', accountingMonth: '2026-05' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+      });
+
+      expect(result.cashflowCents).toBe(0);
+      expect(result.availableBalanceCents).toBe(100000);
+      expect(result.incomeSeries.at(-1).amountCents).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('moves received income into cashflow when its accounting month arrives', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [{ id: 'inc-may-salary', amountCents: 100000, date: '2026-04-28', accountingMonth: '2026-05' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+      });
+
+      expect(result.cashflowCents).toBe(100000);
+      expect(result.availableBalanceCents).toBe(100000);
+      expect(result.incomeSeries.at(-1).amountCents).toBe(100000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

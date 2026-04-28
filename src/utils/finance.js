@@ -15,7 +15,7 @@ export function computeExpenseSeries(expenses) {
 export function computeIncomeSeries(incomes) {
   return lastTwelveMonths().map((month) => ({
     month: month.label,
-    amountCents: sumAmount(incomes.filter((income) => monthKey(income.date) === month.key)),
+    amountCents: sumAmount(incomes.filter((income) => (income.accountingMonth || monthKey(income.date)) === month.key)),
   }));
 }
 
@@ -165,8 +165,34 @@ function portfolioSaleCashflowCents(sale) {
 export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [] }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
+  const allPastIncomes = incomes.filter((item) => item.date <= today);
+  const allPastCashflowIncomes = allPastIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
+  const savingsPaidExpenseIds = new Set(
+    (transfers || [])
+      .filter((t) => t.fromModule === 'savings' && t.toModule === 'expenses')
+      .map((t) => t.linkedExpenseId)
+      .filter(Boolean),
+  );
+  const allPastCashflowExpenses = expenses.filter((item) => item.date <= today && !savingsPaidExpenseIds.has(item.id));
+  const allPastSaleCashflowCents = (portfolioSales || [])
+    .filter((sale) => sale.date <= today)
+    .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
+  const allPastCashflowDistributionsCents = (transfers || [])
+    .filter((t) => t.date <= today && (t.fromModule === 'income' || t.fromModule === 'cashflow'))
+    .filter((t) => t.toModule === 'savings' || t.toModule === 'portfolio')
+    .reduce((sum, t) => sum + (t.amountCents || 0), 0);
+  const allPastDirectSavingsCents = (savingsEntries || [])
+    .filter((e) => e.date <= today && !e.transferId)
+    .reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const availableBalanceCents =
+    sumAmount(allPastCashflowIncomes) +
+    allPastSaleCashflowCents -
+    sumAmount(allPastCashflowExpenses) -
+    allPastCashflowDistributionsCents -
+    allPastDirectSavingsCents;
+
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth && item.date <= today);
-  const currentMonthIncomes  = incomes.filter((item)  => monthKey(item.date) === currentMonth && item.date <= today);
+  const currentMonthIncomes  = incomes.filter((item)  => (item.accountingMonth || monthKey(item.date)) === currentMonth && item.date <= today);
   const currentMonthCashflowIncomes = currentMonthIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
   const currentMonthSaleCashflowCents = (portfolioSales || [])
     .filter((sale) => monthKey(sale.date) === currentMonth && sale.date <= today)
@@ -266,6 +292,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   return {
     netWorthCents,
     cashflowCents,
+    availableBalanceCents,
     savingsRate,
     portfolioPnlMonthCents: portfolio.pnlCents,
     expenseSeries: monthlyExpenses,

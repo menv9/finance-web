@@ -10,7 +10,7 @@ export const DEFAULT_CATEGORIES = [
 
 export const DEFAULT_SETTINGS = {
   baseCurrency: 'EUR',
-  locale: 'de-AT',
+  locale: 'en-GB',
   theme: 'light',
   categories: DEFAULT_CATEGORIES,
   holdingPlatforms: ['Trade Republic', 'IBKR', 'DEGIRO'],

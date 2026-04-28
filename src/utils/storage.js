@@ -83,14 +83,14 @@ export function loadSettings() {
   if (!raw) return DEFAULT_SETTINGS;
 
   try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), locale: DEFAULT_SETTINGS.locale };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, locale: DEFAULT_SETTINGS.locale }));
 }
 
 export function loadSyncMeta() {
@@ -207,6 +207,7 @@ export async function importDatabaseSnapshot(snapshot) {
     saveSettings({
       ...DEFAULT_SETTINGS,
       ...snapshot.settings,
+      locale: DEFAULT_SETTINGS.locale,
       // Never restore device-local / identity-managed fields from a backup
       theme: currentSettings.theme,
       supabaseUrl: currentSettings.supabaseUrl || '',

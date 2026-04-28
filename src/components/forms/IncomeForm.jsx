@@ -4,10 +4,12 @@ import { FormField, Input, Select, Button } from '../ui';
 
 const defaultValue = {
   date: normalizeDateInput(new Date()),
+  accountingMonth: normalizeDateInput(new Date()).slice(0, 7),
   amountCents: '',
   currency: 'EUR',
   incomeKind: 'fixed',
   source: '',
+  variableSourceType: 'client',
   frequency: 'monthly',
   payDay: 1,
   client: '',
@@ -19,6 +21,7 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
+    accountingMonth: initialValue?.accountingMonth || initialValue?.date?.slice(0, 7) || defaultValue.accountingMonth,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
 
@@ -42,6 +45,10 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
         {(props) => <Input {...props} type="date" value={form.date} onChange={set('date')} />}
       </FormField>
 
+      <FormField label="Accounting month" htmlFor="income-accounting-month" hint="Month where this income appears in reports">
+        {(props) => <Input {...props} type="month" value={form.accountingMonth} onChange={set('accountingMonth')} />}
+      </FormField>
+
       <FormField label="Amount" htmlFor="income-amount" required>
         {(props) => (
           <Input
@@ -58,16 +65,31 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
       <FormField label="Income type" htmlFor="income-kind">
         {(props) => (
           <Select {...props} value={form.incomeKind} onChange={set('incomeKind')}>
-            <option value="fixed">Fixed · salary</option>
-            <option value="variable">Variable · freelance</option>
-            <option value="dividend">Dividend · interest</option>
+            <option value="fixed">Fixed income</option>
+            <option value="variable">Variable income</option>
+            <option value="dividend">Dividend interest</option>
           </Select>
         )}
       </FormField>
 
-      <FormField label="Source" htmlFor="income-source" hint="Employer, client, or asset name">
-        {(props) => <Input {...props} value={form.source} onChange={set('source')} />}
-      </FormField>
+      {form.incomeKind === 'variable' ? (
+        <FormField label="Source" htmlFor="income-source">
+          {(props) => (
+            <Select {...props} value={form.variableSourceType || 'client'} onChange={set('variableSourceType')}>
+              <option value="employer">Employer</option>
+              <option value="client">Client</option>
+            </Select>
+          )}
+        </FormField>
+      ) : form.incomeKind !== 'dividend' ? (
+        <FormField
+          label="Source"
+          htmlFor="income-source"
+          hint="Employer, client, or asset name"
+        >
+          {(props) => <Input {...props} value={form.source} onChange={set('source')} />}
+        </FormField>
+      ) : null}
 
       {form.incomeKind === 'fixed' ? (
         <>
@@ -99,23 +121,25 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
 
       {form.incomeKind === 'variable' ? (
         <>
-          <FormField label="Client" htmlFor="income-client">
+          <FormField label={(form.variableSourceType || 'client') === 'employer' ? 'Employer' : 'Client'} htmlFor="income-client">
             {(props) => <Input {...props} value={form.client} onChange={set('client')} />}
           </FormField>
-          <FormField label="Invoice status" htmlFor="income-status">
-            {(props) => (
-              <Select {...props} value={form.invoiceStatus} onChange={set('invoiceStatus')}>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="paid">Paid</option>
-              </Select>
-            )}
-          </FormField>
+          {(form.variableSourceType || 'client') === 'client' ? (
+            <FormField label="Invoice status" htmlFor="income-status">
+              {(props) => (
+                <Select {...props} value={form.invoiceStatus} onChange={set('invoiceStatus')}>
+                  <option value="draft">Draft</option>
+                  <option value="sent">Sent</option>
+                  <option value="paid">Paid</option>
+                </Select>
+              )}
+            </FormField>
+          ) : null}
         </>
       ) : null}
 
       {form.incomeKind === 'dividend' ? (
-        <FormField label="Asset ticker" htmlFor="income-asset" className="md:col-span-2">
+        <FormField label="Asset ticker" htmlFor="income-asset">
           {(props) => (
             <Input
               {...props}

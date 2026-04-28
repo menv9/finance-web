@@ -1,6 +1,6 @@
 // Compact formatter for chart Y-axes — keeps labels short on mobile
 // e.g. € 1.400,00 → € 1,4K
-export function formatCurrencyCompact(amountCents, currency = 'EUR', locale = 'de-AT') {
+export function formatCurrencyCompact(amountCents, currency = 'EUR', locale = 'en-GB') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
@@ -9,7 +9,7 @@ export function formatCurrencyCompact(amountCents, currency = 'EUR', locale = 'd
   }).format((amountCents || 0) / 100);
 }
 
-export function formatCurrency(amountCents, currency = 'EUR', locale = 'de-AT') {
+export function formatCurrency(amountCents, currency = 'EUR', locale = 'en-GB') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
@@ -17,7 +17,7 @@ export function formatCurrency(amountCents, currency = 'EUR', locale = 'de-AT') 
   }).format((amountCents || 0) / 100);
 }
 
-export function formatPercent(value, locale = 'de-AT', digits = 1) {
+export function formatPercent(value, locale = 'en-GB', digits = 1) {
   return new Intl.NumberFormat(locale, {
     style: 'percent',
     minimumFractionDigits: digits,
@@ -25,7 +25,7 @@ export function formatPercent(value, locale = 'de-AT', digits = 1) {
   }).format((value || 0) / 100);
 }
 
-export function formatNumber(value, locale = 'de-AT', digits = 2) {
+export function formatNumber(value, locale = 'en-GB', digits = 2) {
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,

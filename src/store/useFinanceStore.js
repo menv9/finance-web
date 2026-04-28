@@ -76,6 +76,7 @@ function buildPortfolioSaleIncome(sale, existingIncomeId, currency = 'EUR') {
   return {
     id: existingIncomeId || sale.linkedIncomeId || makeId('inc'),
     date: sale.date,
+    accountingMonth: sale.date?.slice(0, 7),
     amountCents: gainCents,
     currency,
     incomeKind: 'portfolio_sale',
@@ -491,6 +492,9 @@ export const useFinanceStore = create((set, get) => ({
         alerts: true,
       }, { skipAutoCreate: true });
       value = { ...value, fixedExpenseId: fixed.id };
+    }
+    if (storeName === 'incomes' && !value.accountingMonth) {
+      value = { ...value, accountingMonth: value.date?.slice(0, 7) };
     }
 
     const prefix = storeName.slice(0, 3);

@@ -179,7 +179,7 @@ export default function SettingsPage() {
             id="preferences"
             eyebrow="General"
             title="Preferences"
-            description="Base currency and locale affect every number shown across the app."
+            description="Base currency affects every money value shown across the app."
             className={rise(1)}
           >
             <div className="grid gap-4 md:grid-cols-2">
@@ -217,17 +217,6 @@ export default function SettingsPage() {
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
                   <option value="GBP">GBP</option>
-                </Select>
-              </FormField>
-              <FormField label="Locale" htmlFor="locale">
-                <Select
-                  id="locale"
-                  value={settings.locale}
-                  onChange={(e) => updateSettings({ locale: e.target.value })}
-                >
-                  <option value="de-AT">de-AT</option>
-                  <option value="en-GB">en-GB</option>
-                  <option value="en-US">en-US</option>
                 </Select>
               </FormField>
             </div>
@@ -627,7 +616,7 @@ export default function SettingsPage() {
             id="danger"
             eyebrow="Danger zone"
             title="Wipe all data"
-            description="Permanently deletes all financial records from this device. Settings (currency, locale, API keys) are kept. This cannot be undone."
+            description="Permanently deletes all financial records from this device. Settings (currency and API keys) are kept. This cannot be undone."
             className={rise(9)}
           >
             <Button variant="danger" size="sm" onClick={() => { setWipeModalOpen(true); setWipeConfirmText(''); }}>

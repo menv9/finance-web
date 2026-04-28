@@ -23,7 +23,7 @@ import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
-import { Card, Button, Stat, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
+import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -407,10 +407,14 @@ export default function SavingsPage() {
             hint="starting balance + logged entries"
             align="center"
             valueClassName="text-accent-strong"
+            info="Starting savings balance plus every logged saving entry and transfer into savings."
           />
         </div>
-        <div className={'min-w-0 overflow-hidden rounded-lg border border-rule bg-surface p-3 md:w-[420px] ' + rise(2)}>
-          <p className="eyebrow mb-2 text-center">Savings evolution</p>
+        <div className={'relative min-w-0 overflow-hidden rounded-lg border border-rule bg-surface p-3 md:w-[420px] ' + rise(2)}>
+          <div className="mb-2 flex items-center justify-center gap-1.5">
+            <p className="eyebrow">Savings evolution</p>
+            <InfoPopover info="A compact chart showing how your total saved amount has changed over time." />
+          </div>
           <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
             {savingsTrendData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -460,6 +464,7 @@ export default function SavingsPage() {
               size="compact"
               align="center"
               tone="muted"
+              info="Savings entries and transfers into savings logged during the current month."
             />
           </div>
           <div className={'min-w-0 bg-surface p-4 md:flex md:min-w-[260px] md:flex-col md:items-center md:justify-center md:px-6 md:py-2 ' + rise(4)}>
@@ -473,6 +478,7 @@ export default function SavingsPage() {
               size="compact"
               align="center"
               tone="muted"
+              info="Average monthly amount saved based on your logged savings history."
             />
           </div>
         </div>

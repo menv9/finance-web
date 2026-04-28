@@ -2,7 +2,10 @@ import { NavLink } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
+import { Modal } from './ui';
 import { cn } from './ui/cn';
+import { ExpenseForm } from './forms/ExpenseForm';
+import { IncomeForm } from './forms/IncomeForm';
 import LiquidChrome from './LiquidChrome';
 import ElectricBorder from './ElectricBorder';
 import SakuraPetals from './SakuraPetals';
@@ -337,16 +340,21 @@ function buildFaviconSVG(theme) {
 
 export function AppShell({ children }) {
   const theme = useFinanceStore((state) => state.settings.theme);
+  const settings = useFinanceStore((state) => state.settings);
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
   const setTheme = useFinanceStore((state) => state.setTheme);
   const metrics = useFinanceStore((state) => state.derived.dashboard);
-  const baseCurrency = useFinanceStore((state) => state.settings.baseCurrency);
+  const saveEntity = useFinanceStore((state) => state.saveEntity);
+  const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
-  const locale = useMemo(() => 'de-AT', []);
+  const locale = useMemo(() => 'en-GB', []);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [incomeModalOpen, setIncomeModalOpen] = useState(false);
   const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
+  const baseCurrency = settings.baseCurrency;
 
   const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
 
@@ -392,6 +400,15 @@ export function AppShell({ children }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
+
+  useEffect(() => {
+    const openEntryModal = (event) => {
+      if (event.detail === 'income') setIncomeModalOpen(true);
+      else setExpenseModalOpen(true);
+    };
+    window.addEventListener('finance:open-entry-modal', openEntryModal);
+    return () => window.removeEventListener('finance:open-entry-modal', openEntryModal);
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -449,6 +466,26 @@ export function AppShell({ children }) {
           </nav>
 
           <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setExpenseModalOpen(true)}
+                aria-label="Log expense"
+                title="Log expense"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-base font-medium text-ink-muted transition-colors duration-180 hover:bg-surface-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncomeModalOpen(true)}
+                aria-label="Log income"
+                title="Log income"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-base font-medium text-ink-muted transition-colors duration-180 hover:bg-surface-raised hover:text-positive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                +
+              </button>
+            </div>
             <div className="hidden md:flex items-baseline gap-2 border-l border-rule pl-4">
               <span className="eyebrow text-[0.6rem]">Net</span>
               <span className="numeric text-sm text-ink">
@@ -541,6 +578,46 @@ export function AppShell({ children }) {
       <main id="main" className="mx-auto max-w-wide px-4 py-10 lg:px-10 lg:py-14 overflow-x-clip">
         <div className="min-w-0">{children}</div>
       </main>
+
+      <Modal
+        open={expenseModalOpen}
+        onClose={() => setExpenseModalOpen(false)}
+        eyebrow="Ledger entry"
+        title="New expense"
+        description="Stored locally in IndexedDB. Syncs to Supabase if configured."
+        size="lg"
+      >
+        <ExpenseForm
+          categories={settings.categories}
+          existingAttachments={[]}
+          onRemoveAttachment={() => {}}
+          onSubmit={async (value, pendingFiles) => {
+            const saved = await saveEntity('expenses', value);
+            for (const file of pendingFiles) {
+              await uploadAttachment(saved.id, file);
+            }
+            setExpenseModalOpen(false);
+          }}
+          onCancel={() => setExpenseModalOpen(false)}
+        />
+      </Modal>
+
+      <Modal
+        open={incomeModalOpen}
+        onClose={() => setIncomeModalOpen(false)}
+        eyebrow="Income entry"
+        title="New income"
+        description="Choose fixed, variable, or asset-linked income."
+        size="lg"
+      >
+        <IncomeForm
+          onSubmit={async (value) => {
+            await saveEntity('incomes', value);
+            setIncomeModalOpen(false);
+          }}
+          onCancel={() => setIncomeModalOpen(false)}
+        />
+      </Modal>
 
       <footer className="mx-auto max-w-wide border-t border-rule px-4 py-8 lg:px-10 mt-20">
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-ink-muted">

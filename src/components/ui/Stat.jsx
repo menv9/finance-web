@@ -1,13 +1,66 @@
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from './cn';
 import { formatCurrency, formatPercent, formatNumber } from '../../utils/formatters';
 import { useCountUp } from '../../utils/motion';
+
+export function InfoPopover({ info, className }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
+
+  if (!info) return null;
+
+  const show = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPosition({
+        top: rect.bottom + 8,
+        left: Math.min(window.innerWidth - 256, Math.max(16, rect.right - 240)),
+      });
+    }
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={cn(
+          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-rule bg-surface-raised text-[9px] font-semibold leading-none text-ink-muted transition-colors hover:border-accent hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent/30',
+          className,
+        )}
+        aria-label="KPI information"
+        onMouseEnter={show}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={show}
+        onBlur={() => setOpen(false)}
+      >
+        i
+      </button>
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[100] max-w-60 rounded-md border border-rule-strong bg-surface-raised px-3 py-2 text-xs leading-relaxed text-ink shadow-card"
+              style={{ top: position.top, left: position.left }}
+              role="tooltip"
+            >
+              {info}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
 
 export function Stat({
   label,
   value,
   mode = 'currency',
   currency = 'EUR',
-  locale = 'de-AT',
+  locale = 'en-GB',
   hint,
   delta,
   deltaMode = 'percent',
@@ -18,6 +71,7 @@ export function Stat({
   size = 'default',
   tone = 'default',
   valueClassName,
+  info,
 }) {
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : null;
   const live = useCountUp(numericValue ?? 0, { enabled: animate && numericValue !== null });
@@ -45,14 +99,17 @@ export function Stat({
   return (
     <div
       className={cn(
-        'flex flex-col min-w-0',
+        'relative flex flex-col min-w-0',
         size === 'compact' ? 'gap-1' : 'gap-2',
         align === 'right' && 'items-end text-right',
         align === 'center' && 'items-center text-center',
         className,
       )}
     >
-      <p className="eyebrow">{label}</p>
+      <div className={cn('flex min-w-0 items-center gap-1.5', align === 'center' && 'justify-center', align === 'right' && 'justify-end')}>
+        <p className="eyebrow truncate">{label}</p>
+        <InfoPopover info={info} />
+      </div>
       <p
         className={cn(
           'font-display leading-none tabular numeric',

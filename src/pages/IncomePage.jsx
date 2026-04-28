@@ -23,7 +23,7 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import { computeIncomeSeries } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
-import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
+import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const COLORS = ['var(--accent)', '#8FB97E', '#C9A96E', '#7A9CC6', '#B48EAD'];
@@ -59,6 +59,10 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
 
 function saleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
+}
+
+function incomeReportMonth(row) {
+  return row.accountingMonth || row.date?.slice(0, 7);
 }
 
 function PlusIcon() {
@@ -143,6 +147,11 @@ function IncomeLedgerList({
                     {formatCurrency(Math.abs(displayAmountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
                   </span>
                 </div>
+                {incomeReportMonth(row) && incomeReportMonth(row) !== row.date?.slice(0, 7) ? (
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Reports in {incomeReportMonth(row)}
+                  </p>
+                ) : null}
                 <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
                   <p className="min-w-0 truncate eyebrow">
                     {row.incomeKind || 'income'} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(row.date))}
@@ -226,7 +235,8 @@ export default function IncomePage() {
     () =>
       incomeLedgerRows.filter(
         (row) =>
-          row.date.startsWith(selectedMonth) &&
+          incomeReportMonth(row) === selectedMonth &&
+          row.incomeKind !== 'fixed' &&
           (filterKind === 'all' || row.incomeKind === filterKind) &&
           (!sourceSearch || (row.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
       ),
@@ -234,7 +244,7 @@ export default function IncomePage() {
   );
 
   const selectedMonthRows = useMemo(
-    () => incomeLedgerRows.filter((row) => row.date.startsWith(selectedMonth)),
+    () => incomeLedgerRows.filter((row) => incomeReportMonth(row) === selectedMonth),
     [incomeLedgerRows, selectedMonth],
   );
 
@@ -275,9 +285,25 @@ export default function IncomePage() {
     .filter((row) => row.incomeKind === 'variable')
     .reduce((sum, row) => sum + row.amountCents, 0);
   const topSource = sourceBreakdown.slice().sort((a, b) => b.value - a.value)[0];
+  const fixedIncomeRows = useMemo(
+    () =>
+      incomes
+        .filter((income) => income.incomeKind === 'fixed')
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((income) => ({ ...income, ledgerType: 'income' })),
+    [incomes],
+  );
 
   const incomeColumns = [
-    { key: 'date', header: 'Date', width: 110, sortable: true },
+    { key: 'date', header: 'Received', width: 110, sortable: true },
+    {
+      key: 'accountingMonth',
+      header: 'Reports in',
+      width: 115,
+      sortable: true,
+      hideOnMobile: true,
+      render: (r) => incomeReportMonth(r) || '-',
+    },
     { key: 'source', header: 'Source', sortable: true },
     {
       key: 'incomeKind',
@@ -377,6 +403,7 @@ export default function IncomePage() {
             currency={currency}
             locale={locale}
             hint={`${selectedMonthRows.length} records`}
+            info="Total income assigned to the selected accounting month."
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
@@ -386,7 +413,8 @@ export default function IncomePage() {
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="freelance & variable this month"
+            hint="variable this month"
+            info="Income marked as variable and assigned to the selected accounting month."
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
@@ -395,13 +423,14 @@ export default function IncomePage() {
             value={topSource ? formatCurrency(topSource.value, currency, locale) : '—'}
             mode="custom"
             hint={topSource?.name || 'no records'}
+            info="The income source with the highest total in the selected accounting month."
           />
         </div>
       </section>
 
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
-        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-7">
+        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-8">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -418,7 +447,7 @@ export default function IncomePage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card eyebrow="Split" title="By source" className="lg:col-span-5">
+        <Card eyebrow="Filtered month" title="By source" className="lg:col-span-4">
           {sourceBreakdown.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[200px] w-full max-w-[200px]">
@@ -472,7 +501,8 @@ export default function IncomePage() {
         </Card>
       </section>
 
-      {/* ledger */}
+      {/* ledgers */}
+      <section className="grid gap-6 lg:grid-cols-12">
       <Card
         eyebrow="Ledger"
         title="Income"
@@ -489,14 +519,13 @@ export default function IncomePage() {
             </Button>
           </div>
         }
-        className={rise(5)}
+        className={'lg:col-span-8 ' + rise(5)}
       >
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label="Kind" htmlFor="income-kind">
             <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
               <option value="all">All kinds</option>
-              <option value="fixed">Fixed (salary)</option>
-              <option value="variable">Variable (freelance)</option>
+              <option value="variable">Variable</option>
               <option value="dividend">Dividend</option>
               <option value="portfolio_sale">Portfolio sale</option>
               <option value="portfolio_sale_cashflow">Portfolio sale cashflow</option>
@@ -554,6 +583,44 @@ export default function IncomePage() {
           />
         )}
       </Card>
+
+      <Card
+        eyebrow="Schedule"
+        title="Fixed incomes"
+        description="Salary and other stable income entries."
+        action={
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <PlusIcon /> Add fixed
+          </Button>
+        }
+        className={'lg:col-span-4 ' + rise(6)}
+      >
+        {fixedIncomeRows.length ? (
+          <IncomeLedgerList
+            rows={fixedIncomeRows.slice(0, PAGE_SIZE)}
+            currency={currency}
+            locale={locale}
+            selectable={false}
+            selectedIds={new Set()}
+            openEdit={openEdit}
+            onDeleteIncome={async (id) => {
+              if (await confirm({ title: 'Delete fixed income', description: 'This income entry will be permanently removed.' }))
+                removeEntity('incomes', id);
+            }}
+          />
+        ) : (
+          <EmptyState
+            title="No fixed income yet"
+            description="Add salary or another recurring income source."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNew}>
+                <PlusIcon /> Add fixed
+              </Button>
+            }
+          />
+        )}
+      </Card>
+      </section>
 
       <Modal
         open={modal.open}

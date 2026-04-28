@@ -139,7 +139,7 @@ export default function DashboardPage() {
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
 
   const currency = settings.baseCurrency;
-  const locale = settings.locale || 'de-AT';
+  const locale = settings.locale || 'en-GB';
 
   const netWorthDelta = useMemo(() => {
     const s = dashboard.netWorthSeries || [];
@@ -198,18 +198,11 @@ export default function DashboardPage() {
         eyebrow={formatLongDate()}
         title={`${greeting()}.`}
         className="mb-0 pb-6"
-        actions={
-          <>
-            <Button variant="primary" size="sm" asChild>
-              <Link to="/expenses">Log expense</Link>
-            </Button>
-          </>
-        }
       />
 
       {/* KPIs */}
       <div>
-        <div className="mb-3 flex justify-center">
+        <div className="relative mb-3 flex items-center justify-center">
           <button
             type="button"
             className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-3 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink transition-colors"
@@ -220,6 +213,26 @@ export default function DashboardPage() {
             <EyeIcon hidden={hideKpis} />
             {hideKpis ? 'Show' : 'Hide'}
           </button>
+          <div className="absolute right-0 flex items-center gap-1 md:hidden">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('finance:open-entry-modal', { detail: 'expense' }))}
+              aria-label="Log expense"
+              title="Log expense"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-danger/40 bg-surface text-base font-medium text-danger transition-colors hover:border-danger hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('finance:open-entry-modal', { detail: 'income' }))}
+              aria-label="Log income"
+              title="Log income"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-positive/40 bg-surface text-base font-medium text-positive transition-colors hover:border-positive hover:bg-positive-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            >
+              +
+            </button>
+          </div>
         </div>
         <section
           aria-label="Key figures"
@@ -232,23 +245,28 @@ export default function DashboardPage() {
               mode: 'currency',
               delta: netWorthDelta,
               deltaMode: 'percent',
+              info: 'Savings plus portfolio value. This is your broad financial position, not just cash available to spend.',
             },
             {
               label: 'Monthly cashflow',
               value: dashboard.cashflowCents,
               mode: 'currency',
               hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
+              info: 'Income assigned to the current month minus expenses, savings, and investments for this month.',
             },
             {
-              label: 'Savings rate',
-              value: dashboard.savingsRate,
-              mode: 'percent',
+              label: 'Total balance',
+              value: dashboard.availableBalanceCents,
+              mode: 'currency',
+              hint: 'cash carried over',
+              info: 'Cash available now. It counts income from the day you receive it and carries leftover cash across months.',
             },
             {
               label: 'Portfolio value',
               value: portfolio.currentValueCents,
               mode: 'currency',
               hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
+              info: 'Current market value of your active portfolio holdings.',
             },
           ].map((k, i) => (
             isGorka ? (
@@ -263,6 +281,7 @@ export default function DashboardPage() {
                   delta={hideKpis ? undefined : k.delta}
                   deltaMode={k.deltaMode}
                   animate={!hideKpis}
+                  info={k.info}
                 />
               </GorkaSpotlight>
             ) : (
@@ -277,6 +296,7 @@ export default function DashboardPage() {
                   delta={hideKpis ? undefined : k.delta}
                   deltaMode={k.deltaMode}
                   animate={!hideKpis}
+                  info={k.info}
                 />
               </div>
             )
@@ -304,12 +324,12 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+                tickFormatter={(v) => (hideKpis ? '****' : formatCurrencyCompact(v, currency, locale))}
                 tickLine={false}
                 axisLine={false}
                 width={60}
               />
-              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
+              <Tooltip formatter={(v) => (hideKpis ? '****' : formatCurrency(v, currency, locale))} />
               <Area
                 type="monotone"
                 dataKey="netWorthCents"
@@ -344,12 +364,12 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="2 4" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis
-                  tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+                  tickFormatter={(v) => (hideKpis ? '****' : formatCurrencyCompact(v, currency, locale))}
                   tickLine={false}
                   axisLine={false}
                   width={60}
                 />
-                <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
+                <Tooltip formatter={(v) => (hideKpis ? '****' : formatCurrency(v, currency, locale))} />
                 <Bar dataKey="incomeCents" fill="var(--accent)" radius={[3, 3, 0, 0]} name="Income" />
                 <Bar dataKey="expenseCents" fill="var(--danger)" radius={[3, 3, 0, 0]} name="Expenses" />
               </BarChart>
@@ -462,6 +482,7 @@ export default function DashboardPage() {
           />
         )}
       </Card>
+
     </div>
   );
 }
