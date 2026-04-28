@@ -445,8 +445,8 @@ export default function DashboardPage() {
                 </div>
                 <span
                   className={
-                    'numeric text-sm tabular ' +
-                    (e.type === 'dividend' ? 'text-positive' : 'text-ink')
+                    'numeric text-sm tabular rounded px-1.5 py-0.5 ' +
+                    (e.type === 'dividend' ? 'text-positive bg-positive-soft' : 'text-danger bg-danger-soft')
                   }
                 >
                   {e.type === 'dividend' ? '+' : '−'}
