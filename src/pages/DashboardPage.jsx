@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -128,7 +128,7 @@ function RecentActivity({ items, currency, locale }) {
 
 export default function DashboardPage() {
   const reportRef = useRef(null);
-  const [hideKpis, setHideKpis] = useState(false);
+  const [hideKpis, setHideKpis] = useState(() => localStorage.getItem('pft-dashboard-hide-kpis') === 'true');
   const dashboard = useFinanceStore((state) => state.derived.dashboard);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
   const settings = useFinanceStore((state) => state.settings);
@@ -186,6 +186,10 @@ export default function DashboardPage() {
   const distributedToPortfolioCents = dashboard.distributedToPortfolioCents || 0;
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
   const hasDistribution = distributedTotalCents > 0;
+
+  useEffect(() => {
+    localStorage.setItem('pft-dashboard-hide-kpis', String(hideKpis));
+  }, [hideKpis]);
 
   return (
     <div ref={reportRef} className="grid grid-cols-1 gap-8">
