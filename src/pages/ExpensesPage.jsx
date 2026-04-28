@@ -157,7 +157,7 @@ function ExpenseLedgerList({
                   <p className="min-w-0 truncate text-sm text-ink">
                     {row.description || row.category || 'Expense'}
                   </p>
-                  <span className="shrink-0 font-mono text-sm tabular text-danger">
+                  <span className="numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular text-danger bg-danger-soft">
                     -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
                   </span>
                 </div>
@@ -231,7 +231,7 @@ function FixedExpenseLedgerList({
                   <p className="min-w-0 truncate text-sm text-ink">
                     {row.name || 'Recurring bill'}
                   </p>
-                  <span className="shrink-0 font-mono text-sm tabular text-danger">
+                  <span className="numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular text-danger bg-danger-soft">
                     -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
                   </span>
                 </div>

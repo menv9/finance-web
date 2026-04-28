@@ -33,6 +33,7 @@ function formatQuantityForInput(value) {
 }
 
 export function HoldingForm({ initialValue, onSubmit, onCancel }) {
+  const isEditing = Boolean(initialValue?.id);
   const settings = useFinanceStore((state) => state.settings);
   const configuredPlatforms = settings.holdingPlatforms?.length
     ? settings.holdingPlatforms
@@ -58,7 +59,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
   const averageBuyPriceCents = Math.round(Number(form.averageBuyPriceCents || 0) * 100);
   const purchaseAmountCents = Math.round(Number(form.purchaseAmountCents || 0) * 100);
-  const hasPurchaseAmount = !initialValue && purchaseAmountCents > 0;
+  const hasPurchaseAmount = !isEditing && purchaseAmountCents > 0;
   const resolvedQuantity = hasPurchaseAmount && averageBuyPriceCents > 0
     ? purchaseAmountCents / averageBuyPriceCents
     : Number(form.quantity || 0);
@@ -113,7 +114,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         )}
       </FormField>
 
-      {!initialValue ? (
+      {!isEditing ? (
         <>
           <FormField label="Purchase funded from" htmlFor="holding-funding-source">
             {(props) => (
@@ -206,7 +207,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
           </Button>
         ) : null}
         <Button type="submit" variant="primary">
-          {initialValue ? 'Save changes' : 'Add holding'}
+          {isEditing ? 'Save changes' : 'Add holding'}
         </Button>
       </div>
     </form>

@@ -179,6 +179,7 @@ function PortfolioHoldingList({
   currency,
   locale,
   openEditHoldingGroup,
+  openAddHoldingOperation,
   openEditHolding,
   openSellHolding,
   sellAllHoldingGroup,
@@ -216,7 +217,16 @@ function PortfolioHoldingList({
               </div>
             </div>
             <div className="min-w-0 justify-self-end">
-              <div className="inline-flex shrink-0 flex-col items-center gap-1 text-xs text-ink-muted">
+              <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
+                  aria-label={`Add ${group.ticker} operation`}
+                  title="Add operation"
+                  onClick={() => openAddHoldingOperation(group)}
+                >
+                  <PlusIcon />
+                </button>
                 <button
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-ink"
@@ -515,7 +525,7 @@ export default function PortfolioPage() {
   const removeDividend = useFinanceStore((state) => state.removeDividend);
   const refreshPrices = useFinanceStore((state) => state.refreshPrices);
   const confirm = useConfirm();
-  const [holdingModal, setHoldingModal] = useState({ open: false, id: null });
+  const [holdingModal, setHoldingModal] = useState({ open: false, id: null, initialValue: null });
   const [holdingGroupModal, setHoldingGroupModal] = useState({ open: false, ticker: null });
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
   const [sellModal, setSellModal] = useState({ open: false, holdingId: null, saleId: null });
@@ -538,9 +548,15 @@ export default function PortfolioPage() {
   const holdingGroups = groupHoldingsByTicker(activeHoldings);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
 
-  const openNewHolding = () => setHoldingModal({ open: true, id: null });
-  const openEditHolding = (id) => setHoldingModal({ open: true, id });
-  const closeHolding = () => setHoldingModal({ open: false, id: null });
+  const openNewHolding = (initialValue = null) => setHoldingModal({ open: true, id: null, initialValue });
+  const openAddHoldingOperation = (group) => openNewHolding({
+    ticker: group.ticker,
+    name: group.name,
+    averageBuyPriceCents: group.averageBuyPriceCents,
+    currentPriceCents: group.currentPriceCents,
+  });
+  const openEditHolding = (id) => setHoldingModal({ open: true, id, initialValue: null });
+  const closeHolding = () => setHoldingModal({ open: false, id: null, initialValue: null });
   const openEditHoldingGroup = (ticker) => setHoldingGroupModal({ open: true, ticker });
   const closeHoldingGroup = () => setHoldingGroupModal({ open: false, ticker: null });
   const openSellHolding = (id) => setSellModal({ open: true, holdingId: id, saleId: null });
@@ -936,6 +952,7 @@ export default function PortfolioPage() {
             currency={currency}
             locale={locale}
             openEditHoldingGroup={openEditHoldingGroup}
+            openAddHoldingOperation={openAddHoldingOperation}
             openEditHolding={openEditHolding}
             openSellHolding={openSellHolding}
             sellAllHoldingGroup={sellAllHoldingGroup}
@@ -1080,7 +1097,7 @@ export default function PortfolioPage() {
         size="lg"
       >
         <HoldingForm
-          initialValue={editingHolding}
+          initialValue={editingHolding || holdingModal.initialValue}
           onSubmit={async (value) => {
             const isNew = !value.id;
             const { fundingSource, purchaseAmountCents, ...holdingValue } = value;

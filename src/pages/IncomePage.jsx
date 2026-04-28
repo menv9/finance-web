@@ -132,7 +132,13 @@ function IncomeLedgerList({
                   <p className="min-w-0 truncate text-sm text-ink">
                     {row.source || 'Income'}
                   </p>
-                  <span className={`shrink-0 font-mono text-sm tabular ${amountClass}`}>
+                  <span
+                    className={`numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular ${
+                      amountClass === 'text-danger'
+                        ? 'text-danger bg-danger-soft'
+                        : 'text-positive bg-positive-soft'
+                    }`}
+                  >
                     {displayAmountCents >= 0 ? '+' : '-'}
                     {formatCurrency(Math.abs(displayAmountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
                   </span>
