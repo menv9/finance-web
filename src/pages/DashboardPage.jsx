@@ -277,6 +277,7 @@ export default function DashboardPage() {
         </div>
         <section
           aria-label="Key figures"
+          data-tour="dashboard-kpis"
           className={
             'grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 ' +
             (portfolioEnabled ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
@@ -320,6 +321,7 @@ export default function DashboardPage() {
 
       {/* Primary chart */}
       <Card
+        data-tour="dashboard-networth"
         eyebrow="Twelve-month arc"
         title="Net worth"
         description="How your total position has moved through the last year."
@@ -363,6 +365,7 @@ export default function DashboardPage() {
       {/* Cashflow bars + recent activity */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card
+          data-tour="dashboard-cashflow"
           eyebrow="Monthly rhythm"
           title="Income vs. expenses"
           variant="chart"
@@ -394,6 +397,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card
+          data-tour="dashboard-activity"
           eyebrow="Ledger"
           title="Recent activity"
           action={

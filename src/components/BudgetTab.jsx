@@ -236,7 +236,7 @@ export function BudgetTab() {
         </p>
       </div>
 
-      <section className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule sm:grid-cols-2">
+      <section data-tour="budgets-stats" className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule sm:grid-cols-2">
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat
             label="Total budgets"
@@ -260,6 +260,7 @@ export function BudgetTab() {
 
       {/* budget cards */}
       <Card
+        data-tour="budgets-cards"
         eyebrow="Plan"
         title="Category budgets"
         description="Your monthly limits for variable spending. These repeat automatically — no need to set them each month."
@@ -294,15 +295,23 @@ export function BudgetTab() {
             ))}
           </div>
         ) : (
-          <EmptyState
-            title="No budgets yet"
-            description="Add a category to start tracking variable spending against a monthly limit."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add category
-              </Button>
-            }
-          />
+          <>
+            {settings.setupIntent?.budgets && (
+              <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
+                <p className="text-sm font-medium text-ink">You mentioned wanting category budgets</p>
+                <p className="mt-0.5 text-xs text-ink-muted">Add a spending limit per category and track it against your real monthly expenses.</p>
+              </div>
+            )}
+            <EmptyState
+              title="No budgets yet"
+              description="Add a category to start tracking variable spending against a monthly limit."
+              action={
+                <Button variant="secondary" size="sm" onClick={openNew}>
+                  <PlusIcon /> Add category
+                </Button>
+              }
+            />
+          </>
         )}
       </Card>
 

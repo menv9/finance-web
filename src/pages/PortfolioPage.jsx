@@ -846,7 +846,7 @@ export default function PortfolioPage() {
       />
 
       {/* KPIs */}
-      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
+      <section data-tour="portfolio-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Market value', value: portfolio.currentValueCents, mode: 'currency', hint: `${activeHoldings.length} holdings`, info: 'Current value of all active holdings using their latest stored prices.' },
           { label: 'TWRR', value: portfolio.twrr, mode: 'percent', hint: 'time-weighted', info: 'Time-weighted rate of return. It measures portfolio performance while reducing the effect of deposits and withdrawals.' },
@@ -861,7 +861,7 @@ export default function PortfolioPage() {
 
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
-        <Card eyebrow="Split" title="Allocation" className={'order-2 lg:col-span-5 ' + rise(2)}>
+        <Card data-tour="portfolio-allocation" eyebrow="Split" title="Allocation" className={'order-2 lg:col-span-5 ' + rise(2)}>
           {portfolio.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[190px] w-full max-w-[190px] sm:h-[220px] sm:max-w-[220px]">
@@ -936,6 +936,7 @@ export default function PortfolioPage() {
 
       {/* holdings */}
       <Card
+        data-tour="portfolio-holdings"
         eyebrow="Register"
         title="Holdings"
         description="Refresh prices manually to fetch the latest market prices."

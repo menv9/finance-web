@@ -394,7 +394,7 @@ export default function IncomePage() {
       />
 
       {/* KPIs */}
-      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
+      <section data-tour="income-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
             label="Selected month"
@@ -430,7 +430,7 @@ export default function IncomePage() {
 
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
-        <Card eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-8">
+        <Card data-tour="income-chart" eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-8">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -504,6 +504,7 @@ export default function IncomePage() {
       {/* ledgers */}
       <section className="grid gap-6 lg:grid-cols-12">
       <Card
+        data-tour="income-log"
         eyebrow="Ledger"
         title="Income"
         description="Filter the selected month by kind and source."
@@ -585,6 +586,7 @@ export default function IncomePage() {
       </Card>
 
       <Card
+        data-tour="income-fixed"
         eyebrow="Schedule"
         title="Fixed incomes"
         description="Salary and other stable income entries."
@@ -609,15 +611,23 @@ export default function IncomePage() {
             }}
           />
         ) : (
-          <EmptyState
-            title="No fixed income yet"
-            description="Add salary or another recurring income source."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add fixed
-              </Button>
-            }
-          />
+          <>
+            {settings.setupIntent?.recurringIncome && (
+              <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
+                <p className="text-sm font-medium text-ink">You mentioned having recurring income</p>
+                <p className="mt-0.5 text-xs text-ink-muted">Add your salary or regular sources here — they feed directly into monthly cashflow.</p>
+              </div>
+            )}
+            <EmptyState
+              title="No fixed income yet"
+              description="Add salary or another recurring income source."
+              action={
+                <Button variant="secondary" size="sm" onClick={openNew}>
+                  <PlusIcon /> Add fixed
+                </Button>
+              }
+            />
+          </>
         )}
       </Card>
       </section>

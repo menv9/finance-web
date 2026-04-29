@@ -101,10 +101,30 @@ export default {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        'slide-from-right': {
+          '0%': { opacity: '0', transform: 'translateX(24px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'slide-from-left': {
+          '0%': { opacity: '0', transform: 'translateX(-24px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'spotlight-in': {
+          '0%': { opacity: '0', transform: 'scale(0.94)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'tooltip-in': {
+          '0%': { opacity: '0', transform: 'translateY(5px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         rise: 'rise 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
         shimmer: 'shimmer 1.6s linear infinite',
+        'slide-from-right': 'slide-from-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
+        'slide-from-left': 'slide-from-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
+        'spotlight-in': 'spotlight-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
+        'tooltip-in': 'tooltip-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both',
       },
     },
   },

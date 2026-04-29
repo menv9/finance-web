@@ -6,6 +6,7 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import { Card, Table, Button, FormField, Input, Select, EmptyState, Modal, Toggle } from '../components/ui';
 import { rise } from '../utils/motion';
 import { formatCurrency } from '../utils/formatters';
+import { useTour } from '../components/tour/TourContext';
 
 const sections = [
   { id: 'appearance', label: 'Appearance' },
@@ -112,6 +113,7 @@ export default function SettingsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
   const navigate = useNavigate();
+  const { startTour } = useTour();
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const exportBackup = useFinanceStore((state) => state.exportBackup);
   const importBackup = useFinanceStore((state) => state.importBackup);
@@ -253,6 +255,7 @@ export default function SettingsPage() {
         <div className="lg:col-span-9 grid gap-10">
           <Card
             id="appearance"
+            data-tour="settings-appearance"
             eyebrow="Display"
             title="Appearance"
             description="Choose how the app looks. Special themes are tied to your account."
@@ -336,6 +339,7 @@ export default function SettingsPage() {
 
           <Card
             id="modules"
+            data-tour="settings-modules"
             eyebrow="Workspace"
             title="Modules"
             description="Choose which optional modules appear in the app navigation."
@@ -367,14 +371,8 @@ export default function SettingsPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    updateSettings({
-                      onboardingCompleted: false,
-                      onboardingCompletedAt: null,
-                      onboardingTutorialCompleted: false,
-                      initialSetupCompleted: false,
-                      initialSetupCompletedAt: null,
-                    });
-                    navigate('/onboarding');
+                    updateSettings({ onboardingTutorialCompleted: false });
+                    startTour();
                   }}
                 >
                   Restart onboarding
@@ -608,6 +606,7 @@ export default function SettingsPage() {
 
           <Card
             id="history"
+            data-tour="settings-history"
             eyebrow="Audit"
             title="Activity history"
             description="Every user-facing change is recorded here. Undo shows a confirmation before touching your data."
@@ -821,6 +820,7 @@ export default function SettingsPage() {
 
           <Card
             id="backup"
+            data-tour="settings-backup"
             eyebrow="Portability"
             title="Backup and restore"
             description="Export or import data as JSON — full backup or per module."
@@ -949,7 +949,7 @@ export default function SettingsPage() {
       >
         <div className="grid gap-4">
           <p className="text-sm text-ink-muted">
-            Type <span className="font-mono font-medium text-danger select-all">  ERASE ALL DATA </span> to confirm.
+            Type <span className="font-mono font-medium text-danger select-all">ERASE ALL DATA</span> to confirm.
           </p>
           <Input
             autoFocus

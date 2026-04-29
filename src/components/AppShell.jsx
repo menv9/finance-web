@@ -9,6 +9,9 @@ import { IncomeForm } from './forms/IncomeForm';
 import LiquidChrome from './LiquidChrome';
 import ElectricBorder from './ElectricBorder';
 import SakuraPetals from './SakuraPetals';
+import { TourProvider } from './tour/TourContext';
+import { TourSpotlight } from './tour/TourSpotlight';
+import { TourHUD } from './tour/TourHUD';
 
 const BASE_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -417,6 +420,7 @@ export function AppShell({ children }) {
   }, []);
 
   return (
+    <TourProvider>
     <div className="min-h-screen">
       {/* Eris: falling sakura petals */}
       {appliedTheme === 'eris' && <SakuraPetals />}
@@ -477,23 +481,27 @@ export function AppShell({ children }) {
                 onClick={() => setExpenseModalOpen(true)}
                 aria-label="Log expense"
                 title="Log expense"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-base font-medium text-ink-muted transition-colors duration-180 hover:bg-surface-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                -
+                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#b5372a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 4v12M4 10l6 6 6-6" />
+                </svg>
               </button>
               <button
                 type="button"
                 onClick={() => setIncomeModalOpen(true)}
                 aria-label="Log income"
                 title="Log income"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-base font-medium text-ink-muted transition-colors duration-180 hover:bg-surface-raised hover:text-positive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                +
+                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#2d6a4f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 16V4M4 10l6-6 6 6" />
+                </svg>
               </button>
             </div>
-            <div className="hidden md:flex items-baseline gap-2 border-l border-rule pl-4">
-              <span className="eyebrow text-[0.6rem]">Total balance</span>
-              <span className="numeric text-sm text-ink">
+            <div className="hidden md:flex flex-col items-end border-l border-rule pl-4">
+              <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Total balance</span>
+              <span className="numeric text-sm text-ink leading-none">
                 {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
               </span>
             </div>
@@ -631,6 +639,10 @@ export function AppShell({ children }) {
           </p>
         </div>
       </footer>
+
+      <TourSpotlight />
+      <TourHUD />
     </div>
+    </TourProvider>
   );
 }

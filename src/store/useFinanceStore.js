@@ -325,6 +325,7 @@ async function persistActivityLogs(set, logs) {
 
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
+  tourActive: false,
   settings: DEFAULT_SETTINGS,
   supabaseConfigured: false,
   supabaseSession: null,
@@ -549,6 +550,8 @@ export const useFinanceStore = create((set, get) => ({
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
   },
+
+  setTourActive: (value) => set({ tourActive: value }),
 
   updateSettings: async (partial) => {
     const previousSettings = get().settings;
@@ -1557,7 +1560,9 @@ export const useFinanceStore = create((set, get) => ({
     await clearAllStores();
     localStorage.removeItem('pft-seeded');
     localStorage.removeItem('pft-sync-meta');
-    // Keep settings (currency, locale, API keys) — only nuke financial records
+    // Keep settings (currency, locale, theme, API keys) — reset financial fields only
+    const current = get().settings;
+    saveSettings({ ...current, initialCashBalanceCents: 0 });
     await get().bootstrap();
     await persistActivityLogs(set, [buildActivityLog({
       storeName: 'settings',

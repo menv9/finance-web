@@ -520,7 +520,7 @@ export default function ExpensesPage() {
       />
 
       {/* summary stats */}
-      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
+      <section data-tour="expenses-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
             label="Selected month"
@@ -574,7 +574,7 @@ export default function ExpensesPage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card eyebrow="Filtered month" title="By category" className={'lg:col-span-4 ' + rise(3)}>
+        <Card data-tour="expenses-breakdown" eyebrow="Filtered month" title="By category" className={'lg:col-span-4 ' + rise(3)}>
           {breakdown.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[200px] w-full max-w-[220px] min-w-0">
@@ -634,6 +634,7 @@ export default function ExpensesPage() {
       {/* ledgers */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card
+        data-tour="expenses-log"
         eyebrow="Ledger"
         title="Expenses"
         description="Filter the selected month by category and description."
@@ -731,6 +732,7 @@ export default function ExpensesPage() {
 
       {/* fixed expenses */}
         <Card
+        data-tour="expenses-recurring"
         eyebrow="Schedule"
         title="Recurring bills"
         description="Rent, utilities, subscriptions. Pause, resume, or remove — paused bills drop out of projections."
@@ -755,15 +757,23 @@ export default function ExpensesPage() {
             }}
           />
         ) : (
-          <EmptyState
-            title="No recurring bills yet"
-            description="Add your first fixed expense — rent, internet, anything monthly."
-            action={
-              <Button variant="secondary" size="sm" onClick={openNewFixed}>
-                <PlusIcon /> Add recurring
-              </Button>
-            }
-          />
+          <>
+            {settings.setupIntent?.recurringBills && (
+              <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
+                <p className="text-sm font-medium text-ink">You mentioned having recurring bills</p>
+                <p className="mt-0.5 text-xs text-ink-muted">Add rent, subscriptions, or utilities here — they stay in your monthly projections automatically.</p>
+              </div>
+            )}
+            <EmptyState
+              title="No recurring bills yet"
+              description="Add your first fixed expense — rent, internet, anything monthly."
+              action={
+                <Button variant="secondary" size="sm" onClick={openNewFixed}>
+                  <PlusIcon /> Add recurring
+                </Button>
+              }
+            />
+          </>
         )}
         </Card>
       </section>

@@ -586,7 +586,7 @@ export default function SavingsPage() {
       />
 
       {/* KPIs */}
-      <section className="flex w-full flex-col gap-5 md:h-[172px] md:flex-row md:items-stretch md:justify-center">
+      <section data-tour="savings-stats" className="flex w-full flex-col gap-5 md:h-[172px] md:flex-row md:items-stretch md:justify-center">
         <div className={'min-w-0 rounded-lg border border-rule bg-surface p-6 md:flex md:min-w-[360px] md:flex-col md:items-center md:justify-center ' + rise(1)}>
           <Stat
             label="Total saved"
@@ -675,6 +675,7 @@ export default function SavingsPage() {
       </section>
 
       <Card
+        data-tour="savings-buckets"
         eyebrow="Buckets"
         title="Savings targets"
         description="Set money aside for specific things while keeping it inside your total savings."
@@ -685,6 +686,12 @@ export default function SavingsPage() {
           </Button>
         }
       >
+        {!goalsWithBalances.length && settings.setupIntent?.buckets && (
+          <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
+            <p className="text-sm font-medium text-ink">You mentioned wanting savings buckets</p>
+            <p className="mt-0.5 text-xs text-ink-muted">Create a goal for a trip, emergency fund, or any target — money stays in your total savings but is earmarked.</p>
+          </div>
+        )}
         {goalsWithBalances.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {goalsWithBalances.map((goal) => {
@@ -900,6 +907,7 @@ export default function SavingsPage() {
 
       {/* Projection config */}
       <Card
+        data-tour="savings-projection"
         eyebrow="Projection"
         title="Future projection setup"
         description="Set your starting balance, how much you save each month, interest rate, and goal. Independent from your entry log."

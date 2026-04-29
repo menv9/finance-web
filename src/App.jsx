@@ -21,7 +21,7 @@ export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
   const hydrated = useFinanceStore((state) => state.hydrated);
   const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
-  const onboardingCompleted = useFinanceStore((state) => state.settings.onboardingCompleted === true);
+  const tourActive = useFinanceStore((state) => state.tourActive);
 
   useEffect(() => {
     bootstrap();
@@ -61,22 +61,27 @@ export default function App() {
             path="/*"
             element={
               <ProtectedRoute>
-                {onboardingCompleted ? (
-                  <AppShell>
-                    <Routes>
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/income" element={<IncomePage />} />
-                      <Route path="/expenses" element={<ExpensesPage />} />
-                      <Route path="/budgets" element={<BudgetsPage />} />
-                      <Route path="/savings" element={<SavingsPage />} />
-                      <Route path="/portfolio" element={portfolioEnabled ? <PortfolioPage /> : <Navigate to="/dashboard" replace />} />
-                      <Route path="/transfers" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                    </Routes>
-                  </AppShell>
-                ) : (
-                  <Navigate to="/onboarding" replace />
-                )}
+                <AppShell>
+                  <Routes>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/income" element={<IncomePage />} />
+                    <Route path="/expenses" element={<ExpensesPage />} />
+                    <Route path="/budgets" element={<BudgetsPage />} />
+                    <Route path="/savings" element={<SavingsPage />} />
+                    <Route
+                      path="/portfolio"
+                      element={
+                        portfolioEnabled || tourActive ? (
+                          <PortfolioPage />
+                        ) : (
+                          <Navigate to="/dashboard" replace />
+                        )
+                      }
+                    />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </AppShell>
               </ProtectedRoute>
             }
           />
