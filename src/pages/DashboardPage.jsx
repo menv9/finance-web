@@ -79,6 +79,22 @@ function EyeIcon({ hidden }) {
   );
 }
 
+function ExpenseArrowIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#b5372a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 4v12M4 10l6 6 6-6" />
+    </svg>
+  );
+}
+
+function IncomeArrowIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#2d6a4f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 16V4M4 10l6-6 6 6" />
+    </svg>
+  );
+}
+
 function RecentActivity({ items, currency, locale }) {
   if (!items.length) {
     return (
@@ -262,7 +278,7 @@ export default function DashboardPage() {
               title="Log expense"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-danger/40 bg-surface text-base font-medium text-danger transition-colors hover:border-danger hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
-              -
+              <ExpenseArrowIcon />
             </button>
             <button
               type="button"
@@ -271,7 +287,7 @@ export default function DashboardPage() {
               title="Log income"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-positive/40 bg-surface text-base font-medium text-positive transition-colors hover:border-positive hover:bg-positive-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
-              +
+              <IncomeArrowIcon />
             </button>
           </div>
         </div>
