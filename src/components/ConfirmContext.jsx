@@ -4,13 +4,13 @@ import { ConfirmDialog } from './ConfirmDialog';
 const ConfirmContext = createContext(null);
 
 export function ConfirmProvider({ children }) {
-  const [state, setState] = useState({ open: false, title: '', description: '' });
+  const [state, setState] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete' });
   const resolveRef = useRef(null);
 
-  const confirm = useCallback(({ title, description }) => {
+  const confirm = useCallback(({ title, description, confirmLabel = 'Delete' }) => {
     return new Promise((resolve) => {
       resolveRef.current = resolve;
-      setState({ open: true, title, description });
+      setState({ open: true, title, description, confirmLabel });
     });
   }, []);
 
@@ -31,6 +31,7 @@ export function ConfirmProvider({ children }) {
         open={state.open}
         title={state.title}
         description={state.description}
+        confirmLabel={state.confirmLabel}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />

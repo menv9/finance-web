@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './ui';
 
-export function ConfirmDialog({ open, title, description, onConfirm, onCancel }) {
+export function ConfirmDialog({ open, title, description, confirmLabel = 'Delete', onConfirm, onCancel }) {
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -56,7 +56,7 @@ export function ConfirmDialog({ open, title, description, onConfirm, onCancel })
             Cancel
           </Button>
           <Button variant="danger" onClick={onConfirm} className="w-full sm:w-auto">
-            Delete
+            {confirmLabel}
           </Button>
         </div>
       </div>

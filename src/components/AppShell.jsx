@@ -441,11 +441,11 @@ export function AppShell({ children }) {
 
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 lg:px-10">
-          <div className="flex min-w-0 items-center justify-start gap-6">
+          <div className="col-start-1 flex min-w-0 items-center justify-start gap-6">
             <Logo theme={appliedTheme} />
           </div>
 
-          <nav aria-label="Primary" className="hidden justify-center lg:flex items-center gap-1">
+          <nav aria-label="Primary" className="col-start-2 hidden justify-center lg:flex items-center gap-1">
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -473,7 +473,7 @@ export function AppShell({ children }) {
             ))}
           </nav>
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="col-start-3 flex items-center justify-end gap-3">
             <div className="hidden md:flex items-center gap-1">
               <button
                 type="button"

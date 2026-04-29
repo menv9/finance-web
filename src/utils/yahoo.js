@@ -155,9 +155,20 @@ export async function fetchTickerPrice(ticker, finnhubApiKey = '') {
     }
   }
 
-  const result = finnhubApiKey
-    ? await fetchFromFinnhub(ticker, finnhubApiKey)
-    : await fetchFromYahoo(ticker);
+  let result;
+  if (finnhubApiKey) {
+    try {
+      result = await fetchFromFinnhub(ticker, finnhubApiKey);
+    } catch (error) {
+      try {
+        result = await fetchFromYahoo(ticker);
+      } catch {
+        throw error;
+      }
+    }
+  } else {
+    result = await fetchFromYahoo(ticker);
+  }
 
   sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), ...result }));
   return result;

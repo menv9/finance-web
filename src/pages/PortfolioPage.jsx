@@ -548,7 +548,10 @@ export default function PortfolioPage() {
   const holdingGroups = groupHoldingsByTicker(activeHoldings);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
 
-  const openNewHolding = (initialValue = null) => setHoldingModal({ open: true, id: null, initialValue });
+  const openNewHolding = (initialValue = null) => {
+    const nextInitialValue = initialValue && !initialValue.nativeEvent ? initialValue : null;
+    setHoldingModal({ open: true, id: null, initialValue: nextInitialValue });
+  };
   const openAddHoldingOperation = (group) => openNewHolding({
     ticker: group.ticker,
     name: group.name,
@@ -629,6 +632,7 @@ export default function PortfolioPage() {
     if (!(await confirm({
       title: 'Sell all operations',
       description: `Sell all ${group.ticker} operations at their current prices?`,
+      confirmLabel: 'Sell all',
     }))) return;
     for (const lot of group.lots) {
       await sellHolding({
@@ -838,7 +842,7 @@ export default function PortfolioPage() {
             <Button variant="secondary" size="sm" loading={refreshing} onClick={onRefresh}>
               {refreshing ? `Refreshing… (${activeHoldings.length} tickers, ~${Math.ceil(activeHoldings.length * 13 / 60)} min)` : 'Refresh prices'}
             </Button>
-            <Button variant="primary" size="sm" onClick={openNewHolding}>
+            <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
               <PlusIcon /> New holding
             </Button>
           </>
@@ -941,7 +945,7 @@ export default function PortfolioPage() {
         title="Holdings"
         description="Refresh prices manually to fetch the latest market prices."
         action={
-          <Button variant="primary" size="sm" onClick={openNewHolding}>
+          <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
             <PlusIcon /> Add holding
           </Button>
         }
@@ -967,7 +971,7 @@ export default function PortfolioPage() {
             title="No holdings yet"
             description="Add your first position — Trade Republic, IBKR, anywhere."
             action={
-              <Button variant="secondary" size="sm" onClick={openNewHolding}>
+              <Button variant="secondary" size="sm" onClick={() => openNewHolding()}>
                 <PlusIcon /> Add holding
               </Button>
             }

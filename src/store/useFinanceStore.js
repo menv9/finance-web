@@ -1465,7 +1465,7 @@ export const useFinanceStore = create((set, get) => ({
     const { holdings, settings } = get();
     const refreshableHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
     const refreshableTickers = [...new Set(refreshableHoldings.map((holding) => holding.ticker))];
-    const apiKey = settings.finnhubApiKey || settings.alphaVantageApiKey || '';
+    const apiKey = settings.finnhubApiKey || '';
     const baseCurrency = settings.baseCurrency || 'EUR';
 
     // Finnhub free tier = 60 req/min — no delay needed between requests.
