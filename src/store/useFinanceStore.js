@@ -291,7 +291,7 @@ function buildActivityLog({ storeName, action, before = null, after = null, undo
 }
 
 function buildSettingsActivity(previousSettings, nextSettings, partial, summary = null) {
-  const sensitive = new Set(['alphaVantageApiKey', 'supabaseUrl', 'supabaseAnonKey']);
+  const sensitive = new Set(['finnhubApiKey', 'alphaVantageApiKey', 'supabaseUrl', 'supabaseAnonKey']);
   const allKeys = Object.keys(partial || {});
   const keys = allKeys.filter((key) => !sensitive.has(key));
   if (!keys.length && allKeys.length) {
@@ -1465,12 +1465,12 @@ export const useFinanceStore = create((set, get) => ({
     const { holdings, settings } = get();
     const refreshableHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
     const refreshableTickers = [...new Set(refreshableHoldings.map((holding) => holding.ticker))];
-    const apiKey = settings.alphaVantageApiKey || '';
+    const apiKey = settings.finnhubApiKey || settings.alphaVantageApiKey || '';
     const baseCurrency = settings.baseCurrency || 'EUR';
 
-    // Alpha Vantage free tier = 5 req/min. Fetch sequentially with a gap to avoid
-    // rate-limiting when the user has many holdings.
-    const DELAY_MS = apiKey ? 13000 : 0; // 13 s between requests when using AV
+    // Finnhub free tier = 60 req/min — no delay needed between requests.
+    // Yahoo fallback is also parallel-safe for small portfolios.
+    const DELAY_MS = 0;
 
     // Step 1: fetch { priceCents, currency } once per ticker, then apply it to
     // every operation/lot with that ticker.

@@ -183,6 +183,8 @@ export function sanitizeSettingsForSync(settings) {
     ...settings,
     supabaseUrl: '',
     supabaseAnonKey: '',
+    finnhubApiKey: '',
+    alphaVantageApiKey: '',
   };
 }
 

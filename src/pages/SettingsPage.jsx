@@ -299,18 +299,18 @@ export default function SettingsPage() {
           >
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
-                label="Alpha Vantage API key"
-                hint="Used for portfolio price refresh. Free key at alphavantage.co"
-                htmlFor="av-key"
+                label="Finnhub API key"
+                hint="Enables real-time prices for stocks, ETFs, crypto, forex and futures. Free key at finnhub.io"
+                htmlFor="fh-key"
                 className="md:col-span-2"
               >
                 <div className="flex gap-2">
                   <Input
-                    id="av-key"
+                    id="fh-key"
                     type={showApiKey ? 'text' : 'password'}
-                    placeholder="e.g. ABCDEF123456"
-                    value={settings.alphaVantageApiKey || ''}
-                    onChange={(e) => updateSettings({ alphaVantageApiKey: e.target.value.trim() })}
+                    placeholder="e.g. abcdef123456xyz"
+                    value={settings.finnhubApiKey || ''}
+                    onChange={(e) => updateSettings({ finnhubApiKey: e.target.value.trim() })}
                     className="flex-1"
                   />
                   <Button

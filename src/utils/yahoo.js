@@ -4,13 +4,11 @@ const TTL_MS = 15 * 60 * 1000;
 
 // Detect crypto/FX pairs like BTC/EUR, ETH/USD
 function parseCurrencyPair(ticker) {
-  const match = ticker.match(/^([A-Z]+)\/([A-Z]+)$/);
+  const match = ticker.match(/^([A-Z0-9]+)\/([A-Z]+)$/);
   return match ? { from: match[1], to: match[2] } : null;
 }
 
 // Infer price currency from ticker exchange suffix.
-// Alpha Vantage GLOBAL_QUOTE doesn't return currency in the response,
-// so we derive it from the exchange code appended to the symbol.
 const SUFFIX_CURRENCY = {
   DE: 'EUR', VI: 'EUR', PA: 'EUR', AS: 'EUR', MI: 'EUR', BR: 'EUR', LS: 'EUR',
   L: 'GBP',
@@ -28,38 +26,59 @@ function inferCurrencyFromTicker(ticker) {
   return (suffix && SUFFIX_CURRENCY[suffix]) || 'USD';
 }
 
-// ── Alpha Vantage ─────────────────────────────────────────────────────────────
+// Well-known crypto exchange prefixes to try in order
+const CRYPTO_EXCHANGES = ['BINANCE', 'COINBASE', 'KRAKEN'];
 
-async function fetchFromAlphaVantage(ticker, apiKey) {
+// ── Finnhub ───────────────────────────────────────────────────────────────────
+
+async function finnhubGet(path, apiKey) {
+  const res = await fetch(`https://finnhub.io/api/v1${path}`, {
+    headers: { 'X-Finnhub-Token': apiKey },
+  });
+  if (!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Finnhub: ${data.error}`);
+  return data;
+}
+
+async function fetchFromFinnhub(ticker, apiKey) {
   const pair = parseCurrencyPair(ticker);
 
-  let url;
+  // ── Forex pair (e.g. USD/EUR) ──────────────────────────────────────────────
   if (pair) {
-    url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${encodeURIComponent(apiKey)}`;
-  } else {
-    url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${encodeURIComponent(apiKey)}`;
+    const isCrypto = pair.from.length > 4 ||
+      ['BTC', 'ETH', 'XRP', 'SOL', 'ADA', 'DOT', 'LTC', 'BNB', 'DOGE', 'AVAX',
+       'MATIC', 'LINK', 'UNI', 'ATOM', 'XLM', 'ALGO', 'FTM'].includes(pair.from);
+
+    if (isCrypto) {
+      // Try common exchanges until one returns a price
+      for (const exchange of CRYPTO_EXCHANGES) {
+        const symbol = `${exchange}:${pair.from}${pair.to}`;
+        try {
+          const data = await finnhubGet(`/quote?symbol=${encodeURIComponent(symbol)}`, apiKey);
+          const price = data.c;
+          if (price && price > 0) {
+            return { priceCents: Math.round(price * 100), currency: pair.to };
+          }
+        } catch {
+          // try next exchange
+        }
+      }
+      throw new Error(`No crypto price from Finnhub for ${ticker}`);
+    }
+
+    // Forex: use /forex/rates which returns all rates relative to a base
+    const data = await finnhubGet(`/forex/rates?base=${pair.from}`, apiKey);
+    const rate = data?.quote?.[pair.to];
+    if (!rate) throw new Error(`No FX rate from Finnhub for ${ticker}`);
+    return { priceCents: Math.round(rate * 100), currency: pair.to };
   }
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Alpha Vantage HTTP ${res.status}`);
-  const data = await res.json();
-
-  if (data.Note || data.Information) {
-    throw new Error('Alpha Vantage rate limit reached — try again later');
-  }
-
-  let price;
-  let currency;
-  if (pair) {
-    price = parseFloat(data?.['Realtime Currency Exchange Rate']?.['5. Exchange Rate'] || '0');
-    currency = pair.to;
-  } else {
-    price = parseFloat(data?.['Global Quote']?.['05. price'] || '0');
-    currency = inferCurrencyFromTicker(ticker);
-  }
-
-  if (!price) throw new Error(`No price data from Alpha Vantage for ${ticker}`);
-  return { priceCents: Math.round(price * 100), currency };
+  // ── Stock / ETF / Future ───────────────────────────────────────────────────
+  const data = await finnhubGet(`/quote?symbol=${encodeURIComponent(ticker)}`, apiKey);
+  const price = data.c;
+  if (!price || price === 0) throw new Error(`No price from Finnhub for ${ticker}`);
+  return { priceCents: Math.round(price * 100), currency: inferCurrencyFromTicker(ticker) };
 }
 
 // ── Yahoo Finance fallback ────────────────────────────────────────────────────
@@ -95,7 +114,6 @@ async function tryFetch(url) {
 }
 
 async function fetchFromYahoo(ticker) {
-  // Translate FX pair format (USD/EUR) → Yahoo ticker (USDEUR=X)
   const pair = parseCurrencyPair(ticker);
   const yahooTicker = pair ? `${pair.from}${pair.to}=X` : ticker;
   const directUrls = YAHOO_URLS(yahooTicker);
@@ -126,7 +144,7 @@ async function fetchFromYahoo(ticker) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 // Returns { priceCents, currency } — price in the ticker's native currency.
-export async function fetchTickerPrice(ticker, alphaVantageApiKey = '') {
+export async function fetchTickerPrice(ticker, finnhubApiKey = '') {
   const cacheKey = `price-cache:${ticker}`;
   const cached = sessionStorage.getItem(cacheKey);
 
@@ -137,8 +155,8 @@ export async function fetchTickerPrice(ticker, alphaVantageApiKey = '') {
     }
   }
 
-  const result = alphaVantageApiKey
-    ? await fetchFromAlphaVantage(ticker, alphaVantageApiKey)
+  const result = finnhubApiKey
+    ? await fetchFromFinnhub(ticker, finnhubApiKey)
     : await fetchFromYahoo(ticker);
 
   sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), ...result }));

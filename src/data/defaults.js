@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS = {
   initialCashBalanceCents: 0,
   categories: DEFAULT_CATEGORIES,
   holdingPlatforms: ['Trade Republic', 'IBKR', 'DEGIRO'],
-  alphaVantageApiKey: '',
+  finnhubApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
   modules: {
