@@ -144,10 +144,15 @@ export default function SettingsPage() {
 
   const handleWipe = async () => {
     setWiping(true);
-    await wipeAllData();
-    setWiping(false);
-    setWipeModalOpen(false);
-    setWipeConfirmText('');
+    try {
+      await wipeAllData();
+      setWipeModalOpen(false);
+      setWipeConfirmText('');
+    } catch (error) {
+      window.alert(error.message || 'Unable to erase data.');
+    } finally {
+      setWiping(false);
+    }
   };
 
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';

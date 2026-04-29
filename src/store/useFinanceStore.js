@@ -1584,13 +1584,50 @@ export const useFinanceStore = create((set, get) => ({
   exportBackup: async (storeFilter = null) => exportDatabaseSnapshot(get().settings, storeFilter),
 
   wipeAllData: async () => {
+    const timestamp = new Date().toISOString();
+    const state = get();
+    const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
+    for (const storeName of STORE_KEYS) {
+      const records = getStateRecords(state, storeName);
+      nextDeletedRecords[storeName] = [
+        ...(nextDeletedRecords[storeName] || []).filter((item) => !records.some((record) => record.id === item.id)),
+        ...records.map((record) => ({ id: record.id, updatedAt: timestamp, deletedAt: timestamp })),
+      ];
+    }
+    const nextSyncMeta = {
+      ...state.syncMeta,
+      deletedRecords: nextDeletedRecords,
+      conflicts: [],
+    };
+    saveSyncMeta(nextSyncMeta);
     await clearAllStores();
-    localStorage.removeItem('pft-seeded');
-    localStorage.removeItem('pft-sync-meta');
+    localStorage.setItem('pft-seeded', 'true');
     // Keep settings (currency, locale, theme, API keys) — reset financial fields only
-    const current = get().settings;
+    const current = state.settings;
     saveSettings({ ...current, initialCashBalanceCents: 0 });
-    await get().bootstrap();
+    set((currentState) => {
+      const nextState = {
+        ...currentState,
+        settings: { ...current, initialCashBalanceCents: 0 },
+        syncMeta: nextSyncMeta,
+        expenses: [],
+        fixedExpenses: [],
+        incomes: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: SAVINGS_DEFAULT,
+        savingsEntries: [],
+        savingsGoals: [],
+        budgets: [],
+        rollovers: [],
+        transfers: [],
+        attachments: [],
+        activityLog: [],
+      };
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
     await persistActivityLogs(set, [buildActivityLog({
       storeName: 'settings',
       action: 'wipe',
@@ -1599,7 +1636,11 @@ export const useFinanceStore = create((set, get) => ({
       undoable: false,
       summary: 'Erased all local financial records',
     })]);
-    get().triggerAutoPush();
+    if (get().supabaseUser) {
+      await get().pushToSupabase();
+    } else {
+      get().triggerAutoPush();
+    }
   },
 
   importBackup: async (snapshot) => {
@@ -1856,7 +1897,12 @@ export const useFinanceStore = create((set, get) => ({
       if (!userId) throw new Error('No authenticated Supabase user');
       const state = get();
       const rows = [
-        ...STORE_KEYS.flatMap((storeName) => getStateRecords(state, storeName).map((record) => buildSyncRecord(userId, storeName, record))),
+        ...STORE_KEYS.flatMap((storeName) => {
+          const tombstones = state.syncMeta.deletedRecords[storeName] || [];
+          return getStateRecords(state, storeName)
+            .filter((record) => !tombstones.some((tombstone) => tombstone.id === record.id))
+            .map((record) => buildSyncRecord(userId, storeName, record));
+        }),
         ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
       ];
       await upsertRemoteRecords(client, rows);
