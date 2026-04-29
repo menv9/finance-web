@@ -6,7 +6,6 @@ import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttachmentViewer } from '../components/AttachmentViewer';
-import { BudgetTab } from '../components/BudgetTab';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
@@ -298,7 +297,6 @@ export default function ExpensesPage() {
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [descSearch, setDescSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('expenses');
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [expenseModal, setExpenseModal] = useState({ open: false, id: null });
   const [fixedModal, setFixedModal] = useState({ open: false, id: null });
@@ -335,7 +333,6 @@ export default function ExpensesPage() {
   const editingExpense = expenses.find((item) => item.id === expenseModal.id);
   const editingFixedExpense = fixedExpenses.find((item) => item.id === fixedModal.id);
 
-  const budgets = useFinanceStore((state) => state.budgets);
   const monthTotal = filteredExpenses.reduce((s, e) => s + e.amountCents, 0);
   const fixedMonthly = fixedExpenses.filter((f) => f.active).reduce((s, f) => s + f.amountCents, 0);
 
@@ -522,71 +519,6 @@ export default function ExpensesPage() {
         }
       />
 
-      {/* tab switcher */}
-      <div className="flex w-fit overflow-hidden rounded-lg border border-rule">
-        {[
-          { id: 'expenses', label: 'Expenses' },
-          { id: 'budget', label: 'Budget' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={
-              'px-5 py-2 text-sm font-medium transition-colors ' +
-              (activeTab === tab.id
-                ? 'bg-ink text-ink-inverse'
-                : 'bg-surface text-ink-muted hover:bg-surface-sunken hover:text-ink')
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'budget' && (
-        <>
-          <BudgetTab />
-          {budgets && budgets.length ? (
-            <section className="grid gap-6">
-              <Card
-                eyebrow="Budget"
-                title="Budget overview"
-                description="Limit per budget category."
-                variant="chart"
-                className={rise(2)}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={budgets.map((b) => ({ name: b.category, amount: (b.monthlyCents || 0) / 100 }))}
-                    margin={{ top: 10, right: 8, left: 0, bottom: 40 }}
-                  >
-                    <CartesianGrid strokeDasharray="2 4" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      tickLine={false}
-                      axisLine={false}
-                      angle={-35}
-                      textAnchor="end"
-                      interval={0}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => formatCurrencyCompact(v * 100, currency, locale)}
-                      tickLine={false}
-                      axisLine={false}
-                      width={60}
-                    />
-                    <Tooltip formatter={(v) => formatCurrency(v * 100, currency, locale)} />
-                    <Bar dataKey="amount" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </section>
-          ) : null}
-        </>
-      )}
-
-      {activeTab === 'expenses' && <>
       {/* summary stats */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
@@ -886,7 +818,6 @@ export default function ExpensesPage() {
           onCancel={closeFixedModal}
         />
       </Modal>
-      </>}
     </div>
   );
 }

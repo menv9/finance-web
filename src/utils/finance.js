@@ -293,6 +293,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     netWorthCents,
     cashflowCents,
     availableBalanceCents,
+    savingsBalanceCents: savingsBalance,
     savingsRate,
     portfolioPnlMonthCents: portfolio.pnlCents,
     expenseSeries: monthlyExpenses,

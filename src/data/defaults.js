@@ -17,6 +17,9 @@ export const DEFAULT_SETTINGS = {
   alphaVantageApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
+  modules: {
+    portfolio: true,
+  },
   allocationTargets: [],
   csvMapping: {
     date: 'date',

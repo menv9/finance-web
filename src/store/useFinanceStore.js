@@ -223,6 +223,8 @@ export const useFinanceStore = create((set, get) => ({
     dashboard: {
       netWorthCents: 0,
       cashflowCents: 0,
+      availableBalanceCents: 0,
+      savingsBalanceCents: 0,
       savingsRate: 0,
       portfolioPnlMonthCents: 0,
       expenseSeries: [],

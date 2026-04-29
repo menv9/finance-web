@@ -140,6 +140,7 @@ export default function DashboardPage() {
 
   const currency = settings.baseCurrency;
   const locale = settings.locale || 'en-GB';
+  const portfolioEnabled = settings.modules?.portfolio !== false;
 
   const netWorthDelta = useMemo(() => {
     const s = dashboard.netWorthSeries || [];
@@ -186,6 +187,46 @@ export default function DashboardPage() {
   const distributedToPortfolioCents = dashboard.distributedToPortfolioCents || 0;
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
   const hasDistribution = distributedTotalCents > 0;
+  const kpis = [
+    {
+      label: 'Net worth',
+      value: dashboard.netWorthCents,
+      mode: 'currency',
+      delta: netWorthDelta,
+      deltaMode: 'percent',
+      info: 'Savings plus portfolio value. This is your broad financial position, not just cash available to spend.',
+    },
+    {
+      label: 'Monthly cashflow',
+      value: dashboard.cashflowCents,
+      mode: 'currency',
+      hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
+      info: 'Income assigned to the current month minus expenses, savings, and investments for this month.',
+    },
+    {
+      label: 'Total balance',
+      value: dashboard.availableBalanceCents,
+      mode: 'currency',
+      hint: 'cash carried over',
+      info: 'Cash available now. It counts income from the day you receive it and carries leftover cash across months.',
+    },
+    {
+      label: 'Total savings',
+      value: dashboard.savingsBalanceCents,
+      mode: 'currency',
+      hint: 'saved balance',
+      info: 'Current savings balance plus all logged savings entries.',
+    },
+    ...(portfolioEnabled
+      ? [{
+          label: 'Portfolio value',
+          value: portfolio.currentValueCents,
+          mode: 'currency',
+          hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
+          info: 'Current market value of your active portfolio holdings.',
+        }]
+      : []),
+  ];
 
   useEffect(() => {
     localStorage.setItem('pft-dashboard-hide-kpis', String(hideKpis));
@@ -236,39 +277,12 @@ export default function DashboardPage() {
         </div>
         <section
           aria-label="Key figures"
-          className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4"
+          className={
+            'grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 ' +
+            (portfolioEnabled ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
+          }
         >
-          {[
-            {
-              label: 'Net worth',
-              value: dashboard.netWorthCents,
-              mode: 'currency',
-              delta: netWorthDelta,
-              deltaMode: 'percent',
-              info: 'Savings plus portfolio value. This is your broad financial position, not just cash available to spend.',
-            },
-            {
-              label: 'Monthly cashflow',
-              value: dashboard.cashflowCents,
-              mode: 'currency',
-              hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
-              info: 'Income assigned to the current month minus expenses, savings, and investments for this month.',
-            },
-            {
-              label: 'Total balance',
-              value: dashboard.availableBalanceCents,
-              mode: 'currency',
-              hint: 'cash carried over',
-              info: 'Cash available now. It counts income from the day you receive it and carries leftover cash across months.',
-            },
-            {
-              label: 'Portfolio value',
-              value: portfolio.currentValueCents,
-              mode: 'currency',
-              hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
-              info: 'Current market value of your active portfolio holdings.',
-            },
-          ].map((k, i) => (
+          {kpis.map((k, i) => (
             isGorka ? (
               <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface p-6 ${rise(i + 1)}`}>
                 <Stat
@@ -400,11 +414,6 @@ export default function DashboardPage() {
           title="Cashflow distribution"
           description="How your monthly cashflow was split between savings, portfolio, and discretionary spending."
           className={rise(5)}
-          action={
-            <Button variant="link" size="sm" asChild>
-              <Link to="/transfers">All transfers →</Link>
-            </Button>
-          }
         >
           <div className="grid gap-3 sm:grid-cols-3">
             {[

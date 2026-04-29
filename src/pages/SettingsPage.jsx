@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { Card, Button, FormField, Input, Select, Table, EmptyState, Modal } from '../components/ui';
+import { Card, Button, FormField, Input, Select, Table, EmptyState, Modal, Toggle } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const sections = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'preferences', label: 'Preferences' },
+  { id: 'modules', label: 'Modules' },
   { id: 'categories', label: 'Categories' },
   { id: 'platforms', label: 'Platforms' },
   { id: 'targets', label: 'Allocation targets' },
@@ -223,11 +224,36 @@ export default function SettingsPage() {
           </Card>
 
           <Card
+            id="modules"
+            eyebrow="Workspace"
+            title="Modules"
+            description="Choose which optional modules appear in the app navigation."
+            className={rise(2)}
+          >
+            <div className="grid gap-4">
+              <Toggle
+                id="module-portfolio"
+                checked={settings.modules?.portfolio !== false}
+                onChange={(checked) =>
+                  updateSettings({
+                    modules: {
+                      ...(settings.modules || {}),
+                      portfolio: checked,
+                    },
+                  })
+                }
+                label="Portfolio"
+                description="Show or hide the Portfolio module in the header navigation."
+              />
+            </div>
+          </Card>
+
+          <Card
             id="categories"
             eyebrow="Taxonomy"
             title="Expense categories"
             description="Edit, add, or remove. Categories are referenced across expense entry and filtering."
-            className={rise(2)}
+            className={rise(3)}
           >
             <div className="flex flex-wrap gap-2">
               {settings.categories.map((category) => (

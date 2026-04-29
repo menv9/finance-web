@@ -10,14 +10,14 @@ import LiquidChrome from './LiquidChrome';
 import ElectricBorder from './ElectricBorder';
 import SakuraPetals from './SakuraPetals';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', num: '01' },
-  { to: '/expenses', label: 'Expenses', num: '02' },
-  { to: '/income', label: 'Income', num: '03' },
-  { to: '/portfolio', label: 'Portfolio', num: '04' },
-  { to: '/savings', label: 'Savings', num: '05' },
-  { to: '/transfers', label: 'Transfers', num: '06' },
-  { to: '/settings', label: 'Settings', num: '07' },
+const BASE_LINKS = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/income', label: 'Income' },
+  { to: '/expenses', label: 'Expenses' },
+  { to: '/budgets', label: 'Budgets' },
+  { to: '/savings', label: 'Savings' },
+  { to: '/portfolio', label: 'Portfolio', module: 'portfolio' },
+  { to: '/settings', label: 'Settings' },
 ];
 
 function SunIcon() {
@@ -355,6 +355,13 @@ export function AppShell({ children }) {
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
   const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
   const baseCurrency = settings.baseCurrency;
+  const links = useMemo(
+    () =>
+      BASE_LINKS
+        .filter((link) => link.module !== 'portfolio' || settings.modules?.portfolio !== false)
+        .map((link, index) => ({ ...link, num: String(index + 1).padStart(2, '0') })),
+    [settings.modules?.portfolio],
+  );
 
   const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
 
@@ -487,9 +494,9 @@ export function AppShell({ children }) {
               </button>
             </div>
             <div className="hidden md:flex items-baseline gap-2 border-l border-rule pl-4">
-              <span className="eyebrow text-[0.6rem]">Net</span>
+              <span className="eyebrow text-[0.6rem]">Total balance</span>
               <span className="numeric text-sm text-ink">
-                {formatCurrency(metrics.netWorthCents, baseCurrency, locale)}
+                {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
               </span>
             </div>
 
@@ -554,9 +561,9 @@ export function AppShell({ children }) {
               ))}
               <div className="mt-3 flex items-center justify-between pt-3 border-t border-rule">
                 <div className="flex items-baseline gap-2">
-                  <span className="eyebrow text-[0.6rem]">Net worth</span>
+                  <span className="eyebrow text-[0.6rem]">Total balance</span>
                   <span className="numeric text-sm text-ink">
-                    {formatCurrency(metrics.netWorthCents, baseCurrency, locale)}
+                    {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
                   </span>
                 </div>
                 {supabaseConfigured && supabaseUser && (

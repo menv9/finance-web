@@ -12,13 +12,14 @@ const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const IncomePage = lazy(() => import('./pages/IncomePage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const SavingsPage = lazy(() => import('./pages/SavingsPage'));
-const TransfersPage = lazy(() => import('./pages/TransfersPage'));
+const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
   const hydrated = useFinanceStore((state) => state.hydrated);
+  const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
 
   useEffect(() => {
     bootstrap();
@@ -60,11 +61,12 @@ export default function App() {
                 <AppShell>
                   <Routes>
                     <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/expenses" element={<ExpensesPage />} />
                     <Route path="/income" element={<IncomePage />} />
-                    <Route path="/portfolio" element={<PortfolioPage />} />
+                    <Route path="/expenses" element={<ExpensesPage />} />
+                    <Route path="/budgets" element={<BudgetsPage />} />
                     <Route path="/savings" element={<SavingsPage />} />
-                    <Route path="/transfers" element={<TransfersPage />} />
+                    <Route path="/portfolio" element={portfolioEnabled ? <PortfolioPage /> : <Navigate to="/dashboard" replace />} />
+                    <Route path="/transfers" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/settings" element={<SettingsPage />} />
                   </Routes>
                 </AppShell>

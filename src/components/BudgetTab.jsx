@@ -97,7 +97,7 @@ export function BudgetTab() {
   const confirm = useConfirm();
   const { baseCurrency: currency, locale, categories: expenseCategories } = settings;
 
-  const [selectedMonth, setSelectedMonth] = useState(
+  const [selectedMonth] = useState(
     () => normalizeDateInput(new Date()).slice(0, 7),
   );
   // modal: { open, category } — category is null for new, string for edit
@@ -109,7 +109,7 @@ export function BudgetTab() {
   const prevMonth = getPrevMonth(selectedMonth);
   const isEditing = modal.open && modal.category !== null;
   const totalBudgetCents = budgets.reduce((sum, budget) => sum + (budget.monthlyCents || 0), 0);
-  const budgetVsCashflowCents = totalBudgetCents - (monthlyCashflowCents || 0);
+  const cashflowAfterBudgetsCents = (monthlyCashflowCents || 0) - totalBudgetCents;
 
   // Expense categories not yet budgeted (for datalist suggestions)
   const unbудgetedSuggestions = expenseCategories.filter(
@@ -248,12 +248,12 @@ export function BudgetTab() {
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
           <Stat
-            label="Budgets - cashflow"
-            value={budgetVsCashflowCents}
+            label="Cashflow - budgets"
+            value={cashflowAfterBudgetsCents}
             formatter={(value) => formatCurrency(value, currency, locale)}
-            hint={budgetVsCashflowCents > 0 ? 'over monthly cashflow' : 'within monthly cashflow'}
-            tone={budgetVsCashflowCents > 0 ? 'danger' : 'positive'}
-            info="Total monthly budgets minus current monthly cashflow."
+            hint={cashflowAfterBudgetsCents >= 0 ? 'left after budgets' : 'over monthly cashflow'}
+            tone={cashflowAfterBudgetsCents >= 0 ? 'positive' : 'danger'}
+            info="Current monthly cashflow minus total planned monthly budgets."
           />
         </div>
       </section>
@@ -264,20 +264,13 @@ export function BudgetTab() {
         title="Category budgets"
         description="Your monthly limits for variable spending. These repeat automatically — no need to set them each month."
         action={
-          <div className="grid w-full gap-3 sm:w-64">
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
-                Manage categories
-              </Button>
-              <Button variant="primary" size="sm" onClick={openNew}>
-                <PlusIcon /> Add budget
-              </Button>
-            </div>
-            <Input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
+              Manage categories
+            </Button>
+            <Button variant="primary" size="sm" onClick={openNew}>
+              <PlusIcon /> Add budget
+            </Button>
           </div>
         }
         className={rise(4)}
