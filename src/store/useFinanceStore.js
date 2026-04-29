@@ -28,7 +28,46 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'attachments'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'attachments', 'activityLog'];
+const STORE_STATE_KEY = {
+  savings: 'savingsConfig',
+};
+const STORE_LABELS = {
+  expenses: 'Expense',
+  fixedExpenses: 'Recurring bill',
+  incomes: 'Income',
+  holdings: 'Holding',
+  dividends: 'Dividend',
+  portfolioCashflows: 'Portfolio cashflow',
+  portfolioSales: 'Portfolio sale',
+  savings: 'Savings settings',
+  savingsEntries: 'Saving',
+  savingsGoals: 'Bucket',
+  budgets: 'Budget',
+  rollovers: 'Budget rollover',
+  transfers: 'Transfer',
+  attachments: 'Attachment',
+  settings: 'Settings',
+  activityLog: 'Activity log',
+};
+const STORE_MODULES = {
+  expenses: 'Expenses',
+  fixedExpenses: 'Expenses',
+  incomes: 'Income',
+  holdings: 'Portfolio',
+  dividends: 'Portfolio',
+  portfolioCashflows: 'Portfolio',
+  portfolioSales: 'Portfolio',
+  savings: 'Savings',
+  savingsEntries: 'Savings',
+  savingsGoals: 'Savings',
+  budgets: 'Budgets',
+  rollovers: 'Budgets',
+  transfers: 'Transfers',
+  attachments: 'Expenses',
+  settings: 'Settings',
+  activityLog: 'Settings',
+};
 let authSubscription = null;
 let autoPushTimer = null;
 let focusHandler = null;
@@ -192,6 +231,98 @@ function buildDeleteTombstone(userId, storeName, tombstone) {
   };
 }
 
+function getStoreStateKey(storeName) {
+  return STORE_STATE_KEY[storeName] || storeName;
+}
+
+function getRecordLabel(storeName, record) {
+  if (!record) return STORE_LABELS[storeName] || storeName;
+  if (storeName === 'budgets') return record.category ? `${record.category} budget` : 'Category budget';
+  if (storeName === 'rollovers') return record.category ? `${record.category} rollover` : 'Budget rollover';
+  if (storeName === 'portfolioCashflows') return record.ticker ? `${record.ticker} cashflow` : record.kind || 'Portfolio cashflow';
+  if (storeName === 'portfolioSales') return record.ticker ? `${record.ticker} sale` : 'Portfolio sale';
+  if (storeName === 'transfers') {
+    const direction = [record.fromModule, record.toModule].filter(Boolean).join(' to ');
+    return direction ? `${direction} transfer` : 'Transfer';
+  }
+  if (storeName === 'savings') return 'Savings settings';
+  if (storeName === 'settings') return 'Settings';
+  if (storeName === 'activityLog') return 'Activity log entry';
+  return (
+    record.description ||
+    record.name ||
+    record.source ||
+    record.ticker ||
+    record.category ||
+    record.fileName ||
+    STORE_LABELS[storeName] ||
+    'Record'
+  );
+}
+
+function buildActivitySummary(action, storeName, before, after) {
+  const label = getRecordLabel(storeName, after || before);
+  const type = STORE_LABELS[storeName] || storeName;
+  if (action === 'create') return `Created ${type.toLowerCase()} "${label}"`;
+  if (action === 'update') return `Updated ${type.toLowerCase()} "${label}"`;
+  if (action === 'delete') return `Deleted ${type.toLowerCase()} "${label}"`;
+  if (action === 'undo') return `Undid ${type.toLowerCase()} "${label}"`;
+  return `${action} ${type.toLowerCase()} "${label}"`;
+}
+
+function buildActivityLog({ storeName, action, before = null, after = null, undoable = true, summary = null }) {
+  const timestamp = new Date().toISOString();
+  const record = after || before || {};
+  return ensureEntitySyncFields({
+    id: makeId('log'),
+    createdAt: timestamp,
+    module: STORE_MODULES[storeName] || 'General',
+    action,
+    recordType: storeName,
+    recordId: record.id || storeName,
+    label: getRecordLabel(storeName, record),
+    summary: summary || buildActivitySummary(action, storeName, before, after),
+    before,
+    after,
+    undoable,
+    undoneAt: null,
+    undoneByLogId: null,
+  }, timestamp);
+}
+
+function buildSettingsActivity(previousSettings, nextSettings, partial, summary = null) {
+  const sensitive = new Set(['alphaVantageApiKey', 'supabaseUrl', 'supabaseAnonKey']);
+  const allKeys = Object.keys(partial || {});
+  const keys = allKeys.filter((key) => !sensitive.has(key));
+  if (!keys.length && allKeys.length) {
+    return buildActivityLog({
+      storeName: 'settings',
+      action: 'update',
+      before: { id: 'settings' },
+      after: { id: 'settings' },
+      undoable: false,
+      summary: 'Updated protected settings',
+    });
+  }
+  if (!keys.length) return null;
+  const before = { id: 'settings', ...Object.fromEntries(keys.map((key) => [key, previousSettings[key]])) };
+  const after = { id: 'settings', ...Object.fromEntries(keys.map((key) => [key, nextSettings[key]])) };
+  return buildActivityLog({
+    storeName: 'settings',
+    action: 'update',
+    before,
+    after,
+    summary: summary || `Updated settings: ${keys.join(', ')}`,
+  });
+}
+
+async function persistActivityLogs(set, logs) {
+  if (!logs?.length) return [];
+  await Promise.all(logs.map((log) => putRecord('activityLog', log)));
+  set((state) => ({ activityLog: [...logs, ...(state.activityLog || [])] }));
+  return logs;
+}
+
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
   settings: DEFAULT_SETTINGS,
@@ -220,6 +351,7 @@ export const useFinanceStore = create((set, get) => ({
   rollovers: [],
   transfers: [],
   attachments: [],
+  activityLog: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -271,6 +403,7 @@ export const useFinanceStore = create((set, get) => ({
         rollovers: normalizedRecords[11],
         transfers: normalizedRecords[12],
         attachments: normalizedRecords[13],
+        activityLog: normalizedRecords[14],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -305,6 +438,7 @@ export const useFinanceStore = create((set, get) => ({
       rollovers: normalizedRecords[11],
       transfers: normalizedRecords[12],
       attachments: normalizedRecords[13],
+      activityLog: normalizedRecords[14],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -403,36 +537,48 @@ export const useFinanceStore = create((set, get) => ({
     authSubscription = subscription;
   },
 
-  toggleTheme: () => {
+  toggleTheme: async () => {
     const nextTheme = get().settings.theme === 'light' ? 'dark' : 'light';
     const settings = { ...get().settings, theme: nextTheme };
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
   },
 
-  setTheme: (theme) => {
+  setTheme: async (theme) => {
     const settings = { ...get().settings, theme };
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
   },
 
-  updateSettings: (partial) => {
-    const settings = { ...get().settings, ...partial };
+  updateSettings: async (partial) => {
+    const previousSettings = get().settings;
+    const settings = { ...previousSettings, ...partial };
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
+    const log = buildSettingsActivity(previousSettings, settings, partial);
+    if (log) await persistActivityLogs(set, [log]);
+    get().triggerAutoPush();
   },
 
   saveSavingsConfig: async (config) => {
+    const previous = get().savingsConfig?.id ? get().savingsConfig : null;
     const record = ensureEntitySyncFields(
       { ...SAVINGS_DEFAULT, ...config, id: 'savings-config' },
       new Date().toISOString(),
     );
     await putRecord('savings', record);
     set({ savingsConfig: record });
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'savings',
+      action: previous ? 'update' : 'create',
+      before: previous,
+      after: record,
+    })]);
     get().triggerAutoPush();
   },
 
   saveSavingsEntry: async (entry) => {
+    const previous = entry.id ? get().savingsEntries.find((item) => item.id === entry.id) : null;
     const record = ensureEntitySyncFields(
       { ...entry, id: entry.id || `sav-${crypto.randomUUID()}` },
       new Date().toISOString(),
@@ -442,16 +588,31 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record) };
       return { ...nextState, derived: buildDerived(nextState) };
     });
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'savingsEntries',
+      action: previous ? 'update' : 'create',
+      before: previous,
+      after: record,
+    })]);
     get().triggerAutoPush();
     return record;
   },
 
   removeSavingsEntry: async (id) => {
+    const previous = get().savingsEntries.find((item) => item.id === id);
     await deleteRecord('savingsEntries', id);
     set((state) => {
       const nextState = { ...state, savingsEntries: state.savingsEntries.filter((e) => e.id !== id) };
       return { ...nextState, derived: buildDerived(nextState) };
     });
+    if (previous) {
+      await persistActivityLogs(set, [buildActivityLog({
+        storeName: 'savingsEntries',
+        action: 'delete',
+        before: previous,
+        after: null,
+      })]);
+    }
     get().triggerAutoPush();
   },
 
@@ -482,11 +643,18 @@ export const useFinanceStore = create((set, get) => ({
       saveSyncMeta(nextSyncMeta);
       return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
     });
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'savingsGoals',
+      action: existing ? 'update' : 'create',
+      before: existing,
+      after: record,
+    })]);
     get().triggerAutoPush();
     return record;
   },
 
   removeSavingsGoal: async (id) => {
+    const previous = get().savingsGoals.find((item) => item.id === id);
     await deleteRecord('savingsGoals', id);
     const timestamp = new Date().toISOString();
     set((state) => {
@@ -506,17 +674,28 @@ export const useFinanceStore = create((set, get) => ({
       saveSyncMeta(nextSyncMeta);
       return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
     });
+    if (previous) {
+      await persistActivityLogs(set, [buildActivityLog({
+        storeName: 'savingsGoals',
+        action: 'delete',
+        before: previous,
+        after: null,
+      })]);
+    }
     get().triggerAutoPush();
   },
 
   saveSupabaseSettings: async (partial) => {
-    const settings = { ...get().settings, ...partial };
+    const previousSettings = get().settings;
+    const settings = { ...previousSettings, ...partial };
     saveSettings(settings);
     set((state) => ({
       settings,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       derived: buildDerived({ ...state, settings }),
     }));
+    const log = buildSettingsActivity(previousSettings, settings, partial, 'Updated sync settings');
+    if (log) await persistActivityLogs(set, [log]);
     await get().initializeSupabase();
   },
 
@@ -533,6 +712,7 @@ export const useFinanceStore = create((set, get) => ({
 
   saveEntity: async (storeName, entity, { skipAutoCreate = false } = {}) => {
     let value = entity;
+    const previous = entity.id ? get()[storeName]?.find((item) => item.id === entity.id) : null;
 
     // When an expense is flagged recurring, mirror it into the Recurring bills store
     // and keep a back-reference so repeat saves don't spawn duplicates.
@@ -576,6 +756,12 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName,
+      action: previous ? 'update' : 'create',
+      before: previous,
+      after: record,
+    })]);
     get().triggerAutoPush();
     // When a fixed expense is saved, immediately check if it needs an expense entry this month
     if (storeName === 'fixedExpenses' && !skipAutoCreate) {
@@ -585,6 +771,7 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   removeEntity: async (storeName, id) => {
+    const previous = get()[storeName]?.find((item) => item.id === id);
     // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
     // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
     if (storeName === 'holdings') {
@@ -625,6 +812,14 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, [storeName]: nextList };
       return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
+    if (previous) {
+      await persistActivityLogs(set, [buildActivityLog({
+        storeName,
+        action: 'delete',
+        before: previous,
+        after: null,
+      })]);
+    }
     get().triggerAutoPush();
   },
 
@@ -690,6 +885,12 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
 
+    await persistActivityLogs(set, [
+      buildActivityLog({ storeName: 'holdings', action: 'update', before: holding, after: nextHolding }),
+      buildActivityLog({ storeName: 'portfolioSales', action: 'create', before: null, after: sale }),
+      buildActivityLog({ storeName: 'portfolioCashflows', action: 'create', before: null, after: cashflow }),
+      buildActivityLog({ storeName: 'incomes', action: 'create', before: null, after: income }),
+    ]);
     get().triggerAutoPush();
     return sale;
   },
@@ -710,6 +911,9 @@ export const useFinanceStore = create((set, get) => ({
       updatedAt: timestamp,
     }, timestamp);
     const currentCashflow = get().portfolioCashflows.find((item) => item.linkedSaleId === currentSale.id);
+    const currentIncome = currentSale.linkedIncomeId
+      ? get().incomes.find((item) => item.id === currentSale.linkedIncomeId)
+      : get().incomes.find((item) => item.linkedSaleId === currentSale.id);
     const { nextHolding, nextSale: rawSale, nextCashflow } = buildSaleUpdate({
       holding: restoredHolding,
       sale: currentSale,
@@ -772,6 +976,12 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
 
+    await persistActivityLogs(set, [
+      buildActivityLog({ storeName: 'holdings', action: 'update', before: holding, after: nextHolding }),
+      buildActivityLog({ storeName: 'portfolioSales', action: 'update', before: currentSale, after: nextSale }),
+      buildActivityLog({ storeName: 'portfolioCashflows', action: currentCashflow ? 'update' : 'create', before: currentCashflow || null, after: nextCashflow }),
+      buildActivityLog({ storeName: 'incomes', action: currentIncome ? 'update' : 'create', before: currentIncome || null, after: income }),
+    ]);
     get().triggerAutoPush();
     return nextSale;
   },
@@ -859,6 +1069,12 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
 
+    await persistActivityLogs(set, [
+      ...(restoredHolding ? [buildActivityLog({ storeName: 'holdings', action: 'update', before: holding, after: restoredHolding })] : []),
+      buildActivityLog({ storeName: 'portfolioSales', action: 'delete', before: sale, after: null }),
+      ...(cashflow ? [buildActivityLog({ storeName: 'portfolioCashflows', action: 'delete', before: cashflow, after: null })] : []),
+      ...(income ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: income, after: null })] : []),
+    ]);
     get().triggerAutoPush();
   },
 
@@ -1008,6 +1224,7 @@ export const useFinanceStore = create((set, get) => ({
   saveDividend: async (entity) => {
     const prefix = 'div';
     const current = entity.id ? get().dividends.find((item) => item.id === entity.id) : null;
+    const currentIncome = current?.linkedIncomeId ? get().incomes.find((item) => item.id === current.linkedIncomeId) : null;
     const linkedIncome = buildDividendIncome(entity, current?.linkedIncomeId);
     const timestamp = new Date().toISOString();
     const record = ensureEntitySyncFields({
@@ -1045,6 +1262,10 @@ export const useFinanceStore = create((set, get) => ({
       };
     });
 
+    await persistActivityLogs(set, [
+      buildActivityLog({ storeName: 'dividends', action: current ? 'update' : 'create', before: current, after: record }),
+      buildActivityLog({ storeName: 'incomes', action: currentIncome ? 'update' : 'create', before: currentIncome, after: syncedIncome }),
+    ]);
     get().triggerAutoPush();
     return record;
   },
@@ -1052,6 +1273,7 @@ export const useFinanceStore = create((set, get) => ({
   removeDividend: async (id) => {
     const current = get().dividends.find((item) => item.id === id);
     if (!current) return;
+    const linkedIncome = current.linkedIncomeId ? get().incomes.find((item) => item.id === current.linkedIncomeId) : null;
     await deleteRecord('dividends', id);
     if (current.linkedIncomeId) {
       await deleteRecord('incomes', current.linkedIncomeId);
@@ -1083,6 +1305,17 @@ export const useFinanceStore = create((set, get) => ({
         derived: buildDerived(nextState),
       };
     });
+    await persistActivityLogs(set, [
+      buildActivityLog({ storeName: 'dividends', action: 'delete', before: current, after: null }),
+      ...(current.linkedIncomeId
+        ? [buildActivityLog({
+            storeName: 'incomes',
+            action: 'delete',
+            before: linkedIncome || { id: current.linkedIncomeId },
+            after: null,
+          })]
+        : []),
+    ]);
     get().triggerAutoPush();
   },
 
@@ -1175,6 +1408,9 @@ export const useFinanceStore = create((set, get) => ({
       return { ...nextState, derived: buildDerived(nextState) };
     });
 
+    await persistActivityLogs(set, toPut.map(({ storeName, record }) =>
+      buildActivityLog({ storeName, action: 'create', before: null, after: record }),
+    ));
     get().triggerAutoPush();
     return trf;
   },
@@ -1189,6 +1425,10 @@ export const useFinanceStore = create((set, get) => ({
     if (trf.linkedExpenseId) toDelete.push({ storeName: 'expenses', id: trf.linkedExpenseId });
     if (trf.linkedCashflowId) toDelete.push({ storeName: 'portfolioCashflows', id: trf.linkedCashflowId });
     toDelete.push({ storeName: 'transfers', id });
+    const deletedRecords = toDelete.map(({ storeName, id: recId }) => ({
+      storeName,
+      record: (get()[storeName] || []).find((item) => item.id === recId) || { id: recId },
+    }));
 
     await Promise.all(toDelete.map(({ storeName, id: recId }) => deleteRecord(storeName, recId)));
 
@@ -1212,6 +1452,9 @@ export const useFinanceStore = create((set, get) => ({
       return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
     });
 
+    await persistActivityLogs(set, deletedRecords.map(({ storeName, record }) =>
+      buildActivityLog({ storeName, action: 'delete', before: record, after: null }),
+    ));
     get().triggerAutoPush();
   },
 
@@ -1286,6 +1529,15 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, holdings: refreshed };
       return { holdings: refreshed, derived: buildDerived(nextState) };
     });
+    await persistActivityLogs(set, updated.map((holding) =>
+      buildActivityLog({
+        storeName: 'holdings',
+        action: 'update',
+        before: holdings.find((item) => item.id === holding.id) || null,
+        after: holding,
+        summary: `Refreshed price for "${getRecordLabel('holdings', holding)}"`,
+      }),
+    ));
 
     if (failures.length === refreshableTickers.length && refreshableTickers.length > 0) {
       throw new Error(`Price refresh failed for all tickers: ${failures.map((f) => f.ticker).join(', ')}`);
@@ -1307,11 +1559,106 @@ export const useFinanceStore = create((set, get) => ({
     localStorage.removeItem('pft-sync-meta');
     // Keep settings (currency, locale, API keys) — only nuke financial records
     await get().bootstrap();
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'settings',
+      action: 'wipe',
+      before: null,
+      after: { id: 'wipe-all-data' },
+      undoable: false,
+      summary: 'Erased all local financial records',
+    })]);
+    get().triggerAutoPush();
   },
 
   importBackup: async (snapshot) => {
     await importDatabaseSnapshot(snapshot);
     await get().bootstrap();
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'settings',
+      action: 'import',
+      before: null,
+      after: { id: 'import-backup' },
+      undoable: false,
+      summary: 'Imported backup data',
+    })]);
+    get().triggerAutoPush();
+  },
+
+  undoActivityLog: async (logId) => {
+    const log = get().activityLog.find((item) => item.id === logId);
+    if (!log || !log.undoable || log.undoneAt) return null;
+
+    const timestamp = new Date().toISOString();
+    const storeName = log.recordType;
+    const stateKey = getStoreStateKey(storeName);
+    const isSettings = storeName === 'settings';
+    const isSavingsConfig = storeName === 'savings';
+
+    if (isSettings) {
+      const nextSettings = { ...get().settings, ...(log.before || {}) };
+      delete nextSettings.id;
+      saveSettings(nextSettings);
+      set((state) => ({ settings: nextSettings, derived: buildDerived({ ...state, settings: nextSettings }) }));
+    } else if (log.action === 'create') {
+      await deleteRecord(storeName, log.recordId);
+      set((state) => {
+        const nextDeletedRecords = {
+          ...state.syncMeta.deletedRecords,
+          [storeName]: [
+            ...(state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== log.recordId),
+            { id: log.recordId, updatedAt: timestamp, deletedAt: timestamp },
+          ],
+        };
+        const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
+        saveSyncMeta(nextSyncMeta);
+        const nextValue = isSavingsConfig
+          ? SAVINGS_DEFAULT
+          : (state[stateKey] || []).filter((item) => item.id !== log.recordId);
+        const nextState = { ...state, [stateKey]: nextValue, syncMeta: nextSyncMeta };
+        return { [stateKey]: nextValue, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+      });
+    } else if (log.action === 'update' || log.action === 'delete') {
+      const restored = ensureEntitySyncFields({ ...(log.before || {}), updatedAt: timestamp }, timestamp);
+      await putRecord(storeName, restored);
+      set((state) => {
+        const nextDeletedRecords = {
+          ...state.syncMeta.deletedRecords,
+          [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== restored.id),
+        };
+        const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
+        saveSyncMeta(nextSyncMeta);
+        const nextValue = isSavingsConfig ? restored : upsertItem(state[stateKey] || [], restored);
+        const nextState = { ...state, [stateKey]: nextValue, syncMeta: nextSyncMeta };
+        return { [stateKey]: nextValue, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+      });
+    } else {
+      return null;
+    }
+
+    const undoLog = buildActivityLog({
+      storeName,
+      action: 'undo',
+      before: log.after,
+      after: log.before,
+      undoable: false,
+      summary: `Undid: ${log.summary}`,
+    });
+    const updatedLog = ensureEntitySyncFields({
+      ...log,
+      undoneAt: timestamp,
+      undoneByLogId: undoLog.id,
+      updatedAt: timestamp,
+    }, timestamp);
+    await putRecord('activityLog', updatedLog);
+    await putRecord('activityLog', undoLog);
+    set((state) => ({
+      activityLog: [
+        undoLog,
+        ...state.activityLog.map((item) => (item.id === log.id ? updatedLog : item)),
+      ],
+    }));
+    get().triggerAutoPush();
+    return updatedLog;
   },
 
   sendMagicLink: async (email) => {
@@ -1375,6 +1722,12 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('attachmentBlobs', { id, blob: file });
     await putRecord('attachments', attachment);
     set((state) => ({ attachments: upsertItem(state.attachments, attachment) }));
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'attachments',
+      action: 'create',
+      before: null,
+      after: attachment,
+    })]);
 
     // Upload to Supabase Storage and push metadata directly (bypass full-push race conditions)
     const client = getSupabaseBrowserClient();
@@ -1432,6 +1785,12 @@ export const useFinanceStore = create((set, get) => ({
       return { attachments: nextAttachments, syncMeta: nextSyncMeta };
     });
 
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'attachments',
+      action: 'delete',
+      before: attachment,
+      after: null,
+    })]);
     get().triggerAutoPush();
   },
 

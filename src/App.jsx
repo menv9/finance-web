@@ -15,11 +15,13 @@ const SavingsPage = lazy(() => import('./pages/SavingsPage'));
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
   const hydrated = useFinanceStore((state) => state.hydrated);
   const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
+  const onboardingCompleted = useFinanceStore((state) => state.settings.onboardingCompleted === true);
 
   useEffect(() => {
     bootstrap();
@@ -52,24 +54,29 @@ export default function App() {
           {/* Public — standalone pages (no AppShell) */}
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
           {/* Protected — all app routes behind auth gate + shared shell */}
           <Route
             path="/*"
             element={
               <ProtectedRoute>
-                <AppShell>
-                  <Routes>
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/income" element={<IncomePage />} />
-                    <Route path="/expenses" element={<ExpensesPage />} />
-                    <Route path="/budgets" element={<BudgetsPage />} />
-                    <Route path="/savings" element={<SavingsPage />} />
-                    <Route path="/portfolio" element={portfolioEnabled ? <PortfolioPage /> : <Navigate to="/dashboard" replace />} />
-                    <Route path="/transfers" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                  </Routes>
-                </AppShell>
+                {onboardingCompleted ? (
+                  <AppShell>
+                    <Routes>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/income" element={<IncomePage />} />
+                      <Route path="/expenses" element={<ExpensesPage />} />
+                      <Route path="/budgets" element={<BudgetsPage />} />
+                      <Route path="/savings" element={<SavingsPage />} />
+                      <Route path="/portfolio" element={portfolioEnabled ? <PortfolioPage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/transfers" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                    </Routes>
+                  </AppShell>
+                ) : (
+                  <Navigate to="/onboarding" replace />
+                )}
               </ProtectedRoute>
             }
           />

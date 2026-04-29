@@ -12,13 +12,25 @@ export const DEFAULT_SETTINGS = {
   baseCurrency: 'EUR',
   locale: 'en-GB',
   theme: 'light',
+  onboardingCompleted: false,
+  onboardingCompletedAt: null,
+  onboardingTutorialCompleted: false,
+  initialSetupCompleted: false,
+  initialSetupCompletedAt: null,
+  initialCashBalanceCents: 0,
   categories: DEFAULT_CATEGORIES,
   holdingPlatforms: ['Trade Republic', 'IBKR', 'DEGIRO'],
   alphaVantageApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
   modules: {
-    portfolio: true,
+    portfolio: false,
+  },
+  setupIntent: {
+    buckets: false,
+    budgets: false,
+    recurringIncome: false,
+    recurringBills: false,
   },
   allocationTargets: [],
   csvMapping: {
@@ -44,4 +56,5 @@ export const DEFAULT_DATA = {
   rollovers: [],
   transfers: [],
   attachments: [],
+  activityLog: [],
 };

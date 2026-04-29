@@ -358,8 +358,7 @@ export function AppShell({ children }) {
   const links = useMemo(
     () =>
       BASE_LINKS
-        .filter((link) => link.module !== 'portfolio' || settings.modules?.portfolio !== false)
-        .map((link, index) => ({ ...link, num: String(index + 1).padStart(2, '0') })),
+        .filter((link) => link.module !== 'portfolio' || settings.modules?.portfolio !== false),
     [settings.modules?.portfolio],
   );
 
@@ -438,12 +437,12 @@ export function AppShell({ children }) {
       </a>
 
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-wide items-center justify-between gap-6 px-4 lg:px-10">
-          <div className="flex items-center gap-6 min-w-0">
+        <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 lg:px-10">
+          <div className="flex min-w-0 items-center justify-start gap-6">
             <Logo theme={appliedTheme} />
           </div>
 
-          <nav aria-label="Primary" className="hidden lg:flex items-center gap-1">
+          <nav aria-label="Primary" className="hidden justify-center lg:flex items-center gap-1">
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -457,7 +456,6 @@ export function AppShell({ children }) {
               >
                 {({ isActive }) => (
                   <>
-                    <span className="numeric text-[0.65rem] text-ink-faint">{link.num}</span>
                     <span className="font-sans">{link.label}</span>
                     <span
                       aria-hidden
@@ -472,7 +470,7 @@ export function AppShell({ children }) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3">
             <div className="hidden md:flex items-center gap-1">
               <button
                 type="button"
@@ -555,7 +553,6 @@ export function AppShell({ children }) {
                     )
                   }
                 >
-                  <span className="numeric text-xs text-ink-faint w-6">{link.num}</span>
                   <span className="font-display text-lg">{link.label}</span>
                 </NavLink>
               ))}

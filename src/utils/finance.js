@@ -162,7 +162,7 @@ function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [] }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], settings = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const allPastIncomes = incomes.filter((item) => item.date <= today);
@@ -185,6 +185,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     .filter((e) => e.date <= today && !e.transferId)
     .reduce((sum, e) => sum + (e.amountCents || 0), 0);
   const availableBalanceCents =
+    (settings.initialCashBalanceCents || 0) +
     sumAmount(allPastCashflowIncomes) +
     allPastSaleCashflowCents -
     sumAmount(allPastCashflowExpenses) -
