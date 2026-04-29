@@ -20,6 +20,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
   const settings = useFinanceStore((s) => s.settings);
   const savingsEntries = useFinanceStore((s) => s.savingsEntries);
   const savingsConfig = useFinanceStore((s) => s.savingsConfig);
+  const availableBalanceCents = useFinanceStore((s) => s.derived.dashboard.availableBalanceCents);
 
   const currency = settings.baseCurrency;
   const locale = settings.locale;
@@ -39,7 +40,9 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
     savingsEntries.reduce((sum, e) => sum + (e.amountCents || 0), 0);
 
   const amountCents = Math.round(parseFloat(amount || '0') * 100);
-  const overdrawnSavings = fromModule === 'savings' && amountCents > savingsBalance && savingsBalance > 0;
+  const overdrawnSavings = amountCents > 0 && fromModule === 'savings' && amountCents > savingsBalance;
+  const overdrawnCashflow = amountCents > 0 && fromModule === 'cashflow' && amountCents > availableBalanceCents;
+  const overdrawnSource = overdrawnSavings || overdrawnCashflow;
   const toOptions = TO_OPTIONS[fromModule] || TO_OPTIONS['savings'];
 
   const handleFromModuleChange = (mod) => {
@@ -136,10 +139,10 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
       </div>
 
       {/* Overdraft warning */}
-      {overdrawnSavings && (
+      {overdrawnSource && (
         <p className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
-          This exceeds your current savings balance of{' '}
-          {formatCurrency(savingsBalance, currency, locale)}. You can still proceed.
+          This exceeds your current {fromModule === 'savings' ? 'savings balance' : 'available cashflow'} of{' '}
+          {formatCurrency(fromModule === 'savings' ? savingsBalance : availableBalanceCents, currency, locale)}.
         </p>
       )}
 
@@ -198,7 +201,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
           variant="primary"
           onClick={handleSubmit}
           loading={submitting}
-          disabled={!amountCents || amountCents <= 0}
+          disabled={!amountCents || amountCents <= 0 || overdrawnSource}
         >
           Create transfer
         </Button>

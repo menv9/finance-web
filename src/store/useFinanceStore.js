@@ -94,6 +94,27 @@ function buildDerived(state) {
   };
 }
 
+function savingsBalanceCents(state) {
+  return (state.savingsConfig?.currentBalanceCents || 0) +
+    (state.savingsEntries || []).reduce((sum, entry) => sum + (entry.amountCents || 0), 0);
+}
+
+function assertSourceHasFunds(state, source, amountCents) {
+  if (!amountCents || amountCents <= 0) return;
+  if (source === 'savings') {
+    const balance = savingsBalanceCents(state);
+    if (amountCents > balance) {
+      throw new Error('Not enough savings balance for this amount.');
+    }
+  }
+  if (source === 'cashflow' || source === 'income') {
+    const balance = state.derived?.dashboard?.availableBalanceCents ?? buildDerived(state).dashboard.availableBalanceCents;
+    if (amountCents > balance) {
+      throw new Error('Not enough available cashflow for this amount.');
+    }
+  }
+}
+
 function makeId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
@@ -582,6 +603,11 @@ export const useFinanceStore = create((set, get) => ({
 
   saveSavingsEntry: async (entry) => {
     const previous = entry.id ? get().savingsEntries.find((item) => item.id === entry.id) : null;
+    if (!entry.transferId) {
+      const previousPositive = previous && !previous.transferId ? Math.max(previous.amountCents || 0, 0) : 0;
+      const nextPositive = Math.max(entry.amountCents || 0, 0);
+      assertSourceHasFunds(get(), 'cashflow', nextPositive - previousPositive);
+    }
     const record = ensureEntitySyncFields(
       { ...entry, id: entry.id || `sav-${crypto.randomUUID()}` },
       new Date().toISOString(),
@@ -1324,6 +1350,7 @@ export const useFinanceStore = create((set, get) => ({
 
   executeTransfer: async (spec) => {
     const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId, goalId } = spec;
+    assertSourceHasFunds(get(), fromModule, amountCents);
     const timestamp = new Date().toISOString();
     const currency = get().settings.baseCurrency;
     const trfId = `trf-${crypto.randomUUID()}`;

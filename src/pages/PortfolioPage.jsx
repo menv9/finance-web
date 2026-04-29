@@ -514,6 +514,11 @@ export default function PortfolioPage() {
   const dividends = useFinanceStore((state) => state.dividends);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
+  const availableBalanceCents = useFinanceStore((state) => state.derived.dashboard.availableBalanceCents);
+  const savingsBalanceCents = useFinanceStore((state) =>
+    (state.savingsConfig?.currentBalanceCents || 0) +
+    state.savingsEntries.reduce((sum, entry) => sum + (entry.amountCents || 0), 0),
+  );
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -1104,28 +1109,42 @@ export default function PortfolioPage() {
         <HoldingForm
           initialValue={editingHolding || holdingModal.initialValue}
           onSubmit={async (value) => {
-            const isNew = !value.id;
-            const { fundingSource, purchaseAmountCents, ...holdingValue } = value;
-            const saved = await saveEntity('holdings', holdingValue);
-            if (isNew) {
+            try {
+              const isNew = !value.id;
+              const { fundingSource, purchaseAmountCents, ...holdingValue } = value;
               const baseCost = purchaseAmountCents > 0
                 ? purchaseAmountCents
-                : Math.round(saved.quantity * saved.averageBuyPriceCents);
-              const cost = baseCost + (saved.feeCents || 0);
-              if (cost > 0) {
-                await executeTransfer({
-                  date: normalizeDateInput(new Date()),
-                  amountCents: cost,
-                  fromModule: fundingSource === 'savings' ? 'savings' : 'cashflow',
-                  fromId: null,
-                  toModule: 'portfolio',
-                  description: `${saved.ticker} purchase`,
-                  holdingId: saved.id,
-                  ticker: saved.ticker,
-                });
+                : Math.round(holdingValue.quantity * holdingValue.averageBuyPriceCents);
+              const cost = baseCost + (holdingValue.feeCents || 0);
+              if (isNew && cost > 0) {
+                const sourceBalance = fundingSource === 'savings' ? savingsBalanceCents : availableBalanceCents;
+                if (cost > sourceBalance) {
+                  throw new Error(
+                    fundingSource === 'savings'
+                      ? 'Not enough savings balance for this holding.'
+                      : 'Not enough available cashflow for this holding.',
+                  );
+                }
               }
+              const saved = await saveEntity('holdings', holdingValue);
+              if (isNew) {
+                if (cost > 0) {
+                  await executeTransfer({
+                    date: normalizeDateInput(new Date()),
+                    amountCents: cost,
+                    fromModule: fundingSource === 'savings' ? 'savings' : 'cashflow',
+                    fromId: null,
+                    toModule: 'portfolio',
+                    description: `${saved.ticker} purchase`,
+                    holdingId: saved.id,
+                    ticker: saved.ticker,
+                  });
+                }
+              }
+              closeHolding();
+            } catch (error) {
+              window.alert(error.message || 'Unable to add holding.');
             }
-            closeHolding();
           }}
           onCancel={closeHolding}
         />

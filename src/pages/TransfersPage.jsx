@@ -286,8 +286,12 @@ export default function TransfersPage() {
         <TransferForm
           defaultFromModule={modal.defaultFromModule}
           onSubmit={async (spec) => {
-            await executeTransfer(spec);
-            closeTransfer();
+            try {
+              await executeTransfer(spec);
+              closeTransfer();
+            } catch (error) {
+              window.alert(error.message || 'Unable to create transfer.');
+            }
           }}
           onCancel={closeTransfer}
         />

@@ -1074,16 +1074,20 @@ export default function SavingsPage() {
           goalLocked={modal.withdraw}
           submitLabel={modal.withdraw ? 'Withdraw' : undefined}
           onSubmit={async (value) => {
-            if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
-              window.alert('You cannot withdraw more than this goal currently has saved.');
-              return;
+            try {
+              if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
+                window.alert('You cannot withdraw more than this goal currently has saved.');
+                return;
+              }
+              await saveSavingsEntry({
+                ...value,
+                amountCents: modal.withdraw ? -Math.abs(value.amountCents) : value.amountCents,
+                note: value.note || (modal.withdraw ? 'Goal withdrawal' : value.goalId ? 'Goal saving' : ''),
+              });
+              close();
+            } catch (error) {
+              window.alert(error.message || 'Unable to add saving.');
             }
-            await saveSavingsEntry({
-              ...value,
-              amountCents: modal.withdraw ? -Math.abs(value.amountCents) : value.amountCents,
-              note: value.note || (modal.withdraw ? 'Goal withdrawal' : value.goalId ? 'Goal saving' : ''),
-            });
-            close();
           }}
           onCancel={close}
         />
@@ -1155,8 +1159,12 @@ export default function SavingsPage() {
         <TransferForm
           defaultFromModule="savings"
           onSubmit={async (spec) => {
-            await executeTransfer(spec);
-            setTransferOpen(false);
+            try {
+              await executeTransfer(spec);
+              setTransferOpen(false);
+            } catch (error) {
+              window.alert(error.message || 'Unable to create transfer.');
+            }
           }}
           onCancel={() => setTransferOpen(false)}
         />
