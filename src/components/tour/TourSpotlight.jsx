@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTour } from './TourContext';
+import { TOUR_STEPS } from './tourSteps';
 
 const PAD = 8;
-const TOOLTIP_W = 260;
-const TOOLTIP_H = 110;
+const TOOLTIP_W = 280;
+const TOOLTIP_H = 200;
 
 export function TourSpotlight() {
-  const { active, currentStop } = useTour();
+  const {
+    active,
+    stepIndex,
+    stopIndex,
+    currentStep,
+    currentStop,
+    nextStop,
+    prevStop,
+    skipTour,
+  } = useTour();
   const [rect, setRect] = useState(null);
   const observerRef = useRef(null);
   const rafRef = useRef(null);
@@ -28,14 +38,10 @@ export function TourSpotlight() {
     }
 
     const el = document.querySelector(`[data-tour="${currentStop.tourId}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    // Delay first measurement to let scroll settle
     const timer = setTimeout(() => {
       measure();
-
       observerRef.current = new ResizeObserver(() => {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(measure);
@@ -58,10 +64,15 @@ export function TourSpotlight() {
     };
   }, [active, currentStop]);
 
-  if (!active || !currentStop) return null;
+  if (!active || !currentStop || !currentStep) return null;
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+
+  const isFirstStop = stepIndex === 0 && stopIndex === 0;
+  const isLastStop =
+    stepIndex === TOUR_STEPS.length - 1 &&
+    stopIndex === currentStep.stops.length - 1;
 
   let tooltipStyle;
   if (!rect) {
@@ -83,7 +94,6 @@ export function TourSpotlight() {
     } else if (spaceLeft >= TOOLTIP_W + 4) {
       tx = rect.left - PAD - TOOLTIP_W;
     } else {
-      // Above or below — default below
       tx = Math.max(8, Math.min(rect.left, vw - TOOLTIP_W - 8));
       ty = rect.top + rect.height + PAD;
       if (ty + TOOLTIP_H > vh - 8) {
@@ -96,18 +106,10 @@ export function TourSpotlight() {
 
   return (
     <>
-      {/* Dim overlay — blocks pointer events on page content */}
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 40,
-          pointerEvents: 'none',
-          background: 'rgba(0,0,0,0)',
-        }}
-      />
+      {/* Dim overlay */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 40, pointerEvents: 'none' }} />
 
-      {/* Spotlight hole using box-shadow trick */}
+      {/* Spotlight hole */}
       {rect && (
         <div
           key={currentStop.tourId}
@@ -127,15 +129,64 @@ export function TourSpotlight() {
         />
       )}
 
-      {/* Tooltip */}
+      {/* Tooltip + controls — single card */}
       <div
+        key={`tooltip-${currentStop.tourId}`}
         style={{ ...tooltipStyle, zIndex: 42 }}
-        className="pointer-events-none rounded-lg bg-surface px-4 py-3 shadow-lift animate-rise"
+        className="rounded-xl bg-surface shadow-lift border border-rule overflow-hidden animate-rise"
       >
-        <p className="text-xs font-semibold uppercase tracking-eyebrow text-accent mb-1">
-          {currentStop.label}
-        </p>
-        <p className="text-sm text-ink leading-relaxed">{currentStop.desc}</p>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-1">
+          <span className="text-xs font-semibold uppercase tracking-eyebrow text-accent">
+            {currentStep.page}
+          </span>
+          <span className="text-xs text-ink-muted">
+            {stepIndex + 1} / {TOUR_STEPS.length}
+          </span>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 pb-2">
+          <p className="text-sm font-semibold text-ink">{currentStop.label}</p>
+          <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">{currentStop.desc}</p>
+        </div>
+
+        {/* Stop dots */}
+        <div className="flex items-center gap-1.5 px-4 pb-3">
+          {currentStep.stops.map((_, i) => (
+            <span
+              key={i}
+              className={`block h-1.5 rounded-full transition-all duration-180 ${
+                i === stopIndex ? 'w-4 bg-accent' : 'w-1.5 bg-rule-strong'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center border-t border-rule">
+          <button
+            onClick={prevStop}
+            disabled={isFirstStop}
+            className="flex-1 py-2.5 text-xs font-medium text-ink-muted hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-120"
+          >
+            ← Back
+          </button>
+          <span className="w-px h-5 bg-rule" />
+          <button
+            onClick={skipTour}
+            className="flex-1 py-2.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors duration-120"
+          >
+            Skip tour
+          </button>
+          <span className="w-px h-5 bg-rule" />
+          <button
+            onClick={nextStop}
+            className="flex-1 py-2.5 text-xs font-semibold text-accent hover:text-accent-strong transition-colors duration-120"
+          >
+            {isLastStop ? 'Finish' : 'Next →'}
+          </button>
+        </div>
       </div>
     </>
   );

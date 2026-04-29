@@ -11,7 +11,6 @@ import ElectricBorder from './ElectricBorder';
 import SakuraPetals from './SakuraPetals';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
-import { TourHUD } from './tour/TourHUD';
 
 const BASE_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -641,7 +640,6 @@ export function AppShell({ children }) {
       </footer>
 
       <TourSpotlight />
-      <TourHUD />
     </div>
     </TourProvider>
   );
