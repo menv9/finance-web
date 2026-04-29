@@ -41,7 +41,7 @@ export function TourProvider({ children }) {
     [navigate, updateSettings, setTourActive],
   );
 
-  const skipTour = useCallback(() => endTour(false), [endTour]);
+  const skipTour = useCallback(() => endTour(true), [endTour]);
 
   const nextStop = useCallback(() => {
     const step = TOUR_STEPS[stepIndex];
