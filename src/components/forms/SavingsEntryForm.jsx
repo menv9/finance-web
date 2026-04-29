@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
-import { FormField, Input, Button } from '../ui';
+import { FormField, Input, Button, Select } from '../ui';
 
 const defaultValue = {
   date: normalizeDateInput(new Date()),
   amountCents: '',
   note: '',
+  goalId: '',
 };
 
-export function SavingsEntryForm({ initialValue, currency = 'EUR', onSubmit, onCancel }) {
+export function SavingsEntryForm({
+  initialValue,
+  currency = 'EUR',
+  goals = [],
+  defaultGoalId = '',
+  goalLocked = false,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}) {
   const [form, setForm] = useState({
     ...defaultValue,
+    goalId: defaultGoalId,
     ...initialValue,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
@@ -26,6 +37,7 @@ export function SavingsEntryForm({ initialValue, currency = 'EUR', onSubmit, onC
           ...initialValue,
           ...form,
           amountCents: Math.round(Number(form.amountCents || 0) * 100),
+          goalId: form.goalId || null,
         });
       }}
     >
@@ -62,6 +74,26 @@ export function SavingsEntryForm({ initialValue, currency = 'EUR', onSubmit, onC
         )}
       </FormField>
 
+      {goals.length ? (
+        <FormField label="Savings for" htmlFor="saving-goal" className="md:col-span-2">
+          {(props) => (
+            <Select
+              {...props}
+              value={form.goalId || ''}
+              onChange={set('goalId')}
+              disabled={goalLocked}
+            >
+              <option value="">No goal</option>
+              {goals.map((goal) => (
+                <option key={goal.id} value={goal.id}>
+                  {goal.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      ) : null}
+
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>
@@ -69,7 +101,7 @@ export function SavingsEntryForm({ initialValue, currency = 'EUR', onSubmit, onC
           </Button>
         )}
         <Button type="submit" variant="primary">
-          {initialValue ? 'Save changes' : 'Add saving'}
+          {submitLabel || (initialValue ? 'Save changes' : 'Add saving')}
         </Button>
       </div>
     </form>

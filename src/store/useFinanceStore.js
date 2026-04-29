@@ -28,7 +28,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'budgets', 'rollovers', 'transfers', 'attachments'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'attachments'];
 let authSubscription = null;
 let autoPushTimer = null;
 let focusHandler = null;
@@ -215,6 +215,7 @@ export const useFinanceStore = create((set, get) => ({
   portfolioSales: [],
   savingsConfig: SAVINGS_DEFAULT,
   savingsEntries: [],
+  savingsGoals: [],
   budgets: [],
   rollovers: [],
   transfers: [],
@@ -265,10 +266,11 @@ export const useFinanceStore = create((set, get) => ({
         portfolioSales: normalizedRecords[6],
         savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
         savingsEntries: normalizedRecords[8],
-        budgets: normalizedRecords[9],
-        rollovers: normalizedRecords[10],
-        transfers: normalizedRecords[11],
-        attachments: normalizedRecords[12],
+        savingsGoals: normalizedRecords[9],
+        budgets: normalizedRecords[10],
+        rollovers: normalizedRecords[11],
+        transfers: normalizedRecords[12],
+        attachments: normalizedRecords[13],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -298,10 +300,11 @@ export const useFinanceStore = create((set, get) => ({
       portfolioSales: normalizedRecords[6],
       savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
       savingsEntries: normalizedRecords[8],
-      budgets: normalizedRecords[9],
-      rollovers: normalizedRecords[10],
-      transfers: normalizedRecords[11],
-      attachments: normalizedRecords[12],
+      savingsGoals: normalizedRecords[9],
+      budgets: normalizedRecords[10],
+      rollovers: normalizedRecords[11],
+      transfers: normalizedRecords[12],
+      attachments: normalizedRecords[13],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -448,6 +451,60 @@ export const useFinanceStore = create((set, get) => ({
     set((state) => {
       const nextState = { ...state, savingsEntries: state.savingsEntries.filter((e) => e.id !== id) };
       return { ...nextState, derived: buildDerived(nextState) };
+    });
+    get().triggerAutoPush();
+  },
+
+  saveSavingsGoal: async (goal) => {
+    const timestamp = new Date().toISOString();
+    const existing = goal.id ? get().savingsGoals.find((item) => item.id === goal.id) : null;
+    const record = {
+      ...ensureEntitySyncFields({
+        id: goal.id || makeId('svg'),
+        name: goal.name,
+        targetCents: goal.targetCents || 0,
+        createdAt: existing?.createdAt || goal.createdAt || timestamp,
+      }, timestamp),
+      updatedAt: timestamp,
+    };
+    await putRecord('savingsGoals', record);
+    set((state) => {
+      const nextSavingsGoals = upsertItem(state.savingsGoals, record);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        savingsGoals: (state.syncMeta.deletedRecords.savingsGoals || []).filter((item) => item.id !== record.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `savingsGoals:${record.id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
+    });
+    get().triggerAutoPush();
+    return record;
+  },
+
+  removeSavingsGoal: async (id) => {
+    await deleteRecord('savingsGoals', id);
+    const timestamp = new Date().toISOString();
+    set((state) => {
+      const nextSavingsGoals = state.savingsGoals.filter((item) => item.id !== id);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        savingsGoals: [
+          ...(state.syncMeta.deletedRecords.savingsGoals || []).filter((item) => item.id !== id),
+          { id, updatedAt: timestamp, deletedAt: timestamp },
+        ],
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `savingsGoals:${id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
     });
     get().triggerAutoPush();
   },
@@ -1030,7 +1087,7 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   executeTransfer: async (spec) => {
-    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId } = spec;
+    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId, goalId } = spec;
     const timestamp = new Date().toISOString();
     const currency = get().settings.baseCurrency;
     const trfId = `trf-${crypto.randomUUID()}`;
@@ -1048,6 +1105,7 @@ export const useFinanceStore = create((set, get) => ({
         amountCents: -Math.abs(amountCents),
         note: description || 'Transfer out',
         transferId: trfId,
+        goalId: goalId || null,
       }, timestamp);
       toPut.push({ storeName: 'savingsEntries', record: entry });
       linkedSavingsEntryId = entry.id;

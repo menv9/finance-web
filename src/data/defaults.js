@@ -39,6 +39,7 @@ export const DEFAULT_DATA = {
   portfolioCashflows: [],
   portfolioSales: [],
   savingsEntries: [],
+  savingsGoals: [],
   budgets: [],
   rollovers: [],
   transfers: [],

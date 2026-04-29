@@ -109,12 +109,147 @@ function SavingsTooltip({ active, payload, label, currency, locale }) {
   );
 }
 
+function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    name: initialValue?.name || '',
+    target: initialValue?.targetCents ? (initialValue.targetCents / 100).toFixed(2) : '',
+  });
+
+  const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  return (
+    <form
+      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({
+          ...initialValue,
+          name: form.name.trim(),
+          targetCents: Math.round(Number(form.target || 0) * 100),
+        });
+      }}
+    >
+      <FormField label="Name" htmlFor="savings-goal-name" required>
+        {(props) => (
+          <Input
+            {...props}
+            value={form.name}
+            onChange={set('name')}
+            placeholder="e.g. Trip, car, emergency fund"
+            required
+          />
+        )}
+      </FormField>
+      <FormField label={`Target (${currency})`} htmlFor="savings-goal-target" required>
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            min="0.01"
+            step="0.01"
+            numeric
+            value={form.target}
+            onChange={set('target')}
+            placeholder="0.00"
+            required
+          />
+        )}
+      </FormField>
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary">
+          {initialValue ? 'Save changes' : 'Add goal'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    date: normalizeDateInput(new Date()),
+    amount: '',
+    category: categories[0] || '',
+    description: goal ? `${goal.name} expense from bucket` : '',
+  });
+
+  const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  return (
+    <form
+      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({
+          date: form.date,
+          amountCents: Math.round(Number(form.amount || 0) * 100),
+          category: form.category,
+          description: form.description.trim(),
+        });
+      }}
+    >
+      <FormField label="Date" htmlFor="bucket-spend-date">
+        {(props) => <Input {...props} type="date" value={form.date} onChange={set('date')} required />}
+      </FormField>
+      <FormField label={`Amount (${currency})`} htmlFor="bucket-spend-amount" required>
+        {(props) => (
+          <Input
+            {...props}
+            type="number"
+            min="0.01"
+            step="0.01"
+            numeric
+            value={form.amount}
+            onChange={set('amount')}
+            placeholder="0.00"
+            required
+          />
+        )}
+      </FormField>
+      <FormField label="Category" htmlFor="bucket-spend-category">
+        {(props) => (
+          <Select {...props} value={form.category} onChange={set('category')}>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+      <FormField label="Description" htmlFor="bucket-spend-description">
+        {(props) => (
+          <Input
+            {...props}
+            value={form.description}
+            onChange={set('description')}
+            placeholder="What did you spend it on?"
+          />
+        )}
+      </FormField>
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary">
+          Create expense
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export default function SavingsPage() {
   const savingsConfig      = useFinanceStore((state) => state.savingsConfig);
   const savingsEntries     = useFinanceStore((state) => state.savingsEntries);
+  const savingsGoals       = useFinanceStore((state) => state.savingsGoals);
   const saveSavingsConfig  = useFinanceStore((state) => state.saveSavingsConfig);
   const saveSavingsEntry   = useFinanceStore((state) => state.saveSavingsEntry);
   const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
+  const saveSavingsGoal    = useFinanceStore((state) => state.saveSavingsGoal);
+  const removeSavingsGoal  = useFinanceStore((state) => state.removeSavingsGoal);
   const executeTransfer    = useFinanceStore((state) => state.executeTransfer);
   const settings           = useFinanceStore((state) => state.settings);
 
@@ -149,11 +284,20 @@ export default function SavingsPage() {
   };
 
   // ── Modal state ──
-  const [modal, setModal] = useState({ open: false, id: null });
-  const openNew  = () => setModal({ open: true,  id: null });
-  const openEdit = (id) => setModal({ open: true, id });
-  const close    = () => setModal({ open: false, id: null });
+  const [modal, setModal] = useState({ open: false, id: null, goalId: '', withdraw: false });
+  const openNew  = (goalId = '') => setModal({ open: true, id: null, goalId, withdraw: false });
+  const openWithdraw = (goalId) => setModal({ open: true, id: null, goalId, withdraw: true });
+  const openEdit = (id) => setModal({ open: true, id, goalId: '', withdraw: false });
+  const close    = () => setModal({ open: false, id: null, goalId: '', withdraw: false });
   const editingEntry = savingsEntries.find((e) => e.id === modal.id);
+  const [goalModal, setGoalModal] = useState({ open: false, id: null });
+  const openNewGoal = () => setGoalModal({ open: true, id: null });
+  const openEditGoal = (id) => setGoalModal({ open: true, id });
+  const closeGoal = () => setGoalModal({ open: false, id: null });
+  const editingGoal = savingsGoals.find((goal) => goal.id === goalModal.id);
+  const [bucketSpendModal, setBucketSpendModal] = useState({ open: false, goalId: null });
+  const openBucketSpend = (goalId) => setBucketSpendModal({ open: true, goalId });
+  const closeBucketSpend = () => setBucketSpendModal({ open: false, goalId: null });
   const [transferOpen, setTransferOpen] = useState(false);
   const [savingsChartPeriod, setSavingsChartPeriod] = useState('12');
 
@@ -170,6 +314,32 @@ export default function SavingsPage() {
     [savingsEntries],
   );
   const totalSavedCents = currentBalanceCents + totalEntriesCents;
+  const goalLookup = useMemo(
+    () => new Map(savingsGoals.map((goal) => [goal.id, goal.name])),
+    [savingsGoals],
+  );
+  const goalBalances = useMemo(() => {
+    const map = {};
+    savingsEntries.forEach((entry) => {
+      if (!entry.goalId) return;
+      map[entry.goalId] = (map[entry.goalId] || 0) + entry.amountCents;
+    });
+    return map;
+  }, [savingsEntries]);
+  const goalsWithBalances = useMemo(
+    () =>
+      savingsGoals.map((goal) => {
+        const savedCents = goalBalances[goal.id] || 0;
+        const targetCents = goal.targetCents || 0;
+        return {
+          ...goal,
+          savedCents,
+          progress: targetCents > 0 ? Math.min(100, Math.max(0, (savedCents / targetCents) * 100)) : 0,
+        };
+      }),
+    [goalBalances, savingsGoals],
+  );
+  const spendingGoal = goalsWithBalances.find((goal) => goal.id === bucketSpendModal.goalId);
 
   const thisMonthKey = monthKey(new Date());
   const savedThisMonthCents = useMemo(
@@ -295,6 +465,20 @@ export default function SavingsPage() {
     batchSelect.cancel();
   };
 
+  const handleDeleteGoal = async (goal) => {
+    const hasEntries = savingsEntries.some((entry) => entry.goalId === goal.id);
+    if (hasEntries) {
+      window.alert('This goal has savings entries. Withdraw, edit, or delete those entries before deleting the goal.');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Delete savings goal',
+      description: `Delete "${goal.name}"? This cannot be undone.`,
+    });
+    if (!ok) return;
+    await removeSavingsGoal(goal.id);
+  };
+
   // ── Entry list (card-list style matching Income / Expenses) ──
   function SavingsEntryList({ rows }) {
     if (!rows.length) {
@@ -307,7 +491,12 @@ export default function SavingsPage() {
     }
     return (
       <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
-        {rows.map((r) => (
+        {rows.map((r) => {
+          const goalName = r.goalId ? goalLookup.get(r.goalId) : null;
+          const meta = [r.amountCents < 0 ? 'withdrawal' : 'deposit', goalName ? `for ${goalName}` : null]
+            .filter(Boolean)
+            .join(' / ');
+          return (
           <li
             key={r.id}
             className={batchSelect.selecting && batchSelect.selectedIds.has(r.id) ? 'bg-accent-soft' : 'transition-colors duration-120 hover:bg-surface-raised'}
@@ -338,7 +527,7 @@ export default function SavingsPage() {
                 </div>
                 <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
                   <p className="min-w-0 truncate eyebrow">
-                    {r.amountCents < 0 ? 'withdrawal' : 'deposit'} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(r.date))}
+                    {meta} / {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(r.date))}
                   </p>
                   {r.transferId ? (
                     <span className="shrink-0 text-xs text-ink-faint">via transfer</span>
@@ -371,7 +560,8 @@ export default function SavingsPage() {
               </div>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     );
   }
@@ -388,7 +578,7 @@ export default function SavingsPage() {
             <Button variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
               Transfer
             </Button>
-            <Button variant="primary" size="sm" onClick={openNew}>
+            <Button variant="primary" size="sm" onClick={() => openNew()}>
               <PlusIcon /> Add saving
             </Button>
           </>
@@ -484,6 +674,88 @@ export default function SavingsPage() {
         </div>
       </section>
 
+      <Card
+        eyebrow="Buckets"
+        title="Savings targets"
+        description="Set money aside for specific things while keeping it inside your total savings."
+        className={rise(2)}
+        action={
+          <Button variant="primary" size="sm" onClick={openNewGoal}>
+            <PlusIcon /> Add goal
+          </Button>
+        }
+      >
+        {goalsWithBalances.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {goalsWithBalances.map((goal) => {
+              const remainingCents = Math.max(0, (goal.targetCents || 0) - goal.savedCents);
+              return (
+                <div key={goal.id} className="rounded-lg border border-rule bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{goal.name}</p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        {formatCurrency(goal.savedCents, currency, locale)} of{' '}
+                        {formatCurrency(goal.targetCents || 0, currency, locale)}
+                      </p>
+                    </div>
+                    <p className="numeric shrink-0 text-sm text-ink">{goal.progress.toFixed(0)}%</p>
+                  </div>
+                  <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-300"
+                      style={{ width: `${goal.progress}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-ink-muted">
+                    {remainingCents > 0
+                      ? `${formatCurrency(remainingCents, currency, locale)} remaining`
+                      : 'Goal reached'}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => openNew(goal.id)}>
+                      Add money
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openWithdraw(goal.id)}
+                      disabled={goal.savedCents <= 0}
+                    >
+                      Withdraw
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openBucketSpend(goal.id)}
+                      disabled={goal.savedCents <= 0}
+                    >
+                      Spend
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => openEditGoal(goal.id)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteGoal(goal)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            title="No savings goals yet"
+            description="Create a goal like a trip, car, or emergency fund."
+            action={
+              <Button variant="secondary" size="sm" onClick={openNewGoal}>
+                <PlusIcon /> Add goal
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
       {/* Entries chart */}
       <Card
         eyebrow="History"
@@ -503,7 +775,7 @@ export default function SavingsPage() {
               <option value="12">Last year</option>
               <option value="24">Last 2 years</option>
             </Select>
-            <Button variant="primary" size="sm" onClick={openNew}>
+            <Button variant="primary" size="sm" onClick={() => openNew()}>
               <PlusIcon /> Add saving
             </Button>
           </>
@@ -580,7 +852,7 @@ export default function SavingsPage() {
                 Select
               </Button>
             )}
-            <Button variant="primary" size="sm" onClick={openNew}>
+            <Button variant="primary" size="sm" onClick={() => openNew()}>
               <PlusIcon /> Add saving
             </Button>
           </div>
@@ -616,7 +888,7 @@ export default function SavingsPage() {
             title="No savings logged yet"
             description="Start logging what you put aside each month."
             action={
-              <Button variant="secondary" size="sm" onClick={openNew}>
+              <Button variant="secondary" size="sm" onClick={() => openNew()}>
                 <PlusIcon /> Add saving
               </Button>
             }
@@ -783,18 +1055,84 @@ export default function SavingsPage() {
         open={modal.open}
         onClose={close}
         eyebrow="Savings entry"
-        title={editingEntry ? 'Edit entry' : 'Log a saving'}
-        description="Record an amount you set aside."
+        title={editingEntry ? 'Edit entry' : modal.withdraw ? 'Withdraw from goal' : 'Log a saving'}
+        description={modal.withdraw ? 'Record money used from this savings goal.' : 'Record an amount you set aside.'}
       >
         <SavingsEntryForm
           initialValue={editingEntry}
           currency={currency}
+          goals={savingsGoals}
+          defaultGoalId={modal.goalId}
+          goalLocked={modal.withdraw}
+          submitLabel={modal.withdraw ? 'Withdraw' : undefined}
           onSubmit={async (value) => {
-            await saveSavingsEntry(value);
+            if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
+              window.alert('You cannot withdraw more than this goal currently has saved.');
+              return;
+            }
+            await saveSavingsEntry({
+              ...value,
+              amountCents: modal.withdraw ? -Math.abs(value.amountCents) : value.amountCents,
+              note: value.note || (modal.withdraw ? 'Goal withdrawal' : value.goalId ? 'Goal saving' : ''),
+            });
             close();
           }}
           onCancel={close}
         />
+      </Modal>
+
+      <Modal
+        open={goalModal.open}
+        onClose={closeGoal}
+        eyebrow="Savings for"
+        title={editingGoal ? 'Edit goal' : 'Add goal'}
+        description="Create a dedicated savings goal inside your total savings."
+      >
+        <SavingsGoalForm
+          initialValue={editingGoal}
+          currency={currency}
+          onSubmit={async (value) => {
+            if (!value.name || value.targetCents <= 0) return;
+            await saveSavingsGoal(value);
+            closeGoal();
+          }}
+          onCancel={closeGoal}
+        />
+      </Modal>
+
+      <Modal
+        open={bucketSpendModal.open}
+        onClose={closeBucketSpend}
+        eyebrow="Bucket spend"
+        title={spendingGoal ? `Spend from ${spendingGoal.name}` : 'Spend from bucket'}
+        description="Create an expense paid from this bucket. The amount is deducted from the bucket balance."
+      >
+        {spendingGoal ? (
+          <BucketSpendForm
+            goal={spendingGoal}
+            categories={settings.categories}
+            currency={currency}
+            onSubmit={async (value) => {
+              if (!value.amountCents || value.amountCents <= 0) return;
+              if (value.amountCents > spendingGoal.savedCents) {
+                window.alert('You cannot spend more than this bucket currently has saved.');
+                return;
+              }
+              await executeTransfer({
+                date: value.date,
+                amountCents: value.amountCents,
+                fromModule: 'savings',
+                fromId: spendingGoal.id,
+                toModule: 'expenses',
+                description: value.description || `${spendingGoal.name} expense from bucket`,
+                category: value.category,
+                goalId: spendingGoal.id,
+              });
+              closeBucketSpend();
+            }}
+            onCancel={closeBucketSpend}
+          />
+        ) : null}
       </Modal>
 
       {/* Transfer modal */}
