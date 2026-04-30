@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
@@ -12,9 +12,32 @@ import SakuraPetals from './SakuraPetals';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
 
-const BASE_LINKS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/this-month', label: 'This month' },
+const NAV_GROUPS = [
+  { kind: 'link', to: '/dashboard', label: 'Overview' },
+  { kind: 'link', to: '/this-month', label: 'Month' },
+  {
+    kind: 'menu',
+    id: 'money',
+    label: 'Money',
+    items: [
+      { to: '/accounts', label: 'Accounts' },
+      { to: '/expenses', label: 'Expenses' },
+      { to: '/income', label: 'Income' },
+    ],
+  },
+  {
+    kind: 'menu',
+    id: 'planning',
+    label: 'Planning',
+    items: [
+      { to: '/budgets', label: 'Budgets' },
+      { to: '/savings', label: 'Savings' },
+    ],
+  },
+  { kind: 'link', to: '/portfolio', label: 'Investing', module: 'portfolio' },
+];
+
+const MORE_LINKS = [
   { to: '/accounts', label: 'Accounts' },
   { to: '/income', label: 'Income' },
   { to: '/expenses', label: 'Expenses' },
@@ -250,6 +273,59 @@ function SignOutIcon() {
   );
 }
 
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M10 4v12M4 10h12" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8l4 4 4-4" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="2.5" />
+      <path d="M16.2 11.5a6.6 6.6 0 0 0 0-3l1.4-1.1-1.7-2.8-1.7.7a6.4 6.4 0 0 0-2.6-1.5L11.4 2H8.6l-.3 1.8a6.4 6.4 0 0 0-2.5 1.5l-1.7-.7-1.7 2.8 1.4 1.1a6.6 6.6 0 0 0 0 3l-1.4 1.1 1.7 2.8 1.7-.7a6.4 6.4 0 0 0 2.5 1.5l.3 1.8h2.8l.3-1.8a6.4 6.4 0 0 0 2.6-1.5l1.7.7 1.7-2.8-1.5-1.1Z" />
+    </svg>
+  );
+}
+
+function MoneyIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="14" height="10" rx="2" />
+      <circle cx="10" cy="10" r="2" />
+      <path d="M5.5 8v0M14.5 12v0" />
+    </svg>
+  );
+}
+
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 11.5 10 5l6 6.5" />
+      <path d="M6 10v6h8v-6" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="4.5" width="13" height="12" rx="2" />
+      <path d="M7 3v3M13 3v3M3.5 8h13" />
+    </svg>
+  );
+}
+
 const FAVICON_TOKENS = {
   dark:  { cardFrom: '#1B2434', cardTo: '#141B26', coinFrom: '#232E42', coinTo: '#1B2434', ringFrom: '#2A3A58', ringTo: '#1E2C46', euroColor: '#5FB394', cardShadow: '#9060D8' },
   light: { cardFrom: '#FFFFFF', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#E0E8FF', ringTo: '#C8D8F8', euroColor: '#1B3A7A', cardShadow: '#8AAAD8' },
@@ -343,6 +419,7 @@ function buildFaviconSVG(theme) {
 }
 
 export function AppShell({ children }) {
+  const location = useLocation();
   const theme = useFinanceStore((state) => state.settings.theme);
   const settings = useFinanceStore((state) => state.settings);
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
@@ -357,13 +434,25 @@ export function AppShell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
+  const [openNavMenu, setOpenNavMenu] = useState(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
   const baseCurrency = settings.baseCurrency;
-  const links = useMemo(
-    () =>
-      BASE_LINKS
-        .filter((link) => link.module !== 'portfolio' || settings.modules?.portfolio !== false),
+  const moduleVisible = useMemo(
+    () => (item) => item.module !== 'portfolio' || settings.modules?.portfolio !== false,
     [settings.modules?.portfolio],
+  );
+  const navGroups = useMemo(
+    () =>
+      NAV_GROUPS
+        .filter(moduleVisible)
+        .map((group) => (group.items ? { ...group, items: group.items.filter(moduleVisible) } : group))
+        .filter((group) => group.kind !== 'menu' || group.items.length),
+    [moduleVisible],
+  );
+  const moreLinks = useMemo(
+    () => MORE_LINKS.filter(moduleVisible),
+    [moduleVisible],
   );
 
   const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
@@ -412,6 +501,22 @@ export function AppShell({ children }) {
   }, [mobileOpen]);
 
   useEffect(() => {
+    setOpenNavMenu(null);
+    setAddMenuOpen(false);
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!openNavMenu && !addMenuOpen) return undefined;
+    const closeMenus = () => {
+      setOpenNavMenu(null);
+      setAddMenuOpen(false);
+    };
+    window.addEventListener('click', closeMenus);
+    return () => window.removeEventListener('click', closeMenus);
+  }, [openNavMenu, addMenuOpen]);
+
+  useEffect(() => {
     const openEntryModal = (event) => {
       if (event.detail === 'income') setIncomeModalOpen(true);
       else setExpenseModalOpen(true);
@@ -448,57 +553,96 @@ export function AppShell({ children }) {
           </div>
 
           <nav aria-label="Primary" className="col-start-2 hidden justify-center lg:flex items-center gap-1">
-            {links.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  cn(
-                    'group relative inline-flex items-center gap-2 px-3 py-2 text-sm transition-colors duration-180',
-                    isActive ? 'text-ink' : 'text-ink-muted hover:text-ink',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className="font-sans">{link.label}</span>
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'absolute bottom-0 left-3 right-3 h-px origin-center bg-accent transition-transform duration-220 ease-editorial',
-                        isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50',
-                      )}
-                    />
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {navGroups.map((group) => {
+              if (group.kind === 'link') {
+                return (
+                  <NavLink
+                    key={group.to}
+                    to={group.to}
+                    className={({ isActive }) =>
+                      cn(
+                        'group relative inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm transition-colors duration-180',
+                        isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                      )
+                    }
+                  >
+                    {group.label}
+                  </NavLink>
+                );
+              }
+              const isActive = group.items.some((item) => item.to === location.pathname);
+              const isOpen = openNavMenu === group.id;
+              return (
+                <div key={group.id} className="relative" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenNavMenu((current) => (current === group.id ? null : group.id))}
+                    className={cn(
+                      'inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm transition-colors duration-180',
+                      isActive || isOpen ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                    )}
+                    aria-haspopup="menu"
+                    aria-expanded={isOpen}
+                  >
+                    {group.label}
+                    <ChevronIcon />
+                  </button>
+                  {isOpen ? (
+                    <div className="absolute left-1/2 top-11 z-40 w-44 -translate-x-1/2 rounded-lg border border-rule bg-surface p-1 shadow-lift">
+                      {group.items.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={({ isActive: itemActive }) =>
+                            cn(
+                              'flex min-w-0 items-center justify-between rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                              itemActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                            )
+                          }
+                        >
+                          <span>{item.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </nav>
 
           <div className="col-start-3 flex items-center justify-end gap-3">
-            <div className="hidden md:flex items-center gap-1">
+            <div className="relative hidden md:block" onClick={(event) => event.stopPropagation()}>
               <button
                 type="button"
-                onClick={() => setExpenseModalOpen(true)}
-                aria-label="Log expense"
-                title="Log expense"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                onClick={() => setAddMenuOpen((current) => !current)}
+                aria-label="Add transaction"
+                aria-haspopup="menu"
+                aria-expanded={addMenuOpen}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-accent-ink transition-colors duration-180 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#b5372a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 4v12M4 10l6 6 6-6" />
-                </svg>
+                <PlusIcon />
+                <span>Add</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setIncomeModalOpen(true)}
-                aria-label="Log income"
-                title="Log income"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-              >
-                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden fill="none" stroke="#2d6a4f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 16V4M4 10l6-6 6 6" />
-                </svg>
-              </button>
+              {addMenuOpen ? (
+                <div className="absolute right-0 top-11 z-40 w-48 rounded-lg border border-rule bg-surface p-1 shadow-lift">
+                  <button
+                    type="button"
+                    onClick={() => { setExpenseModalOpen(true); setAddMenuOpen(false); }}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-ink-muted transition-colors duration-150 hover:bg-surface-raised hover:text-ink"
+                  >
+                    <span>New expense</span>
+                    <span className="text-danger">↓</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIncomeModalOpen(true); setAddMenuOpen(false); }}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-ink-muted transition-colors duration-150 hover:bg-surface-raised hover:text-ink"
+                  >
+                    <span>New income</span>
+                    <span className="text-positive">↑</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className="hidden md:flex flex-col items-end border-l border-rule pl-4">
               <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Total balance</span>
@@ -527,6 +671,19 @@ export function AppShell({ children }) {
               </div>
             )}
 
+            <NavLink
+              to="/settings"
+              aria-label="Settings"
+              title="Settings"
+              className={({ isActive }) =>
+                cn(
+                  'hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+                  isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
+                )
+              }
+            >
+              <SettingsIcon />
+            </NavLink>
             <button
               type="button"
               onClick={toggleTheme}
@@ -550,7 +707,7 @@ export function AppShell({ children }) {
         {mobileOpen && (
           <div className="lg:hidden border-t border-rule bg-surface animate-rise">
             <nav aria-label="Primary mobile" className="mx-auto flex max-w-wide flex-col px-4 py-3">
-              {links.map((link) => (
+              {moreLinks.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
@@ -588,7 +745,72 @@ export function AppShell({ children }) {
         )}
       </header>
 
-      <main id="main" className="mx-auto max-w-wide px-4 py-10 lg:px-10 lg:py-14 overflow-x-clip">
+      <nav
+        aria-label="Mobile shortcuts"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-canvas/95 px-3 py-2 backdrop-blur-md lg:hidden"
+      >
+        <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) =>
+              cn(
+                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+              )
+            }
+          >
+            <DashboardIcon />
+            <span>Home</span>
+          </NavLink>
+          <NavLink
+            to="/this-month"
+            className={({ isActive }) =>
+              cn(
+                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+              )
+            }
+          >
+            <CalendarIcon />
+            <span>Month</span>
+          </NavLink>
+          <button
+            type="button"
+            onClick={() => setExpenseModalOpen(true)}
+            aria-label="Add expense"
+            className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-card transition-colors duration-150 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            <PlusIcon />
+          </button>
+          <NavLink
+            to="/accounts"
+            className={({ isActive }) =>
+              cn(
+                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+              )
+            }
+          >
+            <MoneyIcon />
+            <span>Money</span>
+          </NavLink>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            aria-label={mobileOpen ? 'Close more menu' : 'Open more menu'}
+            aria-expanded={mobileOpen}
+            className={cn(
+              'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+              mobileOpen ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+            )}
+          >
+            <MenuIcon open={mobileOpen} />
+            <span>More</span>
+          </button>
+        </div>
+      </nav>
+
+      <main id="main" className="mx-auto max-w-wide px-4 py-10 pb-28 lg:px-10 lg:py-14 lg:pb-14 overflow-x-clip">
         <div className="min-w-0">{children}</div>
       </main>
 
