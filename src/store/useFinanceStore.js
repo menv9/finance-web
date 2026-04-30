@@ -1661,7 +1661,7 @@ export const useFinanceStore = create((set, get) => ({
 
   exportBackup: async (storeFilter = null) => exportDatabaseSnapshot(get().settings, storeFilter),
 
-  wipeAllData: async () => {
+  wipeAllData: async ({ resetAccountSetup = false } = {}) => {
     const timestamp = new Date().toISOString();
     const state = get();
     const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
@@ -1682,11 +1682,33 @@ export const useFinanceStore = create((set, get) => ({
     localStorage.setItem('pft-seeded', 'true');
     // Keep settings (currency, locale, theme, API keys) — reset financial fields only
     const current = state.settings;
-    saveSettings({ ...current, initialCashBalanceCents: 0 });
+    const resetSetupFields = resetAccountSetup
+      ? {
+          onboardingCompleted: false,
+          onboardingCompletedAt: null,
+          onboardingTutorialCompleted: false,
+          startTutorialAfterSetup: true,
+          initialSetupCompleted: false,
+          initialSetupCompletedAt: null,
+          categories: DEFAULT_SETTINGS.categories,
+          setupIntent: {
+            buckets: false,
+            budgets: false,
+            recurringIncome: false,
+            recurringBills: false,
+          },
+          modules: {
+            ...(current.modules || {}),
+            portfolio: false,
+          },
+        }
+      : {};
+    const nextSettings = { ...current, initialCashBalanceCents: 0, ...resetSetupFields };
+    saveSettings(nextSettings);
     set((currentState) => {
       const nextState = {
         ...currentState,
-        settings: { ...current, initialCashBalanceCents: 0 },
+        settings: nextSettings,
         syncMeta: nextSyncMeta,
         expenses: [],
         fixedExpenses: [],

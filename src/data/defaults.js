@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   onboardingCompleted: false,
   onboardingCompletedAt: null,
   onboardingTutorialCompleted: false,
+  startTutorialAfterSetup: false,
   initialSetupCompleted: false,
   initialSetupCompletedAt: null,
   initialCashBalanceCents: 0,

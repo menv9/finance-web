@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { Card, Table, Button, FormField, Input, Select, EmptyState, Modal, Toggle } from '../components/ui';
+import { Card, Table, Button, FormField, Input, Select, EmptyState, Modal, Toggle, Checkbox } from '../components/ui';
 import { rise } from '../utils/motion';
 import { formatCurrency } from '../utils/formatters';
 import { useTour } from '../components/tour/TourContext';
@@ -135,6 +135,7 @@ export default function SettingsPage() {
   const wipeAllData = useFinanceStore((state) => state.wipeAllData);
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
   const [wipeConfirmText, setWipeConfirmText] = useState('');
+  const [wipeResetAccount, setWipeResetAccount] = useState(false);
   const [wiping, setWiping] = useState(false);
   const [historyModule, setHistoryModule] = useState('all');
   const [historyAction, setHistoryAction] = useState('all');
@@ -145,9 +146,13 @@ export default function SettingsPage() {
   const handleWipe = async () => {
     setWiping(true);
     try {
-      await wipeAllData();
+      await wipeAllData({ resetAccountSetup: wipeResetAccount });
       setWipeModalOpen(false);
       setWipeConfirmText('');
+      setWipeResetAccount(false);
+      if (wipeResetAccount) {
+        startTour();
+      }
     } catch (error) {
       window.alert(error.message || 'Unable to erase data.');
     } finally {
@@ -894,7 +899,7 @@ export default function SettingsPage() {
             description="Permanently deletes all financial records from this device. Settings (currency and API keys) are kept. This cannot be undone."
             className={rise(9)}
           >
-            <Button variant="danger" size="sm" onClick={() => { setWipeModalOpen(true); setWipeConfirmText(''); }}>
+            <Button variant="danger" size="sm" onClick={() => { setWipeModalOpen(true); setWipeConfirmText(''); setWipeResetAccount(false); }}>
               Erase all data
             </Button>
           </Card>
@@ -947,16 +952,27 @@ export default function SettingsPage() {
 
       <Modal
         open={wipeModalOpen}
-        onClose={() => { setWipeModalOpen(false); setWipeConfirmText(''); }}
+        onClose={() => { setWipeModalOpen(false); setWipeConfirmText(''); setWipeResetAccount(false); }}
         eyebrow="Danger zone"
         title="Erase all data"
-        description="This will permanently delete every expense, income, saving, holding, and transfer on this device. It cannot be undone."
+        description="This will permanently delete every expense, income, saving, holding, transfer, and account balance on this device. It cannot be undone."
         size="sm"
       >
         <div className="grid gap-4">
           <p className="text-sm text-ink-muted">
             Type <span className="font-mono font-medium text-danger select-all">ERASE ALL DATA</span> to confirm.
           </p>
+          <div className="rounded-md border border-rule bg-surface-raised p-3">
+            <Checkbox
+              id="wipe-reset-account"
+              checked={wipeResetAccount}
+              onChange={setWipeResetAccount}
+              label="Also reset setup and start as a newly created account"
+            />
+            <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+              Resets default categories, then starts the product tour. After the tour you'll be taken to the initial setup to configure the account from zero.
+            </p>
+          </div>
           <Input
             autoFocus
             placeholder="ERASE ALL DATA"
@@ -967,7 +983,7 @@ export default function SettingsPage() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => { setWipeModalOpen(false); setWipeConfirmText(''); }}
+              onClick={() => { setWipeModalOpen(false); setWipeConfirmText(''); setWipeResetAccount(false); }}
             >
               Cancel
             </Button>

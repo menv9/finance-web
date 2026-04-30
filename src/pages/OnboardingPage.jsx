@@ -53,6 +53,7 @@ export default function OnboardingPage() {
         onboardingCompleted: true,
         onboardingCompletedAt: new Date().toISOString(),
         onboardingTutorialCompleted: true,
+        startTutorialAfterSetup: false,
         modules: {
           ...(settings.modules || {}),
           portfolio: holdings.length > 0 || settings.modules?.portfolio === true,
@@ -97,7 +98,8 @@ export default function OnboardingPage() {
         },
         onboardingCompleted: true,
         onboardingCompletedAt: new Date().toISOString(),
-        onboardingTutorialCompleted: true,
+        onboardingTutorialCompleted: !settings.startTutorialAfterSetup,
+        startTutorialAfterSetup: false,
         initialSetupCompleted: true,
         initialSetupCompletedAt: new Date().toISOString(),
       });
