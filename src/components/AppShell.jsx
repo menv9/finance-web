@@ -14,6 +14,7 @@ import { TourSpotlight } from './tour/TourSpotlight';
 
 const BASE_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/this-month', label: 'This month' },
   { to: '/income', label: 'Income' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/budgets', label: 'Budgets' },

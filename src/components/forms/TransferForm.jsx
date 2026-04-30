@@ -4,29 +4,25 @@ import { normalizeDateInput } from '../../utils/dates';
 import { formatCurrency } from '../../utils/formatters';
 import { Button, FormField, Input, Select } from '../ui';
 
-const TO_OPTIONS = {
-  savings: [
-    { value: 'expenses', label: 'Expenses (pay from savings)' },
-    { value: 'portfolio', label: 'Portfolio (invest from savings)' },
-  ],
-  cashflow: [
-    { value: 'savings', label: 'Savings' },
-    { value: 'portfolio', label: 'Portfolio' },
-  ],
-};
+const TO_OPTIONS = [
+  { value: 'expenses', label: 'Expenses (pay from savings)' },
+  { value: 'portfolio', label: 'Portfolio (invest from savings)' },
+];
 
-export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings' }) {
+export function TransferForm({ onSubmit, onCancel, defaultToModule = null }) {
   const holdings = useFinanceStore((s) => s.holdings);
   const settings = useFinanceStore((s) => s.settings);
   const savingsEntries = useFinanceStore((s) => s.savingsEntries);
   const savingsConfig = useFinanceStore((s) => s.savingsConfig);
-  const availableBalanceCents = useFinanceStore((s) => s.derived.dashboard.availableBalanceCents);
-
   const currency = settings.baseCurrency;
   const locale = settings.locale;
 
-  const [fromModule, setFromModule] = useState(defaultFromModule);
-  const [toModule, setToModule] = useState(TO_OPTIONS[defaultFromModule][0].value);
+  const fromModule = 'savings';
+  const [toModule, setToModule] = useState(
+    defaultToModule && TO_OPTIONS.some((o) => o.value === defaultToModule)
+      ? defaultToModule
+      : TO_OPTIONS[0].value,
+  );
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(normalizeDateInput(new Date()));
   const [description, setDescription] = useState('');
@@ -40,15 +36,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
     savingsEntries.reduce((sum, e) => sum + (e.amountCents || 0), 0);
 
   const amountCents = Math.round(parseFloat(amount || '0') * 100);
-  const overdrawnSavings = amountCents > 0 && fromModule === 'savings' && amountCents > savingsBalance;
-  const overdrawnCashflow = amountCents > 0 && fromModule === 'cashflow' && amountCents > availableBalanceCents;
-  const overdrawnSource = overdrawnSavings || overdrawnCashflow;
-  const toOptions = TO_OPTIONS[fromModule] || TO_OPTIONS['savings'];
-
-  const handleFromModuleChange = (mod) => {
-    setFromModule(mod);
-    setToModule(TO_OPTIONS[mod][0].value);
-  };
+  const overdrawnSource = amountCents > 0 && amountCents > savingsBalance;
 
   const handleSubmit = async () => {
     if (!amountCents || amountCents <= 0) return;
@@ -72,33 +60,13 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
 
   return (
     <div className="grid gap-5">
-      {/* From */}
-      <FormField label="Transfer from" htmlFor="trf-from-module">
-        <Select
-          id="trf-from-module"
-          value={fromModule}
-          onChange={(e) => handleFromModuleChange(e.target.value)}
-        >
-          <option value="savings">Savings</option>
-          <option value="cashflow">Monthly cashflow</option>
-        </Select>
-      </FormField>
-
-      {fromModule === 'cashflow' && (
-        <p className="text-xs text-ink-muted">
-          This moves money from your available cashflow (income − expenses) into savings or your portfolio.
-        </p>
-      )}
-
       {/* Savings balance info */}
-      {fromModule === 'savings' && (
-        <p className="text-xs text-ink-muted">
-          Current savings balance:{' '}
-          <span className="font-mono font-medium text-ink">
-            {formatCurrency(savingsBalance, currency, locale)}
-          </span>
-        </p>
-      )}
+      <p className="text-xs text-ink-muted">
+        Current savings balance:{' '}
+        <span className="font-mono font-medium text-ink">
+          {formatCurrency(savingsBalance, currency, locale)}
+        </span>
+      </p>
 
       {/* To */}
       <FormField label="Transfer to" htmlFor="trf-to-module">
@@ -107,7 +75,7 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
           value={toModule}
           onChange={(e) => setToModule(e.target.value)}
         >
-          {toOptions.map((opt) => (
+          {TO_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </Select>
@@ -141,8 +109,8 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
       {/* Overdraft warning */}
       {overdrawnSource && (
         <p className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
-          This exceeds your current {fromModule === 'savings' ? 'savings balance' : 'available cashflow'} of{' '}
-          {formatCurrency(fromModule === 'savings' ? savingsBalance : availableBalanceCents, currency, locale)}.
+          This exceeds your savings balance of{' '}
+          {formatCurrency(savingsBalance, currency, locale)}.
         </p>
       )}
 
@@ -151,7 +119,10 @@ export function TransferForm({ onSubmit, onCancel, defaultFromModule = 'savings'
         <Input
           id="trf-desc"
           type="text"
-          placeholder={toModule === 'expenses' ? 'e.g. Car repair — mechanic' : 'e.g. Monthly investment'}
+          placeholder={
+            toModule === 'expenses' ? 'e.g. Car repair — mechanic'
+            : 'e.g. Monthly investment'
+          }
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />

@@ -83,13 +83,17 @@ const SAVINGS_DEFAULT = {
 };
 
 function buildDerived(state) {
+  const fxRates = state.fxRates || {};
+  const baseCurrency = state.settings?.baseCurrency || 'EUR';
   return {
-    dashboard: computeDashboardData(state),
+    dashboard: computeDashboardData({ ...state, fxRates }),
     portfolio: computePortfolioMetrics(
       state.holdings,
       state.dividends,
       state.portfolioCashflows,
       state.settings.allocationTargets,
+      fxRates,
+      baseCurrency,
     ),
   };
 }
@@ -149,6 +153,30 @@ function buildPortfolioSaleIncome(sale, existingIncomeId, currency = 'EUR') {
 
 function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
+}
+
+// Convert sale monetary fields (proceeds, cost, P&L, fees) to base currency.
+// Prices per unit (salePriceCents, averageBuyPriceCents) stay in native currency for display.
+function applySaleFx(sale, cashflow, holdingCurrency, fxRates, baseCurrency) {
+  if (!holdingCurrency || holdingCurrency === baseCurrency) return { sale, cashflow };
+  const rate = fxRates[holdingCurrency];
+  if (rate == null) return { sale, cashflow };
+  const conv = (v) => (v != null ? Math.round(v * rate) : v);
+  const convertedSale = {
+    ...sale,
+    grossProceedsCents: conv(sale.grossProceedsCents),
+    proceedsCents: conv(sale.proceedsCents),
+    costBasisCents: conv(sale.costBasisCents),
+    realizedPnlCents: conv(sale.realizedPnlCents),
+    cashflowCents: conv(sale.cashflowCents),
+    feeCents: conv(sale.feeCents),
+    buyFeeCents: conv(sale.buyFeeCents),
+  };
+  const convertedCashflow = {
+    ...cashflow,
+    amountCents: conv(cashflow.amountCents),
+  };
+  return { sale: convertedSale, cashflow: convertedCashflow };
 }
 
 function upsertItem(items, nextItem) {
@@ -347,6 +375,7 @@ async function persistActivityLogs(set, logs) {
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
   tourActive: false,
+  fxRates: {},
   settings: DEFAULT_SETTINGS,
   supabaseConfigured: false,
   supabaseSession: null,
@@ -857,7 +886,8 @@ export const useFinanceStore = create((set, get) => ({
     if (!holding) throw new Error('Holding not found');
 
     const timestamp = new Date().toISOString();
-    const { nextHolding, nextSale: rawSale, nextCashflow: cashflow } = buildSaleUpdate({
+    const baseCurrency = get().settings.baseCurrency || 'EUR';
+    const { nextHolding, nextSale: nativeSale, nextCashflow: nativeCashflow } = buildSaleUpdate({
       holding,
       percent,
       salePriceCents,
@@ -865,7 +895,12 @@ export const useFinanceStore = create((set, get) => ({
       date,
       timestamp,
     });
-    const income = ensureEntitySyncFields(buildPortfolioSaleIncome(rawSale, null, get().settings.baseCurrency), timestamp);
+    // Convert monetary amounts to base currency if holding is in a foreign currency
+    const { sale: rawSale, cashflow } = applySaleFx(
+      nativeSale, nativeCashflow,
+      holding.currency, get().fxRates || {}, baseCurrency,
+    );
+    const income = ensureEntitySyncFields(buildPortfolioSaleIncome(rawSale, null, baseCurrency), timestamp);
     const sale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
 
     await putRecord('holdings', nextHolding);
@@ -943,7 +978,7 @@ export const useFinanceStore = create((set, get) => ({
     const currentIncome = currentSale.linkedIncomeId
       ? get().incomes.find((item) => item.id === currentSale.linkedIncomeId)
       : get().incomes.find((item) => item.linkedSaleId === currentSale.id);
-    const { nextHolding, nextSale: rawSale, nextCashflow } = buildSaleUpdate({
+    const { nextHolding, nextSale: nativeRawSale, nextCashflow: nativeNextCashflow } = buildSaleUpdate({
       holding: restoredHolding,
       sale: currentSale,
       percent,
@@ -953,8 +988,13 @@ export const useFinanceStore = create((set, get) => ({
       timestamp,
       cashflowId: currentCashflow?.id,
     });
+    const baseCurrencyUpd = get().settings.baseCurrency || 'EUR';
+    const { sale: rawSale, cashflow: nextCashflow } = applySaleFx(
+      nativeRawSale, nativeNextCashflow,
+      holding.currency, get().fxRates || {}, baseCurrencyUpd,
+    );
     const income = ensureEntitySyncFields(
-      buildPortfolioSaleIncome(rawSale, currentSale.linkedIncomeId, get().settings.baseCurrency),
+      buildPortfolioSaleIncome(rawSale, currentSale.linkedIncomeId, baseCurrencyUpd),
       timestamp,
     );
     const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
@@ -1359,6 +1399,7 @@ export const useFinanceStore = create((set, get) => ({
     let linkedSavingsEntryId = null;
     let linkedExpenseId = null;
     let linkedCashflowId = null;
+    let linkedIncomeId = null;
 
     // Source side — what leaves
     if (fromModule === 'savings') {
@@ -1410,6 +1451,19 @@ export const useFinanceStore = create((set, get) => ({
       }, timestamp);
       toPut.push({ storeName: 'savingsEntries', record: entry });
       linkedSavingsEntryId = entry.id;
+    } else if (toModule === 'cashflow') {
+      const income = ensureEntitySyncFields({
+        id: `inc-${crypto.randomUUID()}`,
+        date,
+        accountingMonth: date?.slice(0, 7),
+        amountCents: Math.abs(amountCents),
+        currency,
+        incomeKind: 'transfer',
+        source: description || 'Transfer from savings',
+        transferId: trfId,
+      }, timestamp);
+      toPut.push({ storeName: 'incomes', record: income });
+      linkedIncomeId = income.id;
     }
 
     const trf = ensureEntitySyncFields({
@@ -1425,6 +1479,7 @@ export const useFinanceStore = create((set, get) => ({
       linkedSavingsEntryId,
       linkedExpenseId,
       linkedCashflowId,
+      linkedIncomeId,
     }, timestamp);
     toPut.push({ storeName: 'transfers', record: trf });
 
@@ -1454,6 +1509,7 @@ export const useFinanceStore = create((set, get) => ({
     if (trf.linkedSavingsEntryId) toDelete.push({ storeName: 'savingsEntries', id: trf.linkedSavingsEntryId });
     if (trf.linkedExpenseId) toDelete.push({ storeName: 'expenses', id: trf.linkedExpenseId });
     if (trf.linkedCashflowId) toDelete.push({ storeName: 'portfolioCashflows', id: trf.linkedCashflowId });
+    if (trf.linkedIncomeId) toDelete.push({ storeName: 'incomes', id: trf.linkedIncomeId });
     toDelete.push({ storeName: 'transfers', id });
     const deletedRecords = toDelete.map(({ storeName, id: recId }) => ({
       storeName,
@@ -1530,17 +1586,15 @@ export const useFinanceStore = create((set, get) => ({
       }
     }
 
-    // Step 4: build refreshed holdings, converting prices to baseCurrency where possible
+    // Step 4: build refreshed holdings in NATIVE currency.
+    // Prices are stored as-is (no FX conversion); the FX rates are stored in
+    // the Zustand state and applied at display time so P&L is always in baseCurrency.
     const failures = [];
     const refreshedActive = refreshableHoldings.map((holding) => {
       const result = resultsByTicker.get(holding.ticker);
       if (result.status === 'fulfilled') {
         const { priceCents, currency } = result.value;
-        let convertedPriceCents = priceCents;
-        if (currency !== baseCurrency && fxRates[currency] != null) {
-          convertedPriceCents = Math.round(priceCents * fxRates[currency]);
-        }
-        return { ...holding, currentPriceCents: convertedPriceCents };
+        return { ...holding, currentPriceCents: priceCents, currency };
       }
       return holding;
     });
@@ -1556,8 +1610,8 @@ export const useFinanceStore = create((set, get) => ({
     const updated = refreshedActive.filter((holding) => resultsByTicker.get(holding.ticker)?.status === 'fulfilled');
     await Promise.all(updated.map((holding) => putRecord('holdings', holding)));
     set((state) => {
-      const nextState = { ...state, holdings: refreshed };
-      return { holdings: refreshed, derived: buildDerived(nextState) };
+      const nextState = { ...state, holdings: refreshed, fxRates };
+      return { holdings: refreshed, fxRates, derived: buildDerived(nextState) };
     });
     await persistActivityLogs(set, updated.map((holding) =>
       buildActivityLog({

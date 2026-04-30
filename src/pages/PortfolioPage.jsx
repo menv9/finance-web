@@ -41,7 +41,15 @@ function quantityDigits(holding) {
   return Math.min(decimals.length, 20);
 }
 
-function groupHoldingsByTicker(holdings) {
+// Convert native-currency cents to base currency using FX rates.
+// Falls back to 1:1 if rates are not available yet.
+function applyFx(cents, currency, fxRates, baseCurrency) {
+  if (!cents || !currency || currency === baseCurrency) return cents || 0;
+  const rate = fxRates[currency];
+  return rate != null ? Math.round(cents * rate) : cents;
+}
+
+function groupHoldingsByTicker(holdings, fxRates = {}, baseCurrency = 'EUR') {
   const groups = new Map();
   for (const holding of holdings) {
     const key = holding.ticker;
@@ -50,16 +58,33 @@ function groupHoldingsByTicker(holdings) {
   }
   return [...groups.entries()].map(([ticker, lots]) => {
     const quantity = lots.reduce((sum, holding) => sum + Number(holding.quantity || 0), 0);
-    const valueCents = lots.reduce(
-      (sum, holding) => sum + Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0)),
-      0,
+    // Native-currency totals (for per-unit price display)
+    const nativeValueCents = lots.reduce(
+      (sum, h) => sum + Math.round(Number(h.quantity || 0) * (h.currentPriceCents || 0)), 0,
     );
-    const costCents = lots.reduce(
-      (sum, holding) => sum + Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
-      0,
+    const nativePriceCostCents = lots.reduce(
+      (sum, h) => sum + Math.round(Number(h.quantity || 0) * (h.averageBuyPriceCents || 0)), 0,
     );
-    const feeCents = lots.reduce((sum, holding) => sum + (holding.feeCents || 0), 0);
+    // Base-currency totals (for value & P&L display)
+    const valueCents = lots.reduce((sum, h) => {
+      const native = Math.round(Number(h.quantity || 0) * (h.currentPriceCents || 0));
+      return sum + applyFx(native, h.currency, fxRates, baseCurrency);
+    }, 0);
+    const costCents = lots.reduce((sum, h) => {
+      const nativeCost = Math.round(Number(h.quantity || 0) * (h.averageBuyPriceCents || 0));
+      const baseCost = applyFx(nativeCost, h.currency, fxRates, baseCurrency);
+      const feeCurr = h.feeCurrency || h.currency;
+      const baseFee = applyFx(h.feeCents || 0, feeCurr, fxRates, baseCurrency);
+      return sum + baseCost + baseFee;
+    }, 0);
+    // Group-level fee total in base currency (for display)
+    const feeCents = lots.reduce((sum, h) => {
+      const feeCurr = h.feeCurrency || h.currency;
+      return sum + applyFx(h.feeCents || 0, feeCurr, fxRates, baseCurrency);
+    }, 0);
     const quantityDecimals = Math.max(...lots.map((holding) => quantityDigits(holding)), 0);
+    // Native per-unit prices for display (in the holding's own currency)
+    const currency = lots[0]?.currency || baseCurrency;
     return {
       id: `group-${ticker}`,
       rowType: 'group',
@@ -68,8 +93,11 @@ function groupHoldingsByTicker(holdings) {
       platform: lots.length > 1 ? `${lots.length} operations` : lots[0]?.platform,
       quantity,
       quantityDecimals,
-      averageBuyPriceCents: quantity ? Math.round(costCents / quantity) : 0,
-      currentPriceCents: quantity ? Math.round(valueCents / quantity) : 0,
+      currency,
+      // Prices in native currency (for display)
+      averageBuyPriceCents: quantity ? Math.round(nativePriceCostCents / quantity) : 0,
+      currentPriceCents: quantity ? Math.round(nativeValueCents / quantity) : 0,
+      // Values in base currency (for P&L and sorting)
       valueCents,
       costCents,
       feeCents,
@@ -81,25 +109,14 @@ function groupHoldingsByTicker(holdings) {
   }).sort((a, b) => a.ticker.localeCompare(b.ticker));
 }
 
-function buildHoldingRows(holdings) {
-  return groupHoldingsByTicker(holdings).flatMap((group) => {
-    const lotRows = group.lots.map((holding, index) => {
-      const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
-      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
-      const pnlCents = valueCents - costCents;
-      return {
-        ...holding,
-        rowType: 'lot',
-        operationNumber: index + 1,
-        valueCents,
-        costCents,
-        pnlCents,
-        pnlPct: costCents ? (pnlCents / costCents) * 100 : 0,
-        rowClassName: 'bg-surface',
-      };
-    });
-    return [group, ...lotRows];
-  });
+function buildLotMetrics(holding, fxRates, baseCurrency) {
+  const native = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
+  const nativeCost = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0));
+  const valueCents = applyFx(native, holding.currency, fxRates, baseCurrency);
+  const costCents = applyFx(nativeCost, holding.currency, fxRates, baseCurrency)
+    + applyFx(holding.feeCents || 0, holding.feeCurrency || holding.currency, fxRates, baseCurrency);
+  const pnlCents = valueCents - costCents;
+  return { valueCents, costCents, pnlCents, pnlPct: costCents ? (pnlCents / costCents) * 100 : 0 };
 }
 
 function groupSalesByTicker(sales) {
@@ -178,6 +195,7 @@ function PortfolioHoldingList({
   groups,
   currency,
   locale,
+  fxRates,
   openEditHoldingGroup,
   openAddHoldingOperation,
   openEditHolding,
@@ -208,7 +226,15 @@ function PortfolioHoldingList({
                 </p>
                 <p className="mt-3 min-w-0 text-xs text-ink-muted">
                   <span className="block truncate sm:inline">
-                    Avg {formatCurrency(group.averageBuyPriceCents, currency, locale)} · Price {formatCurrency(group.currentPriceCents, currency, locale)}
+                    Avg {formatCurrency(group.averageBuyPriceCents, group.currency || currency, locale)}
+                    {group.currency && group.currency !== currency && (
+                      <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
+                    )}
+                    {' · '}
+                    Price {formatCurrency(group.currentPriceCents, group.currency || currency, locale)}
+                    {group.currency && group.currency !== currency && (
+                      <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
+                    )}
                   </span>
                   <span className="mt-1 block truncate sm:mt-0 sm:inline">
                     <span className="hidden sm:inline"> · </span>Fees {formatCurrency(group.feeCents || 0, currency, locale)}
@@ -250,10 +276,8 @@ function PortfolioHoldingList({
           </div>
           <ul className="divide-y divide-rule">
             {group.lots.map((holding, index) => {
-              const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
-              const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
-              const pnlCents = valueCents - costCents;
-              const pnlPct = costCents ? (pnlCents / costCents) * 100 : 0;
+              const { valueCents, costCents, pnlCents, pnlPct } = buildLotMetrics(holding, fxRates, currency);
+              const holdingCurrency = holding.currency || currency;
               return (
                 <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:gap-8 sm:px-6 sm:py-5">
                   <div className="min-w-0 pr-3 sm:contents">
@@ -266,7 +290,11 @@ function PortfolioHoldingList({
                       </p>
                       <p className="mt-2 truncate text-sm text-ink-muted sm:text-xs">{holding.platform || 'Platform'}</p>
                       <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
-                        Price {formatCurrency(holding.currentPriceCents, currency, locale)} · Fees {formatCurrency(holding.feeCents || 0, currency, locale)}
+                        Price {formatCurrency(holding.currentPriceCents, holdingCurrency, locale)}
+                        {holdingCurrency !== currency && (
+                          <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{holdingCurrency}</span>
+                        )}
+                        {' · '}Fees {formatCurrency(holding.feeCents || 0, holding.feeCurrency || holdingCurrency, locale)}
                       </p>
                     </div>
                     <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
@@ -319,7 +347,12 @@ function PortfolioHoldingList({
   );
 }
 
-function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }) {
+function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, onCancel }) {
+  const holdingCurrency = holding?.currency || currency;
+  const fxRate = holdingCurrency !== currency
+    ? (fxRates[holdingCurrency] ?? 1)
+    : 1;
+
   const [form, setForm] = useState({
     percent: sale?.percent != null ? `${sale.percent}` : '100',
     salePrice: sale?.salePriceCents != null
@@ -332,13 +365,18 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
   });
 
   const percent = Math.min(Math.max(Number(form.percent || 0), 0), 100);
+  // Sale price is entered in holding's native currency
   const salePriceCents = Math.round(Number(form.salePrice || 0) * 100);
   const feeCents = Math.round(Number(form.fee || 0) * 100);
   const soldQuantity = (holding?.quantity || 0) * (percent / 100);
-  const grossProceedsCents = Math.round(soldQuantity * salePriceCents);
-  const proceedsCents = Math.max(0, grossProceedsCents - feeCents);
+  // Proceeds in native currency, then convert to base for P&L display
+  const grossProceedsNative = Math.round(soldQuantity * salePriceCents);
+  const proceedsNative = Math.max(0, grossProceedsNative - feeCents);
   const holdingFeeCents = Math.round((holding?.feeCents || 0) * (percent / 100));
-  const costBasisCents = Math.round(soldQuantity * (holding?.averageBuyPriceCents || 0)) + holdingFeeCents;
+  const costBasisNative = Math.round(soldQuantity * (holding?.averageBuyPriceCents || 0)) + holdingFeeCents;
+  // Convert to base currency for display
+  const proceedsCents = Math.round(proceedsNative * fxRate);
+  const costBasisCents = Math.round(costBasisNative * fxRate);
   const realizedPnlCents = proceedsCents - costBasisCents;
   const realizedPnlPct = costBasisCents ? (realizedPnlCents / costBasisCents) * 100 : 0;
 
@@ -381,7 +419,7 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
         )}
       </FormField>
 
-      <FormField label="Sale price" htmlFor="sell-price" required>
+      <FormField label={`Sale price (${holdingCurrency})`} htmlFor="sell-price" required>
         {(props) => (
           <Input
             {...props}
@@ -422,7 +460,12 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
       <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm">
         <p className="eyebrow text-ink-muted">Estimated result</p>
         <p className="mt-1 font-mono text-ink">
-          {formatNumber(soldQuantity, locale, quantityDigits(holding))} qty - {formatCurrency(proceedsCents, currency, locale)}
+          {formatNumber(soldQuantity, locale, quantityDigits(holding))} qty
+          {' — '}
+          {formatCurrency(proceedsNative, holdingCurrency, locale)}
+          {holdingCurrency !== currency && (
+            <span className="ml-1 text-ink-muted">≈ {formatCurrency(proceedsCents, currency, locale)}</span>
+          )}
         </p>
         <p className={realizedPnlCents >= 0 ? 'mt-1 text-positive' : 'mt-1 text-danger'}>
           {formatCurrency(realizedPnlCents, currency, locale)}
@@ -442,11 +485,22 @@ function SellHoldingForm({ holding, sale, currency, locale, onSubmit, onCancel }
   );
 }
 
-function HoldingGroupForm({ group, onSubmit, onCancel }) {
+const PRICE_CURRENCIES = [
+  'EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD',
+  'SEK', 'NOK', 'DKK', 'HKD', 'SGD', 'INR', 'CNY',
+  'MXN', 'BRL', 'PLN', 'CZK', 'HUF', 'TRY',
+];
+
+function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
+  const currencies = PRICE_CURRENCIES.includes(baseCurrency)
+    ? PRICE_CURRENCIES
+    : [baseCurrency, ...PRICE_CURRENCIES];
+
   const [form, setForm] = useState({
     name: group?.name || '',
     platform: group?.lots?.[0]?.platform || '',
     currentPrice: group?.currentPriceCents ? `${group.currentPriceCents / 100}` : '',
+    currency: group?.currency || baseCurrency,
   });
 
   const set = (key) => (event) =>
@@ -462,6 +516,7 @@ function HoldingGroupForm({ group, onSubmit, onCancel }) {
           name: form.name,
           platform: form.platform,
           currentPriceCents: Math.round(Number(form.currentPrice || 0) * 100),
+          currency: form.currency,
         });
       }}
     >
@@ -483,17 +538,30 @@ function HoldingGroupForm({ group, onSubmit, onCancel }) {
         )}
       </FormField>
 
-      <FormField label="Current price" htmlFor="holding-group-current-price" className="md:col-span-2">
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.currentPrice}
-            onChange={set('currentPrice')}
-            placeholder="0.00"
-          />
+      <FormField label={`Current price (${form.currency})`} htmlFor="holding-group-current-price" className="md:col-span-2">
+        {() => (
+          <div className="flex rounded-md overflow-hidden border border-rule bg-surface focus-within:ring-1 focus-within:ring-accent">
+            <input
+              id="holding-group-current-price"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.currentPrice}
+              onChange={set('currentPrice')}
+              placeholder="0.00"
+              className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none"
+            />
+            <select
+              value={form.currency}
+              onChange={set('currency')}
+              aria-label="Currency"
+              className="shrink-0 border-l border-rule bg-surface-raised text-xs font-mono text-ink-muted px-2 outline-none cursor-pointer hover:bg-surface-sunken"
+            >
+              {currencies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
         )}
       </FormField>
 
@@ -547,10 +615,11 @@ export default function PortfolioPage() {
         archivedAt: null,
       }
     : modalHolding;
+  const fxRates = useFinanceStore((state) => state.fxRates);
   const locale = settings.locale;
   const currency = settings.baseCurrency;
   const activeHoldings = holdings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
-  const holdingGroups = groupHoldingsByTicker(activeHoldings);
+  const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
 
   const openNewHolding = (initialValue = null) => {
@@ -560,6 +629,7 @@ export default function PortfolioPage() {
   const openAddHoldingOperation = (group) => openNewHolding({
     ticker: group.ticker,
     name: group.name,
+    currency: group.currency,
     averageBuyPriceCents: group.averageBuyPriceCents,
     currentPriceCents: group.currentPriceCents,
   });
@@ -615,9 +685,7 @@ export default function PortfolioPage() {
 
   const holdingRows = holdingGroups.flatMap((group) => {
     const lotRows = group.lots.map((holding, index) => {
-      const valueCents = Math.round(Number(holding.quantity || 0) * (holding.currentPriceCents || 0));
-      const costCents = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0);
-      const pnlCents = valueCents - costCents;
+      const { valueCents, costCents, pnlCents, pnlPct } = buildLotMetrics(holding, fxRates, currency);
       return {
         ...holding,
         rowType: 'lot',
@@ -625,7 +693,7 @@ export default function PortfolioPage() {
         valueCents,
         costCents,
         pnlCents,
-        pnlPct: costCents ? (pnlCents / costCents) * 100 : 0,
+        pnlPct,
         rowClassName: 'bg-surface',
       };
     });
@@ -681,13 +749,39 @@ export default function PortfolioPage() {
       ),
     },
     { key: 'quantity', header: 'Qty', numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
-    { key: 'avg', header: 'Avg buy', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.averageBuyPriceCents, currency, locale) },
-    { key: 'price', header: 'Price', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.currentPriceCents, currency, locale) },
-    { key: 'fee', header: 'Fees', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
-    { key: 'value', header: 'Value', numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
+    {
+      key: 'avg',
+      header: 'Avg buy',
+      numeric: true,
+      hideOnMobile: true,
+      render: (r) => (
+        <span>
+          {formatCurrency(r.averageBuyPriceCents, r.currency || currency, locale)}
+          {r.currency && r.currency !== currency && (
+            <span className="ml-1 font-mono text-[10px] text-ink-faint">{r.currency}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      numeric: true,
+      hideOnMobile: true,
+      render: (r) => (
+        <span>
+          {formatCurrency(r.currentPriceCents, r.currency || currency, locale)}
+          {r.currency && r.currency !== currency && (
+            <span className="ml-1 font-mono text-[10px] text-ink-faint">{r.currency}</span>
+          )}
+        </span>
+      ),
+    },
+    { key: 'fee', header: `Fees (${currency})`, numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
+    { key: 'value', header: `Value (${currency})`, numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
     {
       key: 'pnl',
-      header: 'P&L',
+      header: `P&L (${currency})`,
       numeric: true,
       render: (r) => (
         <span className={r.pnlCents >= 0 ? 'text-positive' : 'text-danger'}>
@@ -961,6 +1055,7 @@ export default function PortfolioPage() {
             groups={holdingGroups}
             currency={currency}
             locale={locale}
+            fxRates={fxRates}
             openEditHoldingGroup={openEditHoldingGroup}
             openAddHoldingOperation={openAddHoldingOperation}
             openEditHolding={openEditHolding}
@@ -1112,10 +1207,15 @@ export default function PortfolioPage() {
             try {
               const isNew = !value.id;
               const { fundingSource, purchaseAmountCents, ...holdingValue } = value;
-              const baseCost = purchaseAmountCents > 0
-                ? purchaseAmountCents
-                : Math.round(holdingValue.quantity * holdingValue.averageBuyPriceCents);
-              const cost = baseCost + (holdingValue.feeCents || 0);
+              const priceCurr = holdingValue.currency || currency;
+              const feeCurr = holdingValue.feeCurrency || priceCurr;
+              const priceFx = applyFx(1_00, priceCurr, fxRates, currency) / 100;  // rate: foreign → base
+              const feeFx = applyFx(1_00, feeCurr, fxRates, currency) / 100;
+              // Convert purchase cost to base currency for the cashflow transfer
+              const rawBaseCost = purchaseAmountCents > 0
+                ? Math.round(purchaseAmountCents * priceFx)
+                : Math.round(holdingValue.quantity * holdingValue.averageBuyPriceCents * priceFx);
+              const cost = rawBaseCost + Math.round((holdingValue.feeCents || 0) * feeFx);
               if (isNew && cost > 0) {
                 const sourceBalance = fundingSource === 'savings' ? savingsBalanceCents : availableBalanceCents;
                 if (cost > sourceBalance) {
@@ -1161,6 +1261,7 @@ export default function PortfolioPage() {
         {editingHoldingGroup ? (
           <HoldingGroupForm
             group={editingHoldingGroup}
+            baseCurrency={currency}
             onSubmit={async (value) => {
               for (const lot of editingHoldingGroup.lots) {
                 await saveEntity('holdings', {
@@ -1168,6 +1269,7 @@ export default function PortfolioPage() {
                   name: value.name,
                   platform: value.platform,
                   currentPriceCents: value.currentPriceCents,
+                  currency: value.currency,
                 });
               }
               closeHoldingGroup();
@@ -1191,6 +1293,7 @@ export default function PortfolioPage() {
             sale={editingSale}
             currency={currency}
             locale={locale}
+            fxRates={fxRates}
             onSubmit={async (value) => {
               if (value.saleId) {
                 await updatePortfolioSale(value);

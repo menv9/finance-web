@@ -213,13 +213,6 @@ export default function DashboardPage() {
       info: 'Savings plus portfolio value. This is your broad financial position, not just cash available to spend.',
     },
     {
-      label: 'Monthly cashflow',
-      value: dashboard.cashflowCents,
-      mode: 'currency',
-      hint: dashboard.cashflowCents >= 0 ? 'available to spend' : 'overspend',
-      info: 'Income assigned to the current month minus expenses, savings, and investments for this month.',
-    },
-    {
       label: 'Total balance',
       value: dashboard.availableBalanceCents,
       mode: 'currency',
@@ -296,7 +289,7 @@ export default function DashboardPage() {
           data-tour="dashboard-kpis"
           className={
             'grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 ' +
-            (portfolioEnabled ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
+            (portfolioEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3')
           }
         >
           {kpis.map((k, i) => (

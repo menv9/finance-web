@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormField, Input, Select, Button } from '../ui';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { useConfirm } from '../ConfirmContext';
+
+const PRICE_CURRENCIES = [
+  'EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD',
+  'SEK', 'NOK', 'DKK', 'HKD', 'SGD', 'INR', 'CNY',
+  'MXN', 'BRL', 'PLN', 'CZK', 'HUF', 'TRY',
+];
 
 const defaultValue = {
   ticker: '',
@@ -13,6 +20,8 @@ const defaultValue = {
   averageBuyPriceCents: '',
   currentPriceCents: '',
   feeCents: '',
+  currency: '',
+  feeCurrency: '',
 };
 
 function countDecimals(value) {
@@ -32,19 +41,198 @@ function formatQuantityForInput(value) {
   return `${value.quantity ?? ''}`;
 }
 
+// ── PlatformSelect ──────────────────────────────────────────────────────────
+
+function XIcon() {
+  return (
+    <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
+      <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+
+function PlatformSelect({ id, value, onChange }) {
+  const settings = useFinanceStore((s) => s.settings);
+  const updateSettings = useFinanceStore((s) => s.updateSettings);
+  const confirm = useConfirm();
+
+  const defaultPlatforms = ['Trade Republic', 'IBKR', 'DEGIRO'];
+  const platforms = settings.holdingPlatforms?.length ? settings.holdingPlatforms : defaultPlatforms;
+
+  const [open, setOpen] = useState(false);
+  const [newPlatform, setNewPlatform] = useState('');
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (!containerRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Focus the add-input when dropdown opens
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const handleSelect = (platform) => {
+    onChange({ target: { value: platform } });
+    setOpen(false);
+  };
+
+  const handleDelete = async (platform, e) => {
+    e.stopPropagation();
+    setOpen(false);
+    const ok = await confirm({
+      title: `Remove "${platform}"?`,
+      description: `"${platform}" will be removed from your platform list. Existing holdings using it won't be affected.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) { setOpen(true); return; }
+    const next = platforms.filter((p) => p !== platform);
+    await updateSettings({ holdingPlatforms: next.length ? next : defaultPlatforms });
+    if (value === platform) onChange({ target: { value: next[0] || defaultPlatforms[0] } });
+  };
+
+  const handleAdd = () => {
+    const trimmed = newPlatform.trim();
+    if (!trimmed || platforms.includes(trimmed)) return;
+    const next = [...platforms, trimmed];
+    updateSettings({ holdingPlatforms: next });
+    onChange({ target: { value: trimmed } });
+    setNewPlatform('');
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger — same styles as Select from ui/Input.jsx */}
+      <button
+        id={id}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="block w-full rounded-md border border-rule-strong bg-surface-raised text-ink px-3 py-2.5 text-base sm:text-sm transition-colors duration-180 hover:border-ink-faint focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 appearance-none pr-9 cursor-pointer text-left"
+      >
+        <span className={value ? '' : 'text-ink-faint'}>{value || 'Select platform'}</span>
+      </button>
+      <svg
+        aria-hidden
+        viewBox="0 0 12 12"
+        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-ink-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+      >
+        <path d="M2 4.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-rule bg-surface shadow-md overflow-hidden">
+          <ul className="max-h-52 overflow-y-auto py-1">
+            {platforms.map((platform) => (
+              <li
+                key={platform}
+                className={`group flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-surface-raised ${value === platform ? 'bg-surface-raised' : ''}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSelect(platform)}
+                  className="flex-1 text-left text-sm text-ink"
+                >
+                  {platform}
+                  {value === platform && (
+                    <span className="ml-2 text-xs text-ink-faint">✓</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(platform, e)}
+                  aria-label={`Remove ${platform}`}
+                  className="shrink-0 rounded p-1 text-ink-faint opacity-0 group-hover:opacity-100 hover:bg-danger-soft hover:text-danger transition-opacity"
+                >
+                  <XIcon />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {/* Add custom platform */}
+          <div className="border-t border-rule flex items-center gap-2 px-3 py-2">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Add another platform…"
+              value={newPlatform}
+              onChange={(e) => setNewPlatform(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
+              className="flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!newPlatform.trim() || platforms.includes(newPlatform.trim())}
+              className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A number input with an attached currency selector badge
+function PriceInput({ id, value, onChange, currency, onCurrencyChange, currencies, placeholder, required, step, readOnlyCurrency }) {
+  return (
+    <div className="flex rounded-md overflow-hidden border border-rule bg-surface focus-within:ring-1 focus-within:ring-accent">
+      <input
+        id={id}
+        type="number"
+        step={step || '0.01'}
+        required={required}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder || '0.00'}
+        className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none"
+      />
+      {readOnlyCurrency ? (
+        <span className="flex shrink-0 items-center border-l border-rule bg-surface-raised px-2.5 font-mono text-xs text-ink-muted">
+          {currency}
+        </span>
+      ) : (
+        <select
+          value={currency}
+          onChange={onCurrencyChange}
+          aria-label="Currency"
+          className="shrink-0 border-l border-rule bg-surface-raised text-xs font-mono text-ink-muted px-2 outline-none cursor-pointer hover:bg-surface-sunken"
+        >
+          {currencies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
 export function HoldingForm({ initialValue, onSubmit, onCancel }) {
   const isEditing = Boolean(initialValue?.id);
   const settings = useFinanceStore((state) => state.settings);
-  const configuredPlatforms = settings.holdingPlatforms?.length
-    ? settings.holdingPlatforms
-    : ['Trade Republic', 'IBKR', 'DEGIRO'];
-  const platformOptions = initialValue?.platform && !configuredPlatforms.includes(initialValue.platform)
-    ? [...configuredPlatforms, initialValue.platform]
-    : configuredPlatforms;
+  const baseCurrency = settings.baseCurrency || 'EUR';
+  // Ensure baseCurrency is always in the list
+  const currencies = PRICE_CURRENCIES.includes(baseCurrency)
+    ? PRICE_CURRENCIES
+    : [baseCurrency, ...PRICE_CURRENCIES];
+
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
-    platform: initialValue?.platform || configuredPlatforms[0] || '',
+    platform: initialValue?.platform || settings.holdingPlatforms?.[0] || 'Trade Republic',
     quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
       ? `${initialValue.averageBuyPriceCents / 100}`
@@ -53,10 +241,21 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
       ? `${initialValue.currentPriceCents / 100}`
       : '',
     feeCents: initialValue?.feeCents ? `${initialValue.feeCents / 100}` : '',
+    currency: initialValue?.currency || baseCurrency,
+    feeCurrency: initialValue?.feeCurrency || initialValue?.currency || baseCurrency,
   });
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  const setPriceCurrency = (event) => {
+    const c = event.target.value;
+    setForm((prev) => ({ ...prev, currency: c }));
+  };
+
+  const setFeeCurrency = (event) =>
+    setForm((prev) => ({ ...prev, feeCurrency: event.target.value }));
+
   const averageBuyPriceCents = Math.round(Number(form.averageBuyPriceCents || 0) * 100);
   const purchaseAmountCents = Math.round(Number(form.purchaseAmountCents || 0) * 100);
   const hasPurchaseAmount = !isEditing && purchaseAmountCents > 0;
@@ -66,6 +265,10 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
   const resolvedQuantityDecimals = hasPurchaseAmount
     ? countDecimals(resolvedQuantity.toFixed(12).replace(/0+$/, '').replace(/\.$/, ''))
     : countDecimals(form.quantity);
+
+  const priceCurrency = form.currency || baseCurrency;
+  const feeCurrency = form.feeCurrency || priceCurrency;
+  const isForeignPrice = priceCurrency !== baseCurrency;
 
   return (
     <form
@@ -81,6 +284,8 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
           averageBuyPriceCents,
           currentPriceCents: Math.round(Number(form.currentPriceCents || 0) * 100),
           feeCents: Math.round(Number(form.feeCents || 0) * 100),
+          currency: priceCurrency,
+          feeCurrency,
         });
       }}
     >
@@ -105,35 +310,30 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
       </FormField>
 
       <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
-        {(props) => (
-          <Select {...props} value={form.platform} onChange={set('platform')}>
-            {platformOptions.map((platform) => (
-              <option key={platform} value={platform}>{platform}</option>
-            ))}
-          </Select>
+        {() => (
+          <PlatformSelect
+            id="holding-platform"
+            value={form.platform}
+            onChange={set('platform')}
+          />
         )}
       </FormField>
 
       {!isEditing ? (
         <>
-          <FormField label="Purchase funded from" htmlFor="holding-funding-source">
-            {(props) => (
-              <Select {...props} value={form.fundingSource} onChange={set('fundingSource')}>
-                <option value="cashflow">Monthly cashflow</option>
-                <option value="savings">Savings</option>
-              </Select>
-            )}
-          </FormField>
-
-          <FormField label="Amount invested" htmlFor="holding-purchase-amount" hint="Before commission. If set, quantity is calculated from average buy price.">
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                step="0.01"
-                min="0"
+          <FormField
+            label={`Amount invested (${priceCurrency})`}
+            htmlFor="holding-purchase-amount"
+            hint="Before commission. If set, quantity is calculated from average buy price."
+          >
+            {() => (
+              <PriceInput
+                id="holding-purchase-amount"
                 value={form.purchaseAmountCents}
                 onChange={set('purchaseAmountCents')}
+                currency={priceCurrency}
+                onCurrencyChange={setPriceCurrency}
+                currencies={currencies}
                 placeholder="0.00"
               />
             )}
@@ -160,45 +360,67 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         )}
       </FormField>
 
-      <FormField label="Average buy price" htmlFor="holding-buy" required>
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
+      <FormField
+        label={`Average buy price (${priceCurrency})`}
+        htmlFor="holding-buy"
+        required
+        hint={isForeignPrice ? `Avg buy price and current price share the same currency` : undefined}
+      >
+        {() => (
+          <PriceInput
+            id="holding-buy"
             value={form.averageBuyPriceCents}
             onChange={set('averageBuyPriceCents')}
-            placeholder="0.00"
+            currency={priceCurrency}
+            onCurrencyChange={setPriceCurrency}
+            currencies={currencies}
+            required
           />
         )}
       </FormField>
 
-      <FormField label="Commission" htmlFor="holding-fee" hint="Broker fee for this operation.">
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
-            min="0"
+      <FormField
+        label={`Commission (${feeCurrency})`}
+        htmlFor="holding-fee"
+        hint="Broker fee for this operation."
+      >
+        {() => (
+          <PriceInput
+            id="holding-fee"
             value={form.feeCents}
             onChange={set('feeCents')}
+            currency={feeCurrency}
+            onCurrencyChange={setFeeCurrency}
+            currencies={currencies}
             placeholder="0.00"
           />
         )}
       </FormField>
 
-      <FormField label="Current price" htmlFor="holding-current" hint="Updated via Refresh prices">
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
+      <FormField
+        label={`Current price (${priceCurrency})`}
+        htmlFor="holding-current"
+        hint="Updated via Refresh prices. Uses the same currency as avg buy price."
+        className="md:col-span-2"
+      >
+        {() => (
+          <PriceInput
+            id="holding-current"
             value={form.currentPriceCents}
             onChange={set('currentPriceCents')}
+            currency={priceCurrency}
+            readOnlyCurrency
+            currencies={currencies}
             placeholder="0.00"
           />
         )}
       </FormField>
+
+      {isForeignPrice && (
+        <p className="md:col-span-2 text-xs text-ink-muted rounded-md border border-rule bg-surface-raised px-3 py-2">
+          Prices are in <span className="font-mono font-medium">{priceCurrency}</span>. Value and P&amp;L will be shown in <span className="font-mono font-medium">{baseCurrency}</span> using the latest exchange rate from price refresh.
+        </p>
+      )}
 
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         {onCancel ? (

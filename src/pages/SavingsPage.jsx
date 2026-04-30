@@ -5,7 +5,6 @@ import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
-import { TransferForm } from '../components/forms/TransferForm';
 import {
   Area,
   AreaChart,
@@ -25,6 +24,108 @@ import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
+
+// ── Withdrawal modal ────────────────────────────────────────────────────────
+
+function WithdrawalModal({ open, onClose, balanceCents, currency, locale, onSubmit }) {
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(() => normalizeDateInput(new Date()));
+  const [description, setDescription] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const amountCents = Math.round(parseFloat(amount || '0') * 100);
+  const isOver = amountCents > 0 && amountCents > balanceCents;
+  const canSubmit = amountCents > 0 && !isOver;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({ amountCents, date, description: description.trim() });
+    } catch (err) {
+      window.alert(err.message || 'Unable to process withdrawal.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      eyebrow="Savings"
+      title="Withdraw from savings"
+      description="Move money back to your available balance."
+      size="sm"
+    >
+      <div className="grid gap-5">
+        {/* Balance pill */}
+        <div className="flex items-center justify-between rounded-lg border border-rule bg-surface-raised px-4 py-3">
+          <p className="text-sm text-ink-muted">Available in savings</p>
+          <p className="numeric text-sm font-semibold text-ink">
+            {formatCurrency(balanceCents, currency, locale)}
+          </p>
+        </div>
+
+        {/* Amount + Date */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label={`Amount (${currency})`} htmlFor="wd-amount">
+            <Input
+              id="wd-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              numeric
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              autoFocus
+            />
+          </FormField>
+          <FormField label="Date" htmlFor="wd-date">
+            <Input
+              id="wd-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        {/* Overdraft warning */}
+        {isOver && (
+          <p className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
+            This exceeds your savings balance of{' '}
+            {formatCurrency(balanceCents, currency, locale)}.
+          </p>
+        )}
+
+        {/* Description */}
+        <FormField label="Description (optional)" htmlFor="wd-desc">
+          <Input
+            id="wd-desc"
+            type="text"
+            placeholder="e.g. Emergency fund use"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </FormField>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            loading={submitting}
+            disabled={!canSubmit}
+          >
+            Withdraw
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -576,7 +677,7 @@ export default function SavingsPage() {
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
-              Transfer
+              Withdrawal
             </Button>
             <Button variant="primary" size="sm" onClick={() => openNew()}>
               <PlusIcon /> Add saving
@@ -1147,28 +1248,29 @@ export default function SavingsPage() {
         ) : null}
       </Modal>
 
-      {/* Transfer modal */}
-      <Modal
-        open={transferOpen}
-        onClose={() => setTransferOpen(false)}
-        eyebrow="Money movement"
-        title="New transfer from savings"
-        description="Pay an expense from savings or move money to your portfolio."
-        size="md"
-      >
-        <TransferForm
-          defaultFromModule="savings"
-          onSubmit={async (spec) => {
-            try {
-              await executeTransfer(spec);
-              setTransferOpen(false);
-            } catch (error) {
-              window.alert(error.message || 'Unable to create transfer.');
-            }
+      {/* Withdrawal modal */}
+      {transferOpen && (
+        <WithdrawalModal
+          open={transferOpen}
+          onClose={() => setTransferOpen(false)}
+          balanceCents={totalSavedCents}
+          currency={currency}
+          locale={locale}
+          onSubmit={async ({ amountCents, date, description }) => {
+            await executeTransfer({
+              date,
+              amountCents,
+              fromModule: 'savings',
+              fromId: null,
+              toModule: 'cashflow',
+              description,
+              category: null,
+              ticker: null,
+            });
+            setTransferOpen(false);
           }}
-          onCancel={() => setTransferOpen(false)}
         />
-      </Modal>
+      )}
     </div>
   );
 }

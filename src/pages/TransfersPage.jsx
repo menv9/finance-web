@@ -23,8 +23,6 @@ function PlusIcon() {
 function FlowPill({ from, to }) {
   const labels = {
     savings: 'Savings',
-    income: 'Cashflow',
-    cashflow: 'Cashflow',
     expenses: 'Expenses',
     portfolio: 'Portfolio',
   };
@@ -52,11 +50,11 @@ export default function TransfersPage() {
   const currency = settings.baseCurrency;
   const locale = settings.locale;
 
-  const [modal, setModal] = useState({ open: false, defaultFromModule: 'savings' });
+  const [modal, setModal] = useState({ open: false, defaultToModule: null });
 
-  const openTransfer = (defaultFromModule = 'savings') =>
-    setModal({ open: true, defaultFromModule });
-  const closeTransfer = () => setModal({ open: false, defaultFromModule: 'savings' });
+  const openTransfer = (_from = 'savings', defaultToModule = null) =>
+    setModal({ open: true, defaultToModule });
+  const closeTransfer = () => setModal({ open: false, defaultToModule: null });
 
   // ── Filters ──
   const [filterMonth, setFilterMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
@@ -165,7 +163,7 @@ export default function TransfersPage() {
         title="Transfers"
         description="Move money between savings, portfolio, and expenses. Every transfer creates linked records in both modules automatically."
         actions={
-          <Button variant="primary" size="sm" onClick={() => openTransfer('savings')}>
+          <Button variant="primary" size="sm" onClick={() => openTransfer()}>
             <PlusIcon /> New transfer
           </Button>
         }
@@ -175,20 +173,20 @@ export default function TransfersPage() {
       <section className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-2">
         {[
           {
-            label: 'Savings -> Expenses',
-            desc: 'Pay an expense from savings',
-            from: 'savings',
+            label: 'Savings → Expenses',
+            desc: 'Pay an expense directly from savings',
+            to: 'expenses',
           },
           {
-            label: 'Cashflow → Savings / Portfolio',
-            desc: 'Allocate part of your monthly cashflow',
-            from: 'cashflow',
+            label: 'Savings → Portfolio',
+            desc: 'Invest from savings into your portfolio',
+            to: 'portfolio',
           },
         ].map((action, i) => (
           <button
             key={action.label}
             type="button"
-            onClick={() => openTransfer(action.from)}
+            onClick={() => openTransfer('savings', action.to)}
             className={'text-left rounded-lg border-2 border-rule-strong bg-surface p-4 shadow-[0_1px_0_rgba(32,26,18,0.07)] hover:border-ink-faint hover:bg-surface-raised transition-colors duration-180 ' + rise(i + 1)}
           >
             <p className="text-sm font-medium text-ink">{action.label}</p>
@@ -224,8 +222,6 @@ export default function TransfersPage() {
             <Select id="trf-from" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}>
               <option value="all">All sources</option>
               <option value="savings">Savings</option>
-              <option value="cashflow">Cashflow</option>
-              <option value="income">Income</option>
             </Select>
           </FormField>
           <FormField label="To" htmlFor="trf-to">
@@ -266,7 +262,7 @@ export default function TransfersPage() {
             title="No transfers yet"
             description="Create your first transfer to move money between modules."
             action={
-              <Button variant="secondary" size="sm" onClick={() => openTransfer('savings')}>
+              <Button variant="secondary" size="sm" onClick={() => openTransfer()}>
                 <PlusIcon /> New transfer
               </Button>
             }
@@ -284,7 +280,7 @@ export default function TransfersPage() {
         size="md"
       >
         <TransferForm
-          defaultFromModule={modal.defaultFromModule}
+          defaultToModule={modal.defaultToModule}
           onSubmit={async (spec) => {
             try {
               await executeTransfer(spec);

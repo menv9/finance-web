@@ -30,23 +30,38 @@ export function categoryBreakdown(expenses) {
     .sort((left, right) => right.value - left.value);
 }
 
-export function computePortfolioMetrics(holdings, dividends, cashflows, targets = []) {
+// Convert cents in a foreign currency to base currency.
+// Falls back to 1:1 if no FX rate is available (e.g. prices not yet refreshed).
+function applyFx(cents, currency, fxRates, baseCurrency) {
+  if (!cents || !currency || currency === baseCurrency) return cents || 0;
+  const rate = fxRates[currency];
+  return rate != null ? Math.round(cents * rate) : cents;
+}
+
+export function computePortfolioMetrics(holdings, dividends, cashflows, targets = [], fxRates = {}, baseCurrency = 'EUR') {
   const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
-  const currentValueCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.currentPriceCents || 0)),
-    0,
-  );
-  const investedCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
-    0,
-  );
+
+  const currentValueCents = activeHoldings.reduce((total, holding) => {
+    const native = Math.round(holding.quantity * (holding.currentPriceCents || 0));
+    return total + applyFx(native, holding.currency, fxRates, baseCurrency);
+  }, 0);
+
+  const investedCents = activeHoldings.reduce((total, holding) => {
+    const nativeCost = Math.round(holding.quantity * (holding.averageBuyPriceCents || 0));
+    const baseCost = applyFx(nativeCost, holding.currency, fxRates, baseCurrency);
+    const feeCurr = holding.feeCurrency || holding.currency;
+    const baseFee = applyFx(holding.feeCents || 0, feeCurr, fxRates, baseCurrency);
+    return total + baseCost + baseFee;
+  }, 0);
+
   const pnlCents = currentValueCents - investedCents;
   const pnlPercent = investedCents ? (pnlCents / investedCents) * 100 : 0;
   const dividendIncomeCents = sumAmount(dividends);
   const dividendYield = currentValueCents ? (dividendIncomeCents / currentValueCents) * 100 : 0;
 
   const allocationByTicker = activeHoldings.reduce((groups, holding) => {
-    const valueCents = Math.round(holding.quantity * (holding.currentPriceCents || 0));
+    const native = Math.round(holding.quantity * (holding.currentPriceCents || 0));
+    const valueCents = applyFx(native, holding.currency, fxRates, baseCurrency);
     const current = groups.get(holding.ticker) || {
       ticker: holding.ticker,
       name: holding.name,
@@ -75,7 +90,7 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
     pnlPercent,
     dividendIncomeCents,
     dividendYield,
-    twrr: computeTWRR(holdings, cashflows),
+    twrr: computeTWRR(holdings, cashflows, fxRates, baseCurrency),
     xirr: computeXIRR(cashflows, currentValueCents),
     allocationActual,
   };
@@ -85,17 +100,20 @@ export function computePortfolioMetrics(holdings, dividends, cashflows, targets 
 // portfolio snapshots which we don't store. We use simple price-return on cost
 // basis — (current value − cost basis) / cost basis — which removes the impact
 // of additional contributions because cost basis already grew with each buy.
-export function computeTWRR(holdings, cashflows) {
+export function computeTWRR(holdings, cashflows, fxRates = {}, baseCurrency = 'EUR') {
   void cashflows;
   const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
-  const investedCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.averageBuyPriceCents || 0)) + (holding.feeCents || 0),
-    0,
-  );
-  const currentValueCents = activeHoldings.reduce(
-    (total, holding) => total + Math.round(holding.quantity * (holding.currentPriceCents || 0)),
-    0,
-  );
+  const investedCents = activeHoldings.reduce((total, holding) => {
+    const nativeCost = Math.round(holding.quantity * (holding.averageBuyPriceCents || 0));
+    const baseCost = applyFx(nativeCost, holding.currency, fxRates, baseCurrency);
+    const feeCurr = holding.feeCurrency || holding.currency;
+    const baseFee = applyFx(holding.feeCents || 0, feeCurr, fxRates, baseCurrency);
+    return total + baseCost + baseFee;
+  }, 0);
+  const currentValueCents = activeHoldings.reduce((total, holding) => {
+    const native = Math.round(holding.quantity * (holding.currentPriceCents || 0));
+    return total + applyFx(native, holding.currency, fxRates, baseCurrency);
+  }, 0);
   if (!investedCents) return 0;
   return ((currentValueCents - investedCents) / investedCents) * 100;
 }
@@ -162,7 +180,7 @@ function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], settings = {} }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], settings = {}, fxRates = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const allPastIncomes = incomes.filter((item) => item.date <= today);
@@ -194,7 +212,12 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
 
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth && item.date <= today);
   const currentMonthIncomes  = incomes.filter((item)  => (item.accountingMonth || monthKey(item.date)) === currentMonth && item.date <= today);
-  const currentMonthCashflowIncomes = currentMonthIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
+  // Exclude portfolio_sale (already counted via saleCashflowCents) and transfer
+  // incomes (savings withdrawals) — those affect balance but not the monthly
+  // cashflow metric, which should reflect only real earned income vs spending.
+  const currentMonthCashflowIncomes = currentMonthIncomes.filter(
+    (item) => item.incomeKind !== 'portfolio_sale' && item.incomeKind !== 'transfer',
+  );
   const currentMonthSaleCashflowCents = (portfolioSales || [])
     .filter((sale) => monthKey(sale.date) === currentMonth && sale.date <= today)
     .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
@@ -202,8 +225,8 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   // Fix: only count actually-logged expenses. Adding fixedMonthlyCents on top
   // double-counts recurring bills that were already saved as expense entries.
   const totalExpensesCents = sumAmount(currentMonthExpenses);
-  const totalIncomeCents   = sumAmount(currentMonthIncomes);
-  const cashflowIncomeCents = sumAmount(currentMonthCashflowIncomes);
+  const totalIncomeCents   = sumAmount(currentMonthCashflowIncomes); // excludes transfer & sale incomes
+  const cashflowIncomeCents = totalIncomeCents;
 
   // Distributions this month (income → savings / portfolio) are money you've
   // deliberately set aside — they're no longer "usable" discretionary cash.
@@ -228,7 +251,8 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
   const cashflowCents      = cashflowIncomeCents + currentMonthSaleCashflowCents - totalExpensesCents - distributedTotalCents - savedThisMonthCents;
   const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
-  const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, []);
+  const baseCurrency = settings.baseCurrency || 'EUR';
+  const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, [], fxRates, baseCurrency);
 
   // Fix: real net worth = savings balance (starting balance + logged entries) + portfolio.
   // The old formula (12-month cumulative cashflow + portfolio) ignored pre-existing
