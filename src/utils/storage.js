@@ -1,10 +1,32 @@
-import { DEFAULT_DATA, DEFAULT_SETTINGS } from '../data/defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_DATA, DEFAULT_SETTINGS } from '../data/defaults';
 
 const DB_NAME = 'personal-finance-tracker';
 const DB_VERSION = 9;
 const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'attachments', 'activityLog', 'attachmentBlobs'];
 const SETTINGS_KEY = 'pft-settings';
 const SYNC_META_KEY = 'pft-sync-meta';
+const LEGACY_DEFAULT_CATEGORIES = [
+  'Vivienda',
+  'Transporte',
+  'Alimentacion',
+  'Suscripciones',
+  'Ocio',
+  'Salud',
+  'Otros',
+];
+
+function normalizeSettings(settings) {
+  const categories = Array.isArray(settings.categories) ? settings.categories : DEFAULT_CATEGORIES;
+  const hasLegacyDefaults =
+    categories.length === LEGACY_DEFAULT_CATEGORIES.length &&
+    categories.every((category, index) => category === LEGACY_DEFAULT_CATEGORIES[index]);
+
+  return {
+    ...settings,
+    categories: hasLegacyDefaults ? DEFAULT_CATEGORIES : categories,
+    locale: DEFAULT_SETTINGS.locale,
+  };
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -83,14 +105,14 @@ export function loadSettings() {
   if (!raw) return DEFAULT_SETTINGS;
 
   try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw), locale: DEFAULT_SETTINGS.locale };
+    return normalizeSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, locale: DEFAULT_SETTINGS.locale }));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
 }
 
 export function loadSyncMeta() {

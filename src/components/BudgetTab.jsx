@@ -7,6 +7,7 @@ import { Card, Button, FormField, Input, EmptyState, Modal, Stat } from './ui';
 import { cn } from './ui/cn';
 import { rise } from '../utils/motion';
 import { ManageCategoriesModal } from './ManageCategoriesModal';
+import { CategorySelect } from './forms/CategorySelect';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -372,14 +373,11 @@ export function BudgetTab() {
         <div className="grid gap-5">
           {!isEditing && (
             <FormField label="Category" htmlFor="budget-category">
-              <Input
+              <CategorySelect
                 id="budget-category"
-                type="text"
-                list="budget-category-suggestions"
-                placeholder="e.g. Alimentacion, Ocio…"
                 value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                autoFocus
+                categories={expenseCategories}
+                onChange={(event) => setNewCategory(event.target.value)}
               />
             </FormField>
           )}

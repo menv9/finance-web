@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FormField, Input, Select, Button } from '../ui';
+import { FormField, Input, Button } from '../ui';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useConfirm } from '../ConfirmContext';
 
@@ -220,6 +220,22 @@ function PriceInput({ id, value, onChange, currency, onCurrencyChange, currencie
   );
 }
 
+function FormSection({ step, title, children }) {
+  return (
+    <section className="grid gap-4 border-t border-rule pt-5 first:border-t-0 first:pt-0">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-rule bg-surface-raised font-mono text-xs text-ink-muted">
+          {step}
+        </span>
+        <h3 className="font-display text-sm font-medium text-ink">{title}</h3>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export function HoldingForm({ initialValue, onSubmit, onCancel }) {
   const isEditing = Boolean(initialValue?.id);
   const settings = useFinanceStore((state) => state.settings);
@@ -272,7 +288,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
 
   return (
     <form
-      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit({
@@ -289,38 +305,40 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Ticker" htmlFor="holding-ticker" required>
-        {(props) => (
-          <Input
-            {...props}
-            value={form.ticker}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
-            }
-            placeholder="VWCE"
-            className="font-mono"
-          />
-        )}
-      </FormField>
+      <FormSection step="1" title="Asset">
+        <FormField label="Ticker" htmlFor="holding-ticker" required>
+          {(props) => (
+            <Input
+              {...props}
+              value={form.ticker}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
+              }
+              placeholder="VWCE"
+              className="font-mono"
+            />
+          )}
+        </FormField>
 
-      <FormField label="Name" htmlFor="holding-name">
-        {(props) => (
-          <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
-        )}
-      </FormField>
+        <FormField label="Name" htmlFor="holding-name">
+          {(props) => (
+            <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
+          )}
+        </FormField>
 
-      <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
-        {() => (
-          <PlatformSelect
-            id="holding-platform"
-            value={form.platform}
-            onChange={set('platform')}
-          />
-        )}
-      </FormField>
+        <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
+          {() => (
+            <PlatformSelect
+              id="holding-platform"
+              value={form.platform}
+              onChange={set('platform')}
+            />
+          )}
+        </FormField>
+      </FormSection>
 
-      {!isEditing ? (
-        <>
+      <FormSection step="2" title="Purchase">
+        {!isEditing ? (
           <FormField
             label={`Amount invested (${priceCurrency})`}
             htmlFor="holding-purchase-amount"
@@ -338,91 +356,93 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
               />
             )}
           </FormField>
-        </>
-      ) : null}
+        ) : null}
 
-      <FormField
-        label="Quantity"
-        htmlFor="holding-quantity"
-        required={!hasPurchaseAmount}
-        hint={hasPurchaseAmount && averageBuyPriceCents > 0 ? `Calculated: ${resolvedQuantity.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}` : undefined}
-      >
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="any"
-            value={form.quantity}
-            onChange={set('quantity')}
-            placeholder="0"
-            required={!hasPurchaseAmount}
-          />
+        <FormField
+          label={`Average buy price (${priceCurrency})`}
+          htmlFor="holding-buy"
+          required
+          hint={isForeignPrice ? `Avg buy price and current price share the same currency` : undefined}
+        >
+          {() => (
+            <PriceInput
+              id="holding-buy"
+              value={form.averageBuyPriceCents}
+              onChange={set('averageBuyPriceCents')}
+              currency={priceCurrency}
+              onCurrencyChange={setPriceCurrency}
+              currencies={currencies}
+              required
+            />
+          )}
+        </FormField>
+
+        <FormField
+          label="Quantity"
+          htmlFor="holding-quantity"
+          required={!hasPurchaseAmount}
+          hint={hasPurchaseAmount && averageBuyPriceCents > 0 ? `Calculated: ${resolvedQuantity.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}` : undefined}
+        >
+          {(props) => (
+            <Input
+              {...props}
+              type="number"
+              step="any"
+              value={form.quantity}
+              onChange={set('quantity')}
+              placeholder="0"
+              required={!hasPurchaseAmount}
+            />
+          )}
+        </FormField>
+
+        <FormField
+          label={`Commission (${feeCurrency})`}
+          htmlFor="holding-fee"
+          hint="Broker fee for this operation."
+        >
+          {() => (
+            <PriceInput
+              id="holding-fee"
+              value={form.feeCents}
+              onChange={set('feeCents')}
+              currency={feeCurrency}
+              onCurrencyChange={setFeeCurrency}
+              currencies={currencies}
+              placeholder="0.00"
+            />
+          )}
+        </FormField>
+      </FormSection>
+
+      <FormSection step="3" title="Market">
+        <FormField
+          label={`Current price (${priceCurrency})`}
+          htmlFor="holding-current"
+          hint="Updated via Refresh prices. Uses the same currency as avg buy price."
+          className="md:col-span-2"
+        >
+          {() => (
+            <PriceInput
+              id="holding-current"
+              value={form.currentPriceCents}
+              onChange={set('currentPriceCents')}
+              currency={priceCurrency}
+              readOnlyCurrency
+              currencies={currencies}
+              placeholder="0.00"
+            />
+          )}
+        </FormField>
+
+        {isForeignPrice && (
+          <p className="md:col-span-2 text-xs text-ink-muted rounded-md border border-rule bg-surface-raised px-3 py-2">
+            Prices are in <span className="font-mono font-medium">{priceCurrency}</span>. Value and P&amp;L will be shown in <span className="font-mono font-medium">{baseCurrency}</span> using the latest exchange rate from price refresh.
+          </p>
         )}
-      </FormField>
+      </FormSection>
 
-      <FormField
-        label={`Average buy price (${priceCurrency})`}
-        htmlFor="holding-buy"
-        required
-        hint={isForeignPrice ? `Avg buy price and current price share the same currency` : undefined}
-      >
-        {() => (
-          <PriceInput
-            id="holding-buy"
-            value={form.averageBuyPriceCents}
-            onChange={set('averageBuyPriceCents')}
-            currency={priceCurrency}
-            onCurrencyChange={setPriceCurrency}
-            currencies={currencies}
-            required
-          />
-        )}
-      </FormField>
-
-      <FormField
-        label={`Commission (${feeCurrency})`}
-        htmlFor="holding-fee"
-        hint="Broker fee for this operation."
-      >
-        {() => (
-          <PriceInput
-            id="holding-fee"
-            value={form.feeCents}
-            onChange={set('feeCents')}
-            currency={feeCurrency}
-            onCurrencyChange={setFeeCurrency}
-            currencies={currencies}
-            placeholder="0.00"
-          />
-        )}
-      </FormField>
-
-      <FormField
-        label={`Current price (${priceCurrency})`}
-        htmlFor="holding-current"
-        hint="Updated via Refresh prices. Uses the same currency as avg buy price."
-        className="md:col-span-2"
-      >
-        {() => (
-          <PriceInput
-            id="holding-current"
-            value={form.currentPriceCents}
-            onChange={set('currentPriceCents')}
-            currency={priceCurrency}
-            readOnlyCurrency
-            currencies={currencies}
-            placeholder="0.00"
-          />
-        )}
-      </FormField>
-
-      {isForeignPrice && (
-        <p className="md:col-span-2 text-xs text-ink-muted rounded-md border border-rule bg-surface-raised px-3 py-2">
-          Prices are in <span className="font-mono font-medium">{priceCurrency}</span>. Value and P&amp;L will be shown in <span className="font-mono font-medium">{baseCurrency}</span> using the latest exchange rate from price refresh.
-        </p>
-      )}
-
-      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+      <div className="flex justify-end gap-2 border-t border-rule pt-5">
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel

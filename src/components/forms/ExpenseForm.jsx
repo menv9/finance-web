@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
 import { FormField, Input, Select, Textarea, Checkbox, Button } from '../ui';
+import { CategorySelect } from './CategorySelect';
 
 const initialState = {
   date: normalizeDateInput(new Date()),
   amountCents: '',
   currency: 'EUR',
-  category: 'Otros',
+  category: 'Other',
   subcategory: '',
   description: '',
   isRecurring: false,
@@ -73,7 +74,7 @@ function PendingFilePill({ file, onRemove }) {
 }
 
 export function ExpenseForm({
-  categories,
+  categories = [],
   initialValue,
   existingAttachments = [],
   onRemoveAttachment,
@@ -145,14 +146,13 @@ export function ExpenseForm({
       </FormField>
 
       <FormField label="Category" htmlFor="expense-category">
-        {(props) => (
-          <Select {...props} value={form.category} onChange={set('category')}>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </Select>
+        {() => (
+          <CategorySelect
+            id="expense-category"
+            value={form.category}
+            categories={categories}
+            onChange={set('category')}
+          />
         )}
       </FormField>
 

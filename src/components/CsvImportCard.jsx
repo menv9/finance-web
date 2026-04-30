@@ -66,7 +66,7 @@ export function CsvImportCard({ mapping, categories, onImport }) {
           category:
             row[localMapping.category] && categories.includes(row[localMapping.category])
               ? row[localMapping.category]
-              : 'Otros',
+              : categories.includes('Other') ? 'Other' : categories[0] ?? 'Other',
           subcategory: '',
           description: row[localMapping.description] || '',
           isRecurring: false,

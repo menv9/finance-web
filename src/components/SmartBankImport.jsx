@@ -6,27 +6,27 @@ import { Button, FormField, Select, Input } from './ui';
 // Maps Merchant Category Codes to the app's default category names.
 // Falls back to the user's categories if an exact match isn't found.
 const MCC_CATEGORY = {
-  // Alimentacion — food & grocery
-  5411: 'Alimentacion', 5412: 'Alimentacion', 5422: 'Alimentacion',
-  5441: 'Alimentacion', 5451: 'Alimentacion', 5462: 'Alimentacion',
-  5499: 'Alimentacion', 5814: 'Alimentacion',
-  // Ocio — restaurants, bars, entertainment, hotels
-  5812: 'Ocio', 5813: 'Ocio', 5942: 'Ocio', 5945: 'Ocio',
-  7832: 'Ocio', 7922: 'Ocio', 7941: 'Ocio', 7991: 'Ocio',
-  7993: 'Ocio', 7011: 'Ocio', 7012: 'Ocio',
-  // Transporte — transit, taxis, airlines, fuel
-  4111: 'Transporte', 4112: 'Transporte', 4121: 'Transporte',
-  4131: 'Transporte', 4411: 'Transporte', 4511: 'Transporte',
-  5172: 'Transporte', 5541: 'Transporte', 5542: 'Transporte', 7523: 'Transporte',
-  // Salud — health, pharmacy, beauty/personal care
-  5122: 'Salud', 5912: 'Salud', 7230: 'Salud', 7231: 'Salud',
-  7298: 'Salud', 8011: 'Salud', 8021: 'Salud', 8049: 'Salud', 8099: 'Salud',
-  // Suscripciones — telecom, software, streaming
-  4812: 'Suscripciones', 4814: 'Suscripciones', 4816: 'Suscripciones',
-  7372: 'Suscripciones', 7375: 'Suscripciones',
-  // Vivienda — utilities, home improvement, furniture
-  4900: 'Vivienda', 5200: 'Vivienda', 5211: 'Vivienda', 5251: 'Vivienda',
-  5712: 'Vivienda', 5719: 'Vivienda', 5731: 'Vivienda',
+  // Food and grocery
+  5411: 'Food', 5412: 'Food', 5422: 'Food',
+  5441: 'Food', 5451: 'Food', 5462: 'Food',
+  5499: 'Food', 5814: 'Food',
+  // Other: restaurants, bars, entertainment, hotels
+  5812: 'Other', 5813: 'Other', 5942: 'Other', 5945: 'Other',
+  7832: 'Other', 7922: 'Other', 7941: 'Other', 7991: 'Other',
+  7993: 'Other', 7011: 'Other', 7012: 'Other',
+  // Transport: transit, taxis, airlines, fuel
+  4111: 'Transport', 4112: 'Transport', 4121: 'Transport',
+  4131: 'Transport', 4411: 'Transport', 4511: 'Transport',
+  5172: 'Transport', 5541: 'Transport', 5542: 'Transport', 7523: 'Transport',
+  // Other: health, pharmacy, beauty/personal care
+  5122: 'Other', 5912: 'Other', 7230: 'Other', 7231: 'Other',
+  7298: 'Other', 8011: 'Other', 8021: 'Other', 8049: 'Other', 8099: 'Other',
+  // Other: telecom, software, streaming
+  4812: 'Other', 4814: 'Other', 4816: 'Other',
+  7372: 'Other', 7375: 'Other',
+  // Housing: utilities, home improvement, furniture
+  4900: 'Housing', 5200: 'Housing', 5211: 'Housing', 5251: 'Housing',
+  5712: 'Housing', 5719: 'Housing', 5731: 'Housing',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -60,10 +60,10 @@ function autoMapping(headers) {
 
 function resolveCategory(mccRaw, userCategories) {
   const suggested = MCC_CATEGORY[Number(mccRaw)];
-  if (!suggested) return userCategories.includes('Otros') ? 'Otros' : userCategories[0] ?? 'Otros';
+  if (!suggested) return userCategories.includes('Other') ? 'Other' : userCategories[0] ?? 'Other';
   if (userCategories.includes(suggested)) return suggested;
   const close = userCategories.find((c) => c.toLowerCase().includes(suggested.toLowerCase()));
-  return close ?? (userCategories.includes('Otros') ? 'Otros' : userCategories[0] ?? 'Otros');
+  return close ?? (userCategories.includes('Other') ? 'Other' : userCategories[0] ?? 'Other');
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
       if (rawAmount < 0) {
         const autoCategory = mapping.mcc && row[mapping.mcc]
           ? resolveCategory(row[mapping.mcc], categories)
-          : (categories.includes('Otros') ? 'Otros' : categories[0] ?? 'Otros');
+          : (categories.includes('Other') ? 'Other' : categories[0] ?? 'Other');
         expenses.push({
           date,
           amountCents: Math.abs(rawAmount),

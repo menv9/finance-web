@@ -21,19 +21,19 @@ function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
 }
 
-// Progress-bar cell that contextualises the cashflow number with a denominator
-function CashflowBudgetCell({ incomeCents, cashflowCents, currency, locale, className }) {
-  const budgetCents = Math.max(incomeCents, 0);
+// Progress-bar cell that contextualises the cashflow number with income as denominator
+function CashflowIncomeCell({ incomeCents, cashflowCents, currency, locale, className }) {
+  const incomeTotalCents = Math.max(incomeCents, 0);
   // spentCents = everything that left income (expenses + saved + invested)
   const spentCents = Math.max(incomeCents - cashflowCents, 0);
   const isOver = cashflowCents < 0;
   const differenceCents = Math.abs(cashflowCents);
-  const fillPercent = budgetCents > 0 ? Math.min((spentCents / budgetCents) * 100, 100) : 100;
+  const fillPercent = incomeTotalCents > 0 ? Math.min((spentCents / incomeTotalCents) * 100, 100) : 100;
 
   return (
     <div className={`min-w-0 bg-surface p-6 ${className || ''}`}>
       <p className="eyebrow mb-3">Net cashflow</p>
-      {budgetCents > 0 ? (
+      {incomeTotalCents > 0 ? (
         <>
           <p className="text-sm text-ink mb-3">
             Spent{' '}
@@ -42,9 +42,9 @@ function CashflowBudgetCell({ incomeCents, cashflowCents, currency, locale, clas
             </span>{' '}
             of{' '}
             <span className="font-semibold numeric">
-              {formatCurrency(budgetCents, currency, locale)}
+              {formatCurrency(incomeTotalCents, currency, locale)}
             </span>{' '}
-            budget
+            income
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-surface-sunken">
             <div
@@ -247,7 +247,7 @@ export default function ThisMonthPage() {
             animate
           />
         </div>
-        <CashflowBudgetCell
+        <CashflowIncomeCell
           incomeCents={metrics.incomeCents}
           cashflowCents={metrics.cashflowCents}
           currency={currency}

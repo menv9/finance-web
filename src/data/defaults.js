@@ -1,11 +1,8 @@
 export const DEFAULT_CATEGORIES = [
-  'Vivienda',
-  'Transporte',
-  'Alimentacion',
-  'Suscripciones',
-  'Ocio',
-  'Salud',
-  'Otros',
+  'Housing',
+  'Transport',
+  'Food',
+  'Other',
 ];
 
 export const DEFAULT_SETTINGS = {

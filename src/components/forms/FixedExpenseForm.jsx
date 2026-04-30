@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { FormField, Input, Select, Toggle, Button } from '../ui';
+import { CategorySelect } from './CategorySelect';
 
 const defaultValue = {
   name: '',
   amountCents: '',
   currency: 'EUR',
   chargeDay: 1,
-  category: 'Vivienda',
+  category: 'Housing',
   active: true,
   alerts: true,
 };
@@ -67,14 +68,13 @@ export function FixedExpenseForm({ categories, initialValue, onSubmit, onCancel 
       </FormField>
 
       <FormField label="Category" htmlFor="fixed-category">
-        {(props) => (
-          <Select {...props} value={form.category} onChange={set('category')}>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </Select>
+        {() => (
+          <CategorySelect
+            id="fixed-category"
+            value={form.category}
+            categories={categories}
+            onChange={set('category')}
+          />
         )}
       </FormField>
 
