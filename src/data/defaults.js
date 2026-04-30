@@ -52,6 +52,7 @@ export const DEFAULT_DATA = {
   budgets: [],
   rollovers: [],
   transfers: [],
+  bankAccounts: [],
   attachments: [],
   activityLog: [],
 };

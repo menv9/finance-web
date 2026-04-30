@@ -33,7 +33,9 @@ export function TransferForm({ onSubmit, onCancel, defaultToModule = null }) {
   // Compute current savings balance for soft warning
   const savingsBalance =
     (savingsConfig?.currentBalanceCents || 0) +
-    savingsEntries.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+    savingsEntries
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, e) => sum + (e.amountCents || 0), 0);
 
   const amountCents = Math.round(parseFloat(amount || '0') * 100);
   const overdrawnSource = amountCents > 0 && amountCents > savingsBalance;

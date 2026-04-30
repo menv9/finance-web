@@ -585,7 +585,9 @@ export default function PortfolioPage() {
   const availableBalanceCents = useFinanceStore((state) => state.derived.dashboard.availableBalanceCents);
   const savingsBalanceCents = useFinanceStore((state) =>
     (state.savingsConfig?.currentBalanceCents || 0) +
-    state.savingsEntries.reduce((sum, entry) => sum + (entry.amountCents || 0), 0),
+    state.savingsEntries
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, entry) => sum + (entry.amountCents || 0), 0),
   );
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);

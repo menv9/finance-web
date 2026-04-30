@@ -180,7 +180,7 @@ function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], settings = {}, fxRates = {} }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], settings = {}, fxRates = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const allPastIncomes = incomes.filter((item) => item.date <= today);
@@ -200,10 +200,12 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     .filter((t) => t.toModule === 'savings' || t.toModule === 'portfolio')
     .reduce((sum, t) => sum + (t.amountCents || 0), 0);
   const allPastDirectSavingsCents = (savingsEntries || [])
-    .filter((e) => e.date <= today && !e.transferId)
+    .filter((e) => e.date <= today && !e.transferId && e.source !== 'allocation')
     .reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const bankBalanceCents = (bankAccounts || [])
+    .reduce((sum, account) => sum + (account.balanceCents || 0), 0);
   const availableBalanceCents =
-    (settings.initialCashBalanceCents || 0) +
+    bankBalanceCents +
     sumAmount(allPastCashflowIncomes) +
     allPastSaleCashflowCents -
     sumAmount(allPastCashflowExpenses) -
@@ -244,7 +246,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   // actually left to spend. Exclude transfer-linked entries (transferId is set)
   // since those are already captured by distributedToSavingsCents above.
   const savedThisMonthCents = (savingsEntries || [])
-    .filter((e) => e.date?.startsWith(currentMonth) && e.date <= today && !e.transferId)
+    .filter((e) => e.date?.startsWith(currentMonth) && e.date <= today && !e.transferId && e.source !== 'allocation')
     .reduce((s, e) => s + (e.amountCents || 0), 0);
 
   // Cashflow = money actually left to spend (income − expenses − saved − invested).
@@ -259,8 +261,10 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   // savings and only looked back 12 months.
   const savingsBalance =
     (savingsConfig?.currentBalanceCents || 0) +
-    (savingsEntries || []).reduce((sum, e) => sum + (e.amountCents || 0), 0);
-  const netWorthCents = savingsBalance + portfolio.currentValueCents;
+    (savingsEntries || [])
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const netWorthCents = availableBalanceCents + savingsBalance + portfolio.currentValueCents;
 
   const monthlyExpenses = computeExpenseSeries(expenses);
   const monthlyIncome   = computeIncomeSeries(incomes);
@@ -318,6 +322,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     netWorthCents,
     cashflowCents,
     availableBalanceCents,
+    bankBalanceCents,
     savingsBalanceCents: savingsBalance,
     savingsRate,
     portfolioPnlMonthCents: portfolio.pnlCents,

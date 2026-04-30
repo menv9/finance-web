@@ -210,13 +210,13 @@ export default function DashboardPage() {
       mode: 'currency',
       delta: netWorthDelta,
       deltaMode: 'percent',
-      info: 'Savings plus portfolio value. This is your broad financial position, not just cash available to spend.',
+      info: 'Total balance plus savings and portfolio value. This is your broad financial position, not just cash available to spend.',
     },
     {
       label: 'Total balance',
       value: dashboard.availableBalanceCents,
       mode: 'currency',
-      hint: 'cash carried over',
+      hint: 'bank balance + cashflow',
       info: 'Cash available now. It counts income from the day you receive it and carries leftover cash across months.',
     },
     {

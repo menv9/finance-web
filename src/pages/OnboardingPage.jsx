@@ -13,7 +13,9 @@ export default function OnboardingPage() {
   const settings = useFinanceStore((state) => state.settings);
   const savingsConfig = useFinanceStore((state) => state.savingsConfig);
   const holdings = useFinanceStore((state) => state.holdings);
+  const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
+  const saveEntity = useFinanceStore((state) => state.saveEntity);
   const saveSavingsConfig = useFinanceStore((state) => state.saveSavingsConfig);
 
   const currency = settings.baseCurrency || 'EUR';
@@ -71,9 +73,17 @@ export default function OnboardingPage() {
           currentBalanceCents: (savingsConfig.currentBalanceCents || 0) + savingsBalanceCents,
         });
       }
+      if (initialCashCents > 0) {
+        const mainAccount = bankAccounts.find((account) => account.id === 'bank-main') || bankAccounts[0];
+        await saveEntity('bankAccounts', {
+          ...(mainAccount || { id: 'bank-main', name: 'Main bank' }),
+          balanceCents: (mainAccount?.balanceCents || 0) + initialCashCents,
+          currency,
+        });
+      }
 
       await updateSettings({
-        initialCashBalanceCents: (settings.initialCashBalanceCents || 0) + initialCashCents,
+        initialCashBalanceCents: 0,
         modules: {
           ...(settings.modules || {}),
           portfolio: holdings.length > 0 || setup.portfolio,

@@ -11,14 +11,14 @@ import {
 } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
-import { chartMonthLabel } from '../utils/dates';
+import { chartMonthLabel, normalizeDateInput } from '../utils/dates';
 import { Card, Stat, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { MonthSelector } from '../components/MonthSelector';
 import { rise } from '../utils/motion';
 
 function currentMonthKey() {
-  return new Date().toISOString().slice(0, 7);
+  return normalizeDateInput(new Date()).slice(0, 7);
 }
 
 // Progress-bar cell that contextualises the cashflow number with income as denominator
@@ -114,15 +114,12 @@ export default function ThisMonthPage() {
     const expenseCents = monthExpenses.reduce((s, e) => s + (e.amountCents || 0), 0);
 
     const isCashflowSource = (t) => t.fromModule === 'income' || t.fromModule === 'cashflow';
-    const distributedToSavingsCents = monthTransfers
-      .filter((t) => isCashflowSource(t) && t.toModule === 'savings')
-      .reduce((s, t) => s + (t.amountCents || 0), 0);
     const distributedToPortfolioCents = monthTransfers
       .filter((t) => isCashflowSource(t) && t.toModule === 'portfolio')
       .reduce((s, t) => s + (t.amountCents || 0), 0);
 
-    const savedThisMonthCents = (savingsEntries || [])
-      .filter((e) => e.date?.startsWith(selectedMonth) && !e.transferId)
+    const netSavedThisMonthCents = (savingsEntries || [])
+      .filter((e) => e.date?.startsWith(selectedMonth) && e.source !== 'allocation')
       .reduce((s, e) => s + (e.amountCents || 0), 0);
 
     const saleCashflowCents = (portfolioSales || [])
@@ -133,15 +130,13 @@ export default function ThisMonthPage() {
       cashflowIncomeCents +
       saleCashflowCents -
       expenseCents -
-      distributedToSavingsCents -
-      distributedToPortfolioCents -
-      savedThisMonthCents;
+      distributedToPortfolioCents;
 
     return {
       incomeCents,
       expenseCents,
       cashflowCents,
-      savedCents: distributedToSavingsCents + savedThisMonthCents,
+      savedCents: netSavedThisMonthCents,
       investedCents: distributedToPortfolioCents,
     };
   }, [incomes, expenses, transfers, savingsEntries, portfolioSales, selectedMonth]);
@@ -256,38 +251,36 @@ export default function ThisMonthPage() {
         />
       </section>
 
-      {/* Saved / Invested — only when non-zero */}
-      {(metrics.savedCents > 0 || metrics.investedCents > 0) && (
-        <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2">
-          {[
-            {
-              label: 'Saved',
-              value: metrics.savedCents,
-              hint: 'to savings',
-              info: 'Direct savings entries and transfers to savings this month.',
-            },
-            {
-              label: 'Invested',
-              value: metrics.investedCents,
-              hint: 'to portfolio',
-              info: 'Transfers to your portfolio this month.',
-            },
-          ].map((kpi, i) => (
-            <div key={kpi.label} className={`min-w-0 bg-surface p-6 ${rise(i + 4)}`}>
-              <Stat
-                label={kpi.label}
-                value={kpi.value}
-                mode="currency"
-                currency={currency}
-                locale={locale}
-                hint={kpi.hint}
-                info={kpi.info}
-                animate
-              />
-            </div>
-          ))}
-        </section>
-      )}
+      {/* Saved / Invested */}
+      <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2">
+        {[
+          {
+            label: 'Saved',
+            value: metrics.savedCents,
+            hint: metrics.savedCents >= 0 ? 'to savings' : 'withdrawn from savings',
+            info: 'Net savings movement this month: deposits minus withdrawals.',
+          },
+          {
+            label: 'Invested',
+            value: metrics.investedCents,
+            hint: 'to portfolio',
+            info: 'Transfers to your portfolio this month.',
+          },
+        ].map((kpi, i) => (
+          <div key={kpi.label} className={`min-w-0 bg-surface p-6 ${rise(i + 4)}`}>
+            <Stat
+              label={kpi.label}
+              value={kpi.value}
+              mode="currency"
+              currency={currency}
+              locale={locale}
+              hint={kpi.hint}
+              info={kpi.info}
+              animate
+            />
+          </div>
+        ))}
+      </section>
 
       {/* 12-month bar chart */}
       <Card

@@ -849,6 +849,7 @@ export default function SettingsPage() {
               const modules = [
                 { label: 'Expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
                 { label: 'Income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
+                { label: 'Accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
                 { label: 'Portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
                 { label: 'Savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
                 { label: 'Transfers', stores: ['transfers'],                                                             file: 'transfers-backup.json' },

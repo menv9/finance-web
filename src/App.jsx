@@ -17,6 +17,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
+const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -66,6 +67,7 @@ export default function App() {
                   <Routes>
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/this-month" element={<ThisMonthPage />} />
+                    <Route path="/accounts" element={<AccountsPage />} />
                     <Route path="/income" element={<IncomePage />} />
                     <Route path="/expenses" element={<ExpensesPage />} />
                     <Route path="/budgets" element={<BudgetsPage />} />

@@ -15,6 +15,8 @@ export function SavingsEntryForm({
   goals = [],
   defaultGoalId = '',
   goalLocked = false,
+  showBucketSource = false,
+  unallocatedSavingsCents = 0,
   submitLabel,
   onSubmit,
   onCancel,
@@ -22,6 +24,7 @@ export function SavingsEntryForm({
   const [form, setForm] = useState({
     ...defaultValue,
     goalId: defaultGoalId,
+    bucketSource: 'balance',
     ...initialValue,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
@@ -38,9 +41,26 @@ export function SavingsEntryForm({
           ...form,
           amountCents: Math.round(Number(form.amountCents || 0) * 100),
           goalId: form.goalId || null,
+          bucketSource: form.bucketSource,
         });
       }}
     >
+      {showBucketSource ? (
+        <FormField
+          label="Money source"
+          htmlFor="saving-bucket-source"
+          hint={`Unallocated savings available: ${(unallocatedSavingsCents / 100).toLocaleString(undefined, { style: 'currency', currency })}`}
+          className="md:col-span-2"
+        >
+          {(props) => (
+            <Select {...props} value={form.bucketSource} onChange={set('bucketSource')}>
+              <option value="balance">Total balance (adds to total savings)</option>
+              <option value="savings">Allocate from total savings</option>
+            </Select>
+          )}
+        </FormField>
+      ) : null}
+
       <FormField label="Date" htmlFor="saving-date">
         {(props) => (
           <Input {...props} type="date" value={form.date} onChange={set('date')} required />

@@ -8,7 +8,6 @@ const initialState = {
   amountCents: '',
   currency: 'EUR',
   category: 'Other',
-  subcategory: '',
   description: '',
   isRecurring: false,
 };
@@ -26,6 +25,22 @@ function XIcon() {
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
       <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function FormSection({ step, title, children }) {
+  return (
+    <section className="grid gap-4 border-t border-rule pt-5 first:border-t-0 first:pt-0">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-rule bg-surface-raised font-mono text-xs text-ink-muted">
+          {step}
+        </span>
+        <h3 className="font-display text-sm font-medium text-ink">{title}</h3>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -113,7 +128,7 @@ export function ExpenseForm({
 
   return (
     <form
-      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(
@@ -126,82 +141,75 @@ export function ExpenseForm({
         );
       }}
     >
-      <FormField label="Date" htmlFor="expense-date">
-        {(props) => (
-          <Input {...props} type="date" value={form.date} onChange={set('date')} />
-        )}
-      </FormField>
+      <FormSection step="1" title="Transaction">
+        <FormField label="Date" htmlFor="expense-date">
+          {(props) => (
+            <Input {...props} type="date" value={form.date} onChange={set('date')} />
+          )}
+        </FormField>
 
-      <FormField label="Amount" htmlFor="expense-amount" required>
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
-            value={form.amountCents}
-            onChange={set('amountCents')}
-            placeholder="0.00"
+        <FormField label="Amount" htmlFor="expense-amount" required>
+          {(props) => (
+            <Input
+              {...props}
+              type="number"
+              step="0.01"
+              value={form.amountCents}
+              onChange={set('amountCents')}
+              placeholder="0.00"
+            />
+          )}
+        </FormField>
+
+        <FormField label="Currency" htmlFor="expense-currency">
+          {(props) => (
+            <Select {...props} value={form.currency} onChange={set('currency')}>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+            </Select>
+          )}
+        </FormField>
+      </FormSection>
+
+      <FormSection step="2" title="Details">
+        <FormField label="Category" htmlFor="expense-category">
+          {() => (
+            <CategorySelect
+              id="expense-category"
+              value={form.category}
+              categories={categories}
+              onChange={set('category')}
+            />
+          )}
+        </FormField>
+
+        <div className="flex items-center pt-5 md:pt-6">
+          <Checkbox
+            label="Also add to Recurring bills"
+            checked={form.isRecurring}
+            onChange={(checked) =>
+              setForm((prev) => ({ ...prev, isRecurring: checked }))
+            }
           />
-        )}
-      </FormField>
+        </div>
 
-      <FormField label="Category" htmlFor="expense-category">
-        {() => (
-          <CategorySelect
-            id="expense-category"
-            value={form.category}
-            categories={categories}
-            onChange={set('category')}
-          />
-        )}
-      </FormField>
-
-      <FormField label="Subcategory" htmlFor="expense-subcategory">
-        {(props) => (
-          <Input
-            {...props}
-            value={form.subcategory}
-            onChange={set('subcategory')}
-            placeholder="Optional"
-          />
-        )}
-      </FormField>
-
-      <FormField label="Description" htmlFor="expense-description" className="md:col-span-2">
-        {(props) => (
-          <Textarea
-            {...props}
-            rows={3}
-            value={form.description}
-            onChange={set('description')}
-            placeholder="A short note for the ledger"
-          />
-        )}
-      </FormField>
-
-      <FormField label="Currency" htmlFor="expense-currency">
-        {(props) => (
-          <Select {...props} value={form.currency} onChange={set('currency')}>
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="GBP">GBP</option>
-          </Select>
-        )}
-      </FormField>
-
-      <div className="flex items-center">
-        <Checkbox
-          label="Also add to Recurring bills"
-          checked={form.isRecurring}
-          onChange={(checked) =>
-            setForm((prev) => ({ ...prev, isRecurring: checked }))
-          }
-        />
-      </div>
+        <FormField label="Description" htmlFor="expense-description" className="md:col-span-2">
+          {(props) => (
+            <Textarea
+              {...props}
+              rows={3}
+              value={form.description}
+              onChange={set('description')}
+              placeholder="A short note for the ledger"
+            />
+          )}
+        </FormField>
+      </FormSection>
 
       {/* ── Attachments ─────────────────────────────────────────────────── */}
+      <FormSection step="3" title="Attachments">
       <div className="md:col-span-2">
-        <p className="eyebrow mb-2">Attachments</p>
 
         {/* Existing attachments (when editing) */}
         {existingAttachments.length > 0 && (
@@ -259,7 +267,9 @@ export function ExpenseForm({
         />
       </div>
 
-      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+      </FormSection>
+
+      <div className="flex justify-end gap-2 border-t border-rule pt-5">
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel

@@ -28,7 +28,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'attachments', 'activityLog'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'attachments', 'activityLog'];
 const STORE_STATE_KEY = {
   savings: 'savingsConfig',
 };
@@ -46,6 +46,7 @@ const STORE_LABELS = {
   budgets: 'Budget',
   rollovers: 'Budget rollover',
   transfers: 'Transfer',
+  bankAccounts: 'Bank account',
   attachments: 'Attachment',
   settings: 'Settings',
   activityLog: 'Activity log',
@@ -64,6 +65,7 @@ const STORE_MODULES = {
   budgets: 'Budgets',
   rollovers: 'Budgets',
   transfers: 'Transfers',
+  bankAccounts: 'Accounts',
   attachments: 'Expenses',
   settings: 'Settings',
   activityLog: 'Settings',
@@ -100,7 +102,23 @@ function buildDerived(state) {
 
 function savingsBalanceCents(state) {
   return (state.savingsConfig?.currentBalanceCents || 0) +
-    (state.savingsEntries || []).reduce((sum, entry) => sum + (entry.amountCents || 0), 0);
+    (state.savingsEntries || [])
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, entry) => sum + (entry.amountCents || 0), 0);
+}
+
+async function migrateInitialCashToBankAccounts(accounts, settings) {
+  if (accounts?.length || !settings?.initialCashBalanceCents) return accounts || [];
+  const timestamp = new Date().toISOString();
+  const account = ensureEntitySyncFields({
+    id: 'bank-main',
+    name: 'Main bank',
+    balanceCents: settings.initialCashBalanceCents,
+    currency: settings.baseCurrency || 'EUR',
+    updatedAt: timestamp,
+  }, timestamp);
+  await putRecord('bankAccounts', account);
+  return [account];
 }
 
 function assertSourceHasFunds(state, source, amountCents) {
@@ -401,6 +419,7 @@ export const useFinanceStore = create((set, get) => ({
   budgets: [],
   rollovers: [],
   transfers: [],
+  bankAccounts: [],
   attachments: [],
   activityLog: [],
   derived: {
@@ -408,6 +427,7 @@ export const useFinanceStore = create((set, get) => ({
       netWorthCents: 0,
       cashflowCents: 0,
       availableBalanceCents: 0,
+      bankBalanceCents: 0,
       savingsBalanceCents: 0,
       savingsRate: 0,
       portfolioPnlMonthCents: 0,
@@ -435,6 +455,7 @@ export const useFinanceStore = create((set, get) => ({
     const syncMeta = loadSyncMeta();
     const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
     const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
+    normalizedRecords[13] = await migrateInitialCashToBankAccounts(normalizedRecords[13], settings);
     set((state) => {
       const nextState = {
         ...state,
@@ -453,8 +474,9 @@ export const useFinanceStore = create((set, get) => ({
         budgets: normalizedRecords[10],
         rollovers: normalizedRecords[11],
         transfers: normalizedRecords[12],
-        attachments: normalizedRecords[13],
-        activityLog: normalizedRecords[14],
+        bankAccounts: normalizedRecords[13],
+        attachments: normalizedRecords[14],
+        activityLog: normalizedRecords[15],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -467,6 +489,7 @@ export const useFinanceStore = create((set, get) => ({
     const syncMeta = loadSyncMeta();
     const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
     const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
+    normalizedRecords[13] = await migrateInitialCashToBankAccounts(normalizedRecords[13], settings);
     await Promise.all(
       STORE_KEYS.map(async (storeName, index) => {
         const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
@@ -488,8 +511,9 @@ export const useFinanceStore = create((set, get) => ({
       budgets: normalizedRecords[10],
       rollovers: normalizedRecords[11],
       transfers: normalizedRecords[12],
-      attachments: normalizedRecords[13],
-      activityLog: normalizedRecords[14],
+      bankAccounts: normalizedRecords[13],
+      attachments: normalizedRecords[14],
+      activityLog: normalizedRecords[15],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -632,8 +656,8 @@ export const useFinanceStore = create((set, get) => ({
 
   saveSavingsEntry: async (entry) => {
     const previous = entry.id ? get().savingsEntries.find((item) => item.id === entry.id) : null;
-    if (!entry.transferId) {
-      const previousPositive = previous && !previous.transferId ? Math.max(previous.amountCents || 0, 0) : 0;
+    if (!entry.transferId && entry.source !== 'allocation') {
+      const previousPositive = previous && !previous.transferId && previous.source !== 'allocation' ? Math.max(previous.amountCents || 0, 0) : 0;
       const nextPositive = Math.max(entry.amountCents || 0, 0);
       assertSourceHasFunds(get(), 'cashflow', nextPositive - previousPositive);
     }
@@ -1677,6 +1701,7 @@ export const useFinanceStore = create((set, get) => ({
         budgets: [],
         rollovers: [],
         transfers: [],
+        bankAccounts: [],
         attachments: [],
         activityLog: [],
       };

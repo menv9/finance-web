@@ -145,9 +145,10 @@ function projectSavings(startCents, monthlyContributionCents, annualReturnRate, 
 }
 
 function computeMonthlyAvg(entries) {
-  if (!entries.length) return 0;
-  const total = entries.reduce((sum, e) => sum + e.amountCents, 0);
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const cashEntries = entries.filter((entry) => entry.source !== 'allocation');
+  if (!cashEntries.length) return 0;
+  const total = cashEntries.reduce((sum, e) => sum + e.amountCents, 0);
+  const sorted = [...cashEntries].sort((a, b) => a.date.localeCompare(b.date));
   const first = new Date(sorted[0].date);
   const now = new Date();
   const months = Math.max(
@@ -411,7 +412,9 @@ export default function SavingsPage() {
   const xAxisInterval        = projectionYears <= 10 ? 0 : projectionYears <= 20 ? 1 : 4;
 
   const totalEntriesCents = useMemo(
-    () => savingsEntries.reduce((sum, e) => sum + e.amountCents, 0),
+    () => savingsEntries
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, e) => sum + e.amountCents, 0),
     [savingsEntries],
   );
   const totalSavedCents = currentBalanceCents + totalEntriesCents;
@@ -441,11 +444,16 @@ export default function SavingsPage() {
     [goalBalances, savingsGoals],
   );
   const spendingGoal = goalsWithBalances.find((goal) => goal.id === bucketSpendModal.goalId);
+  const allocatedSavingsCents = useMemo(
+    () => Object.values(goalBalances).reduce((sum, value) => sum + value, 0),
+    [goalBalances],
+  );
+  const unallocatedSavingsCents = Math.max(0, totalSavedCents - allocatedSavingsCents);
 
   const thisMonthKey = monthKey(new Date());
   const savedThisMonthCents = useMemo(
     () => savingsEntries
-      .filter((e) => monthKey(e.date) === thisMonthKey)
+      .filter((e) => monthKey(e.date) === thisMonthKey && e.source !== 'allocation')
       .reduce((sum, e) => sum + e.amountCents, 0),
     [savingsEntries, thisMonthKey],
   );
@@ -455,6 +463,7 @@ export default function SavingsPage() {
   const monthlyChartData = useMemo(() => {
     const map = {};
     savingsEntries.forEach((e) => {
+      if (e.source === 'allocation') return;
       const key = monthKey(e.date);
       map[key] = (map[key] || 0) + e.amountCents;
     });
@@ -492,6 +501,7 @@ export default function SavingsPage() {
   const savingsTrendData = useMemo(() => {
     const map = {};
     savingsEntries.forEach((e) => {
+      if (e.source === 'allocation') return;
       const key = monthKey(e.date);
       map[key] = (map[key] || 0) + e.amountCents;
     });
@@ -1173,6 +1183,8 @@ export default function SavingsPage() {
           goals={savingsGoals}
           defaultGoalId={modal.goalId}
           goalLocked={modal.withdraw}
+          showBucketSource={Boolean(modal.goalId && !modal.withdraw && !editingEntry)}
+          unallocatedSavingsCents={unallocatedSavingsCents}
           submitLabel={modal.withdraw ? 'Withdraw' : undefined}
           onSubmit={async (value) => {
             try {
@@ -1180,10 +1192,28 @@ export default function SavingsPage() {
                 window.alert('You cannot withdraw more than this goal currently has saved.');
                 return;
               }
+              if (
+                modal.goalId &&
+                !modal.withdraw &&
+                !editingEntry &&
+                value.bucketSource === 'savings' &&
+                value.amountCents > unallocatedSavingsCents
+              ) {
+                window.alert('You cannot allocate more than your unallocated total savings.');
+                return;
+              }
+              const { bucketSource, ...entryValue } = value;
               await saveSavingsEntry({
-                ...value,
+                ...entryValue,
                 amountCents: modal.withdraw ? -Math.abs(value.amountCents) : value.amountCents,
-                note: value.note || (modal.withdraw ? 'Goal withdrawal' : value.goalId ? 'Goal saving' : ''),
+                source: bucketSource === 'savings' ? 'allocation' : undefined,
+                note: value.note || (
+                  modal.withdraw
+                    ? 'Goal withdrawal'
+                    : bucketSource === 'savings'
+                      ? 'Allocated from total savings'
+                      : value.goalId ? 'Goal saving' : ''
+                ),
               });
               close();
             } catch (error) {

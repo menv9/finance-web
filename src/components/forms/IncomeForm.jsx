@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
-import { FormField, Input, Select, Button } from '../ui';
+import { FormField, Input, Select, Button, InfoPopover } from '../ui';
 
 const defaultValue = {
   date: normalizeDateInput(new Date()),
@@ -17,6 +17,62 @@ const defaultValue = {
   assetTicker: '',
 };
 
+function FormSection({ step, title, children }) {
+  return (
+    <section className="grid gap-4 border-t border-rule pt-5 first:border-t-0 first:pt-0">
+      <div className="flex items-center gap-3">
+        <h3 className="eyebrow text-ink-muted">{step} - {title}</h3>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function IncomeKindButton({ active, children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-11 rounded-md border px-4 text-sm font-medium transition-colors ${
+        active
+          ? 'border-accent bg-accent-soft text-accent'
+          : 'border-rule-strong bg-surface-raised text-ink-muted hover:border-ink-faint hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MoneyInput({ amount, currency, onAmountChange, onCurrencyChange }) {
+  return (
+    <div className="flex overflow-hidden rounded-md border border-rule-strong bg-surface-raised transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
+      <select
+        value={currency}
+        onChange={onCurrencyChange}
+        aria-label="Currency"
+        className="w-24 shrink-0 border-r border-rule bg-transparent px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none"
+      >
+        <option value="EUR">EUR</option>
+        <option value="USD">USD</option>
+        <option value="GBP">GBP</option>
+      </select>
+      <input
+        id="income-amount"
+        type="number"
+        step="0.01"
+        value={amount}
+        onChange={onAmountChange}
+        placeholder="0.00"
+        required
+        className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-base font-mono tabular text-ink outline-none placeholder:text-ink-faint sm:text-sm"
+      />
+    </div>
+  );
+}
+
 export function IncomeForm({ initialValue, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     ...defaultValue,
@@ -30,7 +86,7 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
 
   return (
     <form
-      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit({
@@ -41,89 +97,129 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Date" htmlFor="income-date">
-        {(props) => <Input {...props} type="date" value={form.date} onChange={set('date')} />}
-      </FormField>
-
-      <FormField label="Accounting month" htmlFor="income-accounting-month" hint="Month where this income appears in reports">
-        {(props) => <Input {...props} type="month" value={form.accountingMonth} onChange={set('accountingMonth')} />}
-      </FormField>
-
-      <FormField label="Amount" htmlFor="income-amount" required>
-        {(props) => (
-          <Input
-            {...props}
-            type="number"
-            step="0.01"
-            value={form.amountCents}
-            onChange={set('amountCents')}
-            placeholder="0.00"
-          />
-        )}
-      </FormField>
-
-      <FormField label="Income type" htmlFor="income-kind">
-        {(props) => (
-          <Select {...props} value={form.incomeKind} onChange={set('incomeKind')}>
-            <option value="fixed">Fixed income</option>
-            <option value="variable">Variable income</option>
-            <option value="dividend">Dividend interest</option>
-          </Select>
-        )}
-      </FormField>
-
-      {form.incomeKind === 'variable' ? (
-        <FormField label="Source" htmlFor="income-source">
+      <FormSection step="1" title="PAYMENT">
+        <FormField label="Date" htmlFor="income-date">
           {(props) => (
-            <Select {...props} value={form.variableSourceType || 'client'} onChange={set('variableSourceType')}>
-              <option value="employer">Employer</option>
-              <option value="client">Client</option>
-            </Select>
+            <Input {...props} type="date" value={form.date} onChange={set('date')} />
           )}
         </FormField>
-      ) : form.incomeKind !== 'dividend' ? (
-        <FormField
-          label="Source"
-          htmlFor="income-source"
-          hint="Employer, client, or asset name"
-        >
-          {(props) => <Input {...props} value={form.source} onChange={set('source')} />}
-        </FormField>
-      ) : null}
 
-      {form.incomeKind === 'fixed' ? (
-        <>
-          <FormField label="Frequency" htmlFor="income-frequency">
+        <div className="grid gap-1.5">
+          <div className="eyebrow flex items-center gap-1.5 text-ink-muted">
+            <label htmlFor="income-accounting-month">Accounting month</label>
+            <InfoPopover info="Month where this income appears in reports." />
+          </div>
+          <Input
+            id="income-accounting-month"
+            type="month"
+            value={form.accountingMonth}
+            onChange={set('accountingMonth')}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection step="2" title="AMOUNT">
+        <div className="md:col-span-2">
+          <MoneyInput
+            amount={form.amountCents}
+            currency={form.currency}
+            onAmountChange={set('amountCents')}
+            onCurrencyChange={set('currency')}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection step="3" title="INCOME DETAILS">
+        <div className="grid grid-cols-3 gap-4 md:col-span-2">
+          <IncomeKindButton
+            active={form.incomeKind === 'fixed'}
+            onClick={() => setForm((prev) => ({ ...prev, incomeKind: 'fixed' }))}
+          >
+            Fixed
+          </IncomeKindButton>
+          <IncomeKindButton
+            active={form.incomeKind === 'variable'}
+            onClick={() => setForm((prev) => ({ ...prev, incomeKind: 'variable' }))}
+          >
+            Variable
+          </IncomeKindButton>
+          <IncomeKindButton
+            active={form.incomeKind === 'dividend'}
+            onClick={() => setForm((prev) => ({ ...prev, incomeKind: 'dividend' }))}
+          >
+            Asset-linked
+          </IncomeKindButton>
+        </div>
+
+        {form.incomeKind === 'variable' ? (
+          <FormField label="Source" htmlFor="income-source">
             {(props) => (
-              <Select {...props} value={form.frequency} onChange={set('frequency')}>
-                <option value="monthly">Monthly</option>
-                <option value="biweekly">Bi-weekly</option>
-                <option value="weekly">Weekly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="annual">Annual</option>
+              <Select {...props} value={form.variableSourceType || 'client'} onChange={set('variableSourceType')}>
+                <option value="employer">Employer</option>
+                <option value="client">Client</option>
               </Select>
             )}
           </FormField>
-          <FormField label="Pay day" htmlFor="income-payday" hint="Day of the month">
+        ) : form.incomeKind === 'fixed' ? (
+          <FormField
+            label="Employer / payer"
+            htmlFor="income-source"
+          >
+            {(props) => <Input {...props} value={form.source} onChange={set('source')} placeholder="e.g. Iberia MRO" />}
+          </FormField>
+        ) : null}
+
+        {form.incomeKind === 'variable' ? (
+          <FormField label={(form.variableSourceType || 'client') === 'employer' ? 'Employer / payer' : 'Client / payer'} htmlFor="income-client">
+            {(props) => <Input {...props} value={form.client} onChange={set('client')} placeholder="e.g. Iberia MRO" />}
+          </FormField>
+        ) : null}
+
+        {form.incomeKind === 'dividend' ? (
+          <FormField label="Asset ticker" htmlFor="income-asset">
             {(props) => (
               <Input
                 {...props}
-                type="number"
-                min="1"
-                max="31"
-                value={form.payDay}
-                onChange={set('payDay')}
+                value={form.assetTicker}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, assetTicker: event.target.value.toUpperCase() }))
+                }
+                placeholder="e.g. VWCE"
               />
             )}
           </FormField>
-        </>
-      ) : null}
+        ) : null}
 
-      {form.incomeKind === 'variable' ? (
-        <>
-          <FormField label={(form.variableSourceType || 'client') === 'employer' ? 'Employer' : 'Client'} htmlFor="income-client">
-            {(props) => <Input {...props} value={form.client} onChange={set('client')} />}
-          </FormField>
+        {form.incomeKind === 'fixed' ? (
+          <>
+            <FormField label="Frequency" htmlFor="income-frequency">
+              {(props) => (
+                <Select {...props} value={form.frequency} onChange={set('frequency')}>
+                  <option value="monthly">Monthly</option>
+                  <option value="biweekly">Bi-weekly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="annual">Annual</option>
+                </Select>
+              )}
+            </FormField>
+            <FormField label="Pay day" htmlFor="income-payday" hint="Day of the month">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={form.payDay}
+                  onChange={set('payDay')}
+                />
+              )}
+            </FormField>
+          </>
+        ) : null}
+
+        {form.incomeKind === 'variable' ? (
+          <>
           {(form.variableSourceType || 'client') === 'client' ? (
             <FormField label="Invoice status" htmlFor="income-status">
               {(props) => (
@@ -135,42 +231,24 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
               )}
             </FormField>
           ) : null}
-        </>
-      ) : null}
+          </>
+        ) : null}
 
-      {form.incomeKind === 'dividend' ? (
-        <FormField label="Asset ticker" htmlFor="income-asset">
-          {(props) => (
-            <Input
-              {...props}
-              value={form.assetTicker}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, assetTicker: event.target.value.toUpperCase() }))
-              }
-              placeholder="e.g. VWCE"
-            />
-          )}
-        </FormField>
-      ) : null}
+        {form.incomeKind === 'dividend' ? (
+          <p className="md:col-span-2 rounded-md border border-rule bg-surface-raised px-3 py-2 text-xs text-ink-muted">
+            Asset-linked income is linked to the ticker for portfolio yield reporting.
+          </p>
+        ) : null}
+      </FormSection>
 
-      <FormField label="Currency" htmlFor="income-currency">
-        {(props) => (
-          <Select {...props} value={form.currency} onChange={set('currency')}>
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="GBP">GBP</option>
-          </Select>
-        )}
-      </FormField>
-
-      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+      <div className="flex justify-end gap-2 border-t border-rule pt-5">
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
         ) : null}
         <Button type="submit" variant="primary">
-          {initialValue ? 'Save changes' : 'Add income'}
+          Save income
         </Button>
       </div>
     </form>

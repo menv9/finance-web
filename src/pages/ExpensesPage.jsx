@@ -133,7 +133,7 @@ function ExpenseLedgerList({
     <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
       {rows.map((row) => {
         const attCount = attachments.filter((a) => a.expenseId === row.id).length;
-        const meta = [row.category, row.subcategory].filter(Boolean).join(' / ') || 'Expense';
+        const meta = row.category || 'Expense';
         return (
           <li
             key={row.id}
@@ -354,7 +354,6 @@ export default function ExpensesPage() {
         amount: (expense.amountCents / 100).toFixed(2),
         currency: expense.currency,
         category: expense.category,
-        subcategory: expense.subcategory,
         description: expense.description,
         recurring: expense.isRecurring,
       })),
@@ -403,7 +402,6 @@ export default function ExpensesPage() {
         </span>
       ),
     },
-    { key: 'subcategory', header: 'Sub', hideOnMobile: true, render: (r) => r.subcategory || <span className="text-ink-faint">—</span> },
     {
       key: 'amountCents',
       header: 'Amount',
