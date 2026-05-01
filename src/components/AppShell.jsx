@@ -368,6 +368,53 @@ export function AppShell({ children }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
 
+  // Lock body scroll while drawer is open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [mobileOpen]);
+
+  // Edge-swipe gesture: swipe left from right edge to open, swipe right inside
+  // panel to close. Ignored on wide viewports where the panel isn't shown.
+  useEffect(() => {
+    const EDGE = 24;        // open: start zone, px from right edge
+    const PANEL_W = 288;    // close: panel width (w-72), track swipes within it
+    const TRIGGER = 50;     // min horizontal delta to count as a swipe
+    const Y_TOL = 60;       // max vertical drift; more = treat as scroll, skip
+    let startX = null;
+    let startY = null;
+
+    const onStart = (e) => {
+      if (window.innerWidth >= 1024) return;
+      const t = e.touches[0];
+      if (!t) return;
+      if (!mobileOpen && t.clientX >= window.innerWidth - EDGE) {
+        startX = t.clientX; startY = t.clientY;          // candidate open
+      } else if (mobileOpen && t.clientX >= window.innerWidth - PANEL_W) {
+        startX = t.clientX; startY = t.clientY;          // candidate close
+      }
+    };
+    const onEnd = (e) => {
+      if (startX == null) return;
+      const t = e.changedTouches[0];
+      if (!t) { startX = null; return; }
+      const dx = startX - t.clientX;                     // +left  −right
+      const dy = Math.abs(startY - t.clientY);
+      startX = null; startY = null;
+      if (dy >= Y_TOL) return;                           // too vertical
+      if (!mobileOpen && dx > TRIGGER)  setMobileOpen(true);
+      if (mobileOpen  && dx < -TRIGGER) setMobileOpen(false);
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchend',   onEnd,   { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onStart);
+      window.removeEventListener('touchend',   onEnd);
+    };
+  }, [mobileOpen]);
+
   useEffect(() => {
     setOpenNavMenu(null);
     setAddMenuOpen(false);
@@ -572,46 +619,81 @@ export function AppShell({ children }) {
           </div>
         </div>
 
-        {mobileOpen && (
-          <div className="lg:hidden border-t border-rule bg-surface animate-rise">
-            <nav aria-label="Primary mobile" className="mx-auto flex max-w-wide flex-col px-4 py-3">
-              {moreLinks.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 py-3 border-b border-rule last:border-b-0 transition-colors duration-120',
-                      isActive ? 'text-ink' : 'text-ink-muted',
-                    )
-                  }
-                >
-                  <span className="font-display text-lg">{link.label}</span>
-                </NavLink>
-              ))}
-              <div className="mt-3 flex items-center justify-between pt-3 border-t border-rule">
-                <div className="flex items-baseline gap-2">
-                  <span className="eyebrow text-[0.6rem]">Total balance</span>
-                  <span className="numeric text-sm text-ink">
-                    {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
-                  </span>
-                </div>
-                {supabaseConfigured && supabaseUser && (
-                  <button
-                    type="button"
-                    onClick={() => { setMobileOpen(false); signOutSupabase(); }}
-                    className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
-                  >
-                    <SignOutIcon />
-                    <span className="eyebrow text-[0.6rem]">Sign out</span>
-                  </button>
-                )}
-              </div>
-            </nav>
-          </div>
-        )}
       </header>
+
+      {/* ── Mobile drawer — fixed right-side panel ─────────────────────────── */}
+      {/* Backdrop: fades in/out, click-to-close */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300',
+          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        aria-hidden
+        onClick={() => setMobileOpen(false)}
+      />
+      {/* Panel: slides in from right */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        aria-hidden={!mobileOpen}
+        className={cn(
+          'fixed right-0 top-0 z-50 flex h-full w-72 flex-col border-l border-rule bg-surface shadow-2xl transition-transform duration-300 ease-in-out lg:hidden',
+          mobileOpen ? 'translate-x-0' : 'translate-x-full',
+        )}
+      >
+        {/* Panel header row */}
+        <div className="flex items-center justify-between border-b border-rule px-4 py-3">
+          <Logo theme={appliedTheme} />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <MenuIcon open />
+          </button>
+        </div>
+        {/* Nav links */}
+        <nav aria-label="Primary mobile" className="flex flex-1 flex-col overflow-y-auto px-3 py-3">
+          {moreLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-3 border-b border-rule last:border-b-0 transition-colors duration-120',
+                  isActive ? 'text-ink' : 'text-ink-muted',
+                )
+              }
+            >
+              <span className="font-display text-lg">{link.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+        {/* Panel footer: balance + sign-out */}
+        <div className="border-t border-rule px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="eyebrow text-[0.6rem]">Total balance</span>
+              <span className="numeric text-sm text-ink">
+                {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
+              </span>
+            </div>
+            {supabaseConfigured && supabaseUser && (
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); signOutSupabase(); }}
+                className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
+              >
+                <SignOutIcon />
+                <span className="eyebrow text-[0.6rem]">Sign out</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
       <nav
         aria-label="Mobile shortcuts"
