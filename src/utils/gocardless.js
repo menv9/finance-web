@@ -23,7 +23,8 @@ export async function getInstitutions(country = 'ES') {
     { headers: { 'Authorization': `Bearer ${token}` } },
   );
   if (!res.ok) throw new Error('Failed to load institutions');
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data?.results ?? data?.institutions ?? []);
 }
 
 export async function createBankLink({ institutionId, userId }) {

@@ -15,6 +15,15 @@ const COUNTRIES = [
 ];
 
 export function BankSyncSection({ userId, onSyncComplete }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [country, setCountry] = useState('ES');
+  const [institutions, setInstitutions] = useState([]);
+  const [institutionId, setInstitutionId] = useState('');
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState(null);
+
   if (!userId) {
     return (
       <Card
@@ -27,14 +36,6 @@ export function BankSyncSection({ userId, onSyncComplete }) {
       </Card>
     );
   }
-  const [modalOpen, setModalOpen] = useState(false);
-  const [country, setCountry] = useState('ES');
-  const [institutions, setInstitutions] = useState([]);
-  const [institutionId, setInstitutionId] = useState('');
-  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!modalOpen) return;
