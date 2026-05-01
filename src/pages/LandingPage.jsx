@@ -7,12 +7,15 @@ import SakuraPetals from '../components/SakuraPetals';
 // ─── Editorial data ───────────────────────────────────────────────────────────
 
 const modules = [
-  { roman: 'I',   title: 'Dashboard',  blurb: 'the arc of net worth, in one panel',          page: '01' },
-  { roman: 'II',  title: 'Expenses',   blurb: 'envelopes, rollover, every outgoing logged',  page: '02' },
-  { roman: 'III', title: 'Income',     blurb: 'salary, freelance, dividends, sales',         page: '03' },
-  { roman: 'IV',  title: 'Portfolio',  blurb: 'holdings, allocations, realised P&L',         page: '04' },
-  { roman: 'V',   title: 'Savings',    blurb: 'goal pots, deposit history, progress',        page: '05' },
-  { roman: 'VI',  title: 'Transfers',  blurb: 'cashflow distributed across the books',       page: '06' },
+  { roman: 'I',    title: 'Dashboard',  blurb: 'the arc of net worth, in one panel',           page: '01' },
+  { roman: 'II',   title: 'This Month', blurb: 'every entry, side-by-side with last year',     page: '02' },
+  { roman: 'III',  title: 'Accounts',   blurb: 'bank balances, kept honest and reconciled',    page: '03' },
+  { roman: 'IV',   title: 'Debts',      blurb: 'mortgages, loans, paid down by linked expenses', page: '04' },
+  { roman: 'V',    title: 'Income',     blurb: 'salary, freelance, dividends, sales',          page: '05' },
+  { roman: 'VI',   title: 'Expenses',   blurb: 'envelopes, rollover, every outgoing logged',   page: '06' },
+  { roman: 'VII',  title: 'Budgets',    blurb: 'category limits with rollover support',        page: '07' },
+  { roman: 'VIII', title: 'Savings',    blurb: 'goal pots, deposit history, progress',         page: '08' },
+  { roman: 'IX',   title: 'Portfolio',  blurb: 'holdings, allocations, realised P&L',          page: '09' },
 ];
 
 const articles = [
@@ -239,7 +242,7 @@ export default function LandingPage() {
 
             {/* — main column: cover headline — */}
             <div className="col-span-12 lg:col-span-7 space-y-8">
-              <p className="rise rise-1 eyebrow text-ink-faint">An honest accounting · in six chapters</p>
+              <p className="rise rise-1 eyebrow text-ink-faint">An honest accounting · in nine chapters</p>
 
               <h1 className="rise rise-2 cover-head">
                 <span className="cover-head-1">A&nbsp;quiet</span>
@@ -310,8 +313,9 @@ export default function LandingPage() {
             {[...Array(2)].map((_, rep) => (
               <span key={rep} className="flex items-center">
                 {[
-                  ['Dashboard', 'I'], ['Expenses', 'II'], ['Income', 'III'],
-                  ['Portfolio', 'IV'], ['Savings', 'V'], ['Transfers', 'VI'],
+                  ['Dashboard', 'I'], ['This Month', 'II'], ['Accounts', 'III'],
+                  ['Debts', 'IV'], ['Income', 'V'], ['Expenses', 'VI'],
+                  ['Budgets', 'VII'], ['Savings', 'VIII'], ['Portfolio', 'IX'],
                   ['Private', '⌧'], ['Local-first', '⌂'], ['Quarterly', '◷'],
                 ].map(([item, mark], i) => (
                   <span key={`${rep}-${i}`} className="flex items-center gap-3 px-7">
@@ -336,7 +340,7 @@ export default function LandingPage() {
                 <span><em>contents</em></span>
               </h2>
               <p className="section-sub">
-                Six chapters · one ledger.<br />
+                Nine chapters · one ledger.<br />
                 Hover a line to follow its thread.
               </p>
             </div>

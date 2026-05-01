@@ -63,6 +63,22 @@ export const TOUR_STEPS = [
     ],
   },
   {
+    route: '/debts',
+    page: 'Debts',
+    stops: [
+      {
+        tourId: 'debts-summary',
+        label: 'Debt totals',
+        desc: 'Your total outstanding balance across every debt, plus the monthly commitments declared on each one.',
+      },
+      {
+        tourId: 'debts-list',
+        label: 'Active debts',
+        desc: 'Track mortgages, loans, credit cards, and informal debts with progress bars. Link an expense to a debt and the balance is paid down automatically.',
+      },
+    ],
+  },
+  {
     route: '/income',
     page: 'Income',
     stops: [

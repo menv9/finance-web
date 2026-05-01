@@ -260,7 +260,7 @@ export default function DebtsPage() {
         actions={<Button onClick={openNew}>Add debt</Button>}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div data-tour="debts-summary" className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-lg border border-rule bg-surface p-6">
           <Stat
             label="Total debt"
@@ -278,6 +278,7 @@ export default function DebtsPage() {
       </div>
 
       <Card
+        data-tour="debts-list"
         title="Active debts"
         description="Edit a debt's balance directly, or pay it down by linking an expense from the Expenses module."
         action={<Button variant="secondary" onClick={openNew}>Add debt</Button>}
