@@ -1,37 +1,36 @@
 import { getSupabaseBrowserClient, getSupabaseConfig } from './supabase';
 import { useFinanceStore } from '../store/useFinanceStore';
 
-function getConfig() {
+async function getAuthToken() {
+  const client = getSupabaseBrowserClient();
+  if (client) {
+    const { data: { session } } = await client.auth.getSession();
+    if (session?.access_token) return session.access_token;
+  }
   const settings = useFinanceStore.getState().settings;
-  return getSupabaseConfig(settings);
+  return getSupabaseConfig(settings).anonKey;
 }
 
-function fnHeaders() {
-  const { anonKey } = getConfig();
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${anonKey}`,
-  };
-}
-
-function fnUrl(name) {
-  const { url } = getConfig();
-  return `${url}/functions/v1/${name}`;
+function getBaseUrl() {
+  const settings = useFinanceStore.getState().settings;
+  return getSupabaseConfig(settings).url;
 }
 
 export async function getInstitutions(country = 'ES') {
+  const token = await getAuthToken();
   const res = await fetch(
-    `${fnUrl('gocardless-institutions')}?country=${country}`,
-    { headers: fnHeaders() },
+    `${getBaseUrl()}/functions/v1/gocardless-institutions?country=${country}`,
+    { headers: { 'Authorization': `Bearer ${token}` } },
   );
   if (!res.ok) throw new Error('Failed to load institutions');
   return res.json();
 }
 
 export async function createBankLink({ institutionId, userId }) {
-  const res = await fetch(fnUrl('gocardless-link'), {
+  const token = await getAuthToken();
+  const res = await fetch(`${getBaseUrl()}/functions/v1/gocardless-link`, {
     method: 'POST',
-    headers: fnHeaders(),
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ institution_id: institutionId, user_id: userId }),
   });
   if (!res.ok) throw new Error('Failed to create bank link');
@@ -39,9 +38,10 @@ export async function createBankLink({ institutionId, userId }) {
 }
 
 export async function syncBankAccounts(userId) {
-  const res = await fetch(fnUrl('gocardless-sync'), {
+  const token = await getAuthToken();
+  const res = await fetch(`${getBaseUrl()}/functions/v1/gocardless-sync`, {
     method: 'POST',
-    headers: fnHeaders(),
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId }),
   });
   if (!res.ok) throw new Error('Sync failed');
