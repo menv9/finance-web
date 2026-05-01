@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import {
   Area,
   AreaChart,
@@ -725,6 +725,7 @@ export default function PortfolioPage() {
   const refreshPrices = useFinanceStore((state) => state.refreshPrices);
   const recordPortfolioSnapshot = useFinanceStore((state) => state.recordPortfolioSnapshot);
   const confirm = useConfirm();
+  const alert = useAlert();
   const [holdingModal, setHoldingModal] = useState({ open: false, id: null, initialValue: null });
   const [holdingGroupModal, setHoldingGroupModal] = useState({ open: false, ticker: null });
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
@@ -1457,7 +1458,7 @@ export default function PortfolioPage() {
               }
               closeHolding();
             } catch (error) {
-              window.alert(error.message || 'Unable to add holding.');
+              await alert({ title: 'Unable to add holding', description: error.message || 'Something went wrong.' });
             }
           }}
           onCancel={closeHolding}
@@ -1539,7 +1540,7 @@ export default function PortfolioPage() {
                 await sellAllHoldingGroup(sellingAllGroup, value);
                 closeSellAllHoldingGroup();
               } catch (error) {
-                window.alert(error.message || 'Unable to sell all holdings.');
+                await alert({ title: 'Unable to sell all holdings', description: error.message || 'Something went wrong.' });
               }
             }}
             onCancel={closeSellAllHoldingGroup}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
@@ -306,6 +306,7 @@ export default function ExpensesPage() {
   const [expensePage, setExpensePage] = useState(1);
 
   const confirm = useConfirm();
+  const alert = useAlert();
   const locale = settings.locale;
   const currency = settings.baseCurrency;
   const filteredExpenses = useMemo(
@@ -809,7 +810,7 @@ export default function ExpensesPage() {
               }
               closeExpenseModal();
             } catch (error) {
-              window.alert(error.message || 'Unable to save expense.');
+              await alert({ title: 'Unable to save expense', description: error.message || 'Something went wrong.' });
             }
           }}
           onCancel={closeExpenseModal}

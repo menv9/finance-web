@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
@@ -28,6 +28,7 @@ import { rise } from '../utils/motion';
 // ── Withdrawal modal ────────────────────────────────────────────────────────
 
 function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAccounts = [], onSubmit }) {
+  const alert = useAlert();
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(() => normalizeDateInput(new Date()));
   const [description, setDescription] = useState('');
@@ -46,7 +47,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
     try {
       await onSubmit({ amountCents, date, description: description.trim(), bankAccountId });
     } catch (err) {
-      window.alert(err.message || 'Unable to process withdrawal.');
+      await alert({ title: 'Unable to process withdrawal', description: err.message || 'Something went wrong.' });
     } finally {
       setSubmitting(false);
     }
@@ -379,6 +380,7 @@ export default function SavingsPage() {
   const bankAccounts       = useFinanceStore((state) => state.bankAccounts || []);
 
   const confirm = useConfirm();
+  const alert = useAlert();
   const currency = settings.baseCurrency;
   const locale   = settings.locale;
 
@@ -602,7 +604,10 @@ export default function SavingsPage() {
   const handleDeleteGoal = async (goal) => {
     const hasEntries = savingsEntries.some((entry) => entry.goalId === goal.id);
     if (hasEntries) {
-      window.alert('This goal has savings entries. Withdraw, edit, or delete those entries before deleting the goal.');
+      await alert({
+        title: 'Goal has entries',
+        description: 'This goal has savings entries. Withdraw, edit, or delete those entries before deleting the goal.',
+      });
       return;
     }
     const ok = await confirm({
@@ -1212,7 +1217,10 @@ export default function SavingsPage() {
           onSubmit={async (value) => {
             try {
               if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
-                window.alert('You cannot withdraw more than this goal currently has saved.');
+                await alert({
+                  title: 'Withdrawal too large',
+                  description: 'You cannot withdraw more than this goal currently has saved.',
+                });
                 return;
               }
               if (
@@ -1222,7 +1230,10 @@ export default function SavingsPage() {
                 value.bucketSource === 'savings' &&
                 value.amountCents > unallocatedSavingsCents
               ) {
-                window.alert('You cannot allocate more than your unallocated total savings.');
+                await alert({
+                  title: 'Allocation too large',
+                  description: 'You cannot allocate more than your unallocated total savings.',
+                });
                 return;
               }
               const { bucketSource, ...entryValue } = value;
@@ -1240,7 +1251,7 @@ export default function SavingsPage() {
               });
               close();
             } catch (error) {
-              window.alert(error.message || 'Unable to add saving.');
+              await alert({ title: 'Unable to add saving', description: error.message || 'Something went wrong.' });
             }
           }}
           onCancel={close}
@@ -1281,7 +1292,10 @@ export default function SavingsPage() {
             onSubmit={async (value) => {
               if (!value.amountCents || value.amountCents <= 0) return;
               if (value.amountCents > spendingGoal.savedCents) {
-                window.alert('You cannot spend more than this bucket currently has saved.');
+                await alert({
+                  title: 'Spend too large',
+                  description: 'You cannot spend more than this bucket currently has saved.',
+                });
                 return;
               }
               await executeTransfer({

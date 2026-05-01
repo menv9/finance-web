@@ -2,7 +2,17 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './ui';
 
-export function ConfirmDialog({ open, title, description, confirmLabel = 'Delete', onConfirm, onCancel }) {
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
+  confirmVariant = 'danger',
+  mode = 'confirm',
+  onConfirm,
+  onCancel,
+}) {
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -20,13 +30,15 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Delete
 
   if (!open) return null;
 
+  const isAlert = mode === 'alert';
+
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
       {/* Backdrop */}
       <button
         type="button"
-        aria-label="Cancel"
-        onClick={onCancel}
+        aria-label={isAlert ? 'Dismiss' : 'Cancel'}
+        onClick={isAlert ? onConfirm : onCancel}
         className="fixed inset-0 bg-canvas/75 backdrop-blur-[2px] animate-[fadeIn_150ms_ease-out]"
       />
 
@@ -38,7 +50,6 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Delete
         aria-describedby={description ? 'confirm-desc' : undefined}
         className="relative w-full max-w-sm rounded-2xl border border-rule bg-surface shadow-lift animate-[modalRise_180ms_cubic-bezier(0.22,0.61,0.36,1)] overflow-hidden"
       >
-        {/* Content */}
         <div className="px-5 pt-5 pb-4">
           <p id="confirm-title" className="font-display text-lg font-medium text-ink">
             {title}
@@ -50,12 +61,13 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Delete
           )}
         </div>
 
-        {/* Actions — stacked on mobile, row on sm+ */}
         <div className="flex flex-col-reverse gap-2 border-t border-rule px-5 py-4 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={onCancel} className="w-full sm:w-auto">
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={onConfirm} className="w-full sm:w-auto">
+          {!isAlert && (
+            <Button variant="secondary" onClick={onCancel} className="w-full sm:w-auto">
+              {cancelLabel}
+            </Button>
+          )}
+          <Button variant={confirmVariant} onClick={onConfirm} className="w-full sm:w-auto">
             {confirmLabel}
           </Button>
         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { useAlert } from '../components/ConfirmContext';
 import { Card, Table, Button, FormField, Input, Select, EmptyState, Modal, Toggle, Checkbox } from '../components/ui';
 import { rise } from '../utils/motion';
 import { formatCurrency } from '../utils/formatters';
@@ -155,6 +156,7 @@ function moneyMovementText(log, locale, baseCurrency) {
 }
 
 export default function SettingsPage() {
+  const alert = useAlert();
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
   const navigate = useNavigate();
@@ -199,7 +201,7 @@ export default function SettingsPage() {
         startTour();
       }
     } catch (error) {
-      window.alert(error.message || 'Unable to erase data.');
+      await alert({ title: 'Unable to erase data', description: error.message || 'Something went wrong.' });
     } finally {
       setWiping(false);
     }

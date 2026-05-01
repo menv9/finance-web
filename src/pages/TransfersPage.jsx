@@ -6,7 +6,7 @@ import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
 import { TransferForm } from '../components/forms/TransferForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { formatCurrency } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
 import { Card, Button, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
@@ -46,6 +46,7 @@ export default function TransfersPage() {
   const executeTransfer = useFinanceStore((s) => s.executeTransfer);
   const removeTransfer = useFinanceStore((s) => s.removeTransfer);
   const confirm = useConfirm();
+  const alert = useAlert();
 
   const currency = settings.baseCurrency;
   const locale = settings.locale;
@@ -286,7 +287,7 @@ export default function TransfersPage() {
               await executeTransfer(spec);
               closeTransfer();
             } catch (error) {
-              window.alert(error.message || 'Unable to create transfer.');
+              await alert({ title: 'Unable to create transfer', description: error.message || 'Something went wrong.' });
             }
           }}
           onCancel={closeTransfer}

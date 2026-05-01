@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { PageHeader } from '../components/PageHeader';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
@@ -26,6 +26,7 @@ function parseAmountToCents(value) {
 }
 
 function DebtModal({ open, debt, currency, onClose, onSave }) {
+  const alert = useAlert();
   const isEditing = Boolean(debt?.id);
   const [name, setName] = useState(debt?.name || '');
   const [lender, setLender] = useState(debt?.lender || '');
@@ -44,13 +45,13 @@ function DebtModal({ open, debt, currency, onClose, onSave }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!name.trim()) {
-      window.alert('Add a name for the debt.');
+      await alert({ title: 'Missing name', description: 'Add a name for the debt.' });
       return;
     }
     const originalCents = parseAmountToCents(originalAmount);
     const currentCents = parseAmountToCents(currentBalance);
     if (currentCents < 0) {
-      window.alert('Current balance cannot be negative.');
+      await alert({ title: 'Invalid balance', description: 'Current balance cannot be negative.' });
       return;
     }
     setSaving(true);
@@ -71,7 +72,7 @@ function DebtModal({ open, debt, currency, onClose, onSave }) {
       });
       onClose();
     } catch (err) {
-      window.alert(err.message || 'Unable to save debt.');
+      await alert({ title: 'Unable to save debt', description: err.message || 'Something went wrong.' });
     } finally {
       setSaving(false);
     }

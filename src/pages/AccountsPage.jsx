@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useConfirm } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -18,6 +18,7 @@ function parseAmountToCents(value) {
 }
 
 function AccountModal({ open, account, currency, onClose, onSave }) {
+  const alert = useAlert();
   const [name, setName] = useState(account?.name || '');
   const [balance, setBalance] = useState(centsToAmount(account?.balanceCents));
   const [saving, setSaving] = useState(false);
@@ -26,12 +27,12 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
-      window.alert('Add an account name.');
+      await alert({ title: 'Missing name', description: 'Add an account name.' });
       return;
     }
     const balanceCents = parseAmountToCents(balance);
     if (balanceCents < 0) {
-      window.alert('Bank account balance cannot be negative.');
+      await alert({ title: 'Invalid balance', description: 'Bank account balance cannot be negative.' });
       return;
     }
     setSaving(true);
@@ -45,7 +46,7 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
       if (saved === false) return;
       onClose();
     } catch (err) {
-      window.alert(err.message || 'Unable to save account.');
+      await alert({ title: 'Unable to save account', description: err.message || 'Something went wrong.' });
     } finally {
       setSaving(false);
     }

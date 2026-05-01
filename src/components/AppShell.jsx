@@ -11,6 +11,7 @@ import SakuraPetals from './SakuraPetals';
 import Grainient from './Grainient';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
+import { useAlert } from './ConfirmContext';
 
 const NAV_GROUPS = [
   { kind: 'link', to: '/dashboard', label: 'Overview' },
@@ -370,6 +371,7 @@ export function AppShell({ children }) {
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
+  const alert = useAlert();
   const locale = useMemo(() => 'en-GB', []);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -921,7 +923,7 @@ export function AppShell({ children }) {
               }
               setExpenseModalOpen(false);
             } catch (error) {
-              window.alert(error.message || 'Unable to save expense.');
+              await alert({ title: 'Unable to save expense', description: error.message || 'Something went wrong.' });
             }
           }}
           onCancel={() => setExpenseModalOpen(false)}
