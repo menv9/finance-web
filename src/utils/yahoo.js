@@ -1,4 +1,7 @@
 const TTL_MS = 15 * 60 * 1000;
+const SEARCH_TTL_MS = 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 5000;
+const SEARCH_TIMEOUT_MS = 3500;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -6,6 +9,10 @@ const TTL_MS = 15 * 60 * 1000;
 function parseCurrencyPair(ticker) {
   const match = ticker.match(/^([A-Z0-9]+)\/([A-Z]+)$/);
   return match ? { from: match[1], to: match[2] } : null;
+}
+
+function normalizeTicker(ticker) {
+  return String(ticker || '').trim().toUpperCase();
 }
 
 // Infer price currency from ticker exchange suffix.
@@ -42,7 +49,8 @@ async function finnhubGet(path, apiKey) {
 }
 
 async function fetchFromFinnhub(ticker, apiKey) {
-  const pair = parseCurrencyPair(ticker);
+  const symbolTicker = normalizeTicker(ticker);
+  const pair = parseCurrencyPair(symbolTicker);
 
   // ── Forex pair (e.g. USD/EUR) ──────────────────────────────────────────────
   if (pair) {
@@ -64,21 +72,21 @@ async function fetchFromFinnhub(ticker, apiKey) {
           // try next exchange
         }
       }
-      throw new Error(`No crypto price from Finnhub for ${ticker}`);
+      throw new Error(`No crypto price from Finnhub for ${symbolTicker}`);
     }
 
     // Forex: use /forex/rates which returns all rates relative to a base
     const data = await finnhubGet(`/forex/rates?base=${pair.from}`, apiKey);
     const rate = data?.quote?.[pair.to];
-    if (!rate) throw new Error(`No FX rate from Finnhub for ${ticker}`);
+    if (!rate) throw new Error(`No FX rate from Finnhub for ${symbolTicker}`);
     return { priceCents: Math.round(rate * 100), currency: pair.to };
   }
 
   // ── Stock / ETF / Future ───────────────────────────────────────────────────
-  const data = await finnhubGet(`/quote?symbol=${encodeURIComponent(ticker)}`, apiKey);
+  const data = await finnhubGet(`/quote?symbol=${encodeURIComponent(symbolTicker)}`, apiKey);
   const price = data.c;
-  if (!price || price === 0) throw new Error(`No price from Finnhub for ${ticker}`);
-  return { priceCents: Math.round(price * 100), currency: inferCurrencyFromTicker(ticker) };
+  if (!price || price === 0) throw new Error(`No price from Finnhub for ${symbolTicker}`);
+  return { priceCents: Math.round(price * 100), currency: inferCurrencyFromTicker(symbolTicker) };
 }
 
 // ── Yahoo Finance fallback ────────────────────────────────────────────────────
@@ -93,6 +101,11 @@ const PROXIES = [
   (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
 ];
 
+const YAHOO_SEARCH_URLS = (query) => [
+  `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`,
+  `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`,
+];
+
 function parseYahooPriceData(payload) {
   const meta = payload?.chart?.result?.[0]?.meta;
   const price = meta?.regularMarketPrice;
@@ -104,48 +117,142 @@ function parseYahooPriceData(payload) {
 }
 
 async function tryFetch(url) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller
+    ? globalThis.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    : null;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, controller ? { signal: controller.signal } : undefined);
     if (res.ok) return res;
   } catch {
     // swallow — try next candidate
+  } finally {
+    if (timeout) globalThis.clearTimeout(timeout);
   }
   return null;
 }
 
+async function tryFetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller
+    ? globalThis.setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+  try {
+    const res = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    if (timeout) globalThis.clearTimeout(timeout);
+  }
+}
+
+async function firstJsonFromUrls(urls, timeoutMs = FETCH_TIMEOUT_MS) {
+  const attempts = urls.map((url) => tryFetchJson(url, timeoutMs));
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFromYahoo(ticker) {
-  const pair = parseCurrencyPair(ticker);
-  const yahooTicker = pair ? `${pair.from}${pair.to}=X` : ticker;
+  const symbolTicker = normalizeTicker(ticker);
+  const pair = parseCurrencyPair(symbolTicker);
+  const yahooTicker = pair ? `${pair.from}${pair.to}=X` : symbolTicker;
   const directUrls = YAHOO_URLS(yahooTicker);
+  const candidateUrls = [
+    ...directUrls,
+    ...PROXIES.flatMap((makeProxy) => directUrls.map((url) => makeProxy(url))),
+  ];
+  const data = await firstJsonFromUrls(candidateUrls);
+  const priceData = parseYahooPriceData(data);
+  if (priceData) return priceData;
 
-  for (const url of directUrls) {
-    const res = await tryFetch(url);
-    if (res) {
-      const data = await res.json();
-      const priceData = parseYahooPriceData(data);
-      if (priceData) return priceData;
-    }
+  throw new Error(`Yahoo fallback failed for ${symbolTicker}`);
+}
+
+function uniqueAssets(results) {
+  const seen = new Set();
+  return results.filter((asset) => {
+    if (!asset.ticker || seen.has(asset.ticker)) return false;
+    seen.add(asset.ticker);
+    return true;
+  });
+}
+
+function normalizeFinnhubAsset(item) {
+  const ticker = normalizeTicker(item?.symbol || item?.displaySymbol);
+  if (!ticker) return null;
+  return {
+    ticker,
+    name: item?.description || item?.displaySymbol || ticker,
+    exchange: item?.mic || '',
+    type: item?.type || '',
+    currency: inferCurrencyFromTicker(ticker),
+  };
+}
+
+function normalizeYahooAsset(item) {
+  const ticker = normalizeTicker(item?.symbol);
+  if (!ticker) return null;
+  return {
+    ticker,
+    name: item?.longname || item?.shortname || item?.name || ticker,
+    exchange: item?.exchDisp || item?.exchange || '',
+    type: item?.quoteType || item?.typeDisp || '',
+    currency: item?.currency || inferCurrencyFromTicker(ticker),
+    priceCents: item?.regularMarketPrice ? Math.round(item.regularMarketPrice * 100) : null,
+  };
+}
+
+async function searchFinnhubAssets(query, apiKey) {
+  if (!apiKey) return [];
+  const data = await finnhubGet(`/search?q=${encodeURIComponent(query)}`, apiKey);
+  return uniqueAssets((data?.result || []).map(normalizeFinnhubAsset).filter(Boolean));
+}
+
+async function searchYahooAssets(query) {
+  const directUrls = YAHOO_SEARCH_URLS(query);
+  const candidateUrls = [
+    ...directUrls,
+    ...PROXIES.flatMap((makeProxy) => directUrls.map((url) => makeProxy(url))),
+  ];
+  const data = await firstJsonFromUrls(candidateUrls, SEARCH_TIMEOUT_MS);
+  const assets = uniqueAssets((data?.quotes || []).map(normalizeYahooAsset).filter(Boolean));
+  if (assets.length) return assets;
+
+  return [];
+}
+
+function readSearchCache(cacheKey) {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp < SEARCH_TTL_MS) return parsed.results || [];
+  } catch {
+    return null;
   }
+  return null;
+}
 
-  for (const makeProxy of PROXIES) {
-    for (const url of directUrls) {
-      const res = await tryFetch(makeProxy(url));
-      if (res) {
-        const data = await res.json();
-        const priceData = parseYahooPriceData(data);
-        if (priceData) return priceData;
-      }
-    }
+function writeSearchCache(cacheKey, results) {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), results }));
+  } catch {
+    // Ignore cache write failures.
   }
-
-  throw new Error(`All price sources failed for ${ticker}`);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 // Returns { priceCents, currency } — price in the ticker's native currency.
 export async function fetchTickerPrice(ticker, finnhubApiKey = '') {
-  const cacheKey = `price-cache:${ticker}`;
+  const symbolTicker = normalizeTicker(ticker);
+  if (!symbolTicker) throw new Error('Missing ticker symbol');
+  const cacheKey = `price-cache:${symbolTicker}`;
   const cached = sessionStorage.getItem(cacheKey);
 
   if (cached) {
@@ -158,18 +265,48 @@ export async function fetchTickerPrice(ticker, finnhubApiKey = '') {
   let result;
   if (finnhubApiKey) {
     try {
-      result = await fetchFromFinnhub(ticker, finnhubApiKey);
-    } catch (error) {
+      result = await fetchFromFinnhub(symbolTicker, finnhubApiKey);
+    } catch (finnhubError) {
       try {
-        result = await fetchFromYahoo(ticker);
-      } catch {
-        throw error;
+        result = await fetchFromYahoo(symbolTicker);
+      } catch (fallbackError) {
+        throw new Error(
+          `${symbolTicker}: ${finnhubError.message}; ${fallbackError.message}. Check your Finnhub API key and ticker format.`,
+        );
       }
     }
   } else {
-    result = await fetchFromYahoo(ticker);
+    try {
+      result = await fetchFromYahoo(symbolTicker);
+    } catch (error) {
+      throw new Error(`${symbolTicker}: ${error.message}. Add a Finnhub API key in Settings for more reliable refreshes.`);
+    }
   }
 
   sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), ...result }));
   return result;
+}
+
+export async function searchAssets(query, finnhubApiKey = '') {
+  const searchQuery = String(query || '').trim();
+  if (searchQuery.length < 2) return [];
+  const cacheKey = `asset-search:${searchQuery.toLowerCase()}:${finnhubApiKey ? 'fh' : 'yh'}`;
+  const cached = readSearchCache(cacheKey);
+  if (cached) return cached;
+
+  if (finnhubApiKey) {
+    try {
+      const results = await searchFinnhubAssets(searchQuery, finnhubApiKey);
+      if (results.length) {
+        writeSearchCache(cacheKey, results);
+        return results;
+      }
+    } catch {
+      // Fall through to Yahoo search.
+    }
+  }
+
+  const results = await searchYahooAssets(searchQuery);
+  writeSearchCache(cacheKey, results);
+  return results;
 }
