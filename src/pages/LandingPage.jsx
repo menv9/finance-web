@@ -178,13 +178,13 @@ export default function LandingPage() {
           className="fixed inset-0 pointer-events-none"
           style={{
             zIndex: -1,
-            background: appliedTheme === 'gorka-light' ? '#F6F1E8' : '#08101F',
+            background: appliedTheme === 'gorka-light' ? '#ECEFF4' : '#08101F',
           }}
         >
           <Silk
             speed={1}
             scale={1.5}
-            color={appliedTheme === 'gorka-light' ? '#D8E2F6' : '#1E2C44'}
+            color={appliedTheme === 'gorka-light' ? '#DDE5F1' : '#1E2C44'}
             noiseIntensity={2}
             rotation={0.6}
           />

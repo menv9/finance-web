@@ -517,12 +517,12 @@ export function AppShell({ children }) {
       {/* Gorka: full-page silk background. Solid navy fallback prevents a
           white flash before the WebGL canvas first renders. */}
       {(appliedTheme === 'gorka' || appliedTheme === 'gorka-light') && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: appliedTheme === 'gorka-light' ? '#FFF8E0' : '#08101F' }}>
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: appliedTheme === 'gorka-light' ? '#ECEFF4' : '#08101F' }}>
           <Silk
             speed={appliedTheme === 'gorka-light' ? 1 : 1.2}
-            scale={appliedTheme === 'gorka-light' ? 0.6 : 1.3}
-            color={appliedTheme === 'gorka-light' ? '#FFFFFF' : '#1E2C44'}
-            noiseIntensity={appliedTheme === 'gorka-light' ? 0.6 : 0.8}
+            scale={appliedTheme === 'gorka-light' ? 0.8 : 1.3}
+            color={appliedTheme === 'gorka-light' ? '#DDE5F1' : '#1E2C44'}
+            noiseIntensity={appliedTheme === 'gorka-light' ? 0.4 : 0.8}
             rotation={0.6}
           />
         </div>
