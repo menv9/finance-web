@@ -337,6 +337,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     cashflowSeries,
     upcomingEvents,
     totalIncomeCents,
+    totalExpensesCents,
     portfolioSaleCashflowCents: currentMonthSaleCashflowCents,
     distributedToSavingsCents,
     distributedToPortfolioCents,
