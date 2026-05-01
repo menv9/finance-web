@@ -21,6 +21,7 @@ const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -88,6 +89,7 @@ export default function App() {
                           )
                         }
                       />
+                      <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

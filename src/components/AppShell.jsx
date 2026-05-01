@@ -36,6 +36,7 @@ const NAV_GROUPS = [
     ],
   },
   { kind: 'link', to: '/portfolio', label: 'Investing', module: 'portfolio' },
+  { kind: 'link', to: '/profile', label: 'Profile' },
 ];
 
 const MORE_LINKS = [
@@ -46,6 +47,7 @@ const MORE_LINKS = [
   { to: '/budgets', label: 'Budgets' },
   { to: '/savings', label: 'Savings' },
   { to: '/portfolio', label: 'Portfolio', module: 'portfolio' },
+  { to: '/profile', label: 'Profile' },
   { to: '/settings', label: 'Settings' },
 ];
 
@@ -675,11 +677,21 @@ export function AppShell({ children }) {
                 </div>
               ) : null}
             </div>
-            <div className="hidden md:flex flex-col items-end border-l border-rule pl-4">
-              <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Total balance</span>
-              <span className="numeric text-sm text-ink leading-none">
-                {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
-              </span>
+            <div className="hidden md:flex items-center gap-4 border-l border-rule pl-4">
+              <div className="flex flex-col items-end">
+                <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Total balance</span>
+                <span className="numeric text-sm text-ink leading-none">
+                  {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
+                </span>
+              </div>
+              {metrics.totalDebtCents > 0 && (
+                <div className="flex flex-col items-end border-l border-rule pl-4">
+                  <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Debt</span>
+                  <span className="numeric text-sm text-danger leading-none">
+                    {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* User pill + sign-out — only when Supabase auth is active */}

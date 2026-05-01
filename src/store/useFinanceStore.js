@@ -27,6 +27,19 @@ import {
 } from '../utils/supabase';
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
+import {
+  acceptFriendRequest as apiAcceptFriendRequest,
+  createOwnProfile,
+  deleteFriendship,
+  fetchFriendships,
+  fetchOwnProfile,
+  fetchProfilesByIds,
+  insertFriendRequest,
+  searchProfileByEmail,
+  searchProfilesByUsername,
+  updateOwnProfile,
+  validateUsername,
+} from '../utils/profilesApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
@@ -491,6 +504,12 @@ export const useFinanceStore = create((set, get) => ({
   supabaseSyncStatus: 'idle',
   supabaseLastSyncedAt: null,
   supabaseError: '',
+  profile: null,
+  friends: [],
+  pendingIncoming: [],
+  pendingOutgoing: [],
+  profileStatus: 'idle',
+  profileError: '',
   syncMeta: {
     lastPulledAt: {},
     deletedRecords: {},
@@ -666,6 +685,8 @@ export const useFinanceStore = create((set, get) => ({
     if (data.session) {
       window.setTimeout(() => {
         get().pullFromSupabase().catch(() => {});
+        get().loadProfile().catch(() => {});
+        get().loadFriendships().catch(() => {});
       }, 0);
     }
 
@@ -701,7 +722,19 @@ export const useFinanceStore = create((set, get) => ({
       if (event === 'SIGNED_IN') {
         window.setTimeout(() => {
           get().pullFromSupabase().catch(() => {});
+          get().loadProfile().catch(() => {});
+          get().loadFriendships().catch(() => {});
         }, 0);
+      }
+      if (event === 'SIGNED_OUT') {
+        set({
+          profile: null,
+          friends: [],
+          pendingIncoming: [],
+          pendingOutgoing: [],
+          profileStatus: 'idle',
+          profileError: '',
+        });
       }
     });
 
@@ -2366,7 +2399,124 @@ export const useFinanceStore = create((set, get) => ({
       supabaseUser: null,
       supabaseSyncStatus: 'idle',
       supabaseError: '',
+      profile: null,
+      friends: [],
+      pendingIncoming: [],
+      pendingOutgoing: [],
+      profileStatus: 'idle',
+      profileError: '',
     });
+  },
+
+  // ── Profile & friends ─────────────────────────────────────────────────────
+
+  loadProfile: async () => {
+    const user = get().supabaseUser;
+    if (!user) return null;
+    set({ profileStatus: 'loading', profileError: '' });
+    try {
+      let profile = await fetchOwnProfile(user.id);
+      if (!profile) {
+        profile = await createOwnProfile(user.id, user.email);
+      }
+      set({ profile, profileStatus: 'idle' });
+      return profile;
+    } catch (error) {
+      set({ profileStatus: 'error', profileError: error.message || 'Failed to load profile' });
+      throw error;
+    }
+  },
+
+  updateProfile: async (patch) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    if (patch.username !== undefined) {
+      const err = validateUsername(patch.username);
+      if (err) throw new Error(err);
+    }
+    const profile = await updateOwnProfile(user.id, patch);
+    set({ profile });
+    return profile;
+  },
+
+  loadFriendships: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const rows = await fetchFriendships(user.id);
+    const otherIds = Array.from(new Set(
+      rows.map((r) => (r.requester_id === user.id ? r.addressee_id : r.requester_id)),
+    ));
+    const profiles = otherIds.length ? await fetchProfilesByIds(otherIds) : [];
+    const profileById = new Map(profiles.map((p) => [p.user_id, p]));
+
+    const friends = [];
+    const pendingIncoming = [];
+    const pendingOutgoing = [];
+    for (const row of rows) {
+      const otherId = row.requester_id === user.id ? row.addressee_id : row.requester_id;
+      const entry = {
+        requesterId: row.requester_id,
+        addresseeId: row.addressee_id,
+        otherId,
+        status: row.status,
+        createdAt: row.created_at,
+        profile: profileById.get(otherId) || null,
+      };
+      if (row.status === 'accepted') friends.push(entry);
+      else if (row.addressee_id === user.id) pendingIncoming.push(entry);
+      else pendingOutgoing.push(entry);
+    }
+    set({ friends, pendingIncoming, pendingOutgoing });
+  },
+
+  searchUsersByUsername: async (query) => {
+    const user = get().supabaseUser;
+    if (!user) return [];
+    return searchProfilesByUsername(query, user.id);
+  },
+
+  searchUserByEmail: async (email) => {
+    const user = get().supabaseUser;
+    if (!user) return null;
+    return searchProfileByEmail(email, user.id);
+  },
+
+  sendFriendRequest: async (targetUserId) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    if (targetUserId === user.id) throw new Error('Cannot friend yourself');
+    await insertFriendRequest(user.id, targetUserId);
+    await get().loadFriendships();
+  },
+
+  acceptFriendRequest: async (requesterId) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    await apiAcceptFriendRequest(requesterId, user.id);
+    await get().loadFriendships();
+  },
+
+  declineFriendRequest: async (requesterId) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    await deleteFriendship(requesterId, user.id);
+    await get().loadFriendships();
+  },
+
+  cancelFriendRequest: async (addresseeId) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    await deleteFriendship(user.id, addresseeId);
+    await get().loadFriendships();
+  },
+
+  removeFriend: async (otherUserId) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    // Delete whichever direction exists.
+    await deleteFriendship(user.id, otherUserId).catch(() => {});
+    await deleteFriendship(otherUserId, user.id).catch(() => {});
+    await get().loadFriendships();
   },
 
   // ── Attachments ───────────────────────────────────────────────────────────
