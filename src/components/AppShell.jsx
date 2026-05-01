@@ -536,7 +536,7 @@ export function AppShell({ children }) {
       </a>
 
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 lg:px-10">
+        <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 pl-4 pr-5 lg:px-10">
           <div className="col-start-1 flex min-w-0 items-center justify-start gap-6">
             <Logo theme={appliedTheme} />
           </div>
@@ -686,7 +686,7 @@ export function AppShell({ children }) {
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
-              className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-full border border-rule-strong text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               <MenuIcon open={mobileOpen} />
             </button>
