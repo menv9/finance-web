@@ -674,10 +674,10 @@ export function AppShell({ children }) {
         </nav>
         {/* Panel footer: balance + sign-out */}
         <div className="border-t border-rule px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="eyebrow text-[0.6rem]">Total balance</span>
-              <span className="numeric text-sm text-ink">
+          <div className="flex items-end justify-between gap-3">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="eyebrow text-[0.6rem] text-ink-muted">Total balance</span>
+              <span className="numeric text-sm text-ink truncate">
                 {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
               </span>
             </div>
@@ -685,7 +685,7 @@ export function AppShell({ children }) {
               <button
                 type="button"
                 onClick={() => { setMobileOpen(false); signOutSupabase(); }}
-                className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
+                className="flex shrink-0 items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
               >
                 <SignOutIcon />
                 <span className="eyebrow text-[0.6rem]">Sign out</span>
