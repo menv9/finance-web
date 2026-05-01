@@ -447,7 +447,7 @@ export function AppShell({ children }) {
   // Edge-swipe gesture: swipe left from right edge to open, swipe right inside
   // panel to close. Ignored on wide viewports where the panel isn't shown.
   useEffect(() => {
-    const EDGE = 24;        // open: start zone, px from right edge
+    const EDGE = 64;        // open: start zone, px from right edge
     const PANEL_W = 288;    // close: panel width (w-72), track swipes within it
     const TRIGGER = 50;     // min horizontal delta to count as a swipe
     const Y_TOL = 60;       // max vertical drift; more = treat as scroll, skip

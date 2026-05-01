@@ -588,13 +588,14 @@ const landingCss = `
   font-family: 'Fraunces', serif;
   font-variation-settings: 'opsz' 144, 'SOFT' 0;
   font-weight: 400;
-  font-size: clamp(3.4rem, 7.5vw, 6.4rem);
-  line-height: 0.92;
+  font-size: clamp(2.6rem, 4.6vw, 4.8rem);
+  line-height: 0.95;
   letter-spacing: -0.035em;
   color: var(--ink);
   display: flex;
   flex-direction: column;
   gap: 0;
+  max-width: 100%;
 }
 .cover-head-1 { padding-left: 0; }
 .cover-head-2 {
