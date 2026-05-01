@@ -301,7 +301,7 @@ function MonthOverview({ metrics, baseCurrency, locale }) {
   return (
     <section
       aria-label="This month overview"
-      className="flex basis-1/2 min-h-0 flex-col gap-4 border-b border-rule px-5 py-5"
+      className="flex shrink-0 flex-col gap-4 border-b border-rule px-5 py-5"
     >
       <div className="flex flex-col gap-0.5">
         <span className="eyebrow text-[0.6rem] text-ink-muted">This month</span>
@@ -721,7 +721,7 @@ export function AppShell({ children }) {
             baseCurrency={baseCurrency}
             locale={locale}
           />
-          <nav aria-label="Primary mobile" className="flex basis-1/2 min-h-0 flex-col overflow-y-auto px-3 py-3">
+          <nav aria-label="Primary mobile" className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
             {moreLinks.map((link) => (
               <NavLink
                 key={link.to}
