@@ -191,7 +191,12 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
       .map((t) => t.linkedExpenseId)
       .filter(Boolean),
   );
-  const allPastCashflowExpenses = expenses.filter((item) => item.date <= today && !savingsPaidExpenseIds.has(item.id));
+  // Transactions tagged to a bank account are already reflected in that
+  // account's snapshot balanceCents (set at import time from the CSV's running
+  // balance). Excluding them here prevents double-counting in availableBalance.
+  const bankAccountIdSet = new Set((bankAccounts || []).map((a) => a.id));
+  const isBankTracked = (item) => item.bankAccountId && bankAccountIdSet.has(item.bankAccountId);
+  const allPastCashflowExpenses = expenses.filter((item) => item.date <= today && !savingsPaidExpenseIds.has(item.id) && !isBankTracked(item));
   const allPastSaleCashflowCents = (portfolioSales || [])
     .filter((sale) => sale.date <= today)
     .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
@@ -206,7 +211,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     .reduce((sum, account) => sum + (account.balanceCents || 0), 0);
   const availableBalanceCents =
     bankBalanceCents +
-    sumAmount(allPastCashflowIncomes) +
+    sumAmount(allPastCashflowIncomes.filter((item) => !isBankTracked(item))) +
     allPastSaleCashflowCents -
     sumAmount(allPastCashflowExpenses) -
     allPastCashflowDistributionsCents -

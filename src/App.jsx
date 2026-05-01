@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { LoadingScreen } from './components/LoadingScreen';
+import { RouteLoader } from './components/RouteLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useFinanceStore } from './store/useFinanceStore';
 
@@ -48,7 +49,7 @@ export default function App() {
 
   return (
     <ConfirmProvider>
-      <Suspense fallback={<LoadingScreen label="Preparing module..." compact />}>
+      <Suspense fallback={<LoadingScreen label="Loading..." />}>
         <Routes>
           {/* Root redirect */}
           <Route path="/" element={<Navigate to="/landing" replace />} />
@@ -64,27 +65,29 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AppShell>
-                  <Routes>
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/this-month" element={<ThisMonthPage />} />
-                    <Route path="/accounts" element={<AccountsPage />} />
-                    <Route path="/income" element={<IncomePage />} />
-                    <Route path="/expenses" element={<ExpensesPage />} />
-                    <Route path="/budgets" element={<BudgetsPage />} />
-                    <Route path="/savings" element={<SavingsPage />} />
-                    <Route
-                      path="/portfolio"
-                      element={
-                        portfolioEnabled || tourActive ? (
-                          <PortfolioPage />
-                        ) : (
-                          <Navigate to="/dashboard" replace />
-                        )
-                      }
-                    />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
+                  <Suspense fallback={<RouteLoader />}>
+                    <Routes>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/this-month" element={<ThisMonthPage />} />
+                      <Route path="/accounts" element={<AccountsPage />} />
+                      <Route path="/income" element={<IncomePage />} />
+                      <Route path="/expenses" element={<ExpensesPage />} />
+                      <Route path="/budgets" element={<BudgetsPage />} />
+                      <Route path="/savings" element={<SavingsPage />} />
+                      <Route
+                        path="/portfolio"
+                        element={
+                          portfolioEnabled || tourActive ? (
+                            <PortfolioPage />
+                          ) : (
+                            <Navigate to="/dashboard" replace />
+                          )
+                        }
+                      />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </Routes>
+                  </Suspense>
                 </AppShell>
               </ProtectedRoute>
             }

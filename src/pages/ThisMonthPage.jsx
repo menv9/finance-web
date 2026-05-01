@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -19,6 +19,35 @@ import { rise } from '../utils/motion';
 
 function currentMonthKey() {
   return normalizeDateInput(new Date()).slice(0, 7);
+}
+
+const PAGE_SIZE = 10;
+
+function Pagination({ page, totalPages, onPrev, onNext }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={page === 1}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        ‹ Previous
+      </button>
+      <span className="tabular text-ink-muted">
+        {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        Next ›
+      </button>
+    </div>
+  );
 }
 
 // Progress-bar cell that contextualises the cashflow number with income as denominator
@@ -75,6 +104,8 @@ function monthDisplayLabel(month) {
 
 export default function ThisMonthPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const [activityPage, setActivityPage] = useState(1);
+  useEffect(() => { setActivityPage(1); }, [selectedMonth]);
 
   const dashboard = useFinanceStore((s) => s.derived.dashboard);
   const incomes = useFinanceStore((s) => s.incomes);
@@ -216,6 +247,7 @@ export default function ThisMonthPage() {
       {/* Monthly KPIs */}
       <section
         aria-label="Monthly figures"
+        data-tour="this-month-kpis"
         className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3"
       >
         <div className={`min-w-0 bg-surface p-6 ${rise(1)}`}>
@@ -284,6 +316,7 @@ export default function ThisMonthPage() {
 
       {/* 12-month bar chart */}
       <Card
+        data-tour="this-month-chart"
         eyebrow="12-month view"
         title="Income vs. expenses"
         description="Your monthly rhythm over the last year. Selected month is highlighted."
@@ -333,13 +366,15 @@ export default function ThisMonthPage() {
 
       {/* Activity log */}
       <Card
+        data-tour="this-month-activity"
         eyebrow="Activity"
         title={`Transactions in ${monthDisplayLabel(selectedMonth)}`}
         className={rise(6)}
       >
         {activityLog.length ? (
+          <>
           <ul className="divide-y divide-rule">
-            {activityLog.map((item) => (
+            {activityLog.slice((activityPage - 1) * PAGE_SIZE, activityPage * PAGE_SIZE).map((item) => (
               <li
                 key={`${item.type}-${item.id}`}
                 className="flex items-baseline justify-between gap-4 py-3"
@@ -371,6 +406,13 @@ export default function ThisMonthPage() {
               </li>
             ))}
           </ul>
+          <Pagination
+            page={activityPage}
+            totalPages={Math.ceil(activityLog.length / PAGE_SIZE)}
+            onPrev={() => setActivityPage((p) => Math.max(1, p - 1))}
+            onNext={() => setActivityPage((p) => Math.min(Math.ceil(activityLog.length / PAGE_SIZE), p + 1))}
+          />
+          </>
         ) : (
           <EmptyState
             title="No activity this month"

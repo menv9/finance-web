@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
@@ -8,29 +8,74 @@ import { rise } from '../utils/motion';
 import { formatCurrency } from '../utils/formatters';
 import { useTour } from '../components/tour/TourContext';
 
-const sections = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'preferences', label: 'Preferences' },
-  { id: 'modules', label: 'Modules' },
-  { id: 'categories', label: 'Categories' },
-  { id: 'platforms', label: 'Platforms' },
-  { id: 'targets', label: 'Allocation targets' },
-  { id: 'import', label: 'Bank import' },
-  { id: 'history', label: 'Activity history' },
-  { id: 'sync', label: 'Sync' },
-  { id: 'conflicts', label: 'Conflicts' },
-  { id: 'backup', label: 'Backup' },
-  { id: 'danger', label: 'Danger zone' },
+const TABS = [
+  { id: 'general', label: 'General', hint: 'Appearance, currency, modules' },
+  { id: 'data',    label: 'Data',    hint: 'Categories, platforms, targets, import' },
+  { id: 'sync',    label: 'Sync',    hint: 'Cloud sync, conflicts, activity' },
+  { id: 'backup',  label: 'Backup',  hint: 'Export, import, danger zone' },
 ];
 
-function SectionLink({ id, label }) {
+// Maps section anchor id -> tab id (for hash deep-linking)
+const SECTION_TO_TAB = {
+  appearance: 'general',
+  preferences: 'general',
+  modules: 'general',
+  categories: 'data',
+  platforms: 'data',
+  targets: 'data',
+  import: 'data',
+  sync: 'sync',
+  conflicts: 'sync',
+  history: 'sync',
+  backup: 'backup',
+  danger: 'backup',
+};
+
+// Maps tour stop id -> tab id (so tour auto-switches tabs)
+const TOUR_TO_TAB = {
+  'settings-appearance': 'general',
+  'settings-modules': 'general',
+  'settings-history': 'sync',
+  'settings-backup': 'backup',
+};
+
+function MoonIcon() {
   return (
-    <a
-      href={`#${id}`}
-      className="block py-2 pl-3 border-l border-rule text-sm text-ink-muted hover:text-ink hover:border-accent transition-colors duration-180"
-    >
-      {label}
-    </a>
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <path d="M14.5 12.8A6.2 6.2 0 1 1 7.2 5.5a5 5 0 0 0 7.3 7.3z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <circle cx="10" cy="10" r="3.4" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+        <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" />
+      </g>
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <path
+        d="M10 2c.3 2.7 1.3 4.6 3 5.6 1.7 1 3.3 1.4 5 1.4-2.7.4-4.6 1.4-5.6 3-1 1.7-1.4 3.3-1.4 5-.4-2.7-1.4-4.6-3-5.6-1.7-1-3.3-1.4-5-1.4 2.7-.4 4.6-1.4 5.6-3 1-1.7 1.4-3.3 1.4-5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function DiscIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <circle cx="10" cy="10" r="7" fill="currentColor" opacity="0.85" />
+      <circle cx="7.5" cy="7.5" r="2.2" fill="white" opacity="0.55" />
+      <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -113,7 +158,7 @@ export default function SettingsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
   const navigate = useNavigate();
-  const { startTour } = useTour();
+  const { startTour, currentStop } = useTour();
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const exportBackup = useFinanceStore((state) => state.exportBackup);
   const importBackup = useFinanceStore((state) => state.importBackup);
@@ -160,17 +205,14 @@ export default function SettingsPage() {
     }
   };
 
-  const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
-  const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
-  const isPrivileged = isEris || isGorka;
   const theme = settings.theme || 'dark';
   const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
 
   const themeOptions = [
-    { value: 'dark',  label: 'Dark',  emoji: '🌑', description: 'Deep & minimal' },
-    { value: 'light', label: 'Light', emoji: '☀️', description: 'Clean & bright' },
-    ...(isPrivileged ? [{ value: 'eris',  label: 'Eris',  emoji: '🌸', description: 'Lavender dreams' }] : []),
-    ...(isPrivileged ? [{ value: 'gorka', label: 'Gorka', emoji: '🪩', description: 'Liquid chrome'   }] : []),
+    { value: 'dark',  label: 'Dark',  Icon: MoonIcon,    description: 'Deep & minimal' },
+    { value: 'light', label: 'Light', Icon: SunIcon,     description: 'Clean & bright' },
+    { value: 'eris',  label: 'Eris',  Icon: SparkleIcon, description: 'Lavender dreams' },
+    { value: 'gorka', label: 'Gorka', Icon: DiscIcon,    description: 'Liquid chrome'   },
   ];
 
   const [categoryInput, setCategoryInput] = useState('');
@@ -241,6 +283,41 @@ export default function SettingsPage() {
   const undoCurrentRecord = currentRecordFromState(useFinanceStore.getState(), undoTarget);
   const undoPreview = undoPreviewText(undoTarget, undoCurrentRecord);
   const undoMoneyMovement = moneyMovementText(undoTarget, settings.locale, settings.baseCurrency);
+
+  const initialTab = (() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
+    if (TABS.some((t) => t.id === hash)) return hash;
+    if (SECTION_TO_TAB[hash]) return SECTION_TO_TAB[hash];
+    return 'general';
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Tour-driven tab switching: ensure the right tab is mounted before the spotlight measures.
+  useEffect(() => {
+    const tab = TOUR_TO_TAB[currentStop?.tourId];
+    if (tab && tab !== activeTab) setActiveTab(tab);
+  }, [currentStop, activeTab]);
+
+  // Hash deep-linking: react to hash changes (e.g. browser back/forward).
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      const tab = TABS.some((t) => t.id === hash) ? hash : SECTION_TO_TAB[hash];
+      if (tab) setActiveTab(tab);
+      const target = hash && document.getElementById(hash);
+      if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const selectTab = (id) => {
+    setActiveTab(id);
+    if (typeof window !== 'undefined') {
+      history.replaceState(null, '', `#${id}`);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
@@ -250,25 +327,45 @@ export default function SettingsPage() {
         description="Preferences, categories, allocation targets, sync, and backup. All changes persist locally; Supabase sync is optional."
       />
 
-      <div className="grid gap-10 lg:grid-cols-12">
-        {/* left rail */}
-        <aside className="lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
-          <p className="eyebrow mb-3">On this page</p>
-          <nav aria-label="Settings sections" className="flex flex-col">
-            {sections.map((s) => (
-              <SectionLink key={s.id} {...s} />
-            ))}
-          </nav>
-        </aside>
+      {/* Tab bar */}
+      <div className="sticky top-14 z-20 -mx-4 border-b border-rule bg-canvas/85 px-4 py-2 backdrop-blur-md sm:mx-0 sm:rounded-lg sm:border sm:bg-surface/80 sm:px-2">
+        <nav aria-label="Settings tabs" className="flex flex-wrap gap-1">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => selectTab(tab.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className={[
+                  'group flex flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors duration-180',
+                  isActive
+                    ? 'bg-accent-soft text-ink'
+                    : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                ].join(' ')}
+              >
+                <span className={['text-sm font-medium', isActive ? 'text-ink' : ''].join(' ')}>
+                  {tab.label}
+                </span>
+                <span className="hidden text-[0.7rem] leading-tight text-ink-muted sm:block">
+                  {tab.hint}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
-        {/* content */}
-        <div className="lg:col-span-9 grid gap-10">
+      {/* Tab content */}
+      <div className="grid gap-8">
+        {activeTab === 'general' && (<>
           <Card
             id="appearance"
             data-tour="settings-appearance"
             eyebrow="Display"
             title="Appearance"
-            description="Choose how the app looks. Special themes are tied to your account."
+            description="Choose how the app looks."
             className={rise(1)}
           >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -286,7 +383,7 @@ export default function SettingsPage() {
                         : 'border-rule bg-surface-raised text-ink-muted hover:border-rule-strong hover:text-ink',
                     ].join(' ')}
                   >
-                    <span className="text-xl leading-none">{opt.emoji}</span>
+                    <span className={isActive ? 'text-accent' : 'text-ink-faint group-hover:text-ink'}><opt.Icon /></span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink leading-tight">{opt.label}</p>
                       <p className="eyebrow text-[0.6rem] mt-0.5 leading-tight">{opt.description}</p>
@@ -391,6 +488,9 @@ export default function SettingsPage() {
             </div>
           </Card>
 
+        </>)}
+
+        {activeTab === 'data' && (<>
           <Card
             id="categories"
             eyebrow="Taxonomy"
@@ -614,6 +714,9 @@ export default function SettingsPage() {
             />
           </Card>
 
+        </>)}
+
+        {activeTab === 'sync' && (<>
           <Card
             id="history"
             data-tour="settings-history"
@@ -828,6 +931,9 @@ export default function SettingsPage() {
             )}
           </Card>
 
+        </>)}
+
+        {activeTab === 'backup' && (<>
           <Card
             id="backup"
             data-tour="settings-backup"
@@ -903,7 +1009,7 @@ export default function SettingsPage() {
               Erase all data
             </Button>
           </Card>
-        </div>
+        </>)}
       </div>
 
       <Modal

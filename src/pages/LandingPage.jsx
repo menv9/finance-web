@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useFinanceStore } from '../store/useFinanceStore';
-import LiquidChrome from '../components/LiquidChrome';
+import Silk from '../components/Silk';
 import SakuraPetals from '../components/SakuraPetals';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -155,7 +155,6 @@ export default function LandingPage() {
   const supabaseUser       = useFinanceStore((s) => s.supabaseUser);
 
   const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
-  const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
 
   // Mirror what AppShell does — keep data-theme in sync while landing is mounted.
   // When the user navigates away, AppShell will take over and re-apply on mount.
@@ -175,10 +174,10 @@ export default function LandingPage() {
       {/* Eris: sakura petals layer (fixed, pointer-events-none, z-0 via its CSS) */}
       {appliedTheme === 'eris' && <SakuraPetals />}
 
-      {/* Gorka: full-page WebGL chrome, same setup as AppShell */}
+      {/* Gorka: full-page silk, same setup as AppShell */}
       {appliedTheme === 'gorka' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#060412' }}>
-          <LiquidChrome baseColor={gorkaBaseColor} speed={0.12} amplitude={0.3} interactive={false} />
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
+          <Silk speed={1} scale={1.5} color="#1E2C44" noiseIntensity={2} rotation={0.6} />
         </div>
       )}
 

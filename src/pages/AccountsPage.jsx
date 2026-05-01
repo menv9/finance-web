@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import { PageHeader } from '../components/PageHeader';
+import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { Button, Card, EmptyState, FormField, Input, Modal, Stat } from '../components/ui';
@@ -92,6 +93,7 @@ export default function AccountsPage() {
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const [editingAccount, setEditingAccount] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importingAccount, setImportingAccount] = useState(null);
 
   const currency = settings.baseCurrency || 'EUR';
   const locale = settings.locale || 'en-GB';
@@ -150,7 +152,7 @@ export default function AccountsPage() {
         actions={<Button onClick={openNewAccount}>Add account</Button>}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div data-tour="accounts-summary" className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-lg border border-rule bg-surface p-6">
           <Stat
             label="Total bank balance"
@@ -168,6 +170,7 @@ export default function AccountsPage() {
       </div>
 
       <Card
+        data-tour="accounts-list"
         title="Bank accounts"
         description="Edit the current funds in each bank account. Changes update your total balance directly."
         action={<Button variant="secondary" onClick={openNewAccount}>Add account</Button>}
@@ -189,6 +192,7 @@ export default function AccountsPage() {
                   </p>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setImportingAccount(account)}>Import CSV</Button>
                   <Button variant="ghost" size="sm" onClick={() => openEditAccount(account)}>Edit</Button>
                   <Button variant="ghost" size="sm" onClick={() => handleDelete(account)}>Delete</Button>
                 </div>
@@ -213,6 +217,36 @@ export default function AccountsPage() {
           onClose={closeModal}
           onSave={handleSave}
         />
+      ) : null}
+
+      {importingAccount ? (
+        <Modal
+          key={`import-${importingAccount.id}`}
+          open
+          onClose={() => setImportingAccount(null)}
+          eyebrow="Bank account"
+          title={`Import CSV — ${importingAccount.name}`}
+          description="Imported transactions will be tagged to this account, and the bank balance will be updated to match the latest running balance from the file."
+          size="lg"
+        >
+          <SmartBankImport
+            categories={settings.categories}
+            bankAccountId={importingAccount.id}
+            onImportExpenses={async (rows) => {
+              for (const row of rows) await saveEntity('expenses', row);
+            }}
+            onImportIncomes={async (rows) => {
+              for (const row of rows) await saveEntity('incomes', row);
+            }}
+            onImportComplete={async ({ latestBalanceCents }) => {
+              if (latestBalanceCents == null) return;
+              await saveEntity('bankAccounts', {
+                ...importingAccount,
+                balanceCents: latestBalanceCents,
+              });
+            }}
+          />
+        </Modal>
       ) : null}
     </div>
   );

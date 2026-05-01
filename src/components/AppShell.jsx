@@ -6,8 +6,7 @@ import { Modal } from './ui';
 import { cn } from './ui/cn';
 import { ExpenseForm } from './forms/ExpenseForm';
 import { IncomeForm } from './forms/IncomeForm';
-import LiquidChrome from './LiquidChrome';
-import ElectricBorder from './ElectricBorder';
+import Silk from './Silk';
 import SakuraPetals from './SakuraPetals';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
@@ -81,141 +80,11 @@ function MenuIcon({ open }) {
   );
 }
 
-function FinanceIcon({ theme }) {
-  const isDark = theme === 'dark' || theme === 'gorka';
-  const isGorka = theme === 'gorka';
-  const isEris = theme === 'eris';
-
-  // Card background
-  const cardFrom = isDark ? '#1B2434' : isEris ? '#FFF6FA' : '#FFFFFF';
-  const cardTo   = isDark ? '#141B26' : isEris ? '#FEF0F5' : '#E8EFFE';
-
-  // Coin face
-  const coinFrom = isDark ? '#232E42' : isEris ? '#FFF0F7' : '#FFFFFF';
-  const coinTo   = isDark ? '#1B2434' : isEris ? '#FFE0EE' : '#EEF2FF';
-
-  // Coin ring
-  const ringFrom = isDark ? '#2A3A58' : isEris ? '#FFD6EA' : '#E0E8FF';
-  const ringTo   = isDark ? '#1E2C46' : isEris ? '#FFBAD8' : '#C8D8F8';
-
-  // Euro stroke color
-  const euroColor     = isGorka ? '#C084FC' : isEris ? '#D4607A' : '#1B3A7A';
-  const euroShadow    = isGorka ? 'rgba(80,0,120,0.4)' : isEris ? 'rgba(80,0,30,0.25)' : 'rgba(0,20,60,0.35)';
-  const euroHighlight = isGorka ? 'rgba(220,180,255,0.4)' : isEris ? 'rgba(255,140,180,0.35)' : 'rgba(100,160,255,0.35)';
-
-  // Card drop shadow color
-  const cardShadow = isGorka ? '#9060D8' : isEris ? '#E8A0B8' : '#8AAAD8';
-
-  return (
-    <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" className="h-7 w-7">
-      <defs>
-        <linearGradient id="fi-bg" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0%" stopColor={cardFrom} />
-          <stop offset="100%" stopColor={cardTo} />
-        </linearGradient>
-        <linearGradient id="fi-g1" x1="0" y1="0" x2="0.3" y2="1">
-          <stop offset="0%" stopColor="#52E8A8" />
-          <stop offset="100%" stopColor="#28B87A" />
-        </linearGradient>
-        <linearGradient id="fi-g2" x1="0" y1="0" x2="0.3" y2="1">
-          <stop offset="0%" stopColor="#3ED8E8" />
-          <stop offset="100%" stopColor="#1A9ECC" />
-        </linearGradient>
-        <linearGradient id="fi-g3" x1="0" y1="0" x2="0.3" y2="1">
-          <stop offset="0%" stopColor="#60A8FF" />
-          <stop offset="100%" stopColor="#1A5FE8" />
-        </linearGradient>
-        <linearGradient id="fi-sh" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.52)" />
-          <stop offset="55%" stopColor="rgba(255,255,255,0)" />
-        </linearGradient>
-        <linearGradient id="fi-bsh" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(0,0,0,0)" />
-          <stop offset="100%" stopColor="rgba(0,0,0,0.14)" />
-        </linearGradient>
-        <linearGradient id="fi-coinbg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={coinFrom} />
-          <stop offset="100%" stopColor={coinTo} />
-        </linearGradient>
-        <linearGradient id="fi-coinring" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={ringFrom} />
-          <stop offset="100%" stopColor={ringTo} />
-        </linearGradient>
-        <filter id="fi-cardshadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="20" stdDeviation="32" floodColor={cardShadow} floodOpacity="0.28" />
-        </filter>
-        <filter id="fi-bardepth" x="-20%" y="-10%" width="150%" height="130%">
-          <feDropShadow dx="4" dy="8" stdDeviation="10" floodColor="#000" floodOpacity="0.16" />
-        </filter>
-        <filter id="fi-coinshadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="8" stdDeviation="14" floodColor="#5577BB" floodOpacity="0.22" />
-        </filter>
-        <filter id="fi-lineglow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="fi-dotglow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="8" floodColor="#fff" floodOpacity="0.9" />
-        </filter>
-      </defs>
-
-      <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#fi-bg)" filter="url(#fi-cardshadow)" />
-
-      <g filter="url(#fi-bardepth)">
-        <rect x="230" y="530" width="155" height="325" rx="36" fill="url(#fi-g1)" />
-        <rect x="230" y="530" width="155" height="325" rx="36" fill="url(#fi-bsh)" />
-        <rect x="230" y="530" width="52"  height="325" rx="36" fill="url(#fi-sh)" opacity="0.9" />
-      </g>
-      <g filter="url(#fi-bardepth)">
-        <rect x="415" y="390" width="155" height="465" rx="36" fill="url(#fi-g2)" />
-        <rect x="415" y="390" width="155" height="465" rx="36" fill="url(#fi-bsh)" />
-        <rect x="415" y="390" width="52"  height="465" rx="36" fill="url(#fi-sh)" opacity="0.9" />
-      </g>
-      <g filter="url(#fi-bardepth)">
-        <rect x="600" y="210" width="160" height="645" rx="36" fill="url(#fi-g3)" />
-        <rect x="600" y="210" width="160" height="645" rx="36" fill="url(#fi-bsh)" />
-        <rect x="600" y="210" width="54"  height="645" rx="36" fill="url(#fi-sh)" opacity="0.9" />
-      </g>
-
-      <path d="M307 668 C390 600 460 450 492 432 C530 412 590 358 680 310"
-            stroke="rgba(255,255,255,0.32)" strokeWidth="32" fill="none" strokeLinecap="round" filter="url(#fi-lineglow)" />
-      <path d="M307 668 C390 600 460 450 492 432 C530 412 590 358 680 310"
-            stroke="white" strokeWidth="18" fill="none" strokeLinecap="round" />
-
-      <circle cx="307" cy="668" r="30" fill="white" filter="url(#fi-dotglow)" />
-      <circle cx="307" cy="668" r="15" fill="#3ABDE0" />
-      <circle cx="492" cy="432" r="30" fill="white" filter="url(#fi-dotglow)" />
-      <circle cx="492" cy="432" r="15" fill="#3ABDE0" />
-      <circle cx="680" cy="310" r="30" fill="white" filter="url(#fi-dotglow)" />
-      <circle cx="680" cy="310" r="15" fill="#4B8EF5" />
-
-      <g filter="url(#fi-coinshadow)">
-        <circle cx="724" cy="748" r="118" fill="url(#fi-coinring)" />
-        <circle cx="724" cy="748" r="100" fill="url(#fi-coinbg)" />
-        <circle cx="724" cy="748" r="100" fill="none" stroke="rgba(100,130,200,0.18)" strokeWidth="12" />
-        <circle cx="724" cy="748" r="109" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="3"
-                strokeDasharray="180 600" strokeDashoffset="-60" strokeLinecap="round" />
-        <ellipse cx="690" cy="712" rx="52" ry="36" fill="rgba(255,255,255,0.18)" />
-        <circle cx="724" cy="748" r="100" fill="none" stroke="rgba(180,200,240,0.6)" strokeWidth="2" />
-        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroShadow} strokeWidth="28" strokeLinecap="round" />
-        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroColor} strokeWidth="22" strokeLinecap="round" />
-        <path d="M758 692 A62 62 0 1 0 758 804" fill="none" stroke={euroHighlight} strokeWidth="8" strokeLinecap="round" />
-        <line x1="650" y1="732" x2="725" y2="732" stroke={euroShadow} strokeWidth="22" strokeLinecap="round" />
-        <line x1="650" y1="732" x2="725" y2="732" stroke={euroColor} strokeWidth="16" strokeLinecap="round" />
-        <line x1="650" y1="729" x2="725" y2="729" stroke={euroHighlight} strokeWidth="5" strokeLinecap="round" />
-        <line x1="650" y1="764" x2="725" y2="764" stroke={euroShadow} strokeWidth="22" strokeLinecap="round" />
-        <line x1="650" y1="764" x2="725" y2="764" stroke={euroColor} strokeWidth="16" strokeLinecap="round" />
-        <line x1="650" y1="761" x2="725" y2="761" stroke={euroHighlight} strokeWidth="5" strokeLinecap="round" />
-      </g>
-    </svg>
-  );
-}
-
 const LOGO_GRADIENTS = {
   dark:  [{ o: '0%', c: '#28B87A' }, { o: '45%', c: '#1A9ECC' }, { o: '100%', c: '#2563EB' }],
   light: [{ o: '0%', c: '#1F4B3A' }, { o: '45%', c: '#0F6E56' }, { o: '100%', c: '#085041' }],
   eris:  [{ o: '0%', c: '#D4607A' }, { o: '45%', c: '#B84362' }, { o: '100%', c: '#8A1A45' }],
-  gorka: [{ o: '0%', c: '#C084FC' }, { o: '45%', c: '#818CF8' }, { o: '100%', c: '#60A5FA' }],
+  gorka: [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
 };
 
 const FIN_COLORS = {
@@ -229,7 +98,7 @@ const TAGLINE_COLORS = {
   dark:  '#C2C0B6',
   light: '#524A40',
   eris:  '#8A4F65',
-  gorka: 'rgba(255,255,255,0.55)',
+  gorka: 'rgba(229,236,246,0.55)',
 };
 
 function FinGesWordmark({ theme }) {
@@ -330,7 +199,7 @@ const FAVICON_TOKENS = {
   dark:  { cardFrom: '#1B2434', cardTo: '#141B26', coinFrom: '#232E42', coinTo: '#1B2434', ringFrom: '#2A3A58', ringTo: '#1E2C46', euroColor: '#5FB394', cardShadow: '#9060D8' },
   light: { cardFrom: '#FFFFFF', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#E0E8FF', ringTo: '#C8D8F8', euroColor: '#1B3A7A', cardShadow: '#8AAAD8' },
   eris:  { cardFrom: '#FFF6FA', cardTo: '#FEF0F5', coinFrom: '#FFF0F7', coinTo: '#FFE0EE', ringFrom: '#FFD6EA', ringTo: '#FFBAD8', euroColor: '#D4607A', cardShadow: '#E8A0B8' },
-  gorka: { cardFrom: '#1B2434', cardTo: '#141B26', coinFrom: '#232E42', coinTo: '#1B2434', ringFrom: '#2A3A58', ringTo: '#1E2C46', euroColor: '#C084FC', cardShadow: '#9060D8' },
+  gorka: { cardFrom: '#131D30', cardTo: '#0E1726', coinFrom: '#1A2540', coinTo: '#0F1827', ringFrom: '#2A3548', ringTo: '#1E2A40', euroColor: '#5B8DEF', cardShadow: '#3B5680' },
 };
 
 function buildFaviconSVG(theme) {
@@ -436,7 +305,6 @@ export function AppShell({ children }) {
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
   const [openNavMenu, setOpenNavMenu] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const gorkaBaseColor = useMemo(() => [0.427, 0, 1.0], []);
   const baseCurrency = settings.baseCurrency;
   const moduleVisible = useMemo(
     () => (item) => item.module !== 'portfolio' || settings.modules?.portfolio !== false,
@@ -531,11 +399,11 @@ export function AppShell({ children }) {
       {/* Eris: falling sakura petals */}
       {appliedTheme === 'eris' && <SakuraPetals />}
 
-      {/* Gorka: full-page liquid chrome background fixed behind everything.
-          Background colour prevents the white flash before WebGL first renders. */}
+      {/* Gorka: full-page silk background. Solid navy fallback prevents a
+          white flash before the WebGL canvas first renders. */}
       {appliedTheme === 'gorka' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#060412' }}>
-          <LiquidChrome baseColor={gorkaBaseColor} speed={0.12} amplitude={0.3} interactive={false} />
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
+          <Silk speed={1.2} scale={1.3} color="#1E2C44" noiseIntensity={0.8} rotation={0.6} />
         </div>
       )}
 

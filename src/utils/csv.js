@@ -67,6 +67,7 @@ export function parseAmountToCents(value) {
   const normalized = text
     .replace(/\s/g, '')
     .replace(/[€$£]/g, '')
+    .replace(/[a-zA-Z]/g, '')
     .replace(/\.(?=.*[.,]\d{2}$)/g, '')
     .replace(/,(?=\d{3}\b)/g, '')
     .replace(',', '.');

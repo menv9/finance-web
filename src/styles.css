@@ -145,156 +145,92 @@ input[type="month"] {
 /* ——————————————————————————————————————————————
    Tokens — Gorka (secret chrome metal mode 🪩)
 —————————————————————————————————————————————— */
+/* Gorka — finance-professional dark. Deep navy/charcoal base, muted steel-blue
+   accent, thin chrome-silver hairline borders, low-key Silk background. */
 [data-theme='gorka'] {
-  --canvas: #060412;
-  --surface: #0D0920;
-  --surface-raised: #150E2E;
-  --surface-sunken: #030209;
-  --rule: rgba(192, 132, 252, 0.08);
-  --rule-strong: rgba(192, 132, 252, 0.20);
-  --ink: #FFFFFF;
-  --ink-muted: rgba(255, 255, 255, 0.85);
-  --ink-faint: rgba(255, 255, 255, 0.55);
-  --ink-inverse: #060412;
-  --accent: #C084FC;
-  --accent-strong: #A855F7;
-  --accent-soft: rgba(192, 132, 252, 0.16);
-  --accent-ink: #0A0318;
-  --danger: #FF5370;
-  --danger-soft: rgba(255, 83, 112, 0.16);
-  --positive: #50FA7B;
-  --positive-soft: rgba(80, 250, 123, 0.15);
-  --grain: 0.025;
+  --canvas: #08101F;
+  --surface: #0E1726;
+  --surface-raised: #131D30;
+  --surface-sunken: #050A14;
+  --rule: rgba(148, 163, 184, 0.10);
+  --rule-strong: rgba(148, 163, 184, 0.22);
+  --ink: #E5ECF6;
+  --ink-muted: rgba(229, 236, 246, 0.78);
+  --ink-faint: rgba(229, 236, 246, 0.50);
+  --ink-inverse: #0A1322;
+  --accent: #5B8DEF;
+  --accent-strong: #3B82F6;
+  --accent-soft: rgba(91, 141, 239, 0.14);
+  --accent-ink: #08101F;
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.20);
+  --positive: #34D399;
+  --positive-soft: rgba(52, 211, 153, 0.18);
+  --grain: 0.018;
   color-scheme: dark;
 }
 
-/* Body background is handled by the fixed LiquidChrome canvas in AppShell.
-   These orb gradients serve as a CSS fallback if WebGL is unavailable. */
+/* CSS fallback if WebGL Silk fails to load — quiet navy gradient. */
 [data-theme='gorka'] body {
   background-image:
-    radial-gradient(900px 750px at -8% -5%,   rgba(192, 132, 252, 0.22) 0%, transparent 65%),
-    radial-gradient(700px 600px at 108% -8%,  rgba(96,  165, 250, 0.18) 0%, transparent 65%),
-    radial-gradient(600px 500px at -6% 108%,  rgba(244, 114, 182, 0.14) 0%, transparent 65%),
-    radial-gradient(500px 450px at 108% 106%, rgba(129, 140, 248, 0.14) 0%, transparent 65%);
+    radial-gradient(900px 750px at -8% -5%,   rgba(59, 130, 246, 0.10) 0%, transparent 65%),
+    radial-gradient(700px 600px at 108% 110%, rgba(91, 141, 239, 0.08) 0%, transparent 65%);
 }
 
-/* Surface cards need some transparency so LiquidChrome bleeds through */
+/* Cards: subtle frosted glass over the silk so depth still reads. */
 [data-theme='gorka'] .bg-surface {
-  background-color: rgba(13, 9, 32, 0.68) !important;
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  background-color: rgba(14, 23, 38, 0.78) !important;
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
 }
 [data-theme='gorka'] .bg-surface-raised {
-  background-color: rgba(45, 28, 90, 0.78) !important;
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-}
-/* Boost soft badge colors so they're readable on the dark gorka surface */
-[data-theme='gorka'] {
-  --danger-soft: rgba(255, 83, 112, 0.30);
-  --positive-soft: rgba(80, 250, 123, 0.28);
+  background-color: rgba(19, 29, 48, 0.84) !important;
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
 }
 
-/* Slowly rotating conic shimmer — gives the living-chrome feel */
-[data-theme='gorka'] body::after {
-  content: '';
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 200vmax;
-  height: 200vmax;
-  transform: translate(-50%, -50%) rotate(0deg);
-  transform-origin: center center;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.038;
-  mix-blend-mode: color-dodge;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    #c084fc 0deg,
-    #818cf8 60deg,
-    #60a5fa 120deg,
-    #f472b6 180deg,
-    #a855f7 240deg,
-    #818cf8 300deg,
-    #c084fc 360deg
-  );
-  animation: gorka-spin 24s linear infinite;
-}
-
-@keyframes gorka-spin {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to   { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-/* Chrome header — dark frosted glass over LiquidChrome background */
+/* Header — dark glass with a hairline steel rule. */
 [data-theme='gorka'] header.sticky {
-  background: rgba(4, 2, 12, 0.82) !important;
-  backdrop-filter: blur(20px) saturate(120%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
-  border-bottom: 1px solid rgba(109, 0, 255, 0.25) !important;
-  box-shadow:
-    0 1px 0 rgba(192, 132, 252, 0.12),
-    0 4px 24px -4px rgba(0, 0, 0, 0.6);
-  /* Force bright text in the header regardless of background bleed */
-  --ink: #FFFFFF;
-  --ink-muted: rgba(255, 255, 255, 0.72);
-  --ink-faint: rgba(255, 255, 255, 0.42);
+  background: rgba(8, 16, 31, 0.86) !important;
+  backdrop-filter: blur(20px) saturate(115%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(115%) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 1px 0 rgba(148, 163, 184, 0.06), 0 4px 24px -8px rgba(0, 0, 0, 0.5);
+  --ink: #F1F5FB;
+  --ink-muted: rgba(241, 245, 251, 0.72);
+  --ink-faint: rgba(241, 245, 251, 0.42);
 }
 
-/* Footer — transparent, white text so it reads over the chrome */
 [data-theme='gorka'] footer {
-  border-top-color: rgba(109, 0, 255, 0.2) !important;
-  --ink-muted: rgba(255, 255, 255, 0.80);
-  --ink-faint: rgba(255, 255, 255, 0.55);
+  border-top-color: rgba(148, 163, 184, 0.14) !important;
+  --ink-muted: rgba(229, 236, 246, 0.74);
+  --ink-faint: rgba(229, 236, 246, 0.50);
 }
 
-/* Logo circle — glowing chrome orb */
-[data-theme='gorka'] [aria-label="Finance Tracker — home"] [aria-hidden="true"] {
-  background: linear-gradient(135deg,
-    rgba(192, 132, 252, 0.18) 0%,
-    rgba(96,  165, 250, 0.12) 50%,
-    rgba(244, 114, 182, 0.10) 100%
-  ) !important;
-  border-color: rgba(192, 132, 252, 0.45) !important;
-  box-shadow:
-    0 0 14px rgba(192, 132, 252, 0.35),
-    0 0  5px rgba(129, 140, 248, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-/* Nav active underline inherits --accent automatically */
-
-/* Cards & panels — iridescent chrome border glow */
+/* Cards — chrome-silver hairline; no glow halo. */
 [data-theme='gorka'] .rounded-lg.border,
 [data-theme='gorka'] .rounded-xl.border,
 [data-theme='gorka'] .rounded-2xl.border {
-  border-color: rgba(192, 132, 252, 0.18) !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
   box-shadow:
-    0 0 0 1px rgba(129, 140, 248, 0.08),
-    0 4px 28px -8px rgba(192, 132, 252, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 0 0 1px rgba(148, 163, 184, 0.04),
+    0 2px 18px -10px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* Chrome scrollbar — purple → blue gradient */
+/* Steel scrollbar. */
 [data-theme='gorka'] *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg,
-    rgba(192, 132, 252, 0.5) 0%,
-    rgba(96,  165, 250, 0.5) 100%
-  );
+  background: rgba(148, 163, 184, 0.35);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 [data-theme='gorka'] *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg,
-    rgba(192, 132, 252, 0.75) 0%,
-    rgba(244, 114, 182, 0.60) 100%
-  );
+  background: rgba(148, 163, 184, 0.55);
   background-clip: padding-box;
   border: 3px solid transparent;
 }
 [data-theme='gorka'] * {
-  scrollbar-color: rgba(192, 132, 252, 0.45) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
 /* ——————————————————————————————————————————————
@@ -444,7 +380,6 @@ p { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .rise, .rise-1, .rise-2, .rise-3, .rise-4, .rise-5, .rise-6 { animation: none; }
-  [data-theme='gorka'] body::after { animation: none; }
   * { transition: none !important; }
 }
 
@@ -458,6 +393,10 @@ p { margin: 0; }
 @keyframes modalRise {
   from { opacity: 0; transform: translateY(8px) scale(0.985); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes route-loader-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }
 @media (prefers-reduced-motion: reduce) {
   @keyframes fadeIn { from { opacity: 1; } to { opacity: 1; } }

@@ -48,13 +48,27 @@ function detectRevolut(headers) {
   return h.includes('type') && h.includes('mcc_code') && h.includes('name');
 }
 
+function detectImagin(headers) {
+  const h = headers.map(normHeader);
+  return h.includes('concepto') && h.includes('fecha') && h.includes('importe') && h.includes('saldo');
+}
+
+function detectFormat(headers) {
+  if (detectRevolut(headers)) return { id: 'revolut', label: 'Revolut' };
+  if (detectImagin(headers)) return { id: 'imagin', label: 'Imagin / CaixaBank' };
+  return null;
+}
+
 function autoMapping(headers) {
   return {
-    date: findHeader(headers, 'date', 'fecha', 'datum', 'booking date', 'transaction date'),
+    // Prefer Completed Date over Started Date — Balance reflects state at completion.
+    date: findHeader(headers, 'completed date', 'date', 'fecha', 'datum', 'booking date', 'transaction date'),
     amount: findHeader(headers, 'amount', 'importe', 'betrag', 'monto', 'transaction amount'),
     description: findHeader(headers, 'name', 'description', 'descripcion', 'merchant', 'concepto', 'details', 'text'),
     currency: findHeader(headers, 'currency', 'moneda', 'wahrung'),
     mcc: findHeader(headers, 'mcc_code', 'mcc', 'category code', 'mcc code'),
+    balance: findHeader(headers, 'saldo', 'balance', 'running balance', 'kontostand'),
+    state: findHeader(headers, 'state', 'status', 'estado'),
   };
 }
 
@@ -74,11 +88,17 @@ function resolveCategory(mccRaw, userCategories) {
  * Auto-detects Revolut format and uses MCC codes to pre-assign categories.
  * Lets the user remap auto-assigned categories before committing.
  */
-export function SmartBankImport({ categories, onImportExpenses, onImportIncomes }) {
+export function SmartBankImport({
+  categories,
+  onImportExpenses,
+  onImportIncomes,
+  bankAccountId,
+  onImportComplete,
+}) {
   const [headers, setHeaders] = useState([]);
   const [rawRows, setRawRows] = useState([]);
   const [mapping, setMapping] = useState(null);
-  const [isRevolut, setIsRevolut] = useState(false);
+  const [detectedFormat, setDetectedFormat] = useState(null);
   const [categoryOverrides, setCategoryOverrides] = useState({}); // { autoCategory → userCategory }
   const [status, setStatus] = useState(null); // null | 'importing' | { expenses: N, incomes: N }
 
@@ -108,6 +128,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           description,
           autoCategory, // used for the override UI — stripped before import
           isRecurring: false,
+          ...(bankAccountId ? { bankAccountId } : {}),
         });
       } else {
         incomes.push({
@@ -118,12 +139,72 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
           source: description || 'Bank transfer',
           client: '',
           invoiceStatus: 'received',
+          ...(bankAccountId ? { bankAccountId } : {}),
         });
       }
     }
 
     return { expenses, incomes, skipped };
-  }, [rawRows, mapping, categories]);
+  }, [rawRows, mapping, categories, bankAccountId]);
+
+  // Effective balance from the CSV. Steps:
+  // 1. Detect row ordering (newest-first vs oldest-first) by comparing the
+  //    parsed date of the first vs last rows that have one.
+  // 2. Pick the latest "cleared" row by parsed date, with a same-date tiebreak
+  //    that respects the detected ordering (oldest-first → largest index wins;
+  //    newest-first → smallest index). This avoids picking the wrong same-day
+  //    row for banks like Revolut where Balance reflects Completed-Date order.
+  // 3. Subtract pending transactions — rows with a parseable amount but no
+  //    Balance value — so the result matches the bank's "available" balance.
+  const latestBalanceCents = useMemo(() => {
+    if (!mapping?.balance || !mapping?.date || !rawRows.length) return null;
+
+    const datedRows = rawRows.map((row, index) => ({
+      row,
+      index,
+      date: parseCsvDate(row[mapping.date]),
+    }));
+
+    // Detect ordering: compare first dated row vs last dated row.
+    const firstDated = datedRows.find((r) => r.date);
+    const lastDated = [...datedRows].reverse().find((r) => r.date);
+    const oldestFirst =
+      firstDated && lastDated && firstDated.date && lastDated.date
+        ? firstDated.date <= lastDated.date
+        : true;
+
+    let bestDate = '';
+    let bestIndex = -1;
+    let bestBalance = null;
+    let pendingDeltaCents = 0;
+
+    datedRows.forEach(({ row, index, date }) => {
+      const balance = parseAmountToCents(row[mapping.balance]);
+      const amount = parseAmountToCents(row[mapping.amount]);
+      const balanceValid = Number.isFinite(balance);
+      const amountValid = Number.isFinite(amount);
+
+      if (balanceValid && date) {
+        const beatsBest =
+          bestIndex === -1 ||
+          date > bestDate ||
+          (date === bestDate && (oldestFirst ? index > bestIndex : index < bestIndex));
+        if (beatsBest) {
+          bestDate = date;
+          bestIndex = index;
+          bestBalance = balance;
+        }
+      } else if (!balanceValid && amountValid) {
+        // Pending row (e.g. Revolut state=PENDING with empty Balance/Completed Date) —
+        // not yet reflected in any cleared Balance, but it will affect the available
+        // balance once it clears. Apply on top of the latest cleared balance.
+        pendingDeltaCents += amount;
+      }
+    });
+
+    if (bestBalance == null) return null;
+    return bestBalance + pendingDeltaCents;
+  }, [rawRows, mapping]);
 
   // Unique auto-categories with row counts — for the override table
   const autoCategories = useMemo(() => {
@@ -153,7 +234,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
     const parsed = parseCsv(text);
     setHeaders(parsed.headers);
     setRawRows(parsed.rows);
-    setIsRevolut(detectRevolut(parsed.headers));
+    setDetectedFormat(detectFormat(parsed.headers));
     setMapping(autoMapping(parsed.headers));
     setCategoryOverrides({});
     setStatus(null);
@@ -163,7 +244,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
     setHeaders([]);
     setRawRows([]);
     setMapping(null);
-    setIsRevolut(false);
+    setDetectedFormat(null);
     setCategoryOverrides({});
     setStatus(null);
   };
@@ -172,6 +253,13 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
     setStatus('importing');
     for (const row of finalExpenses) await onImportExpenses([row]);
     for (const row of split.incomes) await onImportIncomes([row]);
+    if (onImportComplete) {
+      await onImportComplete({
+        latestBalanceCents,
+        expensesCount: finalExpenses.length,
+        incomesCount: split.incomes.length,
+      });
+    }
     setStatus({ expenses: finalExpenses.length, incomes: split.incomes.length });
   };
 
@@ -197,10 +285,10 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
       {rawRows.length > 0 && mapping && (
         <>
           {/* ── Format badge ── */}
-          {isRevolut && (
+          {detectedFormat && (
             <p className="inline-flex items-center gap-1.5 text-xs text-positive">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-positive" />
-              Revolut format detected — columns pre-filled automatically
+              {detectedFormat.label} format detected — columns pre-filled automatically
             </p>
           )}
 
@@ -214,6 +302,7 @@ export function SmartBankImport({ categories, onImportExpenses, onImportIncomes 
                 { key: 'description', label: 'Description / merchant' },
                 { key: 'currency', label: 'Currency' },
                 { key: 'mcc', label: 'MCC / category code' },
+                { key: 'balance', label: 'Running balance / saldo' },
               ].map(({ key, label }) => (
                 <FormField key={key} label={label} htmlFor={`sbi-${key}`}>
                   {(props) => (

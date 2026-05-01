@@ -26,6 +26,43 @@ export const TOUR_STEPS = [
     ],
   },
   {
+    route: '/this-month',
+    page: 'This month',
+    stops: [
+      {
+        tourId: 'this-month-kpis',
+        label: 'Monthly figures',
+        desc: 'Income, expenses, and net cashflow for the selected month. Use the month picker in the header to browse other months.',
+      },
+      {
+        tourId: 'this-month-chart',
+        label: '12-month view',
+        desc: 'Income vs. expenses across the last year, with the selected month highlighted. Great for spotting trends and outlier months.',
+      },
+      {
+        tourId: 'this-month-activity',
+        label: 'Transactions',
+        desc: 'Every income, expense, and transfer logged in the selected month, in one chronological feed.',
+      },
+    ],
+  },
+  {
+    route: '/accounts',
+    page: 'Accounts',
+    stops: [
+      {
+        tourId: 'accounts-summary',
+        label: 'Bank totals',
+        desc: 'Your combined bank balance across every account, plus how many accounts you\'re tracking.',
+      },
+      {
+        tourId: 'accounts-list',
+        label: 'Bank accounts',
+        desc: 'Add and edit individual bank accounts. Adjusting a balance here updates your total directly without creating income or expense records — useful for reconciling against your real bank.',
+      },
+    ],
+  },
+  {
     route: '/income',
     page: 'Income',
     stops: [
