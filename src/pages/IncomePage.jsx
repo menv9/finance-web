@@ -193,6 +193,7 @@ function IncomeLedgerList({
 export default function IncomePage() {
   const incomes = useFinanceStore((state) => state.incomes);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
+  const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -641,6 +642,7 @@ export default function IncomePage() {
         size="lg"
       >
         <IncomeForm
+          bankAccounts={bankAccounts}
           initialValue={editingIncome}
           onSubmit={async (value) => {
             await saveEntity('incomes', value);

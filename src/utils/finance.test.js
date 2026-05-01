@@ -86,7 +86,7 @@ describe('finance metrics', () => {
     }
   });
 
-  it('carries past cashflow into total balance', () => {
+  it('uses bank accounts as total balance while keeping monthly cashflow', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-02T12:00:00'));
 
@@ -105,10 +105,12 @@ describe('finance metrics', () => {
         savingsConfig: [],
         savingsEntries: [],
         transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 7000 }],
       });
 
       expect(result.cashflowCents).toBe(-3000);
       expect(result.availableBalanceCents).toBe(7000);
+      expect(result.bankBalanceCents).toBe(7000);
     } finally {
       vi.useRealTimers();
     }
@@ -130,11 +132,37 @@ describe('finance metrics', () => {
         savingsConfig: [],
         savingsEntries: [],
         transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 100000 }],
       });
 
       expect(result.cashflowCents).toBe(0);
       expect(result.availableBalanceCents).toBe(100000);
       expect(result.incomeSeries.at(-1).amountCents).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores unassigned legacy cashflow for total balance', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-02T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [{ id: 'exp-legacy', amountCents: 2000, date: '2026-05-01' }],
+        incomes: [{ id: 'inc-legacy', amountCents: 50000, date: '2026-05-01' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 12000 }],
+      });
+
+      expect(result.availableBalanceCents).toBe(12000);
     } finally {
       vi.useRealTimers();
     }
@@ -156,6 +184,7 @@ describe('finance metrics', () => {
         savingsConfig: [],
         savingsEntries: [],
         transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 100000 }],
       });
 
       expect(result.cashflowCents).toBe(100000);

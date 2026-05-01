@@ -216,8 +216,8 @@ export default function DashboardPage() {
       label: 'Total balance',
       value: dashboard.availableBalanceCents,
       mode: 'currency',
-      hint: 'bank balance + cashflow',
-      info: 'Cash available now. It counts income from the day you receive it and carries leftover cash across months.',
+      hint: 'bank accounts',
+      info: 'Cash available now across your bank accounts. Manual income and expenses update the account you choose.',
     },
     {
       label: 'Total savings',

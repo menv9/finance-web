@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
 import { FormField, Input, Select, Textarea, Checkbox, Button } from '../ui';
 import { CategorySelect } from './CategorySelect';
@@ -7,6 +7,7 @@ const initialState = {
   date: normalizeDateInput(new Date()),
   amountCents: '',
   currency: 'EUR',
+  bankAccountId: '',
   category: 'Other',
   description: '',
   isRecurring: false,
@@ -90,15 +91,21 @@ function PendingFilePill({ file, onRemove }) {
 
 export function ExpenseForm({
   categories = [],
+  bankAccounts = [],
   initialValue,
   existingAttachments = [],
   onRemoveAttachment,
   onSubmit,
   onCancel,
 }) {
+  const defaultBankAccountId = useMemo(
+    () => initialValue?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '',
+    [bankAccounts, initialValue?.bankAccountId],
+  );
   const [form, setForm] = useState({
     ...initialState,
     ...initialValue,
+    bankAccountId: defaultBankAccountId,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
   const [pendingFiles, setPendingFiles] = useState([]);
@@ -107,6 +114,11 @@ export function ExpenseForm({
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  useEffect(() => {
+    if (!bankAccounts.length || form.bankAccountId) return;
+    setForm((prev) => ({ ...prev, bankAccountId: defaultBankAccountId }));
+  }, [bankAccounts.length, defaultBankAccountId, form.bankAccountId]);
 
   const addFiles = (fileList) => {
     const accepted = Array.from(fileList).filter(
@@ -135,6 +147,7 @@ export function ExpenseForm({
           {
             ...initialValue,
             ...form,
+            bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : '',
             amountCents: Math.round(Number(form.amountCents || 0) * 100),
           },
           pendingFiles,
@@ -170,6 +183,20 @@ export function ExpenseForm({
             </Select>
           )}
         </FormField>
+
+        {bankAccounts.length ? (
+          <FormField label="Account" htmlFor="expense-account" required>
+            {(props) => (
+              <Select {...props} value={form.bankAccountId || defaultBankAccountId} onChange={set('bankAccountId')} required>
+                {bankAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}{account.isMain ? ' (main)' : ''}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        ) : null}
       </FormSection>
 
       <FormSection step="2" title="Details">

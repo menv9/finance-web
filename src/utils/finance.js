@@ -183,39 +183,9 @@ function portfolioSaleCashflowCents(sale) {
 export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], settings = {}, fxRates = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
-  const allPastIncomes = incomes.filter((item) => item.date <= today);
-  const allPastCashflowIncomes = allPastIncomes.filter((item) => item.incomeKind !== 'portfolio_sale');
-  const savingsPaidExpenseIds = new Set(
-    (transfers || [])
-      .filter((t) => t.fromModule === 'savings' && t.toModule === 'expenses')
-      .map((t) => t.linkedExpenseId)
-      .filter(Boolean),
-  );
-  // Transactions tagged to a bank account are already reflected in that
-  // account's snapshot balanceCents (set at import time from the CSV's running
-  // balance). Excluding them here prevents double-counting in availableBalance.
-  const bankAccountIdSet = new Set((bankAccounts || []).map((a) => a.id));
-  const isBankTracked = (item) => item.bankAccountId && bankAccountIdSet.has(item.bankAccountId);
-  const allPastCashflowExpenses = expenses.filter((item) => item.date <= today && !savingsPaidExpenseIds.has(item.id) && !isBankTracked(item));
-  const allPastSaleCashflowCents = (portfolioSales || [])
-    .filter((sale) => sale.date <= today)
-    .reduce((sum, sale) => sum + portfolioSaleCashflowCents(sale), 0);
-  const allPastCashflowDistributionsCents = (transfers || [])
-    .filter((t) => t.date <= today && (t.fromModule === 'income' || t.fromModule === 'cashflow'))
-    .filter((t) => t.toModule === 'savings' || t.toModule === 'portfolio')
-    .reduce((sum, t) => sum + (t.amountCents || 0), 0);
-  const allPastDirectSavingsCents = (savingsEntries || [])
-    .filter((e) => e.date <= today && !e.transferId && e.source !== 'allocation')
-    .reduce((sum, e) => sum + (e.amountCents || 0), 0);
   const bankBalanceCents = (bankAccounts || [])
     .reduce((sum, account) => sum + (account.balanceCents || 0), 0);
-  const availableBalanceCents =
-    bankBalanceCents +
-    sumAmount(allPastCashflowIncomes.filter((item) => !isBankTracked(item))) +
-    allPastSaleCashflowCents -
-    sumAmount(allPastCashflowExpenses) -
-    allPastCashflowDistributionsCents -
-    allPastDirectSavingsCents;
+  const availableBalanceCents = bankBalanceCents;
 
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth && item.date <= today);
   const currentMonthIncomes  = incomes.filter((item)  => (item.accountingMonth || monthKey(item.date)) === currentMonth && item.date <= today);

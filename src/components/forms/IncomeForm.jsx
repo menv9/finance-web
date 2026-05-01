@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
 import { FormField, Input, Select, Button, InfoPopover } from '../ui';
 
@@ -7,6 +7,7 @@ const defaultValue = {
   accountingMonth: normalizeDateInput(new Date()).slice(0, 7),
   amountCents: '',
   currency: 'EUR',
+  bankAccountId: '',
   incomeKind: 'variable',
   source: '',
   variableSourceType: 'employer',
@@ -73,16 +74,26 @@ function MoneyInput({ amount, currency, onAmountChange, onCurrencyChange }) {
   );
 }
 
-export function IncomeForm({ initialValue, onSubmit, onCancel }) {
+export function IncomeForm({ bankAccounts = [], initialValue, onSubmit, onCancel }) {
+  const defaultBankAccountId = useMemo(
+    () => initialValue?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '',
+    [bankAccounts, initialValue?.bankAccountId],
+  );
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
+    bankAccountId: defaultBankAccountId,
     accountingMonth: initialValue?.accountingMonth || initialValue?.date?.slice(0, 7) || defaultValue.accountingMonth,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  useEffect(() => {
+    if (!bankAccounts.length || form.bankAccountId) return;
+    setForm((prev) => ({ ...prev, bankAccountId: defaultBankAccountId }));
+  }, [bankAccounts.length, defaultBankAccountId, form.bankAccountId]);
 
   return (
     <form
@@ -92,6 +103,7 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
         onSubmit({
           ...initialValue,
           ...form,
+          bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : '',
           amountCents: Math.round(Number(form.amountCents || 0) * 100),
           payDay: Number(form.payDay),
         });
@@ -119,7 +131,7 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
       </FormSection>
 
       <FormSection step="2" title="AMOUNT">
-        <div className="md:col-span-2">
+        <div className={bankAccounts.length ? '' : 'md:col-span-2'}>
           <MoneyInput
             amount={form.amountCents}
             currency={form.currency}
@@ -127,6 +139,19 @@ export function IncomeForm({ initialValue, onSubmit, onCancel }) {
             onCurrencyChange={set('currency')}
           />
         </div>
+        {bankAccounts.length ? (
+          <FormField label="Account" htmlFor="income-account" required>
+            {(props) => (
+              <Select {...props} value={form.bankAccountId || defaultBankAccountId} onChange={set('bankAccountId')} required>
+                {bankAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}{account.isMain ? ' (main)' : ''}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        ) : null}
       </FormSection>
 
       <FormSection step="3" title="INCOME DETAILS">

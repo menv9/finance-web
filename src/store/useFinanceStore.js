@@ -202,6 +202,49 @@ function upsertItem(items, nextItem) {
   return index >= 0 ? items.map((item) => (item.id === nextItem.id ? nextItem : item)) : [nextItem, ...items];
 }
 
+function accountDeltaForRecord(storeName, record) {
+  if (!record?.bankAccountId || !record.amountCents) return null;
+  if (storeName === 'expenses') {
+    return { accountId: record.bankAccountId, deltaCents: -Math.abs(record.amountCents || 0) };
+  }
+  if (storeName === 'incomes') {
+    return { accountId: record.bankAccountId, deltaCents: record.amountCents || 0 };
+  }
+  return null;
+}
+
+function buildBankAccountAdjustments(storeName, previous, nextRecord, skipAccountAdjustment) {
+  if (skipAccountAdjustment || (storeName !== 'expenses' && storeName !== 'incomes')) return new Map();
+  const adjustments = new Map();
+  const addAdjustment = (adjustment, multiplier = 1) => {
+    if (!adjustment?.accountId || !adjustment.deltaCents) return;
+    adjustments.set(
+      adjustment.accountId,
+      (adjustments.get(adjustment.accountId) || 0) + adjustment.deltaCents * multiplier,
+    );
+  };
+  addAdjustment(accountDeltaForRecord(storeName, previous), -1);
+  addAdjustment(accountDeltaForRecord(storeName, nextRecord), 1);
+  return adjustments;
+}
+
+function applyBankAccountAdjustments(accounts, adjustments, timestamp) {
+  if (!adjustments.size) return accounts;
+  return accounts.map((account) => {
+    const deltaCents = adjustments.get(account.id);
+    if (!deltaCents) return account;
+    const balanceCents = (account.balanceCents || 0) + deltaCents;
+    if (balanceCents < 0) {
+      throw new Error(`Not enough balance in ${account.name || 'this bank account'}.`);
+    }
+    return ensureEntitySyncFields({
+      ...account,
+      balanceCents,
+      updatedAt: timestamp,
+    }, timestamp);
+  });
+}
+
 function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, date, timestamp, cashflowId }) {
   const salePercent = Math.min(Math.max(Number(percent || 0), 0), 100);
   if (salePercent <= 0) throw new Error('Sale percent must be greater than 0');
@@ -792,7 +835,7 @@ export const useFinanceStore = create((set, get) => ({
     }, 1000);
   },
 
-  saveEntity: async (storeName, entity, { skipAutoCreate = false } = {}) => {
+  saveEntity: async (storeName, entity, { skipAutoCreate = false, skipAccountAdjustment = false } = {}) => {
     let value = entity;
     const previous = entity.id ? get()[storeName]?.find((item) => item.id === entity.id) : null;
 
@@ -809,6 +852,7 @@ export const useFinanceStore = create((set, get) => ({
         currency: value.currency,
         chargeDay,
         category: value.category,
+        bankAccountId: value.bankAccountId || null,
         active: true,
         alerts: true,
       }, { skipAutoCreate: true });
@@ -821,22 +865,46 @@ export const useFinanceStore = create((set, get) => ({
     const prefix = storeName.slice(0, 3);
     // Always stamp a fresh updatedAt — existing records carry their old timestamp which
     // would make ensureEntitySyncFields keep it, causing other devices to miss the edit.
-    const record = { ...ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }), updatedAt: new Date().toISOString() };
+    const timestamp = new Date().toISOString();
+    const record = { ...ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }), updatedAt: timestamp };
+    const bankAccountAdjustments = buildBankAccountAdjustments(storeName, previous, record, skipAccountAdjustment);
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
     await putRecord(storeName, record);
+    if (adjustedBankAccounts !== get().bankAccounts) {
+      await Promise.all(
+        adjustedBankAccounts
+          .filter((account) => bankAccountAdjustments.has(account.id))
+          .map((account) => putRecord('bankAccounts', account)),
+      );
+    }
     set((state) => {
       const nextList = upsertItem(state[storeName], record);
+      const nextBankAccounts = storeName === 'bankAccounts'
+        ? nextList
+        : applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== record.id),
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
         deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `${storeName}:${record.id}`),
+        conflicts: state.syncMeta.conflicts.filter((item) => (
+          item.id !== `${storeName}:${record.id}` &&
+          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', '')))
+        )),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, [storeName]: nextList };
-      return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts };
+      return {
+        [storeName]: nextList,
+        bankAccounts: nextBankAccounts,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
     });
     await persistActivityLogs(set, [buildActivityLog({
       storeName,
@@ -874,25 +942,48 @@ export const useFinanceStore = create((set, get) => ({
       }
     }
 
+    const timestamp = new Date().toISOString();
+    const bankAccountAdjustments = buildBankAccountAdjustments(storeName, previous, null, false);
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
     await deleteRecord(storeName, id);
+    if (adjustedBankAccounts !== get().bankAccounts) {
+      await Promise.all(
+        adjustedBankAccounts
+          .filter((account) => bankAccountAdjustments.has(account.id))
+          .map((account) => putRecord('bankAccounts', account)),
+      );
+    }
     set((state) => {
       const nextList = state[storeName].filter((item) => item.id !== id);
-      const timestamp = new Date().toISOString();
+      const nextBankAccounts = storeName === 'bankAccounts'
+        ? nextList
+        : applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         [storeName]: [
           ...(state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== id),
           { id, updatedAt: timestamp, deletedAt: timestamp },
         ],
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
         deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `${storeName}:${id}`),
+        conflicts: state.syncMeta.conflicts.filter((item) => (
+          item.id !== `${storeName}:${id}` &&
+          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', '')))
+        )),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, [storeName]: nextList };
-      return { [storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts };
+      return {
+        [storeName]: nextList,
+        bankAccounts: nextBankAccounts,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived(nextState),
+      };
     });
     if (previous) {
       await persistActivityLogs(set, [buildActivityLog({
@@ -1298,6 +1389,7 @@ export const useFinanceStore = create((set, get) => ({
         description: fe.name,
         isRecurring: true,
         fixedExpenseId: fe.id,
+        bankAccountId: fe.bankAccountId || null,
       }, new Date().toISOString());
 
       toCreate.push(expense);
@@ -1305,11 +1397,28 @@ export const useFinanceStore = create((set, get) => ({
 
     if (!toCreate.length) return;
 
-    await Promise.all(toCreate.map((e) => putRecord('expenses', e)));
+    const timestamp = new Date().toISOString();
+    const bankAccountAdjustments = toCreate.reduce((adjustments, expense) => {
+      const adjustment = accountDeltaForRecord('expenses', expense);
+      if (!adjustment?.accountId || !adjustment.deltaCents) return adjustments;
+      adjustments.set(
+        adjustment.accountId,
+        (adjustments.get(adjustment.accountId) || 0) + adjustment.deltaCents,
+      );
+      return adjustments;
+    }, new Map());
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
+    await Promise.all([
+      ...toCreate.map((e) => putRecord('expenses', e)),
+      ...adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    ]);
     set((state) => {
       const nextExpenses = [...state.expenses, ...toCreate];
-      const nextState = { ...state, expenses: nextExpenses };
-      return { expenses: nextExpenses, derived: buildDerived(nextState) };
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
+      const nextState = { ...state, expenses: nextExpenses, bankAccounts: nextBankAccounts };
+      return { expenses: nextExpenses, bankAccounts: nextBankAccounts, derived: buildDerived(nextState) };
     });
     get().triggerAutoPush();
   },

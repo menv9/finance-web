@@ -287,6 +287,7 @@ export default function ExpensesPage() {
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
   const attachments = useFinanceStore((state) => state.attachments);
+  const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -794,15 +795,20 @@ export default function ExpensesPage() {
       >
         <ExpenseForm
           categories={settings.categories}
+          bankAccounts={bankAccounts}
           initialValue={editingExpense}
           existingAttachments={attachments.filter((a) => a.expenseId === editingExpense?.id)}
           onRemoveAttachment={removeAttachment}
           onSubmit={async (value, pendingFiles) => {
-            const saved = await saveEntity('expenses', value);
-            for (const file of pendingFiles) {
-              await uploadAttachment(saved.id, file);
+            try {
+              const saved = await saveEntity('expenses', value);
+              for (const file of pendingFiles) {
+                await uploadAttachment(saved.id, file);
+              }
+              closeExpenseModal();
+            } catch (error) {
+              window.alert(error.message || 'Unable to save expense.');
             }
-            closeExpenseModal();
           }}
           onCancel={closeExpenseModal}
         />

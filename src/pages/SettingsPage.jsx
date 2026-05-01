@@ -11,7 +11,7 @@ import { useTour } from '../components/tour/TourContext';
 const TABS = [
   { id: 'general', label: 'General', hint: 'Appearance, currency, modules' },
   { id: 'data',    label: 'Data',    hint: 'Categories, platforms, targets, import' },
-  { id: 'sync',    label: 'Sync',    hint: 'Cloud sync, conflicts, activity' },
+  { id: 'sync',    label: 'Activity', hint: 'Cloud sync, conflicts, activity' },
   { id: 'backup',  label: 'Backup',  hint: 'Export, import, danger zone' },
 ];
 

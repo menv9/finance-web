@@ -354,6 +354,7 @@ export function AppShell({ children }) {
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
   const setTheme = useFinanceStore((state) => state.setTheme);
   const metrics = useFinanceStore((state) => state.derived.dashboard);
+  const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
@@ -841,14 +842,19 @@ export function AppShell({ children }) {
       >
         <ExpenseForm
           categories={settings.categories}
+          bankAccounts={bankAccounts}
           existingAttachments={[]}
           onRemoveAttachment={() => {}}
           onSubmit={async (value, pendingFiles) => {
-            const saved = await saveEntity('expenses', value);
-            for (const file of pendingFiles) {
-              await uploadAttachment(saved.id, file);
+            try {
+              const saved = await saveEntity('expenses', value);
+              for (const file of pendingFiles) {
+                await uploadAttachment(saved.id, file);
+              }
+              setExpenseModalOpen(false);
+            } catch (error) {
+              window.alert(error.message || 'Unable to save expense.');
             }
-            setExpenseModalOpen(false);
           }}
           onCancel={() => setExpenseModalOpen(false)}
         />
@@ -863,6 +869,7 @@ export function AppShell({ children }) {
         size="lg"
       >
         <IncomeForm
+          bankAccounts={bankAccounts}
           onSubmit={async (value) => {
             await saveEntity('incomes', value);
             setIncomeModalOpen(false);
