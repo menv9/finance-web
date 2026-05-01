@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
+import { BankSyncSection } from '../components/BankSyncSection';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { Button, Card, Checkbox, EmptyState, FormField, Input, Modal, Stat } from '../components/ui';
@@ -95,9 +97,19 @@ export default function AccountsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
+  const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const [editingAccount, setEditingAccount] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importingAccount, setImportingAccount] = useState(null);
+  const [bankConnectedBanner, setBankConnectedBanner] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('bank') === 'connected') {
+      setBankConnectedBanner(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const currency = settings.baseCurrency || 'EUR';
   const locale = settings.locale || 'en-GB';
@@ -157,6 +169,27 @@ export default function AccountsPage() {
     await saveEntity('bankAccounts', { ...account, isMain: checked });
   };
 
+  const handleSyncComplete = async (results) => {
+    for (const { accountId, balances } of results) {
+      const closing = balances?.find((b) => b.balanceType === 'closingBooked') ?? balances?.[0];
+      if (!closing) continue;
+      const balanceCents = Math.round(parseFloat(closing.balanceAmount.amount) * 100);
+      const cur = closing.balanceAmount.currency;
+      const existing = accounts.find((a) => a.gcAccountId === accountId);
+      if (existing) {
+        await saveEntity('bankAccounts', { ...existing, balanceCents, currency: cur });
+      } else {
+        await saveEntity('bankAccounts', {
+          gcAccountId: accountId,
+          name: `GoCardless ${cur}`,
+          balanceCents,
+          currency: cur,
+          isMain: accounts.length === 0,
+        });
+      }
+    }
+  };
+
   const handleDelete = async (account) => {
     const ok = await confirm({
       title: 'Delete account',
@@ -175,6 +208,19 @@ export default function AccountsPage() {
         description="Track money by bank and adjust real balances without changing income or expense history."
         actions={<Button onClick={openNewAccount}>Add account</Button>}
       />
+
+      {bankConnectedBanner ? (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-600 dark:text-green-400">
+          <span>Bank connected! Click <strong>Sync now</strong> to pull in your latest balance.</span>
+          <button
+            type="button"
+            className="shrink-0 opacity-60 hover:opacity-100"
+            onClick={() => setBankConnectedBanner(false)}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <div data-tour="accounts-summary" className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-lg border border-rule bg-surface p-6">
@@ -257,6 +303,8 @@ export default function AccountsPage() {
           onSave={handleSave}
         />
       ) : null}
+
+      <BankSyncSection userId={supabaseUser?.id} onSyncComplete={handleSyncComplete} />
 
       {importingAccount ? (
         <Modal
