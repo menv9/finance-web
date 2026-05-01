@@ -206,13 +206,14 @@ export default function SettingsPage() {
   };
 
   const theme = settings.theme || 'dark';
-  const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
+  const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
 
   const themeOptions = [
     { value: 'dark',  label: 'Dark',  Icon: MoonIcon,    description: 'Deep & minimal' },
     { value: 'light', label: 'Light', Icon: SunIcon,     description: 'Clean & bright' },
     { value: 'eris',  label: 'Eris',  Icon: SparkleIcon, description: 'Lavender dreams' },
     { value: 'gorka', label: 'Gorka', Icon: DiscIcon,    description: 'Liquid chrome'   },
+    { value: 'gorka-light', label: 'Gorka light', Icon: DiscIcon, description: 'Chrome on light' },
   ];
 
   const [categoryInput, setCategoryInput] = useState('');
@@ -368,7 +369,7 @@ export default function SettingsPage() {
             description="Choose how the app looks."
             className={rise(1)}
           >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {themeOptions.map((opt) => {
                 const isActive = appliedTheme === opt.value;
                 return (

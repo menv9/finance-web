@@ -85,6 +85,7 @@ const LOGO_GRADIENTS = {
   light: [{ o: '0%', c: '#1F4B3A' }, { o: '45%', c: '#0F6E56' }, { o: '100%', c: '#085041' }],
   eris:  [{ o: '0%', c: '#D4607A' }, { o: '45%', c: '#B84362' }, { o: '100%', c: '#8A1A45' }],
   gorka: [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
+  'gorka-light': [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
 };
 
 const FIN_COLORS = {
@@ -92,6 +93,7 @@ const FIN_COLORS = {
   light: '#1B1712',
   eris:  '#2A1218',
   gorka: '#FFFFFF',
+  'gorka-light': '#1B1712',
 };
 
 const TAGLINE_COLORS = {
@@ -99,6 +101,7 @@ const TAGLINE_COLORS = {
   light: '#524A40',
   eris:  '#8A4F65',
   gorka: 'rgba(229,236,246,0.55)',
+  'gorka-light': '#524A40',
 };
 
 function FinGesWordmark({ theme }) {
@@ -200,6 +203,7 @@ const FAVICON_TOKENS = {
   light: { cardFrom: '#FFFFFF', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#E0E8FF', ringTo: '#C8D8F8', euroColor: '#1B3A7A', cardShadow: '#8AAAD8' },
   eris:  { cardFrom: '#FFF6FA', cardTo: '#FEF0F5', coinFrom: '#FFF0F7', coinTo: '#FFE0EE', ringFrom: '#FFD6EA', ringTo: '#FFBAD8', euroColor: '#D4607A', cardShadow: '#E8A0B8' },
   gorka: { cardFrom: '#131D30', cardTo: '#0E1726', coinFrom: '#1A2540', coinTo: '#0F1827', ringFrom: '#2A3548', ringTo: '#1E2A40', euroColor: '#5B8DEF', cardShadow: '#3B5680' },
+  'gorka-light': { cardFrom: '#F6F1E8', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#D6E1F8', ringTo: '#BFD1F6', euroColor: '#3B82F6', cardShadow: '#8AAAD8' },
 };
 
 function buildFaviconSVG(theme) {
@@ -402,7 +406,7 @@ export function AppShell({ children }) {
   }, [isEris, isGorka, setTheme]);
 
   // Simple: theme value is applied directly. No mapping.
-  const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
+  const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
 
   useEffect(() => {
     document.documentElement.dataset.theme = appliedTheme;
@@ -509,9 +513,15 @@ export function AppShell({ children }) {
 
       {/* Gorka: full-page silk background. Solid navy fallback prevents a
           white flash before the WebGL canvas first renders. */}
-      {appliedTheme === 'gorka' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
-          <Silk speed={1.2} scale={1.3} color="#1E2C44" noiseIntensity={0.8} rotation={0.6} />
+      {(appliedTheme === 'gorka' || appliedTheme === 'gorka-light') && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: appliedTheme === 'gorka-light' ? '#F6F1E8' : '#08101F' }}>
+          <Silk
+            speed={1.2}
+            scale={1.3}
+            color={appliedTheme === 'gorka-light' ? '#D8E2F6' : '#1E2C44'}
+            noiseIntensity={0.8}
+            rotation={0.6}
+          />
         </div>
       )}
 

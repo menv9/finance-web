@@ -170,6 +170,29 @@ input[type="month"] {
   color-scheme: dark;
 }
 
+[data-theme='gorka-light'] {
+  --canvas: #F6F1E8;
+  --surface: #0E1726;
+  --surface-raised: #131D30;
+  --surface-sunken: #050A14;
+  --rule: rgba(148, 163, 184, 0.16);
+  --rule-strong: rgba(148, 163, 184, 0.28);
+  --ink: #E5ECF6;
+  --ink-muted: rgba(229, 236, 246, 0.78);
+  --ink-faint: rgba(229, 236, 246, 0.50);
+  --ink-inverse: #0A1322;
+  --accent: #5B8DEF;
+  --accent-strong: #3B82F6;
+  --accent-soft: rgba(91, 141, 239, 0.14);
+  --accent-ink: #08101F;
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.20);
+  --positive: #34D399;
+  --positive-soft: rgba(52, 211, 153, 0.18);
+  --grain: 0.018;
+  color-scheme: light;
+}
+
 /* CSS fallback if WebGL Silk fails to load — quiet navy gradient. */
 [data-theme='gorka'] body {
   background-image:
@@ -177,20 +200,29 @@ input[type="month"] {
     radial-gradient(700px 600px at 108% 110%, rgba(91, 141, 239, 0.08) 0%, transparent 65%);
 }
 
+[data-theme='gorka-light'] body {
+  background-image:
+    radial-gradient(900px 750px at -8% -5%, rgba(59, 130, 246, 0.12) 0%, transparent 65%),
+    radial-gradient(700px 600px at 108% 110%, rgba(91, 141, 239, 0.10) 0%, transparent 65%);
+}
+
 /* Cards: subtle frosted glass over the silk so depth still reads. */
-[data-theme='gorka'] .bg-surface {
+[data-theme='gorka'] .bg-surface,
+[data-theme='gorka-light'] .bg-surface {
   background-color: rgba(14, 23, 38, 0.78) !important;
   backdrop-filter: blur(14px) saturate(115%);
   -webkit-backdrop-filter: blur(14px) saturate(115%);
 }
-[data-theme='gorka'] .bg-surface-raised {
+[data-theme='gorka'] .bg-surface-raised,
+[data-theme='gorka-light'] .bg-surface-raised {
   background-color: rgba(19, 29, 48, 0.84) !important;
   backdrop-filter: blur(14px) saturate(115%);
   -webkit-backdrop-filter: blur(14px) saturate(115%);
 }
 
 /* Header — dark glass with a hairline steel rule. */
-[data-theme='gorka'] header.sticky {
+[data-theme='gorka'] header.sticky,
+[data-theme='gorka-light'] header.sticky {
   background: rgba(8, 16, 31, 0.86) !important;
   backdrop-filter: blur(20px) saturate(115%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(115%) !important;
@@ -201,7 +233,8 @@ input[type="month"] {
   --ink-faint: rgba(241, 245, 251, 0.42);
 }
 
-[data-theme='gorka'] footer {
+[data-theme='gorka'] footer,
+[data-theme='gorka-light'] footer {
   border-top-color: rgba(148, 163, 184, 0.14) !important;
   --ink-muted: rgba(229, 236, 246, 0.74);
   --ink-faint: rgba(229, 236, 246, 0.50);
@@ -210,7 +243,10 @@ input[type="month"] {
 /* Cards — chrome-silver hairline; no glow halo. */
 [data-theme='gorka'] .rounded-lg.border,
 [data-theme='gorka'] .rounded-xl.border,
-[data-theme='gorka'] .rounded-2xl.border {
+[data-theme='gorka'] .rounded-2xl.border,
+[data-theme='gorka-light'] .rounded-lg.border,
+[data-theme='gorka-light'] .rounded-xl.border,
+[data-theme='gorka-light'] .rounded-2xl.border {
   border-color: rgba(148, 163, 184, 0.16) !important;
   box-shadow:
     0 0 0 1px rgba(148, 163, 184, 0.04),
@@ -231,6 +267,9 @@ input[type="month"] {
 }
 [data-theme='gorka'] * {
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+[data-theme='gorka-light'] * {
+  scrollbar-color: rgba(91, 141, 239, 0.35) transparent;
 }
 
 /* ——————————————————————————————————————————————

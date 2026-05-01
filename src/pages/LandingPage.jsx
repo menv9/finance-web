@@ -154,7 +154,7 @@ export default function LandingPage() {
   const supabaseConfigured = useFinanceStore((s) => s.supabaseConfigured);
   const supabaseUser       = useFinanceStore((s) => s.supabaseUser);
 
-  const appliedTheme = ['dark', 'light', 'eris', 'gorka'].includes(theme) ? theme : 'dark';
+  const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
 
   // Mirror what AppShell does — keep data-theme in sync while landing is mounted.
   // When the user navigates away, AppShell will take over and re-apply on mount.
@@ -175,9 +175,15 @@ export default function LandingPage() {
       {appliedTheme === 'eris' && <SakuraPetals />}
 
       {/* Gorka: full-page silk, same setup as AppShell */}
-      {appliedTheme === 'gorka' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
-          <Silk speed={1} scale={1.5} color="#1E2C44" noiseIntensity={2} rotation={0.6} />
+      {(appliedTheme === 'gorka' || appliedTheme === 'gorka-light') && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: appliedTheme === 'gorka-light' ? '#F6F1E8' : '#08101F' }}>
+          <Silk
+            speed={1}
+            scale={1.5}
+            color={appliedTheme === 'gorka-light' ? '#D8E2F6' : '#1E2C44'}
+            noiseIntensity={2}
+            rotation={0.6}
+          />
         </div>
       )}
 
@@ -210,7 +216,7 @@ export default function LandingPage() {
         {/* ── Hero ─────────────────────────────────────────────── */}
         <section className="relative mx-auto max-w-5xl px-6 pt-20 pb-24 md:pt-32 md:pb-32 overflow-hidden">
           {/* Subtle grid texture — hidden on gorka since LiquidChrome provides depth */}
-          {appliedTheme !== 'gorka' && (
+          {appliedTheme !== 'gorka' && appliedTheme !== 'gorka-light' && (
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0"
