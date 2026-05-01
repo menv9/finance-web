@@ -38,6 +38,7 @@ vi.mock('../utils/yahoo', () => ({
   fetchTickerPrice: vi.fn(async () => ({ priceCents: 0, currency: 'EUR' })),
 }));
 
+const { fetchTickerPrice } = await import('../utils/yahoo');
 const { useFinanceStore } = await import('./useFinanceStore');
 
 function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 10000, currency: 'EUR' }]) {
@@ -177,6 +178,43 @@ describe('account-backed transaction saves', () => {
       name: 'Main renamed',
       balanceCents: 12345,
       isMain: true,
+    });
+  });
+});
+
+describe('portfolio price refresh', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T12:00:00Z'));
+    resetStore();
+    fetchTickerPrice.mockResolvedValue({ priceCents: 12500, currency: 'EUR' });
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('updates current price without changing average buy price', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{
+        id: 'holding-a',
+        ticker: 'VWCE.DE',
+        name: 'Vanguard FTSE All-World',
+        quantity: 2,
+        averageBuyPriceCents: 10000,
+        currentPriceCents: 11000,
+        currency: 'EUR',
+      }],
+    }));
+
+    await useFinanceStore.getState().refreshPrices();
+
+    expect(useFinanceStore.getState().holdings[0]).toMatchObject({
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 12500,
     });
   });
 });
