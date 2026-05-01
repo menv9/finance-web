@@ -287,6 +287,66 @@ function buildFaviconSVG(theme) {
 </svg>`;
 }
 
+function MonthOverview({ metrics, baseCurrency, locale }) {
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(new Date()),
+    [locale],
+  );
+  const income = Math.max(metrics.totalIncomeCents || 0, 0);
+  const expenses = Math.max(metrics.totalExpensesCents || 0, 0);
+  const net = (metrics.totalIncomeCents || 0) - (metrics.totalExpensesCents || 0);
+  const ratio = income > 0 ? Math.min(expenses / income, 1) : 0;
+  const netPositive = net >= 0;
+
+  return (
+    <section
+      aria-label="This month overview"
+      className="flex basis-1/2 min-h-0 flex-col gap-4 border-b border-rule px-5 py-5"
+    >
+      <div className="flex flex-col gap-0.5">
+        <span className="eyebrow text-[0.6rem] text-ink-muted">This month</span>
+        <span className="font-display text-base text-ink leading-tight">{monthLabel}</span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="eyebrow text-[0.55rem] text-ink-faint">Net cashflow</span>
+        <span
+          className={cn(
+            'numeric text-2xl leading-none',
+            netPositive ? 'text-positive' : 'text-danger',
+          )}
+        >
+          {netPositive ? '+' : '−'}
+          {formatCurrency(Math.abs(net), baseCurrency, locale)}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
+          <div
+            className="h-full bg-danger transition-[width] duration-300"
+            style={{ width: `${ratio * 100}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[0.7rem]">
+          <div className="flex flex-col">
+            <span className="eyebrow text-[0.55rem] text-ink-faint">Income</span>
+            <span className="numeric text-positive">
+              {formatCurrency(income, baseCurrency, locale)}
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="eyebrow text-[0.55rem] text-ink-faint">Spent</span>
+            <span className="numeric text-danger">
+              {formatCurrency(expenses, baseCurrency, locale)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function AppShell({ children }) {
   const location = useLocation();
   const theme = useFinanceStore((state) => state.settings.theme);
@@ -654,24 +714,31 @@ export function AppShell({ children }) {
             <MenuIcon open />
           </button>
         </div>
-        {/* Nav links */}
-        <nav aria-label="Primary mobile" className="flex flex-1 flex-col overflow-y-auto px-3 py-3">
-          {moreLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-3 border-b border-rule last:border-b-0 transition-colors duration-120',
-                  isActive ? 'text-ink' : 'text-ink-muted',
-                )
-              }
-            >
-              <span className="font-display text-lg">{link.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+        {/* Body: 50% month overview / 50% nav links */}
+        <div className="flex flex-1 min-h-0 flex-col">
+          <MonthOverview
+            metrics={metrics}
+            baseCurrency={baseCurrency}
+            locale={locale}
+          />
+          <nav aria-label="Primary mobile" className="flex basis-1/2 min-h-0 flex-col overflow-y-auto px-3 py-3">
+            {moreLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2.5 border-b border-rule last:border-b-0 transition-colors duration-120',
+                    isActive ? 'text-ink' : 'text-ink-muted',
+                  )
+                }
+              >
+                <span className="font-display text-lg">{link.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </div>
         {/* Panel footer: balance + sign-out */}
         <div className="border-t border-rule px-4 py-4">
           <div className="flex items-end justify-between gap-3">
