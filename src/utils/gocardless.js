@@ -5,10 +5,17 @@ async function getAuthToken() {
   const client = getSupabaseBrowserClient();
   if (client) {
     const { data: { session } } = await client.auth.getSession();
-    if (session?.access_token) return session.access_token;
+    if (session?.access_token) {
+      // Refresh if token expires within the next 60 seconds
+      const expiresAt = session.expires_at ?? 0;
+      if (expiresAt - Date.now() / 1000 < 60) {
+        const { data: refreshed } = await client.auth.refreshSession();
+        if (refreshed?.session?.access_token) return refreshed.session.access_token;
+      }
+      return session.access_token;
+    }
   }
-  const settings = useFinanceStore.getState().settings;
-  return getSupabaseConfig(settings).anonKey;
+  throw new Error('Not authenticated — sign in to use GoCardless.');
 }
 
 function getBaseUrl() {
