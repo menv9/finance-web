@@ -565,9 +565,10 @@ export const useFinanceStore = create((set, get) => ({
         rollovers: normalizedRecords[11],
         transfers: normalizedRecords[12],
         bankAccounts: normalizedRecords[13],
-        attachments: normalizedRecords[14],
-        activityLog: normalizedRecords[15],
-        portfolioSnapshots: normalizedRecords[16],
+        debts: normalizedRecords[14],
+        attachments: normalizedRecords[15],
+        activityLog: normalizedRecords[16],
+        portfolioSnapshots: normalizedRecords[17],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -603,9 +604,10 @@ export const useFinanceStore = create((set, get) => ({
       rollovers: normalizedRecords[11],
       transfers: normalizedRecords[12],
       bankAccounts: normalizedRecords[13],
-      attachments: normalizedRecords[14],
-      activityLog: normalizedRecords[15],
-      portfolioSnapshots: normalizedRecords[16],
+      debts: normalizedRecords[14],
+      attachments: normalizedRecords[15],
+      activityLog: normalizedRecords[16],
+      portfolioSnapshots: normalizedRecords[17],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
