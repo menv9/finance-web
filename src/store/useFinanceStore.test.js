@@ -64,6 +64,7 @@ function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 1000
     bankAccounts: accounts,
     attachments: [],
     activityLog: [],
+    portfolioSnapshots: [],
   }));
 }
 
@@ -216,5 +217,80 @@ describe('portfolio price refresh', () => {
       averageBuyPriceCents: 10000,
       currentPriceCents: 12500,
     });
+  });
+
+  it('records one floating portfolio value snapshot per hour', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{
+        id: 'holding-a',
+        ticker: 'VWCE.DE',
+        name: 'Vanguard FTSE All-World',
+        quantity: 2,
+        averageBuyPriceCents: 10000,
+        currentPriceCents: 12500,
+        currency: 'EUR',
+      }],
+      derived: {
+        ...state.derived,
+        portfolio: {
+          ...state.derived.portfolio,
+          currentValueCents: 25000,
+        },
+      },
+    }));
+
+    await useFinanceStore.getState().recordPortfolioSnapshot();
+    useFinanceStore.setState((state) => ({
+      ...state,
+      derived: {
+        ...state.derived,
+        portfolio: {
+          ...state.derived.portfolio,
+          currentValueCents: 26000,
+        },
+      },
+    }));
+    await useFinanceStore.getState().recordPortfolioSnapshot();
+
+    expect(useFinanceStore.getState().portfolioSnapshots).toHaveLength(1);
+    expect(useFinanceStore.getState().portfolioSnapshots[0]).toMatchObject({
+      id: 'psn-2026-05-01T12',
+      valueCents: 26000,
+      currency: 'EUR',
+      holdingsCount: 1,
+      source: 'hourly',
+    });
+  });
+
+  it('can force an event snapshot inside an existing hour', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{
+        id: 'holding-a',
+        ticker: 'VWCE.DE',
+        name: 'Vanguard FTSE All-World',
+        quantity: 2,
+        averageBuyPriceCents: 10000,
+        currentPriceCents: 12500,
+        currency: 'EUR',
+      }],
+      derived: {
+        ...state.derived,
+        portfolio: {
+          ...state.derived.portfolio,
+          currentValueCents: 25000,
+        },
+      },
+    }));
+
+    await useFinanceStore.getState().recordPortfolioSnapshot();
+    await useFinanceStore.getState().recordPortfolioSnapshot({ force: true, source: 'holding_added' });
+
+    expect(useFinanceStore.getState().portfolioSnapshots).toHaveLength(2);
+    expect(useFinanceStore.getState().portfolioSnapshots.map((snapshot) => snapshot.source)).toEqual([
+      'holding_added',
+      'hourly',
+    ]);
   });
 });

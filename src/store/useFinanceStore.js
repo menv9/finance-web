@@ -28,7 +28,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'attachments', 'activityLog'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
   savings: 'savingsConfig',
 };
@@ -50,6 +50,7 @@ const STORE_LABELS = {
   attachments: 'Attachment',
   settings: 'Settings',
   activityLog: 'Activity log',
+  portfolioSnapshots: 'Portfolio snapshot',
 };
 const STORE_MODULES = {
   expenses: 'Expenses',
@@ -69,6 +70,7 @@ const STORE_MODULES = {
   attachments: 'Expenses',
   settings: 'Settings',
   activityLog: 'Settings',
+  portfolioSnapshots: 'Investing',
 };
 let authSubscription = null;
 let autoPushTimer = null;
@@ -139,6 +141,10 @@ function assertSourceHasFunds(state, source, amountCents) {
 
 function makeId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function portfolioSnapshotId(timestamp = new Date().toISOString()) {
+  return `psn-${timestamp.slice(0, 13)}`;
 }
 
 function buildDividendIncome(dividend, existingIncomeId) {
@@ -465,6 +471,7 @@ export const useFinanceStore = create((set, get) => ({
   bankAccounts: [],
   attachments: [],
   activityLog: [],
+  portfolioSnapshots: [],
   derived: {
     dashboard: {
       netWorthCents: 0,
@@ -520,6 +527,7 @@ export const useFinanceStore = create((set, get) => ({
         bankAccounts: normalizedRecords[13],
         attachments: normalizedRecords[14],
         activityLog: normalizedRecords[15],
+        portfolioSnapshots: normalizedRecords[16],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -557,6 +565,7 @@ export const useFinanceStore = create((set, get) => ({
       bankAccounts: normalizedRecords[13],
       attachments: normalizedRecords[14],
       activityLog: normalizedRecords[15],
+      portfolioSnapshots: normalizedRecords[16],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -1472,6 +1481,41 @@ export const useFinanceStore = create((set, get) => ({
     return record;
   },
 
+  recordPortfolioSnapshot: async ({ force = false, source = 'hourly' } = {}) => {
+    const state = get();
+    const valueCents = state.derived?.portfolio?.currentValueCents || 0;
+    const activeHoldingsCount = (state.holdings || [])
+      .filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0).length;
+    if (!activeHoldingsCount) return null;
+
+    const timestamp = new Date().toISOString();
+    const record = ensureEntitySyncFields({
+      id: force ? `psn-${timestamp}` : portfolioSnapshotId(timestamp),
+      capturedAt: timestamp,
+      valueCents,
+      currency: state.settings?.baseCurrency || 'EUR',
+      holdingsCount: activeHoldingsCount,
+      source,
+    }, timestamp);
+
+    await putRecord('portfolioSnapshots', record);
+    set((current) => {
+      const nextDeletedRecords = {
+        ...current.syncMeta.deletedRecords,
+        portfolioSnapshots: (current.syncMeta.deletedRecords.portfolioSnapshots || [])
+          .filter((item) => item.id !== record.id),
+      };
+      const nextSyncMeta = { ...current.syncMeta, deletedRecords: nextDeletedRecords };
+      saveSyncMeta(nextSyncMeta);
+      return {
+        portfolioSnapshots: upsertItem(current.portfolioSnapshots || [], record),
+        syncMeta: nextSyncMeta,
+      };
+    });
+    get().triggerAutoPush();
+    return record;
+  },
+
   removeDividend: async (id) => {
     const current = get().dividends.find((item) => item.id === id);
     if (!current) return;
@@ -1835,6 +1879,7 @@ export const useFinanceStore = create((set, get) => ({
         bankAccounts: [],
         attachments: [],
         activityLog: [],
+        portfolioSnapshots: [],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });

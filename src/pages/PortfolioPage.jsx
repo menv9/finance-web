@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConfirm } from '../components/ConfirmContext';
 import {
   Area,
@@ -7,6 +7,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -47,6 +49,36 @@ function applyFx(cents, currency, fxRates, baseCurrency) {
   if (!cents || !currency || currency === baseCurrency) return cents || 0;
   const rate = fxRates[currency];
   return rate != null ? Math.round(cents * rate) : cents;
+}
+
+function formatHourlyLabel(timestamp, locale) {
+  return new Intl.DateTimeFormat(locale || 'en-GB', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+  }).format(new Date(timestamp));
+}
+
+function buildPortfolioValueSeries(snapshots, currentValueCents, locale) {
+  const sorted = (snapshots || [])
+    .filter((snapshot) => snapshot?.capturedAt)
+    .slice()
+    .sort((a, b) => (a.capturedAt || '').localeCompare(b.capturedAt || ''));
+  const recent = sorted.slice(-168);
+  const series = recent.map((snapshot) => ({
+    ...snapshot,
+    label: formatHourlyLabel(snapshot.capturedAt, locale),
+  }));
+  if (!series.length && currentValueCents > 0) {
+    const capturedAt = new Date().toISOString();
+    return [{
+      id: 'live',
+      capturedAt,
+      valueCents: currentValueCents,
+      label: formatHourlyLabel(capturedAt, locale),
+    }];
+  }
+  return series;
 }
 
 function groupHoldingsByTicker(holdings, fxRates = {}, baseCurrency = 'EUR') {
@@ -581,6 +613,7 @@ export default function PortfolioPage() {
   const holdings = useFinanceStore((state) => state.holdings);
   const dividends = useFinanceStore((state) => state.dividends);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
+  const portfolioSnapshots = useFinanceStore((state) => state.portfolioSnapshots);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
   const availableBalanceCents = useFinanceStore((state) => state.derived.dashboard.availableBalanceCents);
   const savingsBalanceCents = useFinanceStore((state) =>
@@ -599,6 +632,7 @@ export default function PortfolioPage() {
   const saveDividend = useFinanceStore((state) => state.saveDividend);
   const removeDividend = useFinanceStore((state) => state.removeDividend);
   const refreshPrices = useFinanceStore((state) => state.refreshPrices);
+  const recordPortfolioSnapshot = useFinanceStore((state) => state.recordPortfolioSnapshot);
   const confirm = useConfirm();
   const [holdingModal, setHoldingModal] = useState({ open: false, id: null, initialValue: null });
   const [holdingGroupModal, setHoldingGroupModal] = useState({ open: false, ticker: null });
@@ -622,7 +656,14 @@ export default function PortfolioPage() {
   const currency = settings.baseCurrency;
   const activeHoldings = holdings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
   const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
+  const portfolioValueSeries = buildPortfolioValueSeries(portfolioSnapshots, portfolio.currentValueCents, locale);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
+
+  useEffect(() => {
+    if (activeHoldings.length && portfolio.currentValueCents > 0) {
+      recordPortfolioSnapshot();
+    }
+  }, [activeHoldings.length, portfolio.currentValueCents, recordPortfolioSnapshot]);
 
   const openNewHolding = (initialValue = null) => {
     const nextInitialValue = initialValue && !initialValue.nativeEvent ? initialValue : null;
@@ -964,6 +1005,107 @@ export default function PortfolioPage() {
         ))}
       </section>
 
+      <Card
+        data-tour="portfolio-value-history"
+        eyebrow="Hourly float"
+        title="Portfolio value"
+        description="Open-position market value captured once per hour."
+        variant="chart"
+        className={rise(2)}
+      >
+        {portfolioValueSeries.length ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={portfolioValueSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="portfolioValueArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.32} />
+                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <YAxis
+                tickFormatter={(value) => formatCurrencyCompact(value, currency, locale)}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+              <Tooltip
+                formatter={(value) => formatCurrency(value, currency, locale)}
+                labelFormatter={(_, payload) => {
+                  const point = payload?.[0]?.payload;
+                  return point?.capturedAt
+                    ? new Intl.DateTimeFormat(locale || 'en-GB', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      }).format(new Date(point.capturedAt))
+                    : '';
+                }}
+              />
+              <Area
+                type="stepAfter"
+                dataKey="valueCents"
+                stroke="transparent"
+                fill="url(#portfolioValueArea)"
+                dot={false}
+              />
+              <Line
+                type="stepAfter"
+                dataKey="valueCents"
+                stroke="var(--accent)"
+                strokeWidth={1.9}
+                dot={{ r: 2.5, strokeWidth: 1.5, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <EmptyState title="No portfolio value yet" description="Add a holding and refresh prices to start the hourly chart." />
+        )}
+      </Card>
+
+      {/* holdings */}
+      <Card
+        data-tour="portfolio-holdings"
+        eyebrow="Register"
+        title="Holdings"
+        description="Refresh prices manually to fetch the latest market prices."
+        action={
+          <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
+            <PlusIcon /> Add holding
+          </Button>
+        }
+        className={rise(3)}
+      >
+        {holdingGroups.length ? (
+          <PortfolioHoldingList
+            groups={holdingGroups}
+            currency={currency}
+            locale={locale}
+            fxRates={fxRates}
+            openEditHoldingGroup={openEditHoldingGroup}
+            openAddHoldingOperation={openAddHoldingOperation}
+            openEditHolding={openEditHolding}
+            openSellHolding={openSellHolding}
+            sellAllHoldingGroup={sellAllHoldingGroup}
+            onDeleteHolding={async (holding) => {
+              if (await confirm({ title: 'Delete holding', description: `Remove ${holding.ticker} from your portfolio? This cannot be undone.` }))
+                removeEntity('holdings', holding.id);
+            }}
+          />
+        ) : (
+          <EmptyState
+            title="No holdings yet"
+            description="Add your first position â€” Trade Republic, IBKR, anywhere."
+            action={
+              <Button variant="secondary" size="sm" onClick={() => openNewHolding()}>
+                <PlusIcon /> Add holding
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card data-tour="portfolio-allocation" eyebrow="Split" title="Allocation" className={'order-2 lg:col-span-5 ' + rise(2)}>
@@ -1039,36 +1181,7 @@ export default function PortfolioPage() {
         </Card>
       </section>
 
-      {/* holdings */}
-      <Card
-        data-tour="portfolio-holdings"
-        eyebrow="Register"
-        title="Holdings"
-        description="Refresh prices manually to fetch the latest market prices."
-        action={
-          <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
-            <PlusIcon /> Add holding
-          </Button>
-        }
-        className={rise(4)}
-      >
-        {holdingGroups.length ? (
-          <PortfolioHoldingList
-            groups={holdingGroups}
-            currency={currency}
-            locale={locale}
-            fxRates={fxRates}
-            openEditHoldingGroup={openEditHoldingGroup}
-            openAddHoldingOperation={openAddHoldingOperation}
-            openEditHolding={openEditHolding}
-            openSellHolding={openSellHolding}
-            sellAllHoldingGroup={sellAllHoldingGroup}
-            onDeleteHolding={async (holding) => {
-              if (await confirm({ title: 'Delete holding', description: `Remove ${holding.ticker} from your portfolio? This cannot be undone.` }))
-                removeEntity('holdings', holding.id);
-            }}
-          />
-        ) : (
+      {/*
           <EmptyState
             title="No holdings yet"
             description="Add your first position — Trade Republic, IBKR, anywhere."
@@ -1079,7 +1192,7 @@ export default function PortfolioPage() {
             }
           />
         )}
-      </Card>
+      */}
 
       {/* historical performance */}
       <Card
@@ -1243,6 +1356,7 @@ export default function PortfolioPage() {
                     ticker: saved.ticker,
                   });
                 }
+                await recordPortfolioSnapshot({ force: true, source: 'holding_added' });
               }
               closeHolding();
             } catch (error) {

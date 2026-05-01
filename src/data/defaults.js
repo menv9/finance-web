@@ -56,4 +56,5 @@ export const DEFAULT_DATA = {
   bankAccounts: [],
   attachments: [],
   activityLog: [],
+  portfolioSnapshots: [],
 };
