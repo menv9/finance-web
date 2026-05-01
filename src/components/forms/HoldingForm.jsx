@@ -188,7 +188,7 @@ function PlatformSelect({ id, value, onChange }) {
 }
 
 // A number input with an attached currency selector badge
-function PriceInput({ id, value, onChange, currency, onCurrencyChange, currencies, placeholder, required, step, readOnlyCurrency }) {
+function PriceInput({ id, value, onChange, currency, onCurrencyChange, currencies, placeholder, required, step, readOnlyCurrency, readOnly }) {
   return (
     <div className="flex rounded-md overflow-hidden border border-rule bg-surface focus-within:ring-1 focus-within:ring-accent">
       <input
@@ -196,6 +196,7 @@ function PriceInput({ id, value, onChange, currency, onCurrencyChange, currencie
         type="number"
         step={step || '0.01'}
         required={required}
+        readOnly={readOnly}
         value={value}
         onChange={onChange}
         placeholder={placeholder || '0.00'}
@@ -335,6 +336,35 @@ function AssetSearch({ apiKey, onSelect }) {
   );
 }
 
+function SelectedAssetSummary({ ticker, name }) {
+  if (!ticker) return null;
+  return (
+    <div className="md:col-span-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <FormField label="Ticker" htmlFor="holding-selected-ticker" required>
+        {(props) => (
+          <Input
+            {...props}
+            value={ticker}
+            readOnly
+            className="font-mono bg-surface-sunken"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Name" htmlFor="holding-selected-name">
+        {(props) => (
+          <Input
+            {...props}
+            value={name}
+            readOnly
+            className="bg-surface-sunken"
+          />
+        )}
+      </FormField>
+    </div>
+  );
+}
+
 export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '' }) {
   const isEditing = Boolean(initialValue?.id);
   const usesAssetSearch = !isEditing && !initialValue?.ticker;
@@ -381,6 +411,9 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
       name: asset.name || prev.name,
       currency: nextCurrency,
       currentPriceCents: asset.priceCents ? `${asset.priceCents / 100}` : prev.currentPriceCents,
+      averageBuyPriceCents: asset.priceCents && !prev.averageBuyPriceCents
+        ? `${asset.priceCents / 100}`
+        : prev.averageBuyPriceCents,
       feeCurrency: prev.feeCurrency || nextCurrency,
     }));
     if (asset.priceCents) {
@@ -393,6 +426,9 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
       setForm((prev) => ({
         ...prev,
         currentPriceCents: price.priceCents ? `${price.priceCents / 100}` : prev.currentPriceCents,
+        averageBuyPriceCents: price.priceCents && !prev.averageBuyPriceCents
+          ? `${price.priceCents / 100}`
+          : prev.averageBuyPriceCents,
         currency: price.currency || nextCurrency,
         feeCurrency: prev.feeCurrency || price.currency || nextCurrency,
       }));
@@ -440,28 +476,39 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
     >
       <FormSection step="1" title="Asset">
         {usesAssetSearch ? (
-          <AssetSearch apiKey={finnhubApiKey} onSelect={handleAssetSelect} />
+          <>
+            <AssetSearch apiKey={finnhubApiKey} onSelect={handleAssetSelect} />
+            <SelectedAssetSummary ticker={form.ticker} name={form.name} />
+          </>
         ) : null}
 
-        <FormField label="Ticker" htmlFor="holding-ticker" required>
-          {(props) => (
-            <Input
-              {...props}
-              value={form.ticker}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
-              }
-              placeholder="VWCE"
-              className="font-mono"
-            />
-          )}
-        </FormField>
+        {!usesAssetSearch ? (
+          <>
+            <FormField label="Ticker" htmlFor="holding-ticker" required>
+              {(props) => (
+                <Input
+                  {...props}
+                  value={form.ticker}
+                  readOnly
+                  placeholder="VWCE"
+                  className="font-mono bg-surface-sunken"
+                />
+              )}
+            </FormField>
 
-        <FormField label="Name" htmlFor="holding-name">
-          {(props) => (
-            <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
-          )}
-        </FormField>
+            <FormField label="Name" htmlFor="holding-name">
+              {(props) => (
+                <Input
+                  {...props}
+                  value={form.name}
+                  readOnly
+                  placeholder="Vanguard FTSE All-World"
+                  className="bg-surface-sunken"
+                />
+              )}
+            </FormField>
+          </>
+        ) : null}
 
         <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
           {() => (
@@ -570,6 +617,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
               onChange={set('currentPriceCents')}
               currency={priceCurrency}
               readOnlyCurrency
+              readOnly
               currencies={currencies}
               placeholder="0.00"
             />
@@ -589,7 +637,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
             Cancel
           </Button>
         ) : null}
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={usesAssetSearch && !form.ticker}>
           {isEditing ? 'Save changes' : 'Add holding'}
         </Button>
       </div>
