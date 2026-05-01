@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmContext';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
-import { BankSyncSection } from '../components/BankSyncSection';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { Button, Card, Checkbox, EmptyState, FormField, Input, Modal, Stat } from '../components/ui';
@@ -97,7 +96,6 @@ export default function AccountsPage() {
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
-  const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const [editingAccount, setEditingAccount] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importingAccount, setImportingAccount] = useState(null);
@@ -167,27 +165,6 @@ export default function AccountsPage() {
       }
     }
     await saveEntity('bankAccounts', { ...account, isMain: checked });
-  };
-
-  const handleSyncComplete = async (results) => {
-    for (const { accountId, balances } of results) {
-      const closing = balances?.find((b) => b.balanceType === 'closingBooked') ?? balances?.[0];
-      if (!closing) continue;
-      const balanceCents = Math.round(parseFloat(closing.balanceAmount.amount) * 100);
-      const cur = closing.balanceAmount.currency;
-      const existing = accounts.find((a) => a.gcAccountId === accountId);
-      if (existing) {
-        await saveEntity('bankAccounts', { ...existing, balanceCents, currency: cur });
-      } else {
-        await saveEntity('bankAccounts', {
-          gcAccountId: accountId,
-          name: `GoCardless ${cur}`,
-          balanceCents,
-          currency: cur,
-          isMain: accounts.length === 0,
-        });
-      }
-    }
   };
 
   const handleDelete = async (account) => {
@@ -303,8 +280,6 @@ export default function AccountsPage() {
           onSave={handleSave}
         />
       ) : null}
-
-      <BankSyncSection userId={supabaseUser?.id} onSyncComplete={handleSyncComplete} />
 
       {importingAccount ? (
         <Modal
