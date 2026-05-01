@@ -27,21 +27,24 @@ import { rise } from '../utils/motion';
 
 // ── Withdrawal modal ────────────────────────────────────────────────────────
 
-function WithdrawalModal({ open, onClose, balanceCents, currency, locale, onSubmit }) {
+function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAccounts = [], onSubmit }) {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(() => normalizeDateInput(new Date()));
   const [description, setDescription] = useState('');
+  const [bankAccountId, setBankAccountId] = useState(
+    () => bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '',
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const amountCents = Math.round(parseFloat(amount || '0') * 100);
   const isOver = amountCents > 0 && amountCents > balanceCents;
-  const canSubmit = amountCents > 0 && !isOver;
+  const canSubmit = amountCents > 0 && !isOver && (!bankAccounts.length || bankAccountId);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onSubmit({ amountCents, date, description: description.trim() });
+      await onSubmit({ amountCents, date, description: description.trim(), bankAccountId });
     } catch (err) {
       window.alert(err.message || 'Unable to process withdrawal.');
     } finally {
@@ -91,6 +94,25 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, onSubm
             />
           </FormField>
         </div>
+
+        {bankAccounts.length ? (
+          <FormField label="Destination bank" htmlFor="wd-bank" required>
+            {(props) => (
+              <Select
+                {...props}
+                value={bankAccountId}
+                onChange={(e) => setBankAccountId(e.target.value)}
+                required
+              >
+                {bankAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}{account.isMain ? ' (main)' : ''}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        ) : null}
 
         {/* Overdraft warning */}
         {isOver && (
@@ -354,6 +376,7 @@ export default function SavingsPage() {
   const removeSavingsGoal  = useFinanceStore((state) => state.removeSavingsGoal);
   const executeTransfer    = useFinanceStore((state) => state.executeTransfer);
   const settings           = useFinanceStore((state) => state.settings);
+  const bankAccounts       = useFinanceStore((state) => state.bankAccounts || []);
 
   const confirm = useConfirm();
   const currency = settings.baseCurrency;
@@ -1286,7 +1309,8 @@ export default function SavingsPage() {
           balanceCents={totalSavedCents}
           currency={currency}
           locale={locale}
-          onSubmit={async ({ amountCents, date, description }) => {
+          bankAccounts={bankAccounts}
+          onSubmit={async ({ amountCents, date, description, bankAccountId }) => {
             await executeTransfer({
               date,
               amountCents,
@@ -1296,6 +1320,7 @@ export default function SavingsPage() {
               description,
               category: null,
               ticker: null,
+              bankAccountId,
             });
             setTransferOpen(false);
           }}

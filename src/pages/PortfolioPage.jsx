@@ -22,7 +22,7 @@ import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
-import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input } from '../components/ui';
+import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const COLORS = [
@@ -379,11 +379,12 @@ function PortfolioHoldingList({
   );
 }
 
-function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, onCancel }) {
+function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccounts = [], onSubmit, onCancel }) {
   const holdingCurrency = holding?.currency || currency;
   const fxRate = holdingCurrency !== currency
     ? (fxRates[holdingCurrency] ?? 1)
     : 1;
+  const defaultBankAccountId = sale?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
 
   const [form, setForm] = useState({
     percent: sale?.percent != null ? `${sale.percent}` : '100',
@@ -394,6 +395,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, o
         : '',
     fee: sale?.feeCents ? `${sale.feeCents / 100}` : '',
     date: sale?.date || normalizeDateInput(new Date()),
+    bankAccountId: defaultBankAccountId,
   });
 
   const percent = Math.min(Math.max(Number(form.percent || 0), 0), 100);
@@ -427,6 +429,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, o
           salePriceCents,
           feeCents,
           date: form.date,
+          bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : null,
         });
       }}
     >
@@ -489,6 +492,25 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, o
         )}
       </FormField>
 
+      {bankAccounts.length ? (
+        <FormField label="Destination bank" htmlFor="sell-bank" required className="md:col-span-2">
+          {(props) => (
+            <Select
+              {...props}
+              value={form.bankAccountId || defaultBankAccountId}
+              onChange={set('bankAccountId')}
+              required
+            >
+              {bankAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}{account.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      ) : null}
+
       <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm">
         <p className="eyebrow text-ink-muted">Estimated result</p>
         <p className="mt-1 font-mono text-ink">
@@ -511,6 +533,74 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, onSubmit, o
         </Button>
         <Button type="submit" variant="primary">
           {sale ? 'Save sale' : 'Sell holding'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function SellAllHoldingsForm({ group, bankAccounts = [], onSubmit, onCancel }) {
+  const defaultBankAccountId = bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
+  const [form, setForm] = useState({
+    date: normalizeDateInput(new Date()),
+    bankAccountId: defaultBankAccountId,
+  });
+  const set = (key) => (event) =>
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
+  return (
+    <form
+      className="grid grid-cols-1 gap-5 md:grid-cols-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({
+          date: form.date,
+          bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : null,
+        });
+      }}
+    >
+      <FormField label="Holding" className="md:col-span-2">
+        <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm text-ink">
+          <span className="font-mono">{group.ticker}</span>
+          <span className="ml-2 text-ink-muted">{group.name}</span>
+        </div>
+      </FormField>
+
+      <FormField label="Sale date" htmlFor="sell-all-date" required>
+        {(props) => (
+          <Input {...props} type="date" value={form.date} onChange={set('date')} required />
+        )}
+      </FormField>
+
+      {bankAccounts.length ? (
+        <FormField label="Destination bank" htmlFor="sell-all-bank" required>
+          {(props) => (
+            <Select
+              {...props}
+              value={form.bankAccountId || defaultBankAccountId}
+              onChange={set('bankAccountId')}
+              required
+            >
+              {bankAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}{account.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      ) : null}
+
+      <p className="md:col-span-2 rounded-md border border-rule bg-surface-raised px-3 py-2 text-xs text-ink-muted">
+        This sells every open operation at its current price with no extra sale commission.
+      </p>
+
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary">
+          Sell all
         </Button>
       </div>
     </form>
@@ -622,6 +712,7 @@ export default function PortfolioPage() {
       .filter((entry) => entry.source !== 'allocation')
       .reduce((sum, entry) => sum + (entry.amountCents || 0), 0),
   );
+  const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -638,6 +729,7 @@ export default function PortfolioPage() {
   const [holdingGroupModal, setHoldingGroupModal] = useState({ open: false, ticker: null });
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
   const [sellModal, setSellModal] = useState({ open: false, holdingId: null, saleId: null });
+  const [sellAllModal, setSellAllModal] = useState({ open: false, ticker: null });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const editingHolding = holdings.find((item) => item.id === holdingModal.id);
@@ -658,6 +750,7 @@ export default function PortfolioPage() {
   const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
   const portfolioValueSeries = buildPortfolioValueSeries(portfolioSnapshots, portfolio.currentValueCents, locale);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
+  const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
   useEffect(() => {
     if (activeHoldings.length && portfolio.currentValueCents > 0) {
@@ -743,20 +836,22 @@ export default function PortfolioPage() {
     return [group, ...lotRows];
   });
 
-  const sellAllHoldingGroup = async (group) => {
+  const openSellAllHoldingGroup = (group) => {
     if (!group) return;
-    if (!(await confirm({
-      title: 'Sell all operations',
-      description: `Sell all ${group.ticker} operations at their current prices?`,
-      confirmLabel: 'Sell all',
-    }))) return;
+    setSellAllModal({ open: true, ticker: group.ticker });
+  };
+  const closeSellAllHoldingGroup = () => setSellAllModal({ open: false, ticker: null });
+
+  const sellAllHoldingGroup = async (group, { date, bankAccountId }) => {
+    if (!group) return;
     for (const lot of group.lots) {
       await sellHolding({
         holdingId: lot.id,
         percent: 100,
         salePriceCents: lot.currentPriceCents || group.currentPriceCents || 0,
         feeCents: 0,
-        date: normalizeDateInput(new Date()),
+        date,
+        bankAccountId,
       });
     }
   };
@@ -1087,7 +1182,7 @@ export default function PortfolioPage() {
             openAddHoldingOperation={openAddHoldingOperation}
             openEditHolding={openEditHolding}
             openSellHolding={openSellHolding}
-            sellAllHoldingGroup={sellAllHoldingGroup}
+            sellAllHoldingGroup={openSellAllHoldingGroup}
             onDeleteHolding={async (holding) => {
               if (await confirm({ title: 'Delete holding', description: `Remove ${holding.ticker} from your portfolio? This cannot be undone.` }))
                 removeEntity('holdings', holding.id);
@@ -1319,10 +1414,11 @@ export default function PortfolioPage() {
         <HoldingForm
           initialValue={editingHolding || holdingModal.initialValue}
           finnhubApiKey={settings.finnhubApiKey || ''}
+          bankAccounts={bankAccounts}
           onSubmit={async (value) => {
             try {
               const isNew = !value.id;
-              const { fundingSource, purchaseAmountCents, ...holdingValue } = value;
+              const { fundingSource, purchaseAmountCents, bankAccountId, ...holdingValue } = value;
               const priceCurr = holdingValue.currency || currency;
               const feeCurr = holdingValue.feeCurrency || priceCurr;
               const priceFx = applyFx(1_00, priceCurr, fxRates, currency) / 100;  // rate: foreign → base
@@ -1354,6 +1450,7 @@ export default function PortfolioPage() {
                     description: `${saved.ticker} purchase`,
                     holdingId: saved.id,
                     ticker: saved.ticker,
+                    bankAccountId: fundingSource === 'cashflow' ? bankAccountId : null,
                   });
                 }
                 await recordPortfolioSnapshot({ force: true, source: 'holding_added' });
@@ -1411,6 +1508,7 @@ export default function PortfolioPage() {
             currency={currency}
             locale={locale}
             fxRates={fxRates}
+            bankAccounts={bankAccounts}
             onSubmit={async (value) => {
               if (value.saleId) {
                 await updatePortfolioSale(value);
@@ -1420,6 +1518,31 @@ export default function PortfolioPage() {
               closeSellHolding();
             }}
             onCancel={closeSellHolding}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={sellAllModal.open}
+        onClose={closeSellAllHoldingGroup}
+        eyebrow="Portfolio sale"
+        title={sellingAllGroup ? `Sell all ${sellingAllGroup.ticker}` : 'Sell all'}
+        description="Choose the destination bank before selling every open operation."
+        size="md"
+      >
+        {sellingAllGroup ? (
+          <SellAllHoldingsForm
+            group={sellingAllGroup}
+            bankAccounts={bankAccounts}
+            onSubmit={async (value) => {
+              try {
+                await sellAllHoldingGroup(sellingAllGroup, value);
+                closeSellAllHoldingGroup();
+              } catch (error) {
+                window.alert(error.message || 'Unable to sell all holdings.');
+              }
+            }}
+            onCancel={closeSellAllHoldingGroup}
           />
         ) : null}
       </Modal>

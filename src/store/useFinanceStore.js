@@ -290,7 +290,7 @@ function applyDebtAdjustments(debts, adjustments, timestamp) {
   });
 }
 
-function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, date, timestamp, cashflowId }) {
+function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, date, timestamp, cashflowId, bankAccountId }) {
   const salePercent = Math.min(Math.max(Number(percent || 0), 0), 100);
   if (salePercent <= 0) throw new Error('Sale percent must be greater than 0');
 
@@ -338,6 +338,7 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, dat
     realizedPnlCents: proceedsCents - costBasisCents,
     cashflowCents: portfolioSaleCashflowCents({ proceedsCents, realizedPnlCents: proceedsCents - costBasisCents }),
     linkedIncomeId: sale?.linkedIncomeId || null,
+    bankAccountId: bankAccountId ?? sale?.bankAccountId ?? null,
     updatedAt: timestamp,
   }, timestamp);
   const nextCashflow = ensureEntitySyncFields({
@@ -348,6 +349,7 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, dat
     ticker: holding.ticker,
     kind: 'sell',
     linkedSaleId: nextSale.id,
+    bankAccountId: bankAccountId ?? sale?.bankAccountId ?? null,
     updatedAt: timestamp,
   }, timestamp);
 
@@ -1168,9 +1170,12 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
-  sellHolding: async ({ holdingId, percent, salePriceCents, feeCents, date }) => {
+  sellHolding: async ({ holdingId, percent, salePriceCents, feeCents, date, bankAccountId }) => {
     const holding = get().holdings.find((item) => item.id === holdingId);
     if (!holding) throw new Error('Holding not found');
+    if ((get().bankAccounts || []).length && !bankAccountId) {
+      throw new Error('Select a destination bank account for this sale.');
+    }
 
     const timestamp = new Date().toISOString();
     const baseCurrency = get().settings.baseCurrency || 'EUR';
@@ -1181,6 +1186,7 @@ export const useFinanceStore = create((set, get) => ({
       feeCents,
       date,
       timestamp,
+      bankAccountId,
     });
     // Convert monetary amounts to base currency if holding is in a foreign currency
     const { sale: rawSale, cashflow } = applySaleFx(
@@ -1189,23 +1195,37 @@ export const useFinanceStore = create((set, get) => ({
     );
     const income = ensureEntitySyncFields(buildPortfolioSaleIncome(rawSale, null, baseCurrency), timestamp);
     const sale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+    const bankAccountAdjustments = new Map();
+    if (sale.bankAccountId && sale.proceedsCents) {
+      bankAccountAdjustments.set(sale.bankAccountId, sale.proceedsCents);
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
     await putRecord('holdings', nextHolding);
     await putRecord('portfolioSales', sale);
     await putRecord('portfolioCashflows', cashflow);
     await putRecord('incomes', income);
+    await Promise.all(
+      adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    );
 
     set((state) => {
       const nextHoldings = upsertItem(state.holdings, nextHolding);
       const nextPortfolioSales = upsertItem(state.portfolioSales, sale);
       const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, cashflow);
       const nextIncomes = upsertItem(state.incomes, income);
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
         portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
         portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
         incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
@@ -1215,7 +1235,8 @@ export const useFinanceStore = create((set, get) => ({
             item.id !== `holdings:${nextHolding.id}` &&
             item.id !== `portfolioSales:${sale.id}` &&
             item.id !== `portfolioCashflows:${cashflow.id}` &&
-            item.id !== `incomes:${income.id}`,
+            item.id !== `incomes:${income.id}` &&
+            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
       saveSyncMeta(nextSyncMeta);
@@ -1225,12 +1246,14 @@ export const useFinanceStore = create((set, get) => ({
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
       };
       return {
         holdings: nextHoldings,
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -1246,9 +1269,13 @@ export const useFinanceStore = create((set, get) => ({
     return sale;
   },
 
-  updatePortfolioSale: async ({ saleId, percent, salePriceCents, feeCents, date }) => {
+  updatePortfolioSale: async ({ saleId, percent, salePriceCents, feeCents, date, bankAccountId }) => {
     const currentSale = get().portfolioSales.find((item) => item.id === saleId);
     if (!currentSale) throw new Error('Sale not found');
+    const destinationBankAccountId = bankAccountId ?? currentSale.bankAccountId ?? null;
+    if ((get().bankAccounts || []).length && !destinationBankAccountId) {
+      throw new Error('Select a destination bank account for this sale.');
+    }
 
     const holding = get().holdings.find((item) => item.id === currentSale.holdingId);
     if (!holding) throw new Error('Holding not found');
@@ -1274,6 +1301,7 @@ export const useFinanceStore = create((set, get) => ({
       date,
       timestamp,
       cashflowId: currentCashflow?.id,
+      bankAccountId: destinationBankAccountId,
     });
     const baseCurrencyUpd = get().settings.baseCurrency || 'EUR';
     const { sale: rawSale, cashflow: nextCashflow } = applySaleFx(
@@ -1285,23 +1313,46 @@ export const useFinanceStore = create((set, get) => ({
       timestamp,
     );
     const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+    const bankAccountAdjustments = new Map();
+    if (currentSale.bankAccountId && currentSale.proceedsCents) {
+      bankAccountAdjustments.set(
+        currentSale.bankAccountId,
+        (bankAccountAdjustments.get(currentSale.bankAccountId) || 0) - currentSale.proceedsCents,
+      );
+    }
+    if (nextSale.bankAccountId && nextSale.proceedsCents) {
+      bankAccountAdjustments.set(
+        nextSale.bankAccountId,
+        (bankAccountAdjustments.get(nextSale.bankAccountId) || 0) + nextSale.proceedsCents,
+      );
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
     await putRecord('holdings', nextHolding);
     await putRecord('portfolioSales', nextSale);
     await putRecord('portfolioCashflows', nextCashflow);
     await putRecord('incomes', income);
+    await Promise.all(
+      adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    );
 
     set((state) => {
       const nextHoldings = upsertItem(state.holdings, nextHolding);
       const nextPortfolioSales = upsertItem(state.portfolioSales, nextSale);
       const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, nextCashflow);
       const nextIncomes = upsertItem(state.incomes, income);
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
         portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== nextSale.id),
         portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== nextCashflow.id),
         incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
@@ -1311,7 +1362,8 @@ export const useFinanceStore = create((set, get) => ({
             item.id !== `holdings:${nextHolding.id}` &&
             item.id !== `portfolioSales:${nextSale.id}` &&
             item.id !== `portfolioCashflows:${nextCashflow.id}` &&
-            item.id !== `incomes:${income.id}`,
+            item.id !== `incomes:${income.id}` &&
+            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
       saveSyncMeta(nextSyncMeta);
@@ -1321,12 +1373,14 @@ export const useFinanceStore = create((set, get) => ({
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
       };
       return {
         holdings: nextHoldings,
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -1366,6 +1420,16 @@ export const useFinanceStore = create((set, get) => ({
     await deleteRecord('portfolioSales', sale.id);
     if (cashflow) await deleteRecord('portfolioCashflows', cashflow.id);
     if (income) await deleteRecord('incomes', income.id);
+    const bankAccountAdjustments = new Map();
+    if (sale.bankAccountId && sale.proceedsCents) {
+      bankAccountAdjustments.set(sale.bankAccountId, -sale.proceedsCents);
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
+    await Promise.all(
+      adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    );
 
     set((state) => {
       const nextHoldings = restoredHolding ? upsertItem(state.holdings, restoredHolding) : state.holdings;
@@ -1374,6 +1438,7 @@ export const useFinanceStore = create((set, get) => ({
         ? state.portfolioCashflows.filter((item) => item.id !== cashflow.id)
         : state.portfolioCashflows;
       const nextIncomes = income ? state.incomes.filter((item) => item.id !== income.id) : state.incomes;
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         portfolioSales: [
@@ -1392,6 +1457,9 @@ export const useFinanceStore = create((set, get) => ({
               { id: income.id, updatedAt: timestamp, deletedAt: timestamp },
             ]
           : state.syncMeta.deletedRecords.incomes || [],
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       if (restoredHolding) {
         nextDeletedRecords.holdings = (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== restoredHolding.id);
@@ -1404,7 +1472,8 @@ export const useFinanceStore = create((set, get) => ({
             item.id !== `portfolioSales:${sale.id}` &&
             item.id !== `portfolioCashflows:${cashflow?.id}` &&
             item.id !== `holdings:${restoredHolding?.id}` &&
-            item.id !== `incomes:${income?.id}`,
+            item.id !== `incomes:${income?.id}` &&
+            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
       saveSyncMeta(nextSyncMeta);
@@ -1414,12 +1483,14 @@ export const useFinanceStore = create((set, get) => ({
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
       };
       return {
         holdings: nextHoldings,
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -1729,7 +1800,7 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   executeTransfer: async (spec) => {
-    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId, goalId } = spec;
+    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId, goalId, bankAccountId } = spec;
     assertSourceHasFunds(get(), fromModule, amountCents);
     const timestamp = new Date().toISOString();
     const currency = get().settings.baseCurrency;
@@ -1766,6 +1837,7 @@ export const useFinanceStore = create((set, get) => ({
         description: description || 'Transfer expense',
         isRecurring: false,
         transferId: trfId,
+        bankAccountId: bankAccountId || null,
       }, timestamp);
       toPut.push({ storeName: 'expenses', record: expense });
       linkedExpenseId = expense.id;
@@ -1801,10 +1873,29 @@ export const useFinanceStore = create((set, get) => ({
         incomeKind: 'transfer',
         source: description || 'Transfer from savings',
         transferId: trfId,
+        bankAccountId: bankAccountId || null,
       }, timestamp);
       toPut.push({ storeName: 'incomes', record: income });
       linkedIncomeId = income.id;
     }
+    const bankAccountAdjustments = toPut.reduce((adjustments, { storeName, record }) => {
+      const adjustment = buildBankAccountAdjustments(storeName, null, record, false);
+      adjustment.forEach((deltaCents, accountId) => {
+        adjustments.set(accountId, (adjustments.get(accountId) || 0) + deltaCents);
+      });
+      return adjustments;
+    }, new Map());
+    if (
+      bankAccountId &&
+      (fromModule === 'cashflow' || fromModule === 'income') &&
+      (toModule === 'portfolio' || toModule === 'savings')
+    ) {
+      bankAccountAdjustments.set(
+        bankAccountId,
+        (bankAccountAdjustments.get(bankAccountId) || 0) - Math.abs(amountCents || 0),
+      );
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
     const trf = ensureEntitySyncFields({
       id: trfId,
@@ -1820,16 +1911,24 @@ export const useFinanceStore = create((set, get) => ({
       linkedExpenseId,
       linkedCashflowId,
       linkedIncomeId,
+      bankAccountId: bankAccountId || null,
     }, timestamp);
     toPut.push({ storeName: 'transfers', record: trf });
 
-    await Promise.all(toPut.map(({ storeName, record }) => putRecord(storeName, record)));
+    await Promise.all([
+      ...toPut.map(({ storeName, record }) => putRecord(storeName, record)),
+      ...adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    ]);
 
     set((state) => {
       let nextState = { ...state };
       for (const { storeName, record } of toPut) {
         nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], record) };
       }
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
+      nextState = { ...nextState, bankAccounts: nextBankAccounts };
       return { ...nextState, derived: buildDerived(nextState) };
     });
 
@@ -1855,8 +1954,31 @@ export const useFinanceStore = create((set, get) => ({
       storeName,
       record: (get()[storeName] || []).find((item) => item.id === recId) || { id: recId },
     }));
+    const bankAccountAdjustments = deletedRecords.reduce((adjustments, { storeName, record }) => {
+      const adjustment = buildBankAccountAdjustments(storeName, record, null, false);
+      adjustment.forEach((deltaCents, accountId) => {
+        adjustments.set(accountId, (adjustments.get(accountId) || 0) + deltaCents);
+      });
+      return adjustments;
+    }, new Map());
+    if (
+      trf.bankAccountId &&
+      (trf.fromModule === 'cashflow' || trf.fromModule === 'income') &&
+      (trf.toModule === 'portfolio' || trf.toModule === 'savings')
+    ) {
+      bankAccountAdjustments.set(
+        trf.bankAccountId,
+        (bankAccountAdjustments.get(trf.bankAccountId) || 0) + Math.abs(trf.amountCents || 0),
+      );
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
-    await Promise.all(toDelete.map(({ storeName, id: recId }) => deleteRecord(storeName, recId)));
+    await Promise.all([
+      ...toDelete.map(({ storeName, id: recId }) => deleteRecord(storeName, recId)),
+      ...adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    ]);
 
     set((state) => {
       let nextState = { ...state };
@@ -1872,6 +1994,12 @@ export const useFinanceStore = create((set, get) => ({
           ...(nextDeletedRecords[storeName] || []).filter((item) => item.id !== recId),
           { id: recId, updatedAt: timestamp, deletedAt: timestamp },
         ];
+      }
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
+      nextState = { ...nextState, bankAccounts: nextBankAccounts };
+      if (bankAccountAdjustments.size) {
+        nextDeletedRecords.bankAccounts = (nextDeletedRecords.bankAccounts || [])
+          .filter((item) => !bankAccountAdjustments.has(item.id));
       }
       const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
       saveSyncMeta(nextSyncMeta);

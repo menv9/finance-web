@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FormField, Input, Button } from '../ui';
+import { FormField, Input, Button, Select } from '../ui';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useConfirm } from '../ConfirmContext';
 import { fetchTickerPrice, searchAssets } from '../../utils/yahoo';
@@ -365,11 +365,12 @@ function SelectedAssetSummary({ ticker, name }) {
   );
 }
 
-export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '' }) {
+export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '', bankAccounts = [] }) {
   const isEditing = Boolean(initialValue?.id);
   const usesAssetSearch = !isEditing && !initialValue?.ticker;
   const settings = useFinanceStore((state) => state.settings);
   const baseCurrency = settings.baseCurrency || 'EUR';
+  const defaultBankAccountId = initialValue?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
   // Ensure baseCurrency is always in the list
   const currencies = PRICE_CURRENCIES.includes(baseCurrency)
     ? PRICE_CURRENCIES
@@ -379,6 +380,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
     ...defaultValue,
     ...initialValue,
     platform: initialValue?.platform || settings.holdingPlatforms?.[0] || 'Trade Republic',
+    bankAccountId: defaultBankAccountId,
     quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
       ? `${initialValue.averageBuyPriceCents / 100}`
@@ -391,6 +393,11 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
     feeCurrency: initialValue?.feeCurrency || initialValue?.currency || baseCurrency,
   });
   const [priceLookup, setPriceLookup] = useState({ loading: false, error: '' });
+
+  useEffect(() => {
+    if (!bankAccounts.length || form.bankAccountId) return;
+    setForm((prev) => ({ ...prev, bankAccountId: defaultBankAccountId }));
+  }, [bankAccounts.length, defaultBankAccountId, form.bankAccountId]);
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
@@ -522,6 +529,36 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
       </FormSection>
 
       <FormSection step="2" title="Purchase">
+        {!isEditing ? (
+          <FormField label="Money source" htmlFor="holding-funding-source" required>
+            {(props) => (
+              <Select {...props} value={form.fundingSource} onChange={set('fundingSource')} required>
+                <option value="cashflow">Bank account</option>
+                <option value="savings">Savings</option>
+              </Select>
+            )}
+          </FormField>
+        ) : null}
+
+        {!isEditing && form.fundingSource === 'cashflow' && bankAccounts.length ? (
+          <FormField label="Source bank" htmlFor="holding-bank-account" required>
+            {(props) => (
+              <Select
+                {...props}
+                value={form.bankAccountId || defaultBankAccountId}
+                onChange={set('bankAccountId')}
+                required
+              >
+                {bankAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}{account.isMain ? ' (main)' : ''}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        ) : null}
+
         {!isEditing ? (
           <FormField
             label={`Amount invested (${priceCurrency})`}
