@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
+const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
 export default function App() {
@@ -72,6 +73,7 @@ export default function App() {
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/this-month" element={<ThisMonthPage />} />
                       <Route path="/accounts" element={<AccountsPage />} />
+                      <Route path="/debts" element={<DebtsPage />} />
                       <Route path="/income" element={<IncomePage />} />
                       <Route path="/expenses" element={<ExpensesPage />} />
                       <Route path="/budgets" element={<BudgetsPage />} />

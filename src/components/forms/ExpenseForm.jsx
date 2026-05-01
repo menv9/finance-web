@@ -11,6 +11,7 @@ const initialState = {
   category: 'Other',
   description: '',
   isRecurring: false,
+  linkedDebtId: '',
 };
 
 function PaperclipIcon() {
@@ -92,12 +93,17 @@ function PendingFilePill({ file, onRemove }) {
 export function ExpenseForm({
   categories = [],
   bankAccounts = [],
+  debts = [],
   initialValue,
   existingAttachments = [],
   onRemoveAttachment,
   onSubmit,
   onCancel,
 }) {
+  const activeDebts = useMemo(
+    () => (debts || []).filter((d) => (d.currentBalanceCents || 0) > 0 || initialValue?.linkedDebtId === d.id),
+    [debts, initialValue?.linkedDebtId],
+  );
   const defaultBankAccountId = useMemo(
     () => initialValue?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '',
     [bankAccounts, initialValue?.bankAccountId],
@@ -149,6 +155,7 @@ export function ExpenseForm({
             ...form,
             bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : '',
             amountCents: Math.round(Number(form.amountCents || 0) * 100),
+            linkedDebtId: form.linkedDebtId || null,
           },
           pendingFiles,
         );
@@ -232,6 +239,26 @@ export function ExpenseForm({
             />
           )}
         </FormField>
+
+        {activeDebts.length ? (
+          <FormField
+            label="Apply to debt"
+            htmlFor="expense-debt"
+            hint="Optional. If selected, this expense reduces the chosen debt's balance by its full amount."
+            className="md:col-span-2"
+          >
+            {(props) => (
+              <Select {...props} value={form.linkedDebtId || ''} onChange={set('linkedDebtId')}>
+                <option value="">— Not a debt payment —</option>
+                {activeDebts.map((debt) => (
+                  <option key={debt.id} value={debt.id}>
+                    {debt.name}{debt.lender ? ` · ${debt.lender}` : ''}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        ) : null}
       </FormSection>
 
       {/* ── Attachments ─────────────────────────────────────────────────── */}

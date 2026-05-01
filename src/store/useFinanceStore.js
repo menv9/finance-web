@@ -28,7 +28,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'attachments', 'activityLog', 'portfolioSnapshots'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
   savings: 'savingsConfig',
 };
@@ -47,6 +47,7 @@ const STORE_LABELS = {
   rollovers: 'Budget rollover',
   transfers: 'Transfer',
   bankAccounts: 'Bank account',
+  debts: 'Debt',
   attachments: 'Attachment',
   settings: 'Settings',
   activityLog: 'Activity log',
@@ -67,6 +68,7 @@ const STORE_MODULES = {
   rollovers: 'Budgets',
   transfers: 'Transfers',
   bankAccounts: 'Accounts',
+  debts: 'Debts',
   attachments: 'Expenses',
   settings: 'Settings',
   activityLog: 'Settings',
@@ -246,6 +248,43 @@ function applyBankAccountAdjustments(accounts, adjustments, timestamp) {
     return ensureEntitySyncFields({
       ...account,
       balanceCents,
+      updatedAt: timestamp,
+    }, timestamp);
+  });
+}
+
+// Linked debt payments — when an expense has linkedDebtId, decrement that
+// debt's currentBalanceCents by the expense amount. Reverses on edit/delete.
+function debtDeltaForRecord(storeName, record) {
+  if (storeName !== 'expenses') return null;
+  if (!record?.linkedDebtId || !record.amountCents) return null;
+  return { debtId: record.linkedDebtId, deltaCents: -Math.abs(record.amountCents || 0) };
+}
+
+function buildDebtAdjustments(storeName, previous, nextRecord) {
+  if (storeName !== 'expenses') return new Map();
+  const adjustments = new Map();
+  const addAdjustment = (adjustment, multiplier = 1) => {
+    if (!adjustment?.debtId || !adjustment.deltaCents) return;
+    adjustments.set(
+      adjustment.debtId,
+      (adjustments.get(adjustment.debtId) || 0) + adjustment.deltaCents * multiplier,
+    );
+  };
+  addAdjustment(debtDeltaForRecord(storeName, previous), -1);
+  addAdjustment(debtDeltaForRecord(storeName, nextRecord), 1);
+  return adjustments;
+}
+
+function applyDebtAdjustments(debts, adjustments, timestamp) {
+  if (!adjustments.size) return debts;
+  return debts.map((debt) => {
+    const deltaCents = adjustments.get(debt.id);
+    if (!deltaCents) return debt;
+    const currentBalanceCents = Math.max(0, (debt.currentBalanceCents || 0) + deltaCents);
+    return ensureEntitySyncFields({
+      ...debt,
+      currentBalanceCents,
       updatedAt: timestamp,
     }, timestamp);
   });
@@ -469,6 +508,7 @@ export const useFinanceStore = create((set, get) => ({
   rollovers: [],
   transfers: [],
   bankAccounts: [],
+  debts: [],
   attachments: [],
   activityLog: [],
   portfolioSnapshots: [],
@@ -819,6 +859,93 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
+  saveDebt: async (debt) => {
+    const timestamp = new Date().toISOString();
+    const existing = debt.id ? get().debts.find((item) => item.id === debt.id) : null;
+    const baseCurrency = get().settings.baseCurrency || 'EUR';
+    const record = {
+      ...ensureEntitySyncFields({
+        id: debt.id || makeId('debt'),
+        name: debt.name || '',
+        lender: debt.lender || '',
+        type: debt.type || 'loan',
+        originalAmountCents: debt.originalAmountCents ?? 0,
+        currentBalanceCents: debt.currentBalanceCents ?? 0,
+        interestRatePercent: debt.interestRatePercent ?? null,
+        monthlyPaymentCents: debt.monthlyPaymentCents ?? null,
+        startDate: debt.startDate || null,
+        endDate: debt.endDate || null,
+        currency: debt.currency || baseCurrency,
+        notes: debt.notes || '',
+        createdAt: existing?.createdAt || debt.createdAt || timestamp,
+      }, timestamp),
+      updatedAt: timestamp,
+    };
+    await putRecord('debts', record);
+    set((state) => {
+      const nextDebts = upsertItem(state.debts, record);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => item.id !== record.id),
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `debts:${record.id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      return {
+        debts: nextDebts,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived({ ...state, debts: nextDebts }),
+      };
+    });
+    await persistActivityLogs(set, [buildActivityLog({
+      storeName: 'debts',
+      action: existing ? 'update' : 'create',
+      before: existing,
+      after: record,
+    })]);
+    get().triggerAutoPush();
+    return record;
+  },
+
+  removeDebt: async (id) => {
+    const previous = get().debts.find((item) => item.id === id);
+    await deleteRecord('debts', id);
+    const timestamp = new Date().toISOString();
+    set((state) => {
+      const nextDebts = state.debts.filter((item) => item.id !== id);
+      const nextDeletedRecords = {
+        ...state.syncMeta.deletedRecords,
+        debts: [
+          ...(state.syncMeta.deletedRecords.debts || []).filter((item) => item.id !== id),
+          { id, updatedAt: timestamp, deletedAt: timestamp },
+        ],
+      };
+      const nextSyncMeta = {
+        ...state.syncMeta,
+        deletedRecords: nextDeletedRecords,
+        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `debts:${id}`),
+      };
+      saveSyncMeta(nextSyncMeta);
+      return {
+        debts: nextDebts,
+        syncMeta: nextSyncMeta,
+        derived: buildDerived({ ...state, debts: nextDebts }),
+      };
+    });
+    if (previous) {
+      await persistActivityLogs(set, [buildActivityLog({
+        storeName: 'debts',
+        action: 'delete',
+        before: previous,
+        after: null,
+      })]);
+    }
+    get().triggerAutoPush();
+  },
+
   saveSupabaseSettings: async (partial) => {
     const previousSettings = get().settings;
     const settings = { ...previousSettings, ...partial };
@@ -878,6 +1005,8 @@ export const useFinanceStore = create((set, get) => ({
     const record = { ...ensureEntitySyncFields({ ...value, id: value.id || makeId(prefix) }), updatedAt: timestamp };
     const bankAccountAdjustments = buildBankAccountAdjustments(storeName, previous, record, skipAccountAdjustment);
     const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
+    const debtAdjustments = buildDebtAdjustments(storeName, previous, record);
+    const adjustedDebts = applyDebtAdjustments(get().debts || [], debtAdjustments, timestamp);
     await putRecord(storeName, record);
     if (adjustedBankAccounts !== get().bankAccounts) {
       await Promise.all(
@@ -886,16 +1015,29 @@ export const useFinanceStore = create((set, get) => ({
           .map((account) => putRecord('bankAccounts', account)),
       );
     }
+    if (adjustedDebts !== get().debts) {
+      await Promise.all(
+        adjustedDebts
+          .filter((debt) => debtAdjustments.has(debt.id))
+          .map((debt) => putRecord('debts', debt)),
+      );
+    }
     set((state) => {
       const nextList = upsertItem(state[storeName], record);
       const nextBankAccounts = storeName === 'bankAccounts'
         ? nextList
         : applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
+      const nextDebts = storeName === 'debts'
+        ? nextList
+        : applyDebtAdjustments(state.debts || [], debtAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== record.id),
         ...(bankAccountAdjustments.size
           ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
+        ...(debtAdjustments.size
+          ? { debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => !debtAdjustments.has(item.id)) }
           : {}),
       };
       const nextSyncMeta = {
@@ -903,14 +1045,16 @@ export const useFinanceStore = create((set, get) => ({
         deletedRecords: nextDeletedRecords,
         conflicts: state.syncMeta.conflicts.filter((item) => (
           item.id !== `${storeName}:${record.id}` &&
-          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', '')))
+          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))) &&
+          (!debtAdjustments.size || !debtAdjustments.has(item.id?.replace('debts:', '')))
         )),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts };
+      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts, debts: nextDebts };
       return {
         [storeName]: nextList,
         bankAccounts: nextBankAccounts,
+        debts: nextDebts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -954,6 +1098,8 @@ export const useFinanceStore = create((set, get) => ({
     const timestamp = new Date().toISOString();
     const bankAccountAdjustments = buildBankAccountAdjustments(storeName, previous, null, false);
     const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
+    const debtAdjustments = buildDebtAdjustments(storeName, previous, null);
+    const adjustedDebts = applyDebtAdjustments(get().debts || [], debtAdjustments, timestamp);
     await deleteRecord(storeName, id);
     if (adjustedBankAccounts !== get().bankAccounts) {
       await Promise.all(
@@ -962,11 +1108,21 @@ export const useFinanceStore = create((set, get) => ({
           .map((account) => putRecord('bankAccounts', account)),
       );
     }
+    if (adjustedDebts !== get().debts) {
+      await Promise.all(
+        adjustedDebts
+          .filter((debt) => debtAdjustments.has(debt.id))
+          .map((debt) => putRecord('debts', debt)),
+      );
+    }
     set((state) => {
       const nextList = state[storeName].filter((item) => item.id !== id);
       const nextBankAccounts = storeName === 'bankAccounts'
         ? nextList
         : applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
+      const nextDebts = storeName === 'debts'
+        ? nextList
+        : applyDebtAdjustments(state.debts || [], debtAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         [storeName]: [
@@ -976,20 +1132,25 @@ export const useFinanceStore = create((set, get) => ({
         ...(bankAccountAdjustments.size
           ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
           : {}),
+        ...(debtAdjustments.size
+          ? { debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => !debtAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
         deletedRecords: nextDeletedRecords,
         conflicts: state.syncMeta.conflicts.filter((item) => (
           item.id !== `${storeName}:${id}` &&
-          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', '')))
+          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))) &&
+          (!debtAdjustments.size || !debtAdjustments.has(item.id?.replace('debts:', '')))
         )),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts };
+      const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts, debts: nextDebts };
       return {
         [storeName]: nextList,
         bankAccounts: nextBankAccounts,
+        debts: nextDebts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -1877,6 +2038,7 @@ export const useFinanceStore = create((set, get) => ({
         rollovers: [],
         transfers: [],
         bankAccounts: [],
+        debts: [],
         attachments: [],
         activityLog: [],
         portfolioSnapshots: [],

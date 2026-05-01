@@ -203,6 +203,7 @@ export default function DashboardPage() {
   const distributedToPortfolioCents = dashboard.distributedToPortfolioCents || 0;
   const distributedTotalCents = distributedToSavingsCents + distributedToPortfolioCents;
   const hasDistribution = distributedTotalCents > 0;
+  const totalDebtCents = dashboard.totalDebtCents || 0;
   const kpis = [
     {
       label: 'Net worth',
@@ -210,7 +211,7 @@ export default function DashboardPage() {
       mode: 'currency',
       delta: netWorthDelta,
       deltaMode: 'percent',
-      info: 'Total balance plus savings and portfolio value. This is your broad financial position, not just cash available to spend.',
+      info: 'Total balance plus savings and portfolio value, minus any outstanding debts. Your broad financial position.',
     },
     {
       label: 'Total balance',
@@ -233,6 +234,15 @@ export default function DashboardPage() {
           mode: 'currency',
           hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
           info: 'Current market value of your active portfolio holdings.',
+        }]
+      : []),
+    ...(totalDebtCents > 0
+      ? [{
+          label: 'Total debt',
+          value: totalDebtCents,
+          mode: 'currency',
+          hint: 'outstanding',
+          info: 'Sum of all debt balances. Net worth subtracts this. Linked expense payments reduce it automatically.',
         }]
       : []),
   ];

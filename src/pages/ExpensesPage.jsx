@@ -288,6 +288,7 @@ export default function ExpensesPage() {
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
   const attachments = useFinanceStore((state) => state.attachments);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
+  const debts = useFinanceStore((state) => state.debts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
@@ -796,6 +797,7 @@ export default function ExpensesPage() {
         <ExpenseForm
           categories={settings.categories}
           bankAccounts={bankAccounts}
+          debts={debts}
           initialValue={editingExpense}
           existingAttachments={attachments.filter((a) => a.expenseId === editingExpense?.id)}
           onRemoveAttachment={removeAttachment}

@@ -180,7 +180,7 @@ function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], settings = {}, fxRates = {} }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], debts = [], settings = {}, fxRates = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const bankBalanceCents = (bankAccounts || [])
@@ -239,7 +239,16 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     (savingsEntries || [])
       .filter((entry) => entry.source !== 'allocation')
       .reduce((sum, e) => sum + (e.amountCents || 0), 0);
-  const netWorthCents = availableBalanceCents + savingsBalance + portfolio.currentValueCents;
+  // Sum debt balances (FX-converted to base currency where needed). Debts are
+  // a liability, so they reduce net worth.
+  const totalDebtCents = (debts || []).reduce((sum, debt) => {
+    const cents = Math.max(0, debt.currentBalanceCents || 0);
+    if (!cents) return sum;
+    if (!debt.currency || debt.currency === baseCurrency) return sum + cents;
+    const rate = fxRates[debt.currency];
+    return sum + (rate != null ? Math.round(cents * rate) : cents);
+  }, 0);
+  const netWorthCents = availableBalanceCents + savingsBalance + portfolio.currentValueCents - totalDebtCents;
 
   const monthlyExpenses = computeExpenseSeries(expenses);
   const monthlyIncome   = computeIncomeSeries(incomes);
@@ -298,6 +307,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
     cashflowCents,
     availableBalanceCents,
     bankBalanceCents,
+    totalDebtCents,
     savingsBalanceCents: savingsBalance,
     savingsRate,
     portfolioPnlMonthCents: portfolio.pnlCents,

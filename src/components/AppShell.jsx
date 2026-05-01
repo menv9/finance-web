@@ -20,6 +20,7 @@ const NAV_GROUPS = [
     label: 'Money',
     items: [
       { to: '/accounts', label: 'Accounts' },
+      { to: '/debts', label: 'Debts' },
       { to: '/expenses', label: 'Expenses' },
       { to: '/income', label: 'Income' },
     ],
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
 
 const MORE_LINKS = [
   { to: '/accounts', label: 'Accounts' },
+  { to: '/debts', label: 'Debts' },
   { to: '/income', label: 'Income' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/budgets', label: 'Budgets' },
@@ -359,6 +361,7 @@ export function AppShell({ children }) {
   const setTheme = useFinanceStore((state) => state.setTheme);
   const metrics = useFinanceStore((state) => state.derived.dashboard);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
+  const debts = useFinanceStore((state) => state.debts || []);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
@@ -853,6 +856,7 @@ export function AppShell({ children }) {
         <ExpenseForm
           categories={settings.categories}
           bankAccounts={bankAccounts}
+          debts={debts}
           existingAttachments={[]}
           onRemoveAttachment={() => {}}
           onSubmit={async (value, pendingFiles) => {
