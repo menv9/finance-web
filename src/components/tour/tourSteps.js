@@ -177,6 +177,11 @@ export const TOUR_STEPS = [
         desc: 'Total portfolio value, overall gain/loss, and today\'s change. Prices are updated automatically from market data.',
       },
       {
+        tourId: 'portfolio-value-history',
+        label: 'Portfolio value',
+        desc: 'Hourly snapshots of your total open-position market value. Lets you see intraday and multi-day price movement without manual refreshes.',
+      },
+      {
         tourId: 'portfolio-holdings',
         label: 'Holdings',
         desc: 'Your individual positions — stocks, ETFs, crypto — with current price, quantity, and performance. Add holdings with the + button.',
