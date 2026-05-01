@@ -1,16 +1,27 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { getSupabaseBrowserClient, getSupabaseConfig } from './supabase';
+import { useFinanceStore } from '../store/useFinanceStore';
+
+function getConfig() {
+  const settings = useFinanceStore.getState().settings;
+  return getSupabaseConfig(settings);
+}
 
 function fnHeaders() {
+  const { anonKey } = getConfig();
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${anonKey}`,
   };
+}
+
+function fnUrl(name) {
+  const { url } = getConfig();
+  return `${url}/functions/v1/${name}`;
 }
 
 export async function getInstitutions(country = 'ES') {
   const res = await fetch(
-    `${SUPABASE_URL}/functions/v1/gocardless-institutions?country=${country}`,
+    `${fnUrl('gocardless-institutions')}?country=${country}`,
     { headers: fnHeaders() },
   );
   if (!res.ok) throw new Error('Failed to load institutions');
@@ -18,7 +29,7 @@ export async function getInstitutions(country = 'ES') {
 }
 
 export async function createBankLink({ institutionId, userId }) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/gocardless-link`, {
+  const res = await fetch(fnUrl('gocardless-link'), {
     method: 'POST',
     headers: fnHeaders(),
     body: JSON.stringify({ institution_id: institutionId, user_id: userId }),
@@ -28,7 +39,7 @@ export async function createBankLink({ institutionId, userId }) {
 }
 
 export async function syncBankAccounts(userId) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/gocardless-sync`, {
+  const res = await fetch(fnUrl('gocardless-sync'), {
     method: 'POST',
     headers: fnHeaders(),
     body: JSON.stringify({ user_id: userId }),
