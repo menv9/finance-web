@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Button } from '../components/ui';
+import { cn } from '../components/ui/cn';
 
 function CheckInboxIcon() {
   return (
@@ -23,6 +24,39 @@ function GoogleIcon() {
   );
 }
 
+const CONFIRMATION_COPY = {
+  'magic-sent': {
+    title: 'Check your inbox.',
+    body: (email) => (
+      <>
+        We sent a magic link to <span className="text-ink font-medium">{email}</span>.
+        <br />
+        Click it to sign in — no password needed.
+      </>
+    ),
+  },
+  'signup-sent': {
+    title: 'Confirm your account.',
+    body: (email) => (
+      <>
+        We sent a confirmation link to <span className="text-ink font-medium">{email}</span>.
+        <br />
+        Click it to activate your account.
+      </>
+    ),
+  },
+  'reset-sent': {
+    title: 'Check your inbox.',
+    body: (email) => (
+      <>
+        We sent a password reset link to <span className="text-ink font-medium">{email}</span>.
+        <br />
+        Open it to set a new password.
+      </>
+    ),
+  },
+};
+
 export default function LoginPage() {
   const supabaseConfigured = useFinanceStore((s) => s.supabaseConfigured);
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
@@ -30,9 +64,14 @@ export default function LoginPage() {
   const supabaseError = useFinanceStore((s) => s.supabaseError);
   const sendMagicLink = useFinanceStore((s) => s.sendMagicLink);
   const signInWithGoogle = useFinanceStore((s) => s.signInWithGoogle);
+  const signUpWithPassword = useFinanceStore((s) => s.signUpWithPassword);
+  const signInWithPassword = useFinanceStore((s) => s.signInWithPassword);
+  const sendPasswordReset = useFinanceStore((s) => s.sendPasswordReset);
 
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState(null); // null | 'magic-sent' | 'signup-sent' | 'reset-sent'
   const [localError, setLocalError] = useState('');
 
   // Already signed in → into the app
@@ -42,29 +81,78 @@ export default function LoginPage() {
   if (!supabaseConfigured) return <Navigate to="/dashboard" replace />;
 
   const loading = supabaseSyncStatus === 'auth-pending';
+  const errorMessage = localError || supabaseError;
+
+  function clearError() {
+    setLocalError('');
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setLocalError('');
-    if (!email.trim()) {
-      setLocalError('Enter your email address.');
+    clearError();
+    if (!email.trim() || !password.trim()) {
+      setLocalError('Email and password are required.');
+      return;
+    }
+    if (mode === 'signup' && password.length < 8) {
+      setLocalError('Password must be at least 8 characters.');
       return;
     }
     try {
-      await sendMagicLink(email.trim());
-      setSent(true);
+      if (mode === 'signup') {
+        await signUpWithPassword(email.trim(), password);
+        setConfirmation('signup-sent');
+      } else {
+        await signInWithPassword(email.trim(), password);
+        // Success → onAuthStateChange will redirect via the Navigate guard above
+      }
     } catch (err) {
       setLocalError(err.message || 'Something went wrong. Try again.');
     }
   }
 
   async function handleGoogleSignIn() {
-    setLocalError('');
+    clearError();
     try {
       await signInWithGoogle();
     } catch (err) {
       setLocalError(err.message || 'Google sign in failed. Try again.');
     }
+  }
+
+  async function handleMagicLink() {
+    clearError();
+    if (!email.trim()) {
+      setLocalError('Enter your email to receive a magic link.');
+      return;
+    }
+    try {
+      await sendMagicLink(email.trim());
+      setConfirmation('magic-sent');
+    } catch (err) {
+      setLocalError(err.message || 'Could not send magic link. Try again.');
+    }
+  }
+
+  async function handleForgotPassword() {
+    clearError();
+    if (!email.trim()) {
+      setLocalError('Enter your email to receive a reset link.');
+      return;
+    }
+    try {
+      await sendPasswordReset(email.trim());
+      setConfirmation('reset-sent');
+    } catch (err) {
+      setLocalError(err.message || 'Could not send reset link. Try again.');
+    }
+  }
+
+  function resetForm() {
+    setConfirmation(null);
+    setEmail('');
+    setPassword('');
+    clearError();
   }
 
   return (
@@ -81,49 +169,71 @@ export default function LoginPage() {
           <span className="eyebrow text-[0.65rem] text-ink-faint">Finance — Quarterly Ledger</span>
         </div>
 
-        {sent ? (
+        {confirmation ? (
           /* ── Confirmation state ── */
           <div className="w-full max-w-sm text-center space-y-6 animate-rise">
             <CheckInboxIcon />
             <div className="space-y-2">
               <h1 className="font-display text-4xl text-ink leading-[0.95] tracking-tight">
-                Check your inbox.
+                {CONFIRMATION_COPY[confirmation].title}
               </h1>
               <p className="text-sm text-ink-muted leading-relaxed">
-                We sent a magic link to{' '}
-                <span className="text-ink font-medium">{email}</span>.
-                <br />
-                Click it to sign in — no password needed.
+                {CONFIRMATION_COPY[confirmation].body(email)}
               </p>
             </div>
             <button
               type="button"
-              onClick={() => { setSent(false); setEmail(''); }}
+              onClick={resetForm}
               className="text-sm text-ink-faint underline-offset-2 hover:text-ink hover:underline transition-colors duration-180"
             >
               Use a different email
             </button>
           </div>
         ) : (
-          /* ── Sign-in form ── */
-          <div className="w-full max-w-sm space-y-10 animate-rise">
+          /* ── Sign-in / Create-account form ── */
+          <div className="w-full max-w-sm space-y-8 animate-rise">
             <div className="space-y-3">
               <h1 className="font-display text-5xl text-ink leading-[0.92] tracking-tight">
-                Sign in.
+                {mode === 'signin' ? 'Sign in.' : 'Create account.'}
               </h1>
               <p className="text-sm text-ink-muted leading-relaxed">
-                Enter your email and we'll send a magic link.
-                <br />
-                No password, no friction.
+                {mode === 'signin'
+                  ? 'Welcome back. Use your email and password.'
+                  : 'A private ledger awaits. Pick an email and password.'}
               </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex rounded-md border border-rule p-1 bg-surface-raised">
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); clearError(); }}
+                className={cn(
+                  'flex-1 rounded px-3 py-1.5 text-sm transition-colors duration-180',
+                  mode === 'signin'
+                    ? 'bg-surface text-ink shadow-sm'
+                    : 'text-ink-muted hover:text-ink',
+                )}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('signup'); clearError(); }}
+                className={cn(
+                  'flex-1 rounded px-3 py-1.5 text-sm transition-colors duration-180',
+                  mode === 'signup'
+                    ? 'bg-surface text-ink shadow-sm'
+                    : 'text-ink-muted hover:text-ink',
+                )}
+              >
+                Create account
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="eyebrow text-[0.65rem] block"
-                >
+                <label htmlFor="email" className="eyebrow text-[0.65rem] block">
                   Email address
                 </label>
                 <input
@@ -133,23 +243,58 @@ export default function LoginPage() {
                   // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setLocalError(''); }}
+                  onChange={(e) => { setEmail(e.target.value); clearError(); }}
                   placeholder="you@example.com"
-                  aria-describedby={localError || supabaseError ? 'login-error' : undefined}
-                  aria-invalid={!!(localError || supabaseError)}
-                  className={[
+                  aria-describedby={errorMessage ? 'login-error' : undefined}
+                  aria-invalid={!!errorMessage}
+                  className={cn(
                     'w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder-ink-faint',
                     'transition-shadow duration-180',
                     'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-canvas',
-                    localError || supabaseError ? 'border-danger' : 'border-rule hover:border-rule-strong',
-                  ].join(' ')}
+                    errorMessage ? 'border-danger' : 'border-rule hover:border-rule-strong',
+                  )}
                 />
-                {(localError || supabaseError) && (
-                  <p id="login-error" className="text-sm text-danger" role="alert">
-                    {localError || supabaseError}
-                  </p>
-                )}
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="eyebrow text-[0.65rem] block">
+                    Password
+                  </label>
+                  {mode === 'signin' && (
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={loading}
+                      className="text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
+                  aria-describedby={errorMessage ? 'login-error' : undefined}
+                  aria-invalid={!!errorMessage}
+                  className={cn(
+                    'w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder-ink-faint',
+                    'transition-shadow duration-180',
+                    'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-canvas',
+                    errorMessage ? 'border-danger' : 'border-rule hover:border-rule-strong',
+                  )}
+                />
+              </div>
+
+              {errorMessage && (
+                <p id="login-error" className="text-sm text-danger" role="alert">
+                  {errorMessage}
+                </p>
+              )}
 
               <Button
                 type="submit"
@@ -157,7 +302,9 @@ export default function LoginPage() {
                 className="w-full justify-center"
                 disabled={loading}
               >
-                {loading ? 'Sending…' : 'Send magic link'}
+                {loading
+                  ? (mode === 'signup' ? 'Creating…' : 'Signing in…')
+                  : (mode === 'signup' ? 'Create account' : 'Sign in')}
               </Button>
             </form>
 
@@ -176,6 +323,14 @@ export default function LoginPage() {
               >
                 <GoogleIcon /> Continue with Google
               </Button>
+              <button
+                type="button"
+                onClick={handleMagicLink}
+                disabled={loading}
+                className="block w-full text-center text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
+              >
+                Send a magic link instead
+              </button>
             </div>
 
             <p className="text-center text-xs text-ink-faint leading-relaxed">

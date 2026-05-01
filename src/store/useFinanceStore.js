@@ -2008,13 +2008,57 @@ export const useFinanceStore = create((set, get) => ({
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://www.finges.xyz',
+        redirectTo: window.location.origin,
       },
     });
     if (error) {
       set({ supabaseSyncStatus: 'error', supabaseError: error.message });
       throw error;
     }
+  },
+
+  signUpWithPassword: async (email, password) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'auth-pending', supabaseError: '' });
+    const { error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+    set({ supabaseSyncStatus: 'auth-signup-pending' });
+  },
+
+  signInWithPassword: async (email, password) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'auth-pending', supabaseError: '' });
+    const { error } = await client.auth.signInWithPassword({ email, password });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+    // Session arrives via onAuthStateChange — supabaseUser populates automatically
+  },
+
+  sendPasswordReset: async (email) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase is not configured');
+    set({ supabaseSyncStatus: 'auth-pending', supabaseError: '' });
+    const { error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
+      throw error;
+    }
+    set({ supabaseSyncStatus: 'auth-reset-pending' });
   },
 
   signOutSupabase: async () => {

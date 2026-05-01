@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -57,6 +58,7 @@ export default function App() {
           {/* Public — standalone pages (no AppShell) */}
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
           {/* Protected — all app routes behind auth gate + shared shell */}
