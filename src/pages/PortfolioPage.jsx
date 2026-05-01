@@ -1205,6 +1205,7 @@ export default function PortfolioPage() {
       >
         <HoldingForm
           initialValue={editingHolding || holdingModal.initialValue}
+          finnhubApiKey={settings.finnhubApiKey || ''}
           onSubmit={async (value) => {
             try {
               const isNew = !value.id;

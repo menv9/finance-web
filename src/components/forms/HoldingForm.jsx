@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FormField, Input, Button } from '../ui';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useConfirm } from '../ConfirmContext';
+import { fetchTickerPrice, searchAssets } from '../../utils/yahoo';
 
 const PRICE_CURRENCIES = [
   'EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD',
@@ -236,8 +237,107 @@ function FormSection({ step, title, children }) {
   );
 }
 
-export function HoldingForm({ initialValue, onSubmit, onCancel }) {
+function AssetSearch({ apiKey, onSelect }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    setError('');
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearched(false);
+      setLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const assets = await searchAssets(trimmed, apiKey);
+        if (!active) return;
+        setResults(assets);
+        setSearched(true);
+      } catch (err) {
+        if (!active) return;
+        setResults([]);
+        setSearched(true);
+        setError(err.message || 'Unable to search assets.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [apiKey, query]);
+
+  return (
+    <div className="md:col-span-2">
+      <FormField
+        label="Search asset"
+        htmlFor="holding-asset-search"
+        hint={apiKey ? 'Search by name or ticker.' : 'Search works best with a Finnhub API key in Settings.'}
+      >
+        {(props) => (
+          <Input
+            {...props}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search VWCE, Apple, Vanguard..."
+          />
+        )}
+      </FormField>
+
+      <div className="mt-2 overflow-hidden rounded-md border border-rule bg-surface">
+        {loading ? (
+          <p className="px-3 py-2 text-sm text-ink-muted">Searching...</p>
+        ) : results.length ? (
+          <ul className="max-h-56 overflow-y-auto divide-y divide-rule">
+            {results.map((asset) => (
+              <li key={asset.ticker}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery(`${asset.ticker} - ${asset.name}`);
+                    onSelect(asset);
+                  }}
+                  className="grid w-full grid-cols-1 gap-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-raised sm:grid-cols-[minmax(0,1fr)_auto]"
+                >
+                  <span className="min-w-0">
+                    <span className="font-mono text-sm font-medium text-ink">{asset.ticker}</span>
+                    <span className="ml-2 text-sm text-ink-muted">{asset.name}</span>
+                  </span>
+                  <span className="flex flex-wrap gap-2 text-xs text-ink-faint sm:justify-end">
+                    {asset.exchange ? <span>{asset.exchange}</span> : null}
+                    {asset.type ? <span>{asset.type}</span> : null}
+                    {asset.currency ? <span className="font-mono">{asset.currency}</span> : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : searched ? (
+          <p className="px-3 py-2 text-sm text-ink-muted">
+            {error || 'No matches found. You can fill the ticker and name manually below.'}
+          </p>
+        ) : (
+          <p className="px-3 py-2 text-sm text-ink-muted">Type at least 2 characters to search.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '' }) {
   const isEditing = Boolean(initialValue?.id);
+  const usesAssetSearch = !isEditing && !initialValue?.ticker;
   const settings = useFinanceStore((state) => state.settings);
   const baseCurrency = settings.baseCurrency || 'EUR';
   // Ensure baseCurrency is always in the list
@@ -260,6 +360,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
     currency: initialValue?.currency || baseCurrency,
     feeCurrency: initialValue?.feeCurrency || initialValue?.currency || baseCurrency,
   });
+  const [priceLookup, setPriceLookup] = useState({ loading: false, error: '' });
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
@@ -271,6 +372,38 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
 
   const setFeeCurrency = (event) =>
     setForm((prev) => ({ ...prev, feeCurrency: event.target.value }));
+
+  const handleAssetSelect = async (asset) => {
+    const nextCurrency = asset.currency || baseCurrency;
+    setForm((prev) => ({
+      ...prev,
+      ticker: asset.ticker,
+      name: asset.name || prev.name,
+      currency: nextCurrency,
+      currentPriceCents: asset.priceCents ? `${asset.priceCents / 100}` : prev.currentPriceCents,
+      feeCurrency: prev.feeCurrency || nextCurrency,
+    }));
+    if (asset.priceCents) {
+      setPriceLookup({ loading: false, error: '' });
+      return;
+    }
+    setPriceLookup({ loading: true, error: '' });
+    try {
+      const price = await fetchTickerPrice(asset.ticker, finnhubApiKey);
+      setForm((prev) => ({
+        ...prev,
+        currentPriceCents: price.priceCents ? `${price.priceCents / 100}` : prev.currentPriceCents,
+        currency: price.currency || nextCurrency,
+        feeCurrency: prev.feeCurrency || price.currency || nextCurrency,
+      }));
+      setPriceLookup({ loading: false, error: '' });
+    } catch (error) {
+      setPriceLookup({
+        loading: false,
+        error: error.message || 'Unable to fetch current price. You can enter it manually.',
+      });
+    }
+  };
 
   const averageBuyPriceCents = Math.round(Number(form.averageBuyPriceCents || 0) * 100);
   const purchaseAmountCents = Math.round(Number(form.purchaseAmountCents || 0) * 100);
@@ -306,6 +439,10 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
       }}
     >
       <FormSection step="1" title="Asset">
+        {usesAssetSearch ? (
+          <AssetSearch apiKey={finnhubApiKey} onSelect={handleAssetSelect} />
+        ) : null}
+
         <FormField label="Ticker" htmlFor="holding-ticker" required>
           {(props) => (
             <Input
@@ -419,7 +556,11 @@ export function HoldingForm({ initialValue, onSubmit, onCancel }) {
         <FormField
           label={`Current price (${priceCurrency})`}
           htmlFor="holding-current"
-          hint="Updated via Refresh prices. Uses the same currency as avg buy price."
+          hint={
+            priceLookup.loading
+              ? 'Fetching latest price...'
+              : priceLookup.error || 'Updated via Refresh prices. Uses the same currency as avg buy price.'
+          }
           className="md:col-span-2"
         >
           {() => (
