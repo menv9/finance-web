@@ -212,8 +212,8 @@ export default function SettingsPage() {
     { value: 'dark',  label: 'Dark',  Icon: MoonIcon,    description: 'Deep & minimal' },
     { value: 'light', label: 'Light', Icon: SunIcon,     description: 'Clean & bright' },
     { value: 'eris',  label: 'Eris',  Icon: SparkleIcon, description: 'Lavender dreams' },
-    { value: 'gorka', label: 'Gorka', Icon: DiscIcon,    description: 'Liquid chrome'   },
-    { value: 'gorka-light', label: 'Gorka light', Icon: DiscIcon, description: 'Chrome on light' },
+    { value: 'gorka', label: 'Gorka', Icon: DiscIcon,    description: 'Silk dark navy' },
+    { value: 'gorka-light', label: 'Gorka light', Icon: DiscIcon, description: 'Old newspaper' },
   ];
 
   const [categoryInput, setCategoryInput] = useState('');

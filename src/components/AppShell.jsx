@@ -8,6 +8,7 @@ import { ExpenseForm } from './forms/ExpenseForm';
 import { IncomeForm } from './forms/IncomeForm';
 import Silk from './Silk';
 import SakuraPetals from './SakuraPetals';
+import Grainient from './Grainient';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
 
@@ -83,11 +84,11 @@ function MenuIcon({ open }) {
 }
 
 const LOGO_GRADIENTS = {
-  dark:  [{ o: '0%', c: '#28B87A' }, { o: '45%', c: '#1A9ECC' }, { o: '100%', c: '#2563EB' }],
+  dark:  [{ o: '0%', c: '#C8D0DA' }, { o: '45%', c: '#8896A8' }, { o: '100%', c: '#5A6878' }],
   light: [{ o: '0%', c: '#1F4B3A' }, { o: '45%', c: '#0F6E56' }, { o: '100%', c: '#085041' }],
   eris:  [{ o: '0%', c: '#D4607A' }, { o: '45%', c: '#B84362' }, { o: '100%', c: '#8A1A45' }],
   gorka: [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
-  'gorka-light': [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
+  'gorka-light': [{ o: '0%', c: '#A0714F' }, { o: '45%', c: '#7C5535' }, { o: '100%', c: '#5E3D22' }],
 };
 
 const FIN_COLORS = {
@@ -103,7 +104,7 @@ const TAGLINE_COLORS = {
   light: '#524A40',
   eris:  '#8A4F65',
   gorka: 'rgba(229,236,246,0.55)',
-  'gorka-light': '#524A40',
+  'gorka-light': '#7A6248',
 };
 
 function FinGesWordmark({ theme }) {
@@ -205,7 +206,7 @@ const FAVICON_TOKENS = {
   light: { cardFrom: '#FFFFFF', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#E0E8FF', ringTo: '#C8D8F8', euroColor: '#1B3A7A', cardShadow: '#8AAAD8' },
   eris:  { cardFrom: '#FFF6FA', cardTo: '#FEF0F5', coinFrom: '#FFF0F7', coinTo: '#FFE0EE', ringFrom: '#FFD6EA', ringTo: '#FFBAD8', euroColor: '#D4607A', cardShadow: '#E8A0B8' },
   gorka: { cardFrom: '#131D30', cardTo: '#0E1726', coinFrom: '#1A2540', coinTo: '#0F1827', ringFrom: '#2A3548', ringTo: '#1E2A40', euroColor: '#5B8DEF', cardShadow: '#3B5680' },
-  'gorka-light': { cardFrom: '#F6F1E8', cardTo: '#E8EFFE', coinFrom: '#FFFFFF', coinTo: '#EEF2FF', ringFrom: '#D6E1F8', ringTo: '#BFD1F6', euroColor: '#3B82F6', cardShadow: '#8AAAD8' },
+  'gorka-light': { cardFrom: '#F5EDD8', cardTo: '#EDE5CF', coinFrom: '#F0E6CC', coinTo: '#E4D8BD', ringFrom: '#D9C9A8', ringTo: '#C8B48E', euroColor: '#7C5535', cardShadow: '#A08060' },
 };
 
 function buildFaviconSVG(theme) {
@@ -514,17 +515,58 @@ export function AppShell({ children }) {
       {/* Eris: falling sakura petals */}
       {appliedTheme === 'eris' && <SakuraPetals />}
 
-      {/* Gorka: full-page silk background. Solid navy fallback prevents a
-          white flash before the WebGL canvas first renders. */}
-      {(appliedTheme === 'gorka' || appliedTheme === 'gorka-light') && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: appliedTheme === 'gorka-light' ? '#ECEFF4' : '#08101F' }}>
+      {/* Gorka dark: full-page silk background */}
+      {appliedTheme === 'gorka' && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
           <Silk
-            speed={appliedTheme === 'gorka-light' ? 1 : 1.2}
-            scale={appliedTheme === 'gorka-light' ? 0.8 : 1.3}
-            color={appliedTheme === 'gorka-light' ? '#DDE5F1' : '#1E2C44'}
-            noiseIntensity={appliedTheme === 'gorka-light' ? 0.4 : 0.8}
+            speed={1.2}
+            scale={1.3}
+            color="#1E2C44"
+            noiseIntensity={0.8}
             rotation={0.6}
           />
+        </div>
+      )}
+
+      {/* Gorka light: grainient + wrinkled paper overlay */}
+      {appliedTheme === 'gorka-light' && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#EDE5CF' }}>
+          <Grainient
+            color1="#F2E8CA"
+            color2="#DBBE93"
+            color3="#E8D8B2"
+            timeSpeed={0.07}
+            warpStrength={0.5}
+            warpFrequency={3.0}
+            warpSpeed={0.6}
+            warpAmplitude={90.0}
+            blendAngle={20.0}
+            blendSoftness={0.18}
+            rotationAmount={160.0}
+            noiseScale={1.4}
+            grainAmount={0.04}
+            grainScale={3.0}
+            contrast={1.05}
+            gamma={1.0}
+            saturation={0.75}
+            zoom={1.05}
+          />
+          {/* SVG wrinkle: fractal noise treated as a bump map, lit from upper-left.
+              multiply blend darkens the "valleys" of the crumpled surface. */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', mixBlendMode: 'multiply', opacity: 0.13 }}
+          >
+            <defs>
+              <filter id="paper-wrinkle" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.032 0.048" numOctaves="5" seed="11" result="noise" />
+                <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="1.2" result="light">
+                  <feDistantLight azimuth="38" elevation="52" />
+                </feDiffuseLighting>
+              </filter>
+            </defs>
+            <rect width="100%" height="100%" filter="url(#paper-wrinkle)" />
+          </svg>
         </div>
       )}
 

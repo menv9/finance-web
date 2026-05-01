@@ -60,10 +60,10 @@ input[type="month"] {
   --ink-muted: #A5AEC3;
   --ink-faint: #6F788E;
   --ink-inverse: #141B26;
-  --accent: #5FB394;
-  --accent-strong: #7BC9AB;
-  --accent-soft: rgba(95, 179, 148, 0.16);
-  --accent-ink: #0B1E16;
+  --accent: #8896A8;
+  --accent-strong: #A4B0BF;
+  --accent-soft: rgba(136, 150, 168, 0.16);
+  --accent-ink: #141B26;
   --danger: #F87171;
   --danger-soft: rgba(248, 113, 113, 0.16);
   --positive: #4ADE80;
@@ -170,28 +170,28 @@ input[type="month"] {
   color-scheme: dark;
 }
 
-/* Gorka Light — paper-steel canvas, white cards, deep navy ink. Same
-   finance-professional DNA as dark Gorka, just inverted for daylight. */
+/* Gorka Light — old newspaper parchment. Warm cream canvas, aged sepia ink,
+   letterpress-brown accent. Finance professional meets vintage broadsheet. */
 [data-theme='gorka-light'] {
-  --canvas: #ECEFF4;
-  --surface: #FFFFFF;
-  --surface-raised: #F8FAFC;
-  --surface-sunken: #E4E9F0;
-  --rule: rgba(30, 44, 68, 0.10);
-  --rule-strong: rgba(30, 44, 68, 0.20);
-  --ink: #243349;
-  --ink-muted: rgba(36, 51, 73, 0.70);
-  --ink-faint: rgba(36, 51, 73, 0.46);
-  --ink-inverse: #F1F5FB;
-  --accent: #2563EB;
-  --accent-strong: #1D4ED8;
-  --accent-soft: rgba(37, 99, 235, 0.10);
-  --accent-ink: #FFFFFF;
-  --danger: #DC2626;
-  --danger-soft: rgba(220, 38, 38, 0.12);
-  --positive: #059669;
-  --positive-soft: rgba(5, 150, 105, 0.14);
-  --grain: 0.012;
+  --canvas: #EDE5CF;
+  --surface: #F5EDD8;
+  --surface-raised: #F0E6CC;
+  --surface-sunken: #E4D8BD;
+  --rule: rgba(100, 70, 30, 0.12);
+  --rule-strong: rgba(100, 70, 30, 0.22);
+  --ink: #2C1A0E;
+  --ink-muted: rgba(44, 26, 14, 0.65);
+  --ink-faint: rgba(44, 26, 14, 0.40);
+  --ink-inverse: #EDE5CF;
+  --accent: #7C5535;
+  --accent-strong: #5E3D22;
+  --accent-soft: rgba(124, 85, 53, 0.12);
+  --accent-ink: #F5EDD8;
+  --danger: #A83228;
+  --danger-soft: rgba(168, 50, 40, 0.12);
+  --positive: #3D6B4A;
+  --positive-soft: rgba(61, 107, 74, 0.14);
+  --grain: 0.018;
   color-scheme: light;
 }
 
@@ -204,8 +204,8 @@ input[type="month"] {
 
 [data-theme='gorka-light'] body {
   background-image:
-    radial-gradient(900px 750px at -8% -5%, rgba(37, 99, 235, 0.07) 0%, transparent 65%),
-    radial-gradient(700px 600px at 108% 110%, rgba(91, 141, 239, 0.06) 0%, transparent 65%);
+    radial-gradient(900px 750px at -8% -5%,   rgba(124, 85, 53, 0.08) 0%, transparent 65%),
+    radial-gradient(700px 600px at 108% 110%, rgba(160, 113, 79, 0.07) 0%, transparent 65%);
 }
 
 /* Cards: subtle frosted glass over the silk so depth still reads. */
@@ -219,16 +219,16 @@ input[type="month"] {
   backdrop-filter: blur(14px) saturate(115%);
   -webkit-backdrop-filter: blur(14px) saturate(115%);
 }
-/* Light variant — frosted white over silk. */
+/* Light variant — frosted parchment over grainient. */
 [data-theme='gorka-light'] .bg-surface {
-  background-color: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  background-color: rgba(255, 252, 244, 0.88) !important;
+  backdrop-filter: blur(14px) saturate(105%);
+  -webkit-backdrop-filter: blur(14px) saturate(105%);
 }
 [data-theme='gorka-light'] .bg-surface-raised {
-  background-color: rgba(255, 255, 255, 0.92) !important;
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  background-color: rgba(255, 253, 247, 0.94) !important;
+  backdrop-filter: blur(14px) saturate(105%);
+  -webkit-backdrop-filter: blur(14px) saturate(105%);
 }
 
 /* Header — dark glass with a hairline steel rule. */
@@ -242,16 +242,16 @@ input[type="month"] {
   --ink-muted: rgba(241, 245, 251, 0.72);
   --ink-faint: rgba(241, 245, 251, 0.42);
 }
-/* Light header — pale steel glass, navy ink. */
+/* Light header — frosted parchment glass, sepia ink. */
 [data-theme='gorka-light'] header.sticky {
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-  border-bottom: 1px solid rgba(30, 44, 68, 0.12) !important;
-  box-shadow: 0 1px 0 rgba(30, 44, 68, 0.04), 0 4px 24px -10px rgba(30, 44, 68, 0.10);
-  --ink: #243349;
-  --ink-muted: rgba(36, 51, 73, 0.70);
-  --ink-faint: rgba(36, 51, 73, 0.44);
+  background: rgba(245, 237, 220, 0.88) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+  border-bottom: 1px solid rgba(100, 70, 30, 0.14) !important;
+  box-shadow: 0 1px 0 rgba(100, 70, 30, 0.04), 0 4px 24px -10px rgba(80, 50, 20, 0.12);
+  --ink: #2C1A0E;
+  --ink-muted: rgba(44, 26, 14, 0.65);
+  --ink-faint: rgba(44, 26, 14, 0.40);
 }
 
 [data-theme='gorka'] footer {
@@ -260,9 +260,9 @@ input[type="month"] {
   --ink-faint: rgba(229, 236, 246, 0.50);
 }
 [data-theme='gorka-light'] footer {
-  border-top-color: rgba(30, 44, 68, 0.12) !important;
-  --ink-muted: rgba(36, 51, 73, 0.68);
-  --ink-faint: rgba(36, 51, 73, 0.44);
+  border-top-color: rgba(100, 70, 30, 0.14) !important;
+  --ink-muted: rgba(44, 26, 14, 0.62);
+  --ink-faint: rgba(44, 26, 14, 0.38);
 }
 
 /* Cards — chrome-silver hairline; no glow halo. */
@@ -275,15 +275,15 @@ input[type="month"] {
     0 2px 18px -10px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-/* Light cards — soft navy hairline, gentle paper shadow. */
+/* Light cards — warm sepia hairline, aged paper shadow. */
 [data-theme='gorka-light'] .rounded-lg.border,
 [data-theme='gorka-light'] .rounded-xl.border,
 [data-theme='gorka-light'] .rounded-2xl.border {
-  border-color: rgba(30, 44, 68, 0.10) !important;
+  border-color: rgba(100, 70, 30, 0.12) !important;
   box-shadow:
-    0 0 0 1px rgba(30, 44, 68, 0.02),
-    0 2px 16px -10px rgba(30, 44, 68, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 0 0 1px rgba(100, 70, 30, 0.03),
+    0 2px 16px -10px rgba(80, 50, 20, 0.20),
+    inset 0 1px 0 rgba(255, 245, 220, 0.6);
 }
 
 /* Steel scrollbar. */
@@ -301,7 +301,7 @@ input[type="month"] {
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 [data-theme='gorka-light'] * {
-  scrollbar-color: rgba(91, 141, 239, 0.35) transparent;
+  scrollbar-color: rgba(124, 85, 53, 0.35) transparent;
 }
 
 /* ——————————————————————————————————————————————
