@@ -335,6 +335,35 @@ function AssetSearch({ apiKey, onSelect }) {
   );
 }
 
+function SelectedAssetSummary({ ticker, name }) {
+  if (!ticker) return null;
+  return (
+    <div className="md:col-span-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <FormField label="Ticker" htmlFor="holding-selected-ticker" required>
+        {(props) => (
+          <Input
+            {...props}
+            value={ticker}
+            readOnly
+            className="font-mono bg-surface-sunken"
+          />
+        )}
+      </FormField>
+
+      <FormField label="Name" htmlFor="holding-selected-name">
+        {(props) => (
+          <Input
+            {...props}
+            value={name}
+            readOnly
+            className="bg-surface-sunken"
+          />
+        )}
+      </FormField>
+    </div>
+  );
+}
+
 export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '' }) {
   const isEditing = Boolean(initialValue?.id);
   const usesAssetSearch = !isEditing && !initialValue?.ticker;
@@ -440,28 +469,35 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
     >
       <FormSection step="1" title="Asset">
         {usesAssetSearch ? (
-          <AssetSearch apiKey={finnhubApiKey} onSelect={handleAssetSelect} />
+          <>
+            <AssetSearch apiKey={finnhubApiKey} onSelect={handleAssetSelect} />
+            <SelectedAssetSummary ticker={form.ticker} name={form.name} />
+          </>
         ) : null}
 
-        <FormField label="Ticker" htmlFor="holding-ticker" required>
-          {(props) => (
-            <Input
-              {...props}
-              value={form.ticker}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
-              }
-              placeholder="VWCE"
-              className="font-mono"
-            />
-          )}
-        </FormField>
+        {!usesAssetSearch ? (
+          <>
+            <FormField label="Ticker" htmlFor="holding-ticker" required>
+              {(props) => (
+                <Input
+                  {...props}
+                  value={form.ticker}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, ticker: event.target.value.toUpperCase() }))
+                  }
+                  placeholder="VWCE"
+                  className="font-mono"
+                />
+              )}
+            </FormField>
 
-        <FormField label="Name" htmlFor="holding-name">
-          {(props) => (
-            <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
-          )}
-        </FormField>
+            <FormField label="Name" htmlFor="holding-name">
+              {(props) => (
+                <Input {...props} value={form.name} onChange={set('name')} placeholder="Vanguard FTSE All-World" />
+              )}
+            </FormField>
+          </>
+        ) : null}
 
         <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
           {() => (
