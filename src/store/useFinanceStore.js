@@ -27,6 +27,7 @@ import {
 } from '../utils/supabase';
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
+import { loadAppMode, saveAppMode } from '../utils/appMode';
 import {
   acceptFriendRequest as apiAcceptFriendRequest,
   avatarPathFromUrl,
@@ -499,6 +500,7 @@ async function persistActivityLogs(set, logs) {
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
   tourActive: false,
+  appMode: loadAppMode(),
   fxRates: {},
   settings: DEFAULT_SETTINGS,
   supabaseConfigured: false,
@@ -758,6 +760,12 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   setTourActive: (value) => set({ tourActive: value }),
+
+  setAppMode: (mode) => {
+    const next = mode === 'lite' ? 'lite' : 'pro';
+    saveAppMode(next);
+    set({ appMode: next });
+  },
 
   updateSettings: async (partial) => {
     const previousSettings = get().settings;

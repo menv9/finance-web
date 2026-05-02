@@ -1,11 +1,22 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { LoadingScreen } from './components/LoadingScreen';
 import { RouteLoader } from './components/RouteLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useFinanceStore } from './store/useFinanceStore';
+import { LITE_PATHS } from './utils/appMode';
+
+function LiteGuard({ children }) {
+  const appMode = useFinanceStore((s) => s.appMode);
+  const tourActive = useFinanceStore((s) => s.tourActive);
+  const { pathname } = useLocation();
+  if (appMode === 'lite' && !tourActive && !LITE_PATHS.has(pathname)) {
+    return <Navigate to="/this-month" replace />;
+  }
+  return children;
+}
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -70,6 +81,7 @@ export default function App() {
               <ProtectedRoute>
                 <AppShell>
                   <Suspense fallback={<RouteLoader />}>
+                    <LiteGuard>
                     <Routes>
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/this-month" element={<ThisMonthPage />} />
@@ -93,6 +105,7 @@ export default function App() {
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
+                    </LiteGuard>
                   </Suspense>
                 </AppShell>
               </ProtectedRoute>

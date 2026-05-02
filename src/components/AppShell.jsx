@@ -12,6 +12,7 @@ import Grainient from './Grainient';
 import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
 import { useAlert } from './ConfirmContext';
+import { LITE_PATHS } from '../utils/appMode';
 
 const NAV_GROUPS = [
   { kind: 'link', to: '/dashboard', label: 'Overview' },
@@ -73,6 +74,45 @@ function MoonIcon() {
     </svg>
   );
 }
+
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden>
+      <path
+        d="M10 2c.3 2.7 1.3 4.6 3 5.6 1.7 1 3.3 1.4 5 1.4-2.7.4-4.6 1.4-5.6 3-1 1.7-1.4 3.3-1.4 5-.4-2.7-1.4-4.6-3-5.6-1.7-1-3.3-1.4-5-1.4 2.7-.4 4.6-1.4 5.6-3 1-1.7 1.4-3.3 1.4-5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function DiscIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden>
+      <circle cx="10" cy="10" r="7" fill="currentColor" opacity="0.85" />
+      <circle cx="7.5" cy="7.5" r="2.2" fill="white" opacity="0.55" />
+      <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function NewspaperIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden>
+      <rect x="3" y="4" width="14" height="12" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5.5 7.5h6M5.5 10h6M5.5 12.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="12.5" y="7.5" width="2.5" height="2.5" fill="currentColor" opacity="0.7" />
+    </svg>
+  );
+}
+
+const THEME_OPTIONS = [
+  { value: 'dark',        label: 'Dark',        Icon: MoonIcon,      hint: 'Deep & minimal' },
+  { value: 'light',       label: 'Light',       Icon: SunIcon,       hint: 'Clean & bright' },
+  { value: 'eris',        label: 'Eris',        Icon: SparkleIcon,   hint: 'Lavender dreams' },
+  { value: 'gorka',       label: 'Gorka',       Icon: DiscIcon,      hint: 'Silk dark navy' },
+  { value: 'gorka-light', label: 'Gorka light', Icon: NewspaperIcon, hint: 'Old newspaper' },
+];
 
 function MenuIcon({ open }) {
   return (
@@ -371,6 +411,8 @@ export function AppShell({ children }) {
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
   const profile = useFinanceStore((state) => state.profile);
+  const appMode = useFinanceStore((state) => state.appMode);
+  const setAppMode = useFinanceStore((state) => state.setAppMode);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const alert = useAlert();
   const locale = useMemo(() => 'en-GB', []);
@@ -379,22 +421,35 @@ export function AppShell({ children }) {
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
   const [openNavMenu, setOpenNavMenu] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const baseCurrency = settings.baseCurrency;
   const moduleVisible = useMemo(
     () => (item) => item.module !== 'portfolio' || settings.modules?.portfolio !== false,
     [settings.modules?.portfolio],
   );
+  const isLite = appMode === 'lite';
   const navGroups = useMemo(
-    () =>
-      NAV_GROUPS
+    () => {
+      if (isLite) {
+        return [
+          { kind: 'link', to: '/this-month', label: 'Month' },
+          { kind: 'link', to: '/expenses',   label: 'Expenses' },
+          { kind: 'link', to: '/income',     label: 'Income' },
+          { kind: 'link', to: '/profile',    label: 'Profile' },
+        ];
+      }
+      return NAV_GROUPS
         .filter(moduleVisible)
         .map((group) => (group.items ? { ...group, items: group.items.filter(moduleVisible) } : group))
-        .filter((group) => group.kind !== 'menu' || group.items.length),
-    [moduleVisible],
+        .filter((group) => group.kind !== 'menu' || group.items.length);
+    },
+    [moduleVisible, isLite],
   );
   const moreLinks = useMemo(
-    () => MORE_LINKS.filter(moduleVisible),
-    [moduleVisible],
+    () => (isLite
+      ? MORE_LINKS.filter((link) => LITE_PATHS.has(link.to))
+      : MORE_LINKS.filter(moduleVisible)),
+    [moduleVisible, isLite],
   );
 
   const emailHandle = supabaseUser?.email?.split('@')[0] ?? null;
@@ -493,18 +548,20 @@ export function AppShell({ children }) {
   useEffect(() => {
     setOpenNavMenu(null);
     setAddMenuOpen(false);
+    setThemeMenuOpen(false);
     setMobileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!openNavMenu && !addMenuOpen) return undefined;
+    if (!openNavMenu && !addMenuOpen && !themeMenuOpen) return undefined;
     const closeMenus = () => {
       setOpenNavMenu(null);
       setAddMenuOpen(false);
+      setThemeMenuOpen(false);
     };
     window.addEventListener('click', closeMenus);
     return () => window.removeEventListener('click', closeMenus);
-  }, [openNavMenu, addMenuOpen]);
+  }, [openNavMenu, addMenuOpen, themeMenuOpen]);
 
   useEffect(() => {
     const openEntryModal = (event) => {
@@ -718,6 +775,34 @@ export function AppShell({ children }) {
               </div>
             )}
 
+            <div
+              role="group"
+              aria-label="Workspace mode"
+              className="hidden sm:inline-flex items-center rounded-full border border-rule-strong p-0.5 text-[0.65rem] eyebrow"
+            >
+              {[
+                { id: 'pro',  label: 'Pro' },
+                { id: 'lite', label: 'Lite' },
+              ].map((opt) => {
+                const active = appMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setAppMode(opt.id)}
+                    aria-pressed={active}
+                    title={opt.id === 'lite' ? 'FinGes Lite — minimal daily view' : 'FinGes Pro — full feature set'}
+                    className={cn(
+                      'inline-flex h-7 items-center px-2.5 rounded-full transition-colors duration-150',
+                      active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <NavLink
               to="/settings"
               aria-label="Settings"
@@ -731,14 +816,55 @@ export function AppShell({ children }) {
             >
               <SettingsIcon />
             </NavLink>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={appliedTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-            >
-              {appliedTheme === 'light' ? <MoonIcon /> : <SunIcon />}
-            </button>
+            <div className="relative" onClick={(event) => event.stopPropagation()}>
+              {(() => {
+                const ActiveIcon = (THEME_OPTIONS.find((o) => o.value === appliedTheme)?.Icon) || SunIcon;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setThemeMenuOpen((v) => !v)}
+                    aria-label="Choose theme"
+                    aria-haspopup="menu"
+                    aria-expanded={themeMenuOpen}
+                    title="Theme"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  >
+                    <ActiveIcon />
+                  </button>
+                );
+              })()}
+              {themeMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-11 z-40 w-52 rounded-lg border border-rule bg-surface p-1 shadow-lift"
+                >
+                  {THEME_OPTIONS.map((opt) => {
+                    const active = appliedTheme === opt.value;
+                    const OptIcon = opt.Icon;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        onClick={() => { setTheme(opt.value); setThemeMenuOpen(false); }}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors duration-150',
+                          active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                        )}
+                      >
+                        <span className={active ? 'text-accent' : 'text-ink-faint'}><OptIcon /></span>
+                        <span className="flex flex-col leading-tight min-w-0">
+                          <span className="truncate">{opt.label}</span>
+                          <span className="eyebrow text-[0.55rem] text-ink-faint truncate">{opt.hint}</span>
+                        </span>
+                        {active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
@@ -812,7 +938,33 @@ export function AppShell({ children }) {
           </nav>
         </div>
         {/* Panel footer: balance + debt + sign-out */}
-        <div className="border-t border-rule px-4 py-4">
+        <div className="border-t border-rule px-4 py-4 grid gap-3">
+          <div
+            role="group"
+            aria-label="Workspace mode"
+            className="inline-flex w-max items-center rounded-full border border-rule-strong p-0.5 text-[0.65rem] eyebrow"
+          >
+            {[
+              { id: 'pro',  label: 'Pro' },
+              { id: 'lite', label: 'Lite' },
+            ].map((opt) => {
+              const active = appMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setAppMode(opt.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    'inline-flex h-7 items-center px-3 rounded-full transition-colors duration-150',
+                    active ? 'bg-surface-raised text-ink' : 'text-ink-muted',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <div className="flex items-end justify-between gap-3">
             <div className="flex items-end gap-4 min-w-0">
               <div className="flex flex-col gap-0.5 min-w-0">
@@ -849,30 +1001,61 @@ export function AppShell({ children }) {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-canvas/95 px-3 py-2 backdrop-blur-md lg:hidden"
       >
         <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              cn(
-                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
-                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
-              )
-            }
-          >
-            <DashboardIcon />
-            <span>Home</span>
-          </NavLink>
-          <NavLink
-            to="/this-month"
-            className={({ isActive }) =>
-              cn(
-                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
-                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
-              )
-            }
-          >
-            <CalendarIcon />
-            <span>Month</span>
-          </NavLink>
+          {isLite ? (
+            <>
+              <NavLink
+                to="/this-month"
+                className={({ isActive }) =>
+                  cn(
+                    'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                    isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                  )
+                }
+              >
+                <CalendarIcon />
+                <span>Month</span>
+              </NavLink>
+              <NavLink
+                to="/expenses"
+                className={({ isActive }) =>
+                  cn(
+                    'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                    isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                  )
+                }
+              >
+                <span aria-hidden className="text-danger text-base leading-none">↓</span>
+                <span>Expenses</span>
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) =>
+                  cn(
+                    'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                    isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                  )
+                }
+              >
+                <DashboardIcon />
+                <span>Home</span>
+              </NavLink>
+              <NavLink
+                to="/this-month"
+                className={({ isActive }) =>
+                  cn(
+                    'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                    isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                  )
+                }
+              >
+                <CalendarIcon />
+                <span>Month</span>
+              </NavLink>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setExpenseModalOpen(true)}
@@ -881,18 +1064,33 @@ export function AppShell({ children }) {
           >
             <PlusIcon />
           </button>
-          <NavLink
-            to="/accounts"
-            className={({ isActive }) =>
-              cn(
-                'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
-                isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
-              )
-            }
-          >
-            <MoneyIcon />
-            <span>Money</span>
-          </NavLink>
+          {isLite ? (
+            <NavLink
+              to="/income"
+              className={({ isActive }) =>
+                cn(
+                  'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                  isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                )
+              }
+            >
+              <span aria-hidden className="text-positive text-base leading-none">↑</span>
+              <span>Income</span>
+            </NavLink>
+          ) : (
+            <NavLink
+              to="/accounts"
+              className={({ isActive }) =>
+                cn(
+                  'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
+                  isActive ? 'text-ink bg-surface-raised' : 'text-ink-muted',
+                )
+              }
+            >
+              <MoneyIcon />
+              <span>Money</span>
+            </NavLink>
+          )}
           <button
             type="button"
             onClick={() => setMobileOpen((value) => !value)}
