@@ -38,10 +38,75 @@ const CRYPTO_EXCHANGES = ['BINANCE', 'COINBASE', 'KRAKEN'];
 
 // ── Finnhub ───────────────────────────────────────────────────────────────────
 
+const NEWS_TTL_MS = 30 * 60 * 1000;
+const newsCache = new Map();
+
+function newsTickerSymbol(ticker) {
+  const t = String(ticker || '').trim().toUpperCase();
+  return t.replace(/\.[A-Z]+$/, ''); // strip exchange suffix (.DE, .PA, .L, …)
+}
+
+export function clearNewsCache() {
+  newsCache.clear();
+}
+
+export async function fetchCompanyNews(ticker, apiKey, { days = 14 } = {}) {
+  if (!apiKey) throw new Error('Finnhub API key required');
+  const symbol = newsTickerSymbol(ticker);
+  if (!symbol) return [];
+  const cacheKey = `news:${symbol}:${days}`;
+  const cached = newsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.at) < NEWS_TTL_MS) return cached.data;
+
+  const to = new Date();
+  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const fromIso = from.toISOString().slice(0, 10);
+  const toIso = to.toISOString().slice(0, 10);
+  try {
+    const data = await finnhubGet(
+      `/company-news?symbol=${encodeURIComponent(symbol)}&from=${fromIso}&to=${toIso}`,
+      apiKey,
+    );
+    const items = Array.isArray(data) ? data : [];
+    const tagged = items.map((item) => ({
+      id: String(item.id ?? `${symbol}:${item.url}`),
+      ticker: symbol,
+      headline: item.headline,
+      summary: item.summary,
+      source: item.source,
+      url: item.url,
+      datetime: item.datetime, // unix seconds
+      image: item.image,
+    }));
+    newsCache.set(cacheKey, { at: Date.now(), data: tagged });
+    return tagged;
+  } catch (error) {
+    console.warn(`[news] ${symbol} failed:`, error?.message || error);
+    return []; // soft-fail per ticker so one bad symbol doesn't break the feed
+  }
+}
+
+export async function fetchPortfolioNews(tickers, apiKey, { days = 14, max = 25 } = {}) {
+  if (!apiKey || !tickers?.length) return [];
+  const unique = Array.from(new Set(tickers.map(newsTickerSymbol).filter(Boolean)));
+  const lists = await Promise.all(unique.map((t) => fetchCompanyNews(t, apiKey, { days })));
+  const seen = new Set();
+  const merged = [];
+  for (const list of lists) {
+    for (const item of list) {
+      if (!item.url || seen.has(item.url)) continue;
+      seen.add(item.url);
+      merged.push(item);
+    }
+  }
+  merged.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
+  return merged.slice(0, max);
+}
+
 async function finnhubGet(path, apiKey) {
-  const res = await fetch(`https://finnhub.io/api/v1${path}`, {
-    headers: { 'X-Finnhub-Token': apiKey },
-  });
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `https://finnhub.io/api/v1${path}${sep}token=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(`Finnhub: ${data.error}`);

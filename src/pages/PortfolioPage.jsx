@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchPortfolioNews, clearNewsCache } from '../utils/yahoo';
 import { useAlert, useConfirm } from '../components/ConfirmContext';
 import {
   Area,
@@ -22,7 +23,7 @@ import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
-import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
+import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
 import { rise } from '../utils/motion';
 
 const COLORS = [
@@ -699,6 +700,231 @@ function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
   );
 }
 
+function timeAgo(unixSeconds) {
+  if (!unixSeconds) return '';
+  const diffMs = Date.now() - unixSeconds * 1000;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(unixSeconds * 1000).toLocaleDateString();
+}
+
+const NEWS_PAGE_SIZE = 5;
+
+function newsTickerStripped(ticker) {
+  return String(ticker || '').trim().toUpperCase().replace(/\.[A-Z]+$/, '');
+}
+
+function PortfolioNews({ tickers, apiKey }) {
+  const [items, setItems] = useState([]);
+  const [status, setStatus] = useState('idle'); // idle | loading | ready | error
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(() => new Set()); // empty = all
+  const [page, setPage] = useState(0);
+
+  const tickerKey = tickers.join(',');
+
+  // Map raw holding ticker -> the symbol Finnhub gets (suffix stripped),
+  // since news items are tagged with the stripped form.
+  const filterChips = useMemo(() => {
+    const seen = new Set();
+    const chips = [];
+    for (const t of tickers) {
+      const symbol = newsTickerStripped(t);
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      chips.push({ symbol, label: t });
+    }
+    return chips;
+  }, [tickerKey]);
+
+  const load = async ({ force = false } = {}) => {
+    if (!apiKey || !tickers.length) return;
+    if (force) clearNewsCache();
+    setStatus('loading');
+    setError('');
+    try {
+      const news = await fetchPortfolioNews(tickers, apiKey, { days: 14, max: 100 });
+      setItems(news);
+      setStatus('ready');
+    } catch (err) {
+      setError(err?.message || 'Could not load news');
+      setStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    if (apiKey && tickers.length) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickerKey, apiKey]);
+
+  // Reset to first page when filter or item list changes
+  useEffect(() => { setPage(0); }, [selected, items]);
+
+  const filtered = useMemo(() => {
+    if (!selected.size) return items;
+    return items.filter((item) => selected.has(item.ticker));
+  }, [items, selected]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / NEWS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * NEWS_PAGE_SIZE;
+  const paged = filtered.slice(start, start + NEWS_PAGE_SIZE);
+
+  const toggleTicker = (symbol) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  return (
+    <Card
+      eyebrow="Signals"
+      title="Portfolio news"
+      description="Recent headlines for tickers you hold. Refreshes every 30 minutes."
+      action={
+        apiKey && tickers.length ? (
+          <Button variant="secondary" size="sm" onClick={() => load({ force: true })} loading={status === 'loading'}>
+            Refresh
+          </Button>
+        ) : null
+      }
+      className={rise(4)}
+    >
+      {!apiKey ? (
+        <EmptyState
+          title="Add a Finnhub API key"
+          description="News uses your existing Finnhub key. Add one in Settings to enable."
+        />
+      ) : !tickers.length ? (
+        <EmptyState title="No holdings yet" description="Add a position to see related news." />
+      ) : status === 'loading' && !items.length ? (
+        <p className="text-sm text-ink-muted">Loading news…</p>
+      ) : status === 'error' ? (
+        <p className="text-sm text-danger">{error}</p>
+      ) : !items.length ? (
+        <EmptyState
+          title="No recent headlines"
+          description="No news returned in the last 14 days for your tickers. European symbols often have limited coverage."
+        />
+      ) : (
+        <div className="grid gap-4">
+          {filterChips.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className={cn(
+                  'inline-flex h-7 items-center rounded-full border px-3 text-xs transition-colors duration-150',
+                  selected.size === 0
+                    ? 'border-accent bg-accent-soft text-ink'
+                    : 'border-rule text-ink-muted hover:border-rule-strong hover:text-ink',
+                )}
+              >
+                All
+              </button>
+              {filterChips.map((chip) => {
+                const active = selected.has(chip.symbol);
+                return (
+                  <button
+                    key={chip.symbol}
+                    type="button"
+                    onClick={() => toggleTicker(chip.symbol)}
+                    className={cn(
+                      'inline-flex h-7 items-center rounded-full border px-3 font-mono text-[0.7rem] transition-colors duration-150',
+                      active
+                        ? 'border-accent bg-accent-soft text-ink'
+                        : 'border-rule text-ink-muted hover:border-rule-strong hover:text-ink',
+                    )}
+                    title={chip.label}
+                  >
+                    {chip.symbol}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {filtered.length === 0 ? (
+            <p className="text-sm text-ink-muted">No headlines match the selected tickers.</p>
+          ) : (
+            <ul className="grid gap-3">
+              {paged.map((item) => (
+                <li key={item.id} className="border-b border-rule pb-3 last:border-b-0 last:pb-0">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-start gap-3"
+                  >
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt=""
+                        loading="lazy"
+                        className="hidden sm:block h-14 w-20 shrink-0 rounded-md border border-rule object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-ink leading-snug group-hover:text-accent transition-colors duration-150">
+                        {item.headline}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                        <span className="font-mono text-ink-faint">{item.ticker}</span>
+                        {item.source ? <span className="text-ink-faint">·</span> : null}
+                        {item.source ? <span>{item.source}</span> : null}
+                        <span className="text-ink-faint">·</span>
+                        <span>{timeAgo(item.datetime)}</span>
+                      </div>
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {filtered.length > NEWS_PAGE_SIZE ? (
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-xs text-ink-muted">
+                Showing {start + 1}–{Math.min(start + NEWS_PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                >
+                  Prev
+                </Button>
+                <span className="text-xs text-ink-faint tabular">
+                  {safePage + 1} / {totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={safePage >= totalPages - 1}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function PortfolioPage() {
   const holdings = useFinanceStore((state) => state.holdings);
   const dividends = useFinanceStore((state) => state.dividends);
@@ -749,6 +975,10 @@ export default function PortfolioPage() {
   const currency = settings.baseCurrency;
   const activeHoldings = holdings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
   const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
+  const newsTickers = useMemo(
+    () => Array.from(new Set(activeHoldings.map((h) => h.ticker).filter(Boolean))),
+    [activeHoldings],
+  );
   const portfolioValueSeries = buildPortfolioValueSeries(portfolioSnapshots, portfolio.currentValueCents, locale);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
@@ -1201,6 +1431,9 @@ export default function PortfolioPage() {
           />
         )}
       </Card>
+
+      {/* news */}
+      <PortfolioNews tickers={newsTickers} apiKey={settings.finnhubApiKey || ''} />
 
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
