@@ -144,3 +144,56 @@ export async function deleteFriendship(requesterId, addresseeId) {
     .eq('addressee_id', addresseeId);
   if (error) throw error;
 }
+
+const AVATAR_BUCKET = 'profile-avatars';
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+export const AVATAR_LIMITS = {
+  maxBytes: AVATAR_MAX_BYTES,
+  acceptMime: 'image/*',
+};
+
+export function avatarPathFromUrl(url) {
+  if (!url) return null;
+  const marker = `/${AVATAR_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length);
+}
+
+function extFromFile(file) {
+  const fromName = file.name?.split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5) return fromName;
+  if (file.type === 'image/png') return 'png';
+  if (file.type === 'image/webp') return 'webp';
+  if (file.type === 'image/gif') return 'gif';
+  return 'jpg';
+}
+
+function randomSuffix() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function uploadAvatar(userId, file) {
+  if (!file.type?.startsWith('image/')) {
+    throw new Error('Avatar must be an image.');
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    throw new Error('Avatar must be 5 MB or smaller.');
+  }
+  const ext = extFromFile(file);
+  const path = `${userId}/${randomSuffix()}.${ext}`;
+  const c = client();
+  const { error: uploadError } = await c.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) throw uploadError;
+  const { data } = c.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}
+
+export async function removeAvatarObject(path) {
+  if (!path) return;
+  const { error } = await client().storage.from(AVATAR_BUCKET).remove([path]);
+  if (error) throw error;
+}

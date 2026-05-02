@@ -29,15 +29,18 @@ import { buildConflict, detectConflict, removeConflict, upsertConflict } from '.
 import { fetchTickerPrice } from '../utils/yahoo';
 import {
   acceptFriendRequest as apiAcceptFriendRequest,
+  avatarPathFromUrl,
   createOwnProfile,
   deleteFriendship,
   fetchFriendships,
   fetchOwnProfile,
   fetchProfilesByIds,
   insertFriendRequest,
+  removeAvatarObject,
   searchProfileByEmail,
   searchProfilesByUsername,
   updateOwnProfile,
+  uploadAvatar,
   validateUsername,
 } from '../utils/profilesApi';
 
@@ -2508,6 +2511,33 @@ export const useFinanceStore = create((set, get) => ({
     if (!user) throw new Error('Not signed in');
     await deleteFriendship(user.id, addresseeId);
     await get().loadFriendships();
+  },
+
+  setAvatar: async (file) => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    const previous = get().profile;
+    const { publicUrl } = await uploadAvatar(user.id, file);
+    const profile = await updateOwnProfile(user.id, { avatar_url: publicUrl });
+    set({ profile });
+    const oldPath = avatarPathFromUrl(previous?.avatar_url);
+    if (oldPath) {
+      await removeAvatarObject(oldPath).catch(() => {});
+    }
+    return profile;
+  },
+
+  clearAvatar: async () => {
+    const user = get().supabaseUser;
+    if (!user) throw new Error('Not signed in');
+    const previous = get().profile;
+    const profile = await updateOwnProfile(user.id, { avatar_url: null });
+    set({ profile });
+    const oldPath = avatarPathFromUrl(previous?.avatar_url);
+    if (oldPath) {
+      await removeAvatarObject(oldPath).catch(() => {});
+    }
+    return profile;
   },
 
   removeFriend: async (otherUserId) => {

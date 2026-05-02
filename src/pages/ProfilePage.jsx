@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Textarea } from '../components/ui';
+import { useAlert } from '../components/ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { validateUsername } from '../utils/profilesApi';
+import { AVATAR_LIMITS, validateUsername } from '../utils/profilesApi';
 
 function Avatar({ profile, size = 40 }) {
   const initials = (profile?.display_name || profile?.username || '?')
@@ -46,10 +47,91 @@ function ProfileLine({ profile, trailing }) {
   );
 }
 
+function AvatarUploader() {
+  const profile = useFinanceStore((s) => s.profile);
+  const setAvatar = useFinanceStore((s) => s.setAvatar);
+  const clearAvatar = useFinanceStore((s) => s.clearAvatar);
+  const alert = useAlert();
+  const fileRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+
+  const onPick = () => fileRef.current?.click();
+
+  const onFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      await alert({ title: 'Not an image', description: 'Pick a JPG, PNG, WebP, or GIF.' });
+      return;
+    }
+    if (file.size > AVATAR_LIMITS.maxBytes) {
+      await alert({ title: 'Image too large', description: 'Avatar must be 5 MB or smaller.' });
+      return;
+    }
+    setBusy(true);
+    try {
+      await setAvatar(file);
+    } catch (err) {
+      await alert({ title: 'Upload failed', description: err?.message || 'Could not upload avatar.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRemove = async () => {
+    setBusy(true);
+    try {
+      await clearAvatar();
+    } catch (err) {
+      await alert({ title: 'Could not remove', description: err?.message || 'Something went wrong.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <button
+        type="button"
+        onClick={onPick}
+        disabled={busy}
+        aria-label="Change avatar"
+        className="group relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60"
+      >
+        <Avatar profile={profile} size={64} />
+        <span className="absolute inset-0 rounded-full border border-rule-strong opacity-0 group-hover:opacity-100 group-hover:bg-canvas/30 transition-opacity flex items-center justify-center text-[0.6rem] eyebrow text-ink">
+          Change
+        </span>
+      </button>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onPick} loading={busy}>
+            {profile?.avatar_url ? 'Replace photo' : 'Upload photo'}
+          </Button>
+          {profile?.avatar_url ? (
+            <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-xs text-ink-faint">JPG, PNG, WebP or GIF. Up to 5 MB.</p>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={AVATAR_LIMITS.acceptMime}
+        className="hidden"
+        onChange={onFile}
+      />
+    </div>
+  );
+}
+
 function ProfileEditor() {
   const profile = useFinanceStore((s) => s.profile);
   const updateProfile = useFinanceStore((s) => s.updateProfile);
-  const [form, setForm] = useState({ username: '', display_name: '', bio: '', avatar_url: '' });
+  const [form, setForm] = useState({ username: '', display_name: '', bio: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedAt, setSavedAt] = useState(null);
@@ -60,7 +142,6 @@ function ProfileEditor() {
       username: profile.username || '',
       display_name: profile.display_name || '',
       bio: profile.bio || '',
-      avatar_url: profile.avatar_url || '',
     });
   }, [profile]);
 
@@ -71,8 +152,7 @@ function ProfileEditor() {
   const dirty =
     form.username !== (profile.username || '') ||
     form.display_name !== (profile.display_name || '') ||
-    form.bio !== (profile.bio || '') ||
-    form.avatar_url !== (profile.avatar_url || '');
+    form.bio !== (profile.bio || '');
 
   const submit = async (event) => {
     event.preventDefault();
@@ -88,7 +168,6 @@ function ProfileEditor() {
         username: form.username.trim().toLowerCase(),
         display_name: form.display_name.trim() || null,
         bio: form.bio.trim() || null,
-        avatar_url: form.avatar_url.trim() || null,
       });
       setSavedAt(Date.now());
     } catch (err) {
@@ -100,66 +179,51 @@ function ProfileEditor() {
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-4">
-      <div className="flex items-center gap-4">
-        <Avatar profile={{ ...profile, ...form }} size={56} />
-        <div className="min-w-0">
-          <p className="text-sm text-ink truncate">{form.display_name || form.username}</p>
-          <p className="text-xs text-ink-muted truncate">@{form.username}</p>
+    <div className="grid gap-5">
+      <AvatarUploader />
+      <form onSubmit={submit} className="grid gap-4">
+        <FormField label="Username" hint="3–20 lowercase letters, numbers, or underscores.">
+          {(p) => (
+            <Input
+              {...p}
+              value={form.username}
+              onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))}
+              maxLength={20}
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          )}
+        </FormField>
+        <FormField label="Display name" hint="What friends see. Optional.">
+          {(p) => (
+            <Input
+              {...p}
+              value={form.display_name}
+              onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
+              maxLength={60}
+            />
+          )}
+        </FormField>
+        <FormField label="Bio">
+          {(p) => (
+            <Textarea
+              {...p}
+              value={form.bio}
+              onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+              rows={3}
+              maxLength={280}
+            />
+          )}
+        </FormField>
+        {error ? <p className="text-xs text-danger">{error}</p> : null}
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || saving} loading={saving}>
+            Save
+          </Button>
+          {savedAt && !dirty ? <span className="text-xs text-ink-muted">Saved.</span> : null}
         </div>
-      </div>
-      <FormField label="Username" hint="3–20 lowercase letters, numbers, or underscores.">
-        {(p) => (
-          <Input
-            {...p}
-            value={form.username}
-            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))}
-            maxLength={20}
-            autoCapitalize="none"
-            autoCorrect="off"
-          />
-        )}
-      </FormField>
-      <FormField label="Display name" hint="What friends see. Optional.">
-        {(p) => (
-          <Input
-            {...p}
-            value={form.display_name}
-            onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-            maxLength={60}
-          />
-        )}
-      </FormField>
-      <FormField label="Bio">
-        {(p) => (
-          <Textarea
-            {...p}
-            value={form.bio}
-            onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-            rows={3}
-            maxLength={280}
-          />
-        )}
-      </FormField>
-      <FormField label="Avatar URL" hint="Paste a link to an image. Upload coming later.">
-        {(p) => (
-          <Input
-            {...p}
-            type="url"
-            placeholder="https://…"
-            value={form.avatar_url}
-            onChange={(e) => setForm((f) => ({ ...f, avatar_url: e.target.value }))}
-          />
-        )}
-      </FormField>
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || saving} loading={saving}>
-          Save
-        </Button>
-        {savedAt && !dirty ? <span className="text-xs text-ink-muted">Saved.</span> : null}
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
 
