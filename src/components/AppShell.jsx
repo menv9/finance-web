@@ -13,44 +13,46 @@ import { TourProvider } from './tour/TourContext';
 import { TourSpotlight } from './tour/TourSpotlight';
 import { useAlert } from './ConfirmContext';
 import { LITE_PATHS } from '../utils/appMode';
+import { Wordmark } from './Wordmark';
+import { useTranslation } from '../i18n/useTranslation';
 
 const NAV_GROUPS = [
-  { kind: 'link', to: '/dashboard', label: 'Overview' },
-  { kind: 'link', to: '/this-month', label: 'Month' },
+  { kind: 'link', to: '/dashboard', labelKey: 'nav.overview' },
+  { kind: 'link', to: '/this-month', labelKey: 'nav.month' },
   {
     kind: 'menu',
     id: 'money',
-    label: 'Money',
+    labelKey: 'nav.money',
     items: [
-      { to: '/accounts', label: 'Accounts' },
-      { to: '/debts', label: 'Debts' },
-      { to: '/expenses', label: 'Expenses' },
-      { to: '/income', label: 'Income' },
+      { to: '/accounts', labelKey: 'nav.accounts' },
+      { to: '/debts', labelKey: 'nav.debts' },
+      { to: '/expenses', labelKey: 'nav.expenses' },
+      { to: '/income', labelKey: 'nav.income' },
     ],
   },
   {
     kind: 'menu',
     id: 'planning',
-    label: 'Planning',
+    labelKey: 'nav.planning',
     items: [
-      { to: '/budgets', label: 'Budgets' },
-      { to: '/savings', label: 'Savings' },
+      { to: '/budgets', labelKey: 'nav.budgets' },
+      { to: '/savings', labelKey: 'nav.savings' },
     ],
   },
-  { kind: 'link', to: '/portfolio', label: 'Investing', module: 'portfolio' },
-  { kind: 'link', to: '/profile', label: 'Profile' },
+  { kind: 'link', to: '/portfolio', labelKey: 'nav.investing', module: 'portfolio' },
+  { kind: 'link', to: '/profile', labelKey: 'nav.profile' },
 ];
 
 const MORE_LINKS = [
-  { to: '/accounts', label: 'Accounts' },
-  { to: '/debts', label: 'Debts' },
-  { to: '/income', label: 'Income' },
-  { to: '/expenses', label: 'Expenses' },
-  { to: '/budgets', label: 'Budgets' },
-  { to: '/savings', label: 'Savings' },
-  { to: '/portfolio', label: 'Portfolio', module: 'portfolio' },
-  { to: '/profile', label: 'Profile' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/accounts', labelKey: 'nav.accounts' },
+  { to: '/debts', labelKey: 'nav.debts' },
+  { to: '/income', labelKey: 'nav.income' },
+  { to: '/expenses', labelKey: 'nav.expenses' },
+  { to: '/budgets', labelKey: 'nav.budgets' },
+  { to: '/savings', labelKey: 'nav.savings' },
+  { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
+  { to: '/profile', labelKey: 'nav.profile' },
+  { to: '/settings', labelKey: 'nav.settings' },
 ];
 
 function SunIcon() {
@@ -107,11 +109,11 @@ function NewspaperIcon() {
 }
 
 const THEME_OPTIONS = [
-  { value: 'dark',        label: 'Dark',        Icon: MoonIcon,      hint: 'Deep & minimal' },
-  { value: 'light',       label: 'Light',       Icon: SunIcon,       hint: 'Clean & bright' },
-  { value: 'eris',        label: 'Eris',        Icon: SparkleIcon,   hint: 'Lavender dreams' },
-  { value: 'gorka',       label: 'Gorka',       Icon: DiscIcon,      hint: 'Silk dark navy' },
-  { value: 'gorka-light', label: 'Gorka light', Icon: NewspaperIcon, hint: 'Old newspaper' },
+  { value: 'dark',        labelKey: 'theme.dark.label',       hintKey: 'theme.dark.hint',       Icon: MoonIcon },
+  { value: 'light',       labelKey: 'theme.light.label',      hintKey: 'theme.light.hint',      Icon: SunIcon },
+  { value: 'eris',        labelKey: 'theme.eris.label',       hintKey: 'theme.eris.hint',       Icon: SparkleIcon },
+  { value: 'gorka',       labelKey: 'theme.gorka.label',      hintKey: 'theme.gorka.hint',      Icon: DiscIcon },
+  { value: 'gorka-light', labelKey: 'theme.gorkaLight.label', hintKey: 'theme.gorkaLight.hint', Icon: NewspaperIcon },
 ];
 
 function MenuIcon({ open }) {
@@ -126,57 +128,10 @@ function MenuIcon({ open }) {
   );
 }
 
-const LOGO_GRADIENTS = {
-  dark:  [{ o: '0%', c: '#C8D0DA' }, { o: '45%', c: '#8896A8' }, { o: '100%', c: '#5A6878' }],
-  light: [{ o: '0%', c: '#1F4B3A' }, { o: '45%', c: '#0F6E56' }, { o: '100%', c: '#085041' }],
-  eris:  [{ o: '0%', c: '#D4607A' }, { o: '45%', c: '#B84362' }, { o: '100%', c: '#8A1A45' }],
-  gorka: [{ o: '0%', c: '#3B82F6' }, { o: '45%', c: '#5B8DEF' }, { o: '100%', c: '#93C5FD' }],
-  'gorka-light': [{ o: '0%', c: '#A0714F' }, { o: '45%', c: '#7C5535' }, { o: '100%', c: '#5E3D22' }],
-};
-
-const FIN_COLORS = {
-  dark:  '#FAF9F5',
-  light: '#1B1712',
-  eris:  '#2A1218',
-  gorka: '#FFFFFF',
-  'gorka-light': '#1B1712',
-};
-
-const TAGLINE_COLORS = {
-  dark:  '#C2C0B6',
-  light: '#524A40',
-  eris:  '#8A4F65',
-  gorka: 'rgba(229,236,246,0.55)',
-  'gorka-light': '#7A6248',
-};
-
-function FinGesWordmark({ theme }) {
-  const stops = LOGO_GRADIENTS[theme] ?? LOGO_GRADIENTS.dark;
-  const finColor = FIN_COLORS[theme] ?? FIN_COLORS.dark;
-  const taglineColor = TAGLINE_COLORS[theme] ?? TAGLINE_COLORS.dark;
-  const id = `lgw-${theme}`;
-
+function Logo() {
   return (
-    <svg viewBox="50 55 540 175" role="img" xmlns="http://www.w3.org/2000/svg" className="h-9 w-auto">
-      <title>FinGes</title>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-          {stops.map(s => <stop key={s.o} offset={s.o} stopColor={s.c} />)}
-        </linearGradient>
-      </defs>
-
-      <text x="60" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="400" fill={finColor} opacity="0.9" letterSpacing="-3">Fin</text>
-      <text x="253" y="188" fontFamily="'Fraunces', Georgia, serif" fontSize="130" fontWeight="600" fill={`url(#${id})`} letterSpacing="-3">Ges</text>
-
-      <text x="61" y="220" fontFamily="'Instrument Sans', system-ui, sans-serif" fontSize="15" fontWeight="500" letterSpacing="6" fill={taglineColor}>QUARTERLY LEDGER</text>
-    </svg>
-  );
-}
-
-function Logo({ theme }) {
-  return (
-    <NavLink to="/dashboard" className="flex items-center group" aria-label="Finance Tracker — home">
-      <FinGesWordmark theme={theme} />
+    <NavLink to="/dashboard" className="flex items-center group" aria-label="FinGes">
+      <Wordmark size="md" />
     </NavLink>
   );
 }
@@ -244,7 +199,7 @@ function CalendarIcon() {
   );
 }
 
-function MonthOverview({ metrics, baseCurrency, locale }) {
+function MonthOverview({ metrics, baseCurrency, locale, t }) {
   const monthLabel = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(new Date()),
     [locale],
@@ -257,16 +212,16 @@ function MonthOverview({ metrics, baseCurrency, locale }) {
 
   return (
     <section
-      aria-label="This month overview"
+      aria-label={t('shell.monthOverview.ariaLabel')}
       className="flex shrink-0 flex-col gap-4 border-b border-rule px-5 py-5"
     >
       <div className="flex flex-col gap-0.5">
-        <span className="eyebrow text-[0.6rem] text-ink-muted">This month</span>
+        <span className="eyebrow text-[0.6rem] text-ink-muted">{t('shell.monthOverview.thisMonth')}</span>
         <span className="font-display text-base text-ink leading-tight">{monthLabel}</span>
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="eyebrow text-[0.55rem] text-ink-faint">Net cashflow</span>
+        <span className="eyebrow text-[0.55rem] text-ink-faint">{t('shell.monthOverview.netCashflow')}</span>
         <span
           className={cn(
             'numeric text-2xl leading-none',
@@ -287,13 +242,13 @@ function MonthOverview({ metrics, baseCurrency, locale }) {
         </div>
         <div className="flex items-center justify-between text-[0.7rem]">
           <div className="flex flex-col">
-            <span className="eyebrow text-[0.55rem] text-ink-faint">Income</span>
+            <span className="eyebrow text-[0.55rem] text-ink-faint">{t('shell.monthOverview.income')}</span>
             <span className="numeric text-positive">
               {formatCurrency(income, baseCurrency, locale)}
             </span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="eyebrow text-[0.55rem] text-ink-faint">Spent</span>
+            <span className="eyebrow text-[0.55rem] text-ink-faint">{t('shell.monthOverview.spent')}</span>
             <span className="numeric text-danger">
               {formatCurrency(expenses, baseCurrency, locale)}
             </span>
@@ -322,7 +277,7 @@ export function AppShell({ children }) {
   const setAppMode = useFinanceStore((state) => state.setAppMode);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const alert = useAlert();
-  const locale = useMemo(() => 'en-GB', []);
+  const { t, locale } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
@@ -339,10 +294,10 @@ export function AppShell({ children }) {
     () => {
       if (isLite) {
         return [
-          { kind: 'link', to: '/this-month', label: 'Month' },
-          { kind: 'link', to: '/expenses',   label: 'Expenses' },
-          { kind: 'link', to: '/income',     label: 'Income' },
-          { kind: 'link', to: '/profile',    label: 'Profile' },
+          { kind: 'link', to: '/this-month', labelKey: 'nav.month' },
+          { kind: 'link', to: '/expenses',   labelKey: 'nav.expenses' },
+          { kind: 'link', to: '/income',     labelKey: 'nav.income' },
+          { kind: 'link', to: '/profile',    labelKey: 'nav.profile' },
         ];
       }
       return NAV_GROUPS
@@ -531,16 +486,16 @@ export function AppShell({ children }) {
         href="#main"
         className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-3 focus-visible:left-3 focus-visible:z-50 focus-visible:rounded-md focus-visible:bg-accent focus-visible:px-3 focus-visible:py-2 focus-visible:text-accent-ink"
       >
-        Skip to content
+        {t('nav.skipToContent')}
       </a>
 
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 pl-4 pr-5 lg:px-10">
           <div className="col-start-1 flex min-w-0 items-center justify-start gap-6">
-            <Logo theme={appliedTheme} />
+            <Logo />
           </div>
 
-          <nav aria-label="Primary" className="col-start-2 hidden justify-center lg:flex items-center gap-1">
+          <nav aria-label={t('nav.primary')} className="col-start-2 hidden justify-center lg:flex items-center gap-1">
             {navGroups.map((group) => {
               if (group.kind === 'link') {
                 return (
@@ -554,7 +509,7 @@ export function AppShell({ children }) {
                       )
                     }
                   >
-                    {group.label}
+                    {t(group.labelKey)}
                   </NavLink>
                 );
               }
@@ -572,7 +527,7 @@ export function AppShell({ children }) {
                     aria-haspopup="menu"
                     aria-expanded={isOpen}
                   >
-                    {group.label}
+                    {t(group.labelKey)}
                     <ChevronIcon />
                   </button>
                   {isOpen ? (
@@ -588,7 +543,7 @@ export function AppShell({ children }) {
                             )
                           }
                         >
-                          <span>{item.label}</span>
+                          <span>{t(item.labelKey)}</span>
                         </NavLink>
                       ))}
                     </div>
@@ -603,13 +558,13 @@ export function AppShell({ children }) {
               <button
                 type="button"
                 onClick={() => setAddMenuOpen((current) => !current)}
-                aria-label="Add transaction"
+                aria-label={t('nav.addTransaction')}
                 aria-haspopup="menu"
                 aria-expanded={addMenuOpen}
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-accent-ink transition-colors duration-180 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <PlusIcon />
-                <span>Add</span>
+                <span>{t('common.add')}</span>
               </button>
               {addMenuOpen ? (
                 <div className="absolute right-0 top-11 z-40 w-48 rounded-lg border border-rule bg-surface p-1 shadow-lift">
@@ -618,7 +573,7 @@ export function AppShell({ children }) {
                     onClick={() => { setExpenseModalOpen(true); setAddMenuOpen(false); }}
                     className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-ink-muted transition-colors duration-150 hover:bg-surface-raised hover:text-ink"
                   >
-                    <span>New expense</span>
+                    <span>{t('nav.newExpense')}</span>
                     <span className="text-danger">↓</span>
                   </button>
                   <button
@@ -626,7 +581,7 @@ export function AppShell({ children }) {
                     onClick={() => { setIncomeModalOpen(true); setAddMenuOpen(false); }}
                     className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-ink-muted transition-colors duration-150 hover:bg-surface-raised hover:text-ink"
                   >
-                    <span>New income</span>
+                    <span>{t('nav.newIncome')}</span>
                     <span className="text-positive">↑</span>
                   </button>
                 </div>
@@ -634,14 +589,14 @@ export function AppShell({ children }) {
             </div>
             <div className="hidden md:flex items-center gap-4 border-l border-rule pl-4">
               <div className="flex flex-col items-end">
-                <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Total balance</span>
+                <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">{t('shell.header.totalBalance')}</span>
                 <span className="numeric text-sm text-ink leading-none">
                   {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
                 </span>
               </div>
               {metrics.totalDebtCents > 0 && (
                 <div className="flex flex-col items-end border-l border-rule pl-4">
-                  <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">Debt</span>
+                  <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">{t('shell.header.debt')}</span>
                   <span className="numeric text-sm text-danger leading-none">
                     {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
                   </span>
@@ -661,7 +616,7 @@ export function AppShell({ children }) {
                 <button
                   type="button"
                   onClick={signOutSupabase}
-                  aria-label="Sign out"
+                  aria-label={t('common.signOut')}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-faint transition-colors duration-180 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <SignOutIcon />
@@ -671,12 +626,12 @@ export function AppShell({ children }) {
 
             <div
               role="group"
-              aria-label="Workspace mode"
+              aria-label={t('shell.workspace.groupLabel')}
               className="hidden sm:inline-flex items-center rounded-full border border-rule-strong p-0.5 text-[0.65rem] eyebrow"
             >
               {[
-                { id: 'pro',  label: 'Pro' },
-                { id: 'lite', label: 'Lite' },
+                { id: 'pro',  label: t('shell.workspace.pro'),  hint: t('shell.workspace.proHint') },
+                { id: 'lite', label: t('shell.workspace.lite'), hint: t('shell.workspace.liteHint') },
               ].map((opt) => {
                 const active = appMode === opt.id;
                 return (
@@ -685,7 +640,7 @@ export function AppShell({ children }) {
                     type="button"
                     onClick={() => setAppMode(opt.id)}
                     aria-pressed={active}
-                    title={opt.id === 'lite' ? 'FinGes Lite — minimal daily view' : 'FinGes Pro — full feature set'}
+                    title={opt.hint}
                     className={cn(
                       'inline-flex h-7 items-center px-2.5 rounded-full transition-colors duration-150',
                       active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink',
@@ -699,8 +654,8 @@ export function AppShell({ children }) {
 
             <NavLink
               to="/settings"
-              aria-label="Settings"
-              title="Settings"
+              aria-label={t('nav.settings')}
+              title={t('nav.settings')}
               className={({ isActive }) =>
                 cn(
                   'hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
@@ -717,10 +672,10 @@ export function AppShell({ children }) {
                   <button
                     type="button"
                     onClick={() => setThemeMenuOpen((v) => !v)}
-                    aria-label="Choose theme"
+                    aria-label={t('theme.menuLabel')}
                     aria-haspopup="menu"
                     aria-expanded={themeMenuOpen}
-                    title="Theme"
+                    title={t('theme.title')}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   >
                     <ActiveIcon />
@@ -749,8 +704,8 @@ export function AppShell({ children }) {
                       >
                         <span className={active ? 'text-accent' : 'text-ink-faint'}><OptIcon /></span>
                         <span className="flex flex-col leading-tight min-w-0">
-                          <span className="truncate">{opt.label}</span>
-                          <span className="eyebrow text-[0.55rem] text-ink-faint truncate">{opt.hint}</span>
+                          <span className="truncate">{t(opt.labelKey)}</span>
+                          <span className="eyebrow text-[0.55rem] text-ink-faint truncate">{t(opt.hintKey)}</span>
                         </span>
                         {active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
                       </button>
@@ -762,7 +717,7 @@ export function AppShell({ children }) {
             <button
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-label={mobileOpen ? t('nav.closeMenu') : t('nav.openMenu')}
               aria-expanded={mobileOpen}
               className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-full border border-rule-strong text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
@@ -787,7 +742,7 @@ export function AppShell({ children }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Navigation menu"
+        aria-label={t('nav.navigationMenu')}
         aria-hidden={!mobileOpen}
         className={cn(
           'fixed right-0 top-0 z-50 flex h-full w-72 flex-col border-l border-rule bg-surface shadow-2xl transition-transform duration-300 ease-in-out lg:hidden',
@@ -796,11 +751,11 @@ export function AppShell({ children }) {
       >
         {/* Panel header row */}
         <div className="flex items-center justify-between border-b border-rule px-4 py-3">
-          <Logo theme={appliedTheme} />
+          <Logo />
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
+            aria-label={t('nav.closeMenu')}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <MenuIcon open />
@@ -812,8 +767,9 @@ export function AppShell({ children }) {
             metrics={metrics}
             baseCurrency={baseCurrency}
             locale={locale}
+            t={t}
           />
-          <nav aria-label="Primary mobile" className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
+          <nav aria-label={t('nav.primaryMobile')} className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
             {moreLinks.map((link) => (
               <NavLink
                 key={link.to}
@@ -826,7 +782,7 @@ export function AppShell({ children }) {
                   )
                 }
               >
-                <span className="font-display text-lg">{link.label}</span>
+                <span className="font-display text-lg">{t(link.labelKey)}</span>
               </NavLink>
             ))}
           </nav>
@@ -835,12 +791,12 @@ export function AppShell({ children }) {
         <div className="border-t border-rule px-4 py-4 grid gap-3">
           <div
             role="group"
-            aria-label="Workspace mode"
+            aria-label={t('shell.workspace.groupLabel')}
             className="inline-flex w-max items-center rounded-full border border-rule-strong p-0.5 text-[0.65rem] eyebrow"
           >
             {[
-              { id: 'pro',  label: 'Pro' },
-              { id: 'lite', label: 'Lite' },
+              { id: 'pro',  label: t('shell.workspace.pro') },
+              { id: 'lite', label: t('shell.workspace.lite') },
             ].map((opt) => {
               const active = appMode === opt.id;
               return (
@@ -862,14 +818,14 @@ export function AppShell({ children }) {
           <div className="flex items-end justify-between gap-3">
             <div className="flex items-end gap-4 min-w-0">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="eyebrow text-[0.6rem] text-ink-muted">Total balance</span>
+                <span className="eyebrow text-[0.6rem] text-ink-muted">{t('shell.header.totalBalance')}</span>
                 <span className="numeric text-sm text-ink truncate">
                   {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
                 </span>
               </div>
               {metrics.totalDebtCents > 0 && (
                 <div className="flex flex-col gap-0.5 min-w-0 border-l border-rule pl-4">
-                  <span className="eyebrow text-[0.6rem] text-ink-muted">Debt</span>
+                  <span className="eyebrow text-[0.6rem] text-ink-muted">{t('shell.header.debt')}</span>
                   <span className="numeric text-sm text-danger truncate">
                     {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
                   </span>
@@ -883,7 +839,7 @@ export function AppShell({ children }) {
                 className="flex shrink-0 items-center gap-1.5 text-xs text-ink-faint hover:text-danger transition-colors duration-180"
               >
                 <SignOutIcon />
-                <span className="eyebrow text-[0.6rem]">Sign out</span>
+                <span className="eyebrow text-[0.6rem]">{t('common.signOut')}</span>
               </button>
             )}
           </div>
@@ -891,7 +847,7 @@ export function AppShell({ children }) {
       </div>
 
       <nav
-        aria-label="Mobile shortcuts"
+        aria-label={t('nav.mobileShortcuts')}
         className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-canvas/95 px-3 py-2 backdrop-blur-md lg:hidden"
       >
         <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
@@ -907,7 +863,7 @@ export function AppShell({ children }) {
                 }
               >
                 <CalendarIcon />
-                <span>Month</span>
+                <span>{t('nav.month')}</span>
               </NavLink>
               <NavLink
                 to="/expenses"
@@ -919,7 +875,7 @@ export function AppShell({ children }) {
                 }
               >
                 <span aria-hidden className="text-danger text-base leading-none">↓</span>
-                <span>Expenses</span>
+                <span>{t('nav.expenses')}</span>
               </NavLink>
             </>
           ) : (
@@ -934,7 +890,7 @@ export function AppShell({ children }) {
                 }
               >
                 <DashboardIcon />
-                <span>Home</span>
+                <span>{t('nav.home')}</span>
               </NavLink>
               <NavLink
                 to="/this-month"
@@ -946,14 +902,14 @@ export function AppShell({ children }) {
                 }
               >
                 <CalendarIcon />
-                <span>Month</span>
+                <span>{t('nav.month')}</span>
               </NavLink>
             </>
           )}
           <button
             type="button"
             onClick={() => setExpenseModalOpen(true)}
-            aria-label="Add expense"
+            aria-label={t('nav.addExpense')}
             className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-card transition-colors duration-150 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <PlusIcon />
@@ -969,7 +925,7 @@ export function AppShell({ children }) {
               }
             >
               <span aria-hidden className="text-positive text-base leading-none">↑</span>
-              <span>Income</span>
+              <span>{t('nav.income')}</span>
             </NavLink>
           ) : (
             <NavLink
@@ -982,13 +938,13 @@ export function AppShell({ children }) {
               }
             >
               <MoneyIcon />
-              <span>Money</span>
+              <span>{t('nav.money')}</span>
             </NavLink>
           )}
           <button
             type="button"
             onClick={() => setMobileOpen((value) => !value)}
-            aria-label={mobileOpen ? 'Close more menu' : 'Open more menu'}
+            aria-label={mobileOpen ? t('nav.closeMore') : t('nav.openMore')}
             aria-expanded={mobileOpen}
             className={cn(
               'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
@@ -996,7 +952,7 @@ export function AppShell({ children }) {
             )}
           >
             <MenuIcon open={mobileOpen} />
-            <span>More</span>
+            <span>{t('nav.more')}</span>
           </button>
         </div>
       </nav>
@@ -1008,9 +964,9 @@ export function AppShell({ children }) {
       <Modal
         open={expenseModalOpen}
         onClose={() => setExpenseModalOpen(false)}
-        eyebrow="Ledger entry"
-        title="New expense"
-        description="Stored locally in IndexedDB. Syncs to Supabase if configured."
+        eyebrow={t('shell.modals.ledgerEntry')}
+        title={t('nav.newExpense')}
+        description={t('shell.modals.newExpenseDescription')}
         size="lg"
       >
         <ExpenseForm
@@ -1027,7 +983,7 @@ export function AppShell({ children }) {
               }
               setExpenseModalOpen(false);
             } catch (error) {
-              await alert({ title: 'Unable to save expense', description: error.message || 'Something went wrong.' });
+              await alert({ title: t('shell.modals.unableToSaveExpense'), description: error.message || t('shell.modals.somethingWentWrong') });
             }
           }}
           onCancel={() => setExpenseModalOpen(false)}
@@ -1037,9 +993,9 @@ export function AppShell({ children }) {
       <Modal
         open={incomeModalOpen}
         onClose={() => setIncomeModalOpen(false)}
-        eyebrow="Income entry"
-        title="New income"
-        description="Choose fixed, variable, or asset-linked income."
+        eyebrow={t('shell.modals.incomeEntry')}
+        title={t('nav.newIncome')}
+        description={t('shell.modals.newIncomeDescription')}
         size="lg"
       >
         <IncomeForm
@@ -1054,9 +1010,9 @@ export function AppShell({ children }) {
 
       <footer className="mx-auto max-w-wide border-t border-rule px-4 py-8 lg:px-10 mt-20">
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-ink-muted">
-          <p className="font-display italic">Finance — a private ledger.</p>
+          <p className="font-display italic">{t('shell.footer.tagline')}</p>
           <p className="numeric text-ink-faint">
-            {new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(new Date())}
+            {new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date())}
           </p>
         </div>
       </footer>

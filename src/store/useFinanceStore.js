@@ -1008,6 +1008,19 @@ export const useFinanceStore = create((set, get) => ({
     await get().initializeSupabase();
   },
 
+  enableLocalOnlyMode: async () => {
+    try { await get().signOutSupabase(); } catch { /* no session, ignore */ }
+    await get().saveSupabaseSettings({ localOnlyMode: true });
+  },
+
+  // After this resolves, supabaseConfigured is true again and the user can sign in
+  // normally. Existing local records flow up to Supabase automatically on the next
+  // triggerAutoPush tick after sign-in — pushToSupabase serializes the full local
+  // state, so no explicit migration step is needed.
+  disableLocalOnlyMode: async () => {
+    await get().saveSupabaseSettings({ localOnlyMode: false });
+  },
+
   triggerAutoPush: () => {
     if (autoPushTimer) clearTimeout(autoPushTimer);
     autoPushTimer = setTimeout(() => {

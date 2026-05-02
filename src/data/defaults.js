@@ -8,6 +8,7 @@ export const DEFAULT_CATEGORIES = [
 export const DEFAULT_SETTINGS = {
   baseCurrency: 'EUR',
   locale: 'en-GB',
+  language: 'en',
   theme: 'light',
   onboardingCompleted: false,
   onboardingCompletedAt: null,
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS = {
   finnhubApiKey: '',
   supabaseUrl: '',
   supabaseAnonKey: '',
+  localOnlyMode: false,
   modules: {
     portfolio: false,
   },

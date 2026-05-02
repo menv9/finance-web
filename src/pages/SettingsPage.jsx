@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { useAlert } from '../components/ConfirmContext';
+import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { Card, Table, Button, FormField, Input, Select, EmptyState, Modal, Toggle, Checkbox } from '../components/ui';
 import { rise } from '../utils/motion';
 import { formatCurrency } from '../utils/formatters';
 import { useTour } from '../components/tour/TourContext';
+import { useTranslation, resolveLanguage } from '../i18n/useTranslation';
 
 const TABS = [
   { id: 'general', label: 'General', hint: 'Appearance, currency, modules' },
@@ -76,6 +77,28 @@ function DiscIcon() {
       <circle cx="10" cy="10" r="7" fill="currentColor" opacity="0.85" />
       <circle cx="7.5" cy="7.5" r="2.2" fill="white" opacity="0.55" />
       <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function FlagENIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <rect x="2" y="4" width="16" height="12" rx="1.5" fill="#012169" />
+      <path d="M2 4l16 12M18 4L2 16" stroke="white" strokeWidth="1.6" />
+      <path d="M2 4l16 12M18 4L2 16" stroke="#C8102E" strokeWidth="0.7" />
+      <path d="M10 4v12M2 10h16" stroke="white" strokeWidth="2.4" />
+      <path d="M10 4v12M2 10h16" stroke="#C8102E" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function FlagESIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden>
+      <rect x="2" y="4" width="16" height="3" fill="#AA151B" />
+      <rect x="2" y="7" width="16" height="6" fill="#F1BF00" />
+      <rect x="2" y="13" width="16" height="3" fill="#AA151B" />
     </svg>
   );
 }
@@ -157,6 +180,8 @@ function moneyMovementText(log, locale, baseCurrency) {
 
 export default function SettingsPage() {
   const alert = useAlert();
+  const confirm = useConfirm();
+  const { t } = useTranslation();
   const settings = useFinanceStore((state) => state.settings);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
   const navigate = useNavigate();
@@ -175,6 +200,9 @@ export default function SettingsPage() {
   const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
   const resolveConflictUseRemote = useFinanceStore((state) => state.resolveConflictUseRemote);
   const resolveConflictKeepLocal = useFinanceStore((state) => state.resolveConflictKeepLocal);
+  const enableLocalOnlyMode = useFinanceStore((state) => state.enableLocalOnlyMode);
+  const disableLocalOnlyMode = useFinanceStore((state) => state.disableLocalOnlyMode);
+  const localOnlyMode = Boolean(settings.localOnlyMode);
   const activityLog = useFinanceStore((state) => state.activityLog);
   const undoActivityLog = useFinanceStore((state) => state.undoActivityLog);
 
@@ -211,11 +239,17 @@ export default function SettingsPage() {
   const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
 
   const themeOptions = [
-    { value: 'dark',  label: 'Dark',  Icon: MoonIcon,    description: 'Deep & minimal' },
-    { value: 'light', label: 'Light', Icon: SunIcon,     description: 'Clean & bright' },
-    { value: 'eris',  label: 'Eris',  Icon: SparkleIcon, description: 'Lavender dreams' },
-    { value: 'gorka', label: 'Gorka', Icon: DiscIcon,    description: 'Silk dark navy' },
-    { value: 'gorka-light', label: 'Gorka light', Icon: DiscIcon, description: 'Old newspaper' },
+    { value: 'dark',  label: t('theme.dark.label'),  Icon: MoonIcon,    description: t('theme.dark.hint') },
+    { value: 'light', label: t('theme.light.label'), Icon: SunIcon,     description: t('theme.light.hint') },
+    { value: 'eris',  label: t('theme.eris.label'),  Icon: SparkleIcon, description: t('theme.eris.hint') },
+    { value: 'gorka', label: t('theme.gorka.label'), Icon: DiscIcon,    description: t('theme.gorka.hint') },
+    { value: 'gorka-light', label: t('theme.gorkaLight.label'), Icon: DiscIcon, description: t('theme.gorkaLight.hint') },
+  ];
+
+  const language = resolveLanguage(settings.language);
+  const languageOptions = [
+    { value: 'en', label: t('settings.language.english.label'), Icon: FlagENIcon, description: t('settings.language.english.hint') },
+    { value: 'es', label: t('settings.language.spanish.label'), Icon: FlagESIcon, description: t('settings.language.spanish.hint') },
   ];
 
   const [categoryInput, setCategoryInput] = useState('');
@@ -325,9 +359,9 @@ export default function SettingsPage() {
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="07"
-        eyebrow="Module"
-        title="Settings"
-        description="Preferences, categories, allocation targets, sync, and backup. All changes persist locally; Supabase sync is optional."
+        eyebrow={t('settings.pageEyebrow')}
+        title={t('settings.pageTitle')}
+        description={t('settings.pageDescription')}
       />
 
       {/* Tab bar */}
@@ -366,9 +400,9 @@ export default function SettingsPage() {
           <Card
             id="appearance"
             data-tour="settings-appearance"
-            eyebrow="Display"
-            title="Appearance"
-            description="Choose how the app looks."
+            eyebrow={t('settings.appearance.eyebrow')}
+            title={t('settings.appearance.title')}
+            description={t('settings.appearance.description')}
             className={rise(1)}
           >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -402,15 +436,15 @@ export default function SettingsPage() {
 
           <Card
             id="preferences"
-            eyebrow="General"
-            title="Preferences"
-            description="Base currency affects every money value shown across the app."
+            eyebrow={t('settings.preferences.eyebrow')}
+            title={t('settings.preferences.title')}
+            description={t('settings.preferences.description')}
             className={rise(1)}
           >
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
-                label="Finnhub API key"
-                hint="Enables real-time prices for stocks, ETFs, crypto, forex and futures. Free key at finnhub.io"
+                label={t('settings.preferences.finnhubLabel')}
+                hint={t('settings.preferences.finnhubHint')}
                 htmlFor="fh-key"
                 className="md:col-span-2"
               >
@@ -418,7 +452,7 @@ export default function SettingsPage() {
                   <Input
                     id="fh-key"
                     type={showApiKey ? 'text' : 'password'}
-                    placeholder="e.g. abcdef123456xyz"
+                    placeholder={t('settings.preferences.finnhubPlaceholder')}
                     value={settings.finnhubApiKey || ''}
                     onChange={(e) => updateSettings({ finnhubApiKey: e.target.value.trim() })}
                     className="flex-1"
@@ -429,11 +463,11 @@ export default function SettingsPage() {
                     onClick={() => setShowApiKey((v) => !v)}
                     type="button"
                   >
-                    {showApiKey ? 'Hide' : 'Show'}
+                    {showApiKey ? t('common.hide') : t('common.show')}
                   </Button>
                 </div>
               </FormField>
-              <FormField label="Base currency" htmlFor="base-currency">
+              <FormField label={t('settings.preferences.baseCurrency')} htmlFor="base-currency">
                 <Select
                   id="base-currency"
                   value={settings.baseCurrency}
@@ -445,6 +479,79 @@ export default function SettingsPage() {
                 </Select>
               </FormField>
             </div>
+          </Card>
+
+          <Card
+            id="language"
+            eyebrow={t('settings.language.eyebrow')}
+            title={t('settings.language.title')}
+            description={t('settings.language.description')}
+            className={rise(1)}
+          >
+            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+              {languageOptions.map((opt) => {
+                const isActive = language === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => updateSettings({ language: opt.value })}
+                    className={[
+                      'group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all duration-180',
+                      isActive
+                        ? 'border-accent bg-accent-soft text-ink'
+                        : 'border-rule bg-surface-raised text-ink-muted hover:border-rule-strong hover:text-ink',
+                    ].join(' ')}
+                  >
+                    <span className={isActive ? 'text-accent' : 'text-ink-faint group-hover:text-ink'}><opt.Icon /></span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink leading-tight">{opt.label}</p>
+                      <p className="eyebrow text-[0.6rem] mt-0.5 leading-tight">{opt.description}</p>
+                    </div>
+                    {isActive && (
+                      <span className="absolute top-2.5 right-2.5 h-1.5 w-1.5 rounded-full bg-accent" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card
+            id="cloud-sync"
+            eyebrow="Cloud"
+            title="Cloud sync"
+            description="When off, this device works fully offline. Data stays in your browser; nothing is sent to Supabase."
+            className={rise(2)}
+          >
+            <Toggle
+              id="cloud-sync-toggle"
+              checked={!localOnlyMode}
+              onChange={async (checked) => {
+                if (checked) {
+                  await disableLocalOnlyMode();
+                  if (!supabaseUser) navigate('/login');
+                  return;
+                }
+                const ok = await confirm({
+                  title: 'Switch to local-only mode?',
+                  description: supabaseUser
+                    ? 'You will be signed out on this device. Local data stays here, but no further changes will sync to the cloud until you sign in again.'
+                    : 'No further changes will sync to the cloud until you sign in again.',
+                  confirmLabel: 'Switch to local-only',
+                  confirmVariant: 'primary',
+                });
+                if (ok) await enableLocalOnlyMode();
+              }}
+              label={localOnlyMode ? 'Local-only mode' : 'Cloud sync enabled'}
+              description={
+                localOnlyMode
+                  ? 'No data is leaving this device. Turn on to sign in and sync.'
+                  : supabaseUser
+                    ? `Signed in as ${supabaseUser.email}.`
+                    : 'Sign in from the login page to start syncing.'
+              }
+            />
           </Card>
 
           <Card
@@ -829,53 +936,105 @@ export default function SettingsPage() {
             )}
           </Card>
 
-          <Card
-            id="sync"
-            eyebrow="Cloud"
-            title="Sync"
-            description="Push or pull data between this device and the cloud. Sign in from the login page."
-            action={
-              <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
-                <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
-                {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'Not signed in'}
-              </span>
-            }
-            className={rise(7)}
-          >
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
-                Push local → cloud
-              </Button>
-              <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
-                Pull cloud → local
-              </Button>
-              <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
-                Sign out
-              </Button>
-            </div>
+          {localOnlyMode ? (
+            <Card
+              id="sync"
+              eyebrow="Cloud"
+              title="Local-only mode"
+              description="This device is not connected to cloud sync. All data stays in your browser."
+              action={
+                <span className="inline-flex items-center gap-1.5 text-xs text-ink-faint">
+                  <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-ink-faint" />
+                  Offline
+                </span>
+              }
+              className={rise(7)}
+            >
+              <p className="text-sm text-ink-muted leading-relaxed">
+                Sign in to enable cloud sync. Your existing local data will be uploaded
+                automatically once you sign in.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={async () => {
+                    await disableLocalOnlyMode();
+                    navigate('/login');
+                  }}
+                >
+                  Sign in to enable cloud sync
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card
+              id="sync"
+              eyebrow="Cloud"
+              title="Sync"
+              description="Push or pull data between this device and the cloud. Sign in from the login page."
+              action={
+                <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
+                  <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
+                  {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'Not signed in'}
+                </span>
+              }
+              className={rise(7)}
+            >
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
+                  Push local → cloud
+                </Button>
+                <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
+                  Pull cloud → local
+                </Button>
+                <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
+                  Sign out
+                </Button>
+              </div>
 
-            <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
-              <div className="flex gap-3">
-                <dt className="eyebrow w-20">Status</dt>
-                <dd className="text-ink">{supabaseSyncStatus}</dd>
-              </div>
-              <div className="flex gap-3">
-                <dt className="eyebrow w-20">Last</dt>
-                <dd className="text-ink numeric">
-                  {supabaseLastSyncedAt
-                    ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
-                    : '—'}
-                </dd>
-              </div>
-              <div className="flex gap-3">
-                <dt className="eyebrow w-20">Error</dt>
-                <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
-                  {supabaseError || 'none'}
-                </dd>
-              </div>
-            </dl>
-          </Card>
+              <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
+                <div className="flex gap-3">
+                  <dt className="eyebrow w-20">Status</dt>
+                  <dd className="text-ink">{supabaseSyncStatus}</dd>
+                </div>
+                <div className="flex gap-3">
+                  <dt className="eyebrow w-20">Last</dt>
+                  <dd className="text-ink numeric">
+                    {supabaseLastSyncedAt
+                      ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
+                      : '—'}
+                  </dd>
+                </div>
+                <div className="flex gap-3">
+                  <dt className="eyebrow w-20">Error</dt>
+                  <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
+                    {supabaseError || 'none'}
+                  </dd>
+                </div>
+              </dl>
 
+              <div className="mt-6 pt-4 border-t border-rule">
+                <button
+                  type="button"
+                  className="text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Switch to local-only mode?',
+                      description: supabaseUser
+                        ? 'You will be signed out on this device. Your local data stays here, but no further changes will sync to the cloud until you sign in again.'
+                        : 'No further changes will sync to the cloud until you sign in again.',
+                      confirmLabel: 'Switch to local-only',
+                      confirmVariant: 'primary',
+                    });
+                    if (ok) await enableLocalOnlyMode();
+                  }}
+                >
+                  Switch to local-only mode
+                </button>
+              </div>
+            </Card>
+          )}
+
+          {!localOnlyMode && (
           <Card
             id="conflicts"
             eyebrow="Sync"
@@ -933,6 +1092,7 @@ export default function SettingsPage() {
               <p className="text-sm text-ink-muted">No sync conflicts right now.</p>
             )}
           </Card>
+          )}
 
         </>)}
 

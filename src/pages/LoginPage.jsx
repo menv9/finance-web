@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Button } from '../components/ui';
 import { cn } from '../components/ui/cn';
+import { useTranslation } from '../i18n/useTranslation';
 
 function CheckInboxIcon() {
   return (
@@ -24,40 +25,8 @@ function GoogleIcon() {
   );
 }
 
-const CONFIRMATION_COPY = {
-  'magic-sent': {
-    title: 'Check your inbox.',
-    body: (email) => (
-      <>
-        We sent a magic link to <span className="text-ink font-medium">{email}</span>.
-        <br />
-        Click it to sign in — no password needed.
-      </>
-    ),
-  },
-  'signup-sent': {
-    title: 'Confirm your account.',
-    body: (email) => (
-      <>
-        We sent a confirmation link to <span className="text-ink font-medium">{email}</span>.
-        <br />
-        Click it to activate your account.
-      </>
-    ),
-  },
-  'reset-sent': {
-    title: 'Check your inbox.',
-    body: (email) => (
-      <>
-        We sent a password reset link to <span className="text-ink font-medium">{email}</span>.
-        <br />
-        Open it to set a new password.
-      </>
-    ),
-  },
-};
-
 export default function LoginPage() {
+  const { t } = useTranslation();
   const supabaseConfigured = useFinanceStore((s) => s.supabaseConfigured);
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
   const supabaseSyncStatus = useFinanceStore((s) => s.supabaseSyncStatus);
@@ -68,6 +37,8 @@ export default function LoginPage() {
   const signInWithPassword = useFinanceStore((s) => s.signInWithPassword);
   const sendPasswordReset = useFinanceStore((s) => s.sendPasswordReset);
   const resetAuthStatus = useFinanceStore((s) => s.resetAuthStatus);
+  const enableLocalOnlyMode = useFinanceStore((s) => s.enableLocalOnlyMode);
+  const navigate = useNavigate();
 
   // If the user lands here after backing out of an OAuth flow, the status can
   // be stuck on 'auth-pending'. Clear it so the form is interactive again.
@@ -91,6 +62,12 @@ export default function LoginPage() {
   const loading = supabaseSyncStatus === 'auth-pending';
   const errorMessage = localError || supabaseError;
 
+  const confirmationCopy = {
+    'magic-sent':  { title: t('login.magicSentTitle'),  prefix: t('login.magicSentPrefix'),  suffix: t('login.magicSentSuffix') },
+    'signup-sent': { title: t('login.signupSentTitle'), prefix: t('login.signupSentPrefix'), suffix: t('login.signupSentSuffix') },
+    'reset-sent':  { title: t('login.resetSentTitle'),  prefix: t('login.resetSentPrefix'),  suffix: t('login.resetSentSuffix') },
+  };
+
   function clearError() {
     setLocalError('');
   }
@@ -99,11 +76,11 @@ export default function LoginPage() {
     e.preventDefault();
     clearError();
     if (!email.trim() || !password.trim()) {
-      setLocalError('Email and password are required.');
+      setLocalError(t('login.errorRequired'));
       return;
     }
     if (mode === 'signup' && password.length < 8) {
-      setLocalError('Password must be at least 8 characters.');
+      setLocalError(t('login.errorTooShort'));
       return;
     }
     try {
@@ -112,10 +89,9 @@ export default function LoginPage() {
         setConfirmation('signup-sent');
       } else {
         await signInWithPassword(email.trim(), password);
-        // Success → onAuthStateChange will redirect via the Navigate guard above
       }
     } catch (err) {
-      setLocalError(err.message || 'Something went wrong. Try again.');
+      setLocalError(err.message || t('login.errorGeneric'));
     }
   }
 
@@ -124,35 +100,35 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      setLocalError(err.message || 'Google sign in failed. Try again.');
+      setLocalError(err.message || t('login.errorGoogle'));
     }
   }
 
   async function handleMagicLink() {
     clearError();
     if (!email.trim()) {
-      setLocalError('Enter your email to receive a magic link.');
+      setLocalError(t('login.errorMagicEmail'));
       return;
     }
     try {
       await sendMagicLink(email.trim());
       setConfirmation('magic-sent');
     } catch (err) {
-      setLocalError(err.message || 'Could not send magic link. Try again.');
+      setLocalError(err.message || t('login.errorMagicSend'));
     }
   }
 
   async function handleForgotPassword() {
     clearError();
     if (!email.trim()) {
-      setLocalError('Enter your email to receive a reset link.');
+      setLocalError(t('login.errorResetEmail'));
       return;
     }
     try {
       await sendPasswordReset(email.trim());
       setConfirmation('reset-sent');
     } catch (err) {
-      setLocalError(err.message || 'Could not send reset link. Try again.');
+      setLocalError(err.message || t('login.errorResetSend'));
     }
   }
 
@@ -161,6 +137,16 @@ export default function LoginPage() {
     setEmail('');
     setPassword('');
     clearError();
+  }
+
+  async function handleContinueLocally() {
+    clearError();
+    try {
+      await enableLocalOnlyMode();
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setLocalError(err.message || t('login.errorLocal'));
+    }
   }
 
   return (
@@ -174,7 +160,7 @@ export default function LoginPage() {
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rule-strong bg-surface-raised shadow-lift">
             <span className="font-display text-xl leading-none text-ink">ƒ</span>
           </span>
-          <span className="eyebrow text-[0.65rem] text-ink-faint">Finance — Quarterly Ledger</span>
+          <span className="eyebrow text-[0.65rem] text-ink-faint">{t('login.eyebrow')}</span>
         </div>
 
         {confirmation ? (
@@ -183,10 +169,13 @@ export default function LoginPage() {
             <CheckInboxIcon />
             <div className="space-y-2">
               <h1 className="font-display text-4xl text-ink leading-[0.95] tracking-tight">
-                {CONFIRMATION_COPY[confirmation].title}
+                {confirmationCopy[confirmation].title}
               </h1>
               <p className="text-sm text-ink-muted leading-relaxed">
-                {CONFIRMATION_COPY[confirmation].body(email)}
+                {confirmationCopy[confirmation].prefix}{' '}
+                <span className="text-ink font-medium">{email}</span>.
+                <br />
+                {confirmationCopy[confirmation].suffix}
               </p>
             </div>
             <button
@@ -194,7 +183,7 @@ export default function LoginPage() {
               onClick={resetForm}
               className="text-sm text-ink-faint underline-offset-2 hover:text-ink hover:underline transition-colors duration-180"
             >
-              Use a different email
+              {t('login.useDifferent')}
             </button>
           </div>
         ) : (
@@ -202,12 +191,10 @@ export default function LoginPage() {
           <div className="w-full max-w-sm space-y-8 animate-rise">
             <div className="space-y-3">
               <h1 className="font-display text-5xl text-ink leading-[0.92] tracking-tight">
-                {mode === 'signin' ? 'Sign in.' : 'Create account.'}
+                {mode === 'signin' ? t('login.titleSignIn') : t('login.titleSignUp')}
               </h1>
               <p className="text-sm text-ink-muted leading-relaxed">
-                {mode === 'signin'
-                  ? 'Welcome back. Use your email and password.'
-                  : 'A private ledger awaits. Pick an email and password.'}
+                {mode === 'signin' ? t('login.subtitleSignIn') : t('login.subtitleSignUp')}
               </p>
             </div>
 
@@ -223,7 +210,7 @@ export default function LoginPage() {
                     : 'text-ink-muted hover:text-ink',
                 )}
               >
-                Sign in
+                {t('login.tabSignIn')}
               </button>
               <button
                 type="button"
@@ -235,14 +222,14 @@ export default function LoginPage() {
                     : 'text-ink-muted hover:text-ink',
                 )}
               >
-                Create account
+                {t('login.tabSignUp')}
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <label htmlFor="email" className="eyebrow text-[0.65rem] block">
-                  Email address
+                  {t('login.email')}
                 </label>
                 <input
                   id="email"
@@ -252,7 +239,7 @@ export default function LoginPage() {
                   autoFocus
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); clearError(); }}
-                  placeholder="you@example.com"
+                  placeholder={t('login.emailPlaceholder')}
                   aria-describedby={errorMessage ? 'login-error' : undefined}
                   aria-invalid={!!errorMessage}
                   className={cn(
@@ -267,7 +254,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="eyebrow text-[0.65rem] block">
-                    Password
+                    {t('login.password')}
                   </label>
                   {mode === 'signin' && (
                     <button
@@ -276,7 +263,7 @@ export default function LoginPage() {
                       disabled={loading}
                       className="text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
                     >
-                      Forgot password?
+                      {t('login.forgot')}
                     </button>
                   )}
                 </div>
@@ -286,7 +273,7 @@ export default function LoginPage() {
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); clearError(); }}
-                  placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
+                  placeholder={mode === 'signup' ? t('login.passwordPlaceholderNew') : '••••••••'}
                   aria-describedby={errorMessage ? 'login-error' : undefined}
                   aria-invalid={!!errorMessage}
                   className={cn(
@@ -311,15 +298,15 @@ export default function LoginPage() {
                 disabled={loading}
               >
                 {loading
-                  ? (mode === 'signup' ? 'Creating…' : 'Signing in…')
-                  : (mode === 'signup' ? 'Create account' : 'Sign in')}
+                  ? (mode === 'signup' ? t('login.loadingSignUp') : t('login.loadingSignIn'))
+                  : (mode === 'signup' ? t('login.submitSignUp') : t('login.submitSignIn'))}
               </Button>
             </form>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="h-px flex-1 bg-rule" />
-                <span className="eyebrow text-[0.65rem] text-ink-faint">or</span>
+                <span className="eyebrow text-[0.65rem] text-ink-faint">{t('login.or')}</span>
                 <span className="h-px flex-1 bg-rule" />
               </div>
               <Button
@@ -329,7 +316,7 @@ export default function LoginPage() {
                 disabled={loading}
                 onClick={handleGoogleSignIn}
               >
-                <GoogleIcon /> Continue with Google
+                <GoogleIcon /> {t('login.google')}
               </Button>
               <button
                 type="button"
@@ -337,21 +324,35 @@ export default function LoginPage() {
                 disabled={loading}
                 className="block w-full text-center text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
               >
-                Send a magic link instead
+                {t('login.magicLink')}
               </button>
             </div>
 
             <p className="text-center text-xs text-ink-faint leading-relaxed">
-              Your data stays in your browser until you connect Supabase sync.
+              {t('login.privacy')}
               <br />
-              Each account is completely private.
+              {t('login.privacyLine2')}
             </p>
+
+            <div className="pt-2 border-t border-rule space-y-1.5">
+              <button
+                type="button"
+                onClick={handleContinueLocally}
+                disabled={loading}
+                className="block w-full text-center text-sm text-ink-muted hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
+              >
+                {t('login.continueLocal')}
+              </button>
+              <p className="text-center text-xs text-ink-faint leading-relaxed">
+                {t('login.continueLocalHint')}
+              </p>
+            </div>
           </div>
         )}
       </div>
 
       <footer className="py-6 text-center">
-        <p className="text-xs text-ink-faint font-display italic">a private ledger.</p>
+        <p className="text-xs text-ink-faint font-display italic">{t('login.footer')}</p>
       </footer>
     </div>
   );

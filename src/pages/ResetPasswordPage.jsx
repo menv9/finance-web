@@ -4,8 +4,10 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import { Button } from '../components/ui';
 import { cn } from '../components/ui/cn';
 import { getSupabaseBrowserClient } from '../utils/supabase';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const supabaseConfigured = useFinanceStore((s) => s.supabaseConfigured);
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
@@ -40,22 +42,22 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(t('resetPassword.errorTooShort'));
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(t('resetPassword.errorMismatch'));
       return;
     }
     setLoading(true);
     try {
       const client = getSupabaseBrowserClient();
-      if (!client) throw new Error('Supabase is not configured');
+      if (!client) throw new Error(t('resetPassword.notConfigured'));
       const { error: updateError } = await client.auth.updateUser({ password });
       if (updateError) throw updateError;
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Could not update password.');
+      setError(err.message || t('resetPassword.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -70,18 +72,18 @@ export default function ResetPasswordPage() {
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rule-strong bg-surface-raised shadow-lift">
             <span className="font-display text-xl leading-none text-ink">ƒ</span>
           </span>
-          <span className="eyebrow text-[0.65rem] text-ink-faint">Finance — Quarterly Ledger</span>
+          <span className="eyebrow text-[0.65rem] text-ink-faint">{t('resetPassword.eyebrow')}</span>
         </div>
 
         <div className="w-full max-w-sm space-y-8 animate-rise">
           <div className="space-y-3">
             <h1 className="font-display text-5xl text-ink leading-[0.92] tracking-tight">
-              Set a new password.
+              {t('resetPassword.title')}
             </h1>
             <p className="text-sm text-ink-muted leading-relaxed">
               {recoveryReady
-                ? 'Pick a password you’ll remember. At least 8 characters.'
-                : 'Verifying your reset link…'}
+                ? t('resetPassword.subtitle')
+                : t('resetPassword.verifying')}
             </p>
           </div>
 
@@ -89,7 +91,7 @@ export default function ResetPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <label htmlFor="new-password" className="eyebrow text-[0.65rem] block">
-                  New password
+                  {t('resetPassword.newPassword')}
                 </label>
                 <input
                   id="new-password"
@@ -99,7 +101,7 @@ export default function ResetPasswordPage() {
                   autoFocus
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  placeholder="At least 8 characters"
+                  placeholder={t('resetPassword.newPasswordPlaceholder')}
                   aria-invalid={!!error}
                   className={cn(
                     'w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder-ink-faint',
@@ -112,7 +114,7 @@ export default function ResetPasswordPage() {
 
               <div className="space-y-2">
                 <label htmlFor="confirm-password" className="eyebrow text-[0.65rem] block">
-                  Confirm password
+                  {t('resetPassword.confirmPassword')}
                 </label>
                 <input
                   id="confirm-password"
@@ -120,7 +122,7 @@ export default function ResetPasswordPage() {
                   autoComplete="new-password"
                   value={confirm}
                   onChange={(e) => { setConfirm(e.target.value); setError(''); }}
-                  placeholder="Repeat the password"
+                  placeholder={t('resetPassword.confirmPasswordPlaceholder')}
                   aria-invalid={!!error}
                   className={cn(
                     'w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder-ink-faint',
@@ -143,7 +145,7 @@ export default function ResetPasswordPage() {
                 className="w-full justify-center"
                 disabled={loading}
               >
-                {loading ? 'Updating…' : 'Update password'}
+                {loading ? t('resetPassword.updating') : t('resetPassword.update')}
               </Button>
             </form>
           )}
@@ -151,7 +153,7 @@ export default function ResetPasswordPage() {
       </div>
 
       <footer className="py-6 text-center">
-        <p className="text-xs text-ink-faint font-display italic">a private ledger.</p>
+        <p className="text-xs text-ink-faint font-display italic">{t('resetPassword.footer')}</p>
       </footer>
     </div>
   );

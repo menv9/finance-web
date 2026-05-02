@@ -4,37 +4,34 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import Silk from '../components/Silk';
 import SakuraPetals from '../components/SakuraPetals';
 import Grainient from '../components/Grainient';
+import { Wordmark } from '../components/Wordmark';
+import { useTranslation } from '../i18n/useTranslation';
 
-// ─── Editorial data ───────────────────────────────────────────────────────────
+const VALID_THEMES = ['dark', 'light', 'eris', 'gorka', 'gorka-light'];
 
-const modules = [
-  { title: 'Dashboard',  blurb: 'the arc of net worth, in one panel' },
-  { title: 'This Month', blurb: 'every entry, side-by-side with last year' },
-  { title: 'Accounts',   blurb: 'bank balances, kept honest and reconciled' },
-  { title: 'Debts',      blurb: 'mortgages, loans, paid down by linked expenses' },
-  { title: 'Income',     blurb: 'salary, freelance, dividends, sales' },
-  { title: 'Expenses',   blurb: 'envelopes, rollover, every outgoing logged' },
-  { title: 'Budgets',    blurb: 'category limits with rollover support' },
-  { title: 'Savings',    blurb: 'goal pots, deposit history, progress' },
-  { title: 'Portfolio',  blurb: 'holdings, allocations, realised P&L' },
+const PILLAR_KEYS = [
+  { glyph: '◐', titleKey: 'landing.pillars.local.title',     bodyKey: 'landing.pillars.local.body' },
+  { glyph: '↗', titleKey: 'landing.pillars.portfolio.title', bodyKey: 'landing.pillars.portfolio.body' },
+  { glyph: '◇', titleKey: 'landing.pillars.goals.title',     bodyKey: 'landing.pillars.goals.body' },
 ];
 
-const articles = [
-  {
-    head: 'Private by default.',
-    lede: 'Everything is kept in your browser. There are no accounts to make, no servers to trust, no analytics in the gutters. The ledger never leaves the desk it was written on.',
-  },
-  {
-    head: 'Quarterly, not hourly.',
-    lede: 'This ledger is built around the rhythm of a quarterly review — not the daily noise of a feed. The arc of three months tells the truth that any single Tuesday cannot.',
-  },
-  {
-    head: 'Kept for a household.',
-    lede: 'Two people, one ledger. Each view is shared, each entry is visible, and the books belong to neither one alone. Finance is more honest when it\'s not a secret.',
-  },
+const FEATURE_KEYS = [
+  'dashboard', 'accounts', 'expenses', 'income', 'budgets', 'savings', 'portfolio', 'debts', 'activity',
 ];
 
-// ─── Tiny utilities ───────────────────────────────────────────────────────────
+const SYNC_STEP_KEYS = [
+  { n: '01', titleKey: 'landing.syncSection.step1Title', bodyKey: 'landing.syncSection.step1Body' },
+  { n: '02', titleKey: 'landing.syncSection.step2Title', bodyKey: 'landing.syncSection.step2Body' },
+  { n: '03', titleKey: 'landing.syncSection.step3Title', bodyKey: 'landing.syncSection.step3Body' },
+];
+
+const THEME_KEYS = [
+  { id: 'dark',        labelKey: 'landing.themesSection.dark.label',        subKey: 'landing.themesSection.dark.sub' },
+  { id: 'light',       labelKey: 'landing.themesSection.light.label',       subKey: 'landing.themesSection.light.sub' },
+  { id: 'eris',        labelKey: 'landing.themesSection.eris.label',        subKey: 'landing.themesSection.eris.sub' },
+  { id: 'gorka',       labelKey: 'landing.themesSection.gorka.label',       subKey: 'landing.themesSection.gorka.sub' },
+  { id: 'gorka-light', labelKey: 'landing.themesSection.gorkaLight.label',  subKey: 'landing.themesSection.gorkaLight.sub' },
+];
 
 function ArrowRight({ className = 'h-3.5 w-3.5' }) {
   return (
@@ -44,78 +41,165 @@ function ArrowRight({ className = 'h-3.5 w-3.5' }) {
   );
 }
 
-function Ornament({ className = '' }) {
+function Sparkline({ className = '' }) {
+  const pts = [[0,80],[12,72],[26,76],[40,58],[54,62],[68,44],[82,38],[96,24],[110,28],[124,10]];
+  const line = pts.map(([x,y], i) => `${i===0?'M':'L'}${x},${y}`).join(' ');
+  const area = line + ' L124,100 L0,100 Z';
   return (
-    <div className={`flex items-center justify-center gap-3 select-none ${className}`} aria-hidden>
-      <span className="h-px w-16" style={{ background: 'var(--rule-strong)' }} />
-      <span className="text-[0.7rem]" style={{ color: 'var(--accent)' }}>✦</span>
-      <span className="h-px w-16" style={{ background: 'var(--rule-strong)' }} />
+    <svg viewBox="0 0 124 100" className={className} aria-hidden preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="lp-spark-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#lp-spark-area)" />
+      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="124" cy="10" r="2.6" fill="var(--accent)" />
+    </svg>
+  );
+}
+
+function ProjectionCurve({ className = '' }) {
+  const pts = [];
+  for (let i = 0; i <= 30; i++) {
+    const x = (i / 30) * 124;
+    const y = 75 - 65 * (1 - Math.exp(-i / 9));
+    pts.push([x, y]);
+  }
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox="0 0 124 90" className={className} aria-hidden preserveAspectRatio="none">
+      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.85" />
+      <circle cx="124" cy={(75 - 65 * (1 - Math.exp(-30 / 9))).toFixed(1)} r="2.4" fill="var(--accent)" />
+    </svg>
+  );
+}
+
+function HeroComposition({ t }) {
+  return (
+    <div className="lp-hero-stack">
+      <div aria-hidden className="lp-hero-glow" />
+
+      <div className="lp-hero-card lp-hero-card-1">
+        <div className="lp-card-meta">
+          <span>{t('landing.hero3up.netWorth')}</span>
+          <span className="lp-tag">{t('landing.hero3up.illustrative')}</span>
+        </div>
+        <div className="lp-bignum">€&thinsp;48,320</div>
+        <div className="lp-delta-row">
+          <span className="lp-delta lp-positive">{t('landing.hero3up.delta')}</span>
+          <span className="lp-muted">{t('landing.hero3up.trailing')}</span>
+        </div>
+        <div className="lp-spark"><Sparkline className="w-full h-full" /></div>
+        <div className="lp-spark-axis">
+          <span>2024</span>
+          <span>2025</span>
+          <span>2026</span>
+        </div>
+      </div>
+
+      <div className="lp-hero-card lp-hero-card-2">
+        <div className="lp-card-meta">
+          <span>{t('landing.hero3up.portfolioHolding')}</span>
+        </div>
+        <div className="lp-holding-head">
+          <span className="lp-ticker">VWRL.DE</span>
+          <span className="lp-holding-name">Vanguard FTSE All-World</span>
+        </div>
+        <div className="lp-holding-grid">
+          <div><span className="lp-muted">{t('landing.hero3up.lots')}</span><span className="lp-num">42</span></div>
+          <div><span className="lp-muted">{t('landing.hero3up.value')}</span><span className="lp-num">€&thinsp;18,420</span></div>
+          <div><span className="lp-muted">{t('landing.hero3up.pnl')}</span><span className="lp-num lp-positive">+8.4%</span></div>
+          <div><span className="lp-muted">{t('landing.hero3up.fx')}</span><span className="lp-num">EUR</span></div>
+        </div>
+      </div>
+
+      <div className="lp-hero-card lp-hero-card-3">
+        <div className="lp-card-meta">
+          <span>{t('landing.hero3up.savingsPot')}</span>
+        </div>
+        <div className="lp-goal-row">
+          <span className="lp-goal-name">{t('landing.hero3up.emergencyFund')}</span>
+          <span className="lp-num">€&thinsp;4,800 <span className="lp-muted">/ €&thinsp;6,000</span></span>
+        </div>
+        <div className="lp-goal-bar"><span style={{ width: '80%' }} /></div>
+        <div className="lp-goal-foot">
+          <span className="lp-muted">{t('landing.hero3up.projected')}</span>
+          <div className="lp-goal-proj"><ProjectionCurve className="w-full h-full" /></div>
+          <span className="lp-num lp-positive">€&thinsp;36,200</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Cover figure: net worth as an editorial spark line ──────────────────────
-
-function CoverFigure() {
-  const pts = [
-    [0, 92], [12, 80], [26, 86], [40, 64], [54, 70],
-    [68, 50], [82, 44], [96, 26], [110, 30], [124, 12],
-  ];
-  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
-  const area = line + ' L124,100 L0,100 Z';
+function Pillar({ glyph, title, body, delay }) {
   return (
-    <svg viewBox="0 0 124 100" className="w-full h-full" aria-hidden preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="cov-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#cov-area)" />
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
-      {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === pts.length - 1 ? 2.4 : 1} fill="var(--accent)" opacity={i === pts.length - 1 ? 1 : 0.4} />
-      ))}
-      <line x1="124" y1="0" x2="124" y2="100" stroke="var(--rule-strong)" strokeWidth="0.5" />
-    </svg>
+    <article className="lp-pillar lp-rise" style={{ animationDelay: `${delay}ms` }}>
+      <span className="lp-pillar-glyph" aria-hidden>{glyph}</span>
+      <h3 className="lp-pillar-title">{title}</h3>
+      <p className="lp-pillar-body">{body}</p>
+    </article>
   );
 }
 
-// ─── Wordmark ─────────────────────────────────────────────────────────────────
-
-function Wordmark({ size = 'sm' }) {
-  const isLg = size === 'lg';
+function FeatureCard({ title, body, meta, delay }) {
   return (
-    <svg viewBox="50 55 540 140" role="img" xmlns="http://www.w3.org/2000/svg" className={isLg ? 'h-12 w-auto' : 'h-6 w-auto'}>
-      <title>FinGes</title>
-      <defs>
-        <linearGradient id={`wm-grad-${size}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--accent)" />
-          <stop offset="60%" stopColor="var(--accent-strong)" />
-          <stop offset="100%" stopColor="var(--accent)" />
-        </linearGradient>
-      </defs>
-      <text x="60" y="170" fontFamily="'Fraunces', Georgia, serif" fontSize="120" fontWeight="400" fill="var(--ink)" opacity="0.92" letterSpacing="-3">Fin</text>
-      <text x="240" y="170" fontFamily="'Fraunces', Georgia, serif" fontStyle="italic" fontSize="120" fontWeight="500" fill={`url(#wm-grad-${size})`} letterSpacing="-3">Ges</text>
-    </svg>
+    <Link to="/dashboard" className="lp-feature lp-rise" style={{ animationDelay: `${delay}ms` }}>
+      <div className="lp-feature-head">
+        <h3 className="lp-feature-title">{title}</h3>
+        <span className="lp-feature-arrow"><ArrowRight /></span>
+      </div>
+      <p className="lp-feature-body">{body}</p>
+      <span className="lp-feature-meta">{meta}</span>
+    </Link>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function SyncStep({ n, title, body, delay }) {
+  return (
+    <div className="lp-step lp-rise" style={{ animationDelay: `${delay}ms` }}>
+      <span className="lp-step-n">§ {n}</span>
+      <h3 className="lp-step-title">{title}</h3>
+      <p className="lp-step-body">{body}</p>
+    </div>
+  );
+}
+
+function ThemeSwatch({ id, label, sub }) {
+  return (
+    <div className="lp-swatch" data-theme={id}>
+      <div className="lp-swatch-canvas">
+        <div className="lp-swatch-surface">
+          <span className="lp-swatch-line lp-swatch-line-a" />
+          <span className="lp-swatch-line lp-swatch-line-b" />
+          <span className="lp-swatch-dot" />
+        </div>
+      </div>
+      <div className="lp-swatch-foot">
+        <span className="lp-swatch-label">{label}</span>
+        <span className="lp-swatch-sub">{sub}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
+  const { t } = useTranslation();
   const theme = useFinanceStore((s) => s.settings?.theme);
-
-  const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
+  const appliedTheme = VALID_THEMES.includes(theme) ? theme : 'dark';
 
   useEffect(() => {
     document.documentElement.dataset.theme = appliedTheme;
     document.body.dataset.theme = appliedTheme;
   }, [appliedTheme]);
 
-  const now = new Date();
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const issueDate = `${months[now.getMonth()]} ${now.getFullYear()}`;
+  const trustItems = [
+    t('landing.trust.offline'),
+    t('landing.trust.pwa'),
+    t('landing.trust.sync'),
+  ];
 
   return (
     <div className="min-h-screen flex flex-col" data-landing-edition="true">
@@ -138,281 +222,209 @@ export default function LandingPage() {
             rotationAmount={160.0} noiseScale={1.4} grainAmount={0.04}
             grainScale={3.0} contrast={1.05} gamma={1.0} saturation={0.75} zoom={1.05}
           />
-          <svg xmlns="http://www.w3.org/2000/svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', mixBlendMode: 'multiply', opacity: 0.13 }}>
-            <defs>
-              <filter id="lp-paper-wrinkle" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
-                <feTurbulence type="fractalNoise" baseFrequency="0.032 0.048" numOctaves="5" seed="11" result="noise" />
-                <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="1.2" result="light">
-                  <feDistantLight azimuth="38" elevation="52" />
-                </feDiffuseLighting>
-              </filter>
-            </defs>
-            <rect width="100%" height="100%" filter="url(#lp-paper-wrinkle)" />
-          </svg>
         </div>
       )}
 
-      {/* ╔════════════════════════ MASTHEAD ════════════════════════╗ */}
-      <header className="sticky top-0 z-40 border-b border-rule bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto max-w-[1280px] px-10">
-          <div className="flex items-center justify-between py-2 border-b border-rule">
-            <span className="masthead-meta">A QUARTERLY LEDGER</span>
-            <span className="masthead-meta hidden md:inline">PRIVATE · LOCAL · HONEST</span>
-            <span className="masthead-meta">{issueDate.toUpperCase()}</span>
-          </div>
-          <div className="flex h-12 items-center justify-between gap-6">
-            <Wordmark size="sm" />
-            <Link to="/dashboard" className="cta-link group">
-              <span className="cta-link-label">Open the ledger</span>
-              <span className="cta-link-arrow"><ArrowRight /></span>
+      <header className="sticky top-0 z-40 border-b border-rule lp-nav">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-10 h-14 flex items-center justify-between gap-6">
+          <Link to="/landing" aria-label={t('landing.nav.home')}><Wordmark size="sm" /></Link>
+          <nav className="flex items-center gap-2 sm:gap-4">
+            <a href="#features" className="lp-nav-link hidden sm:inline-flex">{t('landing.nav.features')}</a>
+            <a href="#sync" className="lp-nav-link hidden md:inline-flex">{t('landing.nav.sync')}</a>
+            <Link to="/login" className="lp-nav-link">{t('landing.nav.signIn')}</Link>
+            <Link to="/dashboard" className="lp-btn lp-btn-primary lp-btn-sm">
+              <span>{t('landing.nav.openApp')}</span>
+              <ArrowRight />
             </Link>
-          </div>
+          </nav>
         </div>
       </header>
 
       <main className="flex-1">
 
-        {/* ╔════════════════════════ COVER ════════════════════════╗ */}
-        <section className="relative mx-auto max-w-[1280px] px-10 pt-20 pb-24 lg:pt-28 lg:pb-32 overflow-hidden">
+        {/* HERO ─────────────────────────────────────────────────────────── */}
+        <section className="relative overflow-hidden">
+          <div aria-hidden className="lp-hero-grid" />
 
-          {appliedTheme !== 'gorka' && appliedTheme !== 'gorka-light' && (
-            <div aria-hidden className="pointer-events-none absolute inset-0" style={{
-              backgroundImage: 'linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px)',
-              backgroundSize: '88px 88px',
-              opacity: 0.4,
-              maskImage: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 100%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 100%)',
-            }} />
-          )}
+          <div className="relative mx-auto max-w-[1280px] px-6 lg:px-10 pt-16 lg:pt-24 pb-20 lg:pb-28">
+            <div className="grid grid-cols-12 gap-x-8 gap-y-14 items-start">
 
-          <div className="relative grid grid-cols-12 gap-x-8 gap-y-10">
-
-            <div className="col-span-12 lg:col-span-7 space-y-8">
-              <p className="rise rise-1 eyebrow text-ink-faint">A personal finance ledger</p>
-
-              <h1 className="rise rise-2 cover-head">
-                <span className="cover-head-1">A&nbsp;quiet</span>
-                <span className="cover-head-2"><em>ledger</em></span>
-                <span className="cover-head-3">for&nbsp;loud&nbsp;months.</span>
-              </h1>
-
-              <p className="rise rise-3 cover-lede">
-                <span className="drop-cap">F</span>inGes is a personal finance journal for people who want
-                <em> full clarity</em> over their money — without handing the keys to anyone else.
-                Logged in your browser, read in the rhythm of a quarter rather than a tick.
-              </p>
-
-              <div className="rise rise-4 flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-                <Link to="/dashboard" className="btn-primary group">
-                  <span>Open the ledger</span>
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-                </Link>
-                <a href="#contents" className="btn-rule">
-                  <span>See what's inside</span>
-                </a>
-              </div>
-            </div>
-
-            <aside className="col-span-12 lg:col-span-4 lg:col-start-9 lg:pl-8 lg:border-l lg:border-rule">
-              <div className="rise rise-3 space-y-1">
-                <p className="margin-caption">
-                  <em>Net worth, ten quarters trailing.</em>
-                  &nbsp;Drawn from the household&nbsp;books.
+              <div className="col-span-12 lg:col-span-7 lg:pr-6 space-y-7">
+                <p className="lp-rise lp-rise-1 lp-eyebrow">
+                  <span className="lp-eyebrow-dot" /> {t('landing.hero.eyebrow')}
                 </p>
-                <div className="figure-frame">
-                  <div className="h-32 mt-1">
-                    <CoverFigure />
-                  </div>
-                  <div className="figure-baseline">
-                    <span>Q3 '23</span>
-                    <span className="text-positive">↑ 12.4%</span>
-                    <span>Q1 '26</span>
-                  </div>
-                </div>
-              </div>
 
-              <dl className="rise rise-4 mt-8 grid grid-cols-1 gap-3">
-                {[
-                  ['Savings rate',    '42.5 %'],
-                  ['Monthly income',  '+€ 3,200'],
-                  ['Monthly outflow', '−€ 1,840'],
-                  ['Holdings',        '14 lines'],
-                ].map(([k, v]) => (
-                  <div key={k} className="dot-row">
-                    <dt>{k}</dt>
-                    <span className="dot-leader" aria-hidden />
-                    <dd className="numeric">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </aside>
-          </div>
-        </section>
+                <h1 className="lp-rise lp-rise-2 lp-h1">
+                  <span>{t('landing.hero.h1Line1')}</span>
+                  <span className="lp-h1-italic"><em>{t('landing.hero.h1Line2')}</em></span>
+                </h1>
 
-        {/* ╔════════════════════════ CONTENTS ════════════════════╗ */}
-        <section id="contents" className="mx-auto max-w-[1280px] px-10 py-24 lg:py-32">
-          <div className="grid grid-cols-12 gap-x-8 gap-y-10">
+                <p className="lp-rise lp-rise-3 lp-lede">
+                  {t('landing.hero.lede')}
+                </p>
 
-            <div className="col-span-12 lg:col-span-3 space-y-3">
-              <h2 className="section-head">
-                <span>What's</span>
-                <span><em>inside</em></span>
-              </h2>
-              <p className="section-sub">
-                Nine chapters, one ledger.<br />
-                Hover a line to follow its thread.
-              </p>
-            </div>
-
-            <ul className="col-span-12 lg:col-span-9 lg:pl-8 lg:border-l lg:border-rule contents-list">
-              {modules.map((m, i) => (
-                <li key={m.title} style={{ animationDelay: `${i * 60}ms` }} className="rise contents-row">
-                  <Link to="/dashboard" className="contents-link group">
-                    <span className="contents-title">{m.title}</span>
-                    <span className="contents-blurb"><em>{m.blurb}</em></span>
-                    <span className="contents-leader" aria-hidden />
-                    <span className="contents-arrow"><ArrowRight /></span>
+                <div className="lp-rise lp-rise-4 flex flex-wrap items-center gap-x-4 gap-y-3 pt-2">
+                  <Link to="/dashboard" className="lp-btn lp-btn-primary lp-btn-lg group">
+                    <span>{t('landing.hero.openApp')}</span>
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
                   </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
+                  <Link to="/login" className="lp-btn lp-btn-rule lp-btn-lg">
+                    <span>{t('landing.hero.createAccount')}</span>
+                  </Link>
+                </div>
 
-        <Ornament className="my-2" />
-
-        {/* ╔════════════════════════ LETTER FROM THE EDITOR ══════╗ */}
-        <section className="border-t border-b border-rule bg-surface relative overflow-hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'repeating-linear-gradient(0deg, var(--ink) 0 1px, transparent 1px 28px)' }} />
-          <div className="relative mx-auto max-w-[1280px] px-10 py-24 lg:py-32">
-            <div className="grid grid-cols-12 gap-x-8 gap-y-10">
-              <div className="col-span-12 lg:col-span-3 space-y-3">
-                <h2 className="section-head">
-                  <span>From the</span>
-                  <span><em>editor</em></span>
-                </h2>
-                <p className="section-sub">A short note on how — and why — the books are kept.</p>
-              </div>
-
-              <div className="col-span-12 lg:col-span-9 lg:pl-8 lg:border-l lg:border-rule">
-                <div className="grid gap-10 lg:grid-cols-3">
-                  {articles.map((a, i) => (
-                    <article key={a.head} className="rise letter-article" style={{ animationDelay: `${i * 80}ms` }}>
-                      <h3 className="article-head">{a.head}</h3>
-                      <p className="article-lede">{a.lede}</p>
-                    </article>
+                <ul className="lp-rise lp-rise-5 lp-trust">
+                  {trustItems.map((item) => (
+                    <li key={item}><span className="lp-trust-tick" aria-hidden>✓</span>{item}</li>
                   ))}
-                </div>
+                </ul>
+              </div>
 
-                <div className="mt-14 pt-6 border-t border-rule signature-row">
-                  <span className="signature-em">—</span>
-                  <span className="signature-name">eris &amp; gorka</span>
-                  <span className="signature-role"><em>keepers of the books</em></span>
-                </div>
+              <aside className="col-span-12 lg:col-span-5 lp-rise lp-rise-3">
+                <HeroComposition t={t} />
+              </aside>
+
+            </div>
+          </div>
+        </section>
+
+        {/* PILLARS ──────────────────────────────────────────────────────── */}
+        <section className="border-t border-rule lp-section">
+          <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-20 lg:py-28">
+            <div className="grid grid-cols-12 gap-x-8 gap-y-12">
+              <div className="col-span-12 lg:col-span-3">
+                <p className="lp-section-tag">{t('landing.pillars.sectionTag')}</p>
+                <h2 className="lp-h2">
+                  <span>{t('landing.pillars.h2Line1')}</span>
+                  <span className="lp-h2-italic"><em>{t('landing.pillars.h2Line2')}</em></span>
+                </h2>
+                <p className="lp-section-sub">
+                  {t('landing.pillars.sub')}
+                </p>
+              </div>
+              <div className="col-span-12 lg:col-span-9 grid gap-10 md:grid-cols-3">
+                {PILLAR_KEYS.map((p, i) => (
+                  <Pillar key={p.titleKey} glyph={p.glyph} title={t(p.titleKey)} body={t(p.bodyKey)} delay={i * 80} />
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* ╔════════════════════════ SPECIMEN ════════════════════╗ */}
-        <section className="mx-auto max-w-[1280px] px-10 py-24 lg:py-32">
-          <div className="grid grid-cols-12 gap-x-8 gap-y-12">
-            <div className="col-span-12 lg:col-span-3 space-y-3">
-              <h2 className="section-head">
-                <span>A specimen</span>
-                <span><em>page</em></span>
-              </h2>
-              <p className="section-sub">
-                A sample dashboard, set in our usual styles. Numbers approximate, sentiment honest.
-              </p>
-            </div>
-
-            <div className="col-span-12 lg:col-span-9 lg:pl-8 lg:border-l lg:border-rule">
-              <div className="specimen-frame">
-                <div className="specimen-header">
-                  <span className="eyebrow text-ink-faint">Dashboard · overview</span>
-                  <span className="text-xs text-ink-faint font-display italic">illustrative</span>
-                </div>
-
-                <div className="grid lg:grid-cols-[1.6fr_1fr] gap-8 mt-6">
-                  <div className="space-y-3">
-                    <p className="eyebrow text-ink-faint">Net worth</p>
-                    <p className="display-serif text-5xl text-ink leading-none tracking-tight">
-                      € 48,320
-                      <span className="ml-3 text-positive text-xl align-middle">↑ 12.4%</span>
-                    </p>
-                    <div className="h-44 mt-3">
-                      <CoverFigure />
-                    </div>
-                    <p className="margin-caption mt-2">
-                      <em>Trailing twelve months. Locally computed.</em>
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    {[
-                      ['Income',       '+€ 3,200', 'positive'],
-                      ['Expenses',     '−€ 1,840', 'danger'],
-                      ['Savings rate', '42.5 %',   'accent'],
-                      ['Holdings',     '14 lines', 'muted'],
-                      ['Realised P&L', '+€ 620',   'positive'],
-                      ['Pots active',  '6',         'muted'],
-                    ].map(([k, v, tone]) => (
-                      <div key={k} className="dot-row">
-                        <dt>{k}</dt>
-                        <span className="dot-leader" aria-hidden />
-                        <dd className={`numeric tone-${tone}`}>{v}</dd>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-8 pt-6 border-t border-rule flex items-center justify-between">
-                  <p className="margin-caption m-0">
-                    <em>Each module is private. Nothing leaves your browser.</em>
-                  </p>
-                  <Link to="/dashboard" className="btn-rule btn-rule-sm">
-                    <span>Take a closer look</span>
-                    <ArrowRight />
-                  </Link>
-                </div>
+        {/* FEATURES ─────────────────────────────────────────────────────── */}
+        <section id="features" className="border-t border-rule lp-section lp-section-alt">
+          <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-20 lg:py-28">
+            <div className="grid grid-cols-12 gap-x-8 gap-y-12">
+              <div className="col-span-12 lg:col-span-3">
+                <p className="lp-section-tag">{t('landing.features.sectionTag')}</p>
+                <h2 className="lp-h2">
+                  <span>{t('landing.features.h2Line1')}</span>
+                  <span className="lp-h2-italic"><em>{t('landing.features.h2Line2')}</em></span>
+                </h2>
+                <p className="lp-section-sub">
+                  {t('landing.features.sub')}
+                </p>
+              </div>
+              <div className="col-span-12 lg:col-span-9 grid gap-px lp-feature-grid">
+                {FEATURE_KEYS.map((key, i) => (
+                  <FeatureCard
+                    key={key}
+                    title={t(`landing.features.${key}.title`)}
+                    body={t(`landing.features.${key}.body`)}
+                    meta={t(`landing.features.${key}.meta`)}
+                    delay={i * 50}
+                  />
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* ╔════════════════════════ CLOSING ═════════════════════╗ */}
-        <section className="mx-auto max-w-[1280px] px-10 pb-32 pt-12">
-          <div className="closing-card">
-            <h2 className="closing-head">
-              <span>Begin</span>
-              <span className="closing-italic"><em>your ledger.</em></span>
+        {/* SYNC ─────────────────────────────────────────────────────────── */}
+        <section id="sync" className="border-t border-rule lp-section">
+          <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-20 lg:py-28">
+            <div className="grid grid-cols-12 gap-x-8 gap-y-12">
+              <div className="col-span-12 lg:col-span-3">
+                <p className="lp-section-tag">{t('landing.syncSection.sectionTag')}</p>
+                <h2 className="lp-h2">
+                  <span>{t('landing.syncSection.h2Line1')}</span>
+                  <span className="lp-h2-italic"><em>{t('landing.syncSection.h2Line2')}</em></span>
+                </h2>
+                <p className="lp-section-sub">
+                  {t('landing.syncSection.sub')}
+                </p>
+              </div>
+              <div className="col-span-12 lg:col-span-9 grid gap-x-6 gap-y-10 md:grid-cols-3 lp-step-row">
+                {SYNC_STEP_KEYS.map((s, i) => (
+                  <SyncStep key={s.n} n={s.n} title={t(s.titleKey)} body={t(s.bodyKey)} delay={i * 90} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* THEMES ───────────────────────────────────────────────────────── */}
+        <section className="border-t border-rule lp-section lp-section-alt">
+          <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-20 lg:py-28">
+            <div className="grid grid-cols-12 gap-x-8 gap-y-10">
+              <div className="col-span-12 lg:col-span-3">
+                <p className="lp-section-tag">{t('landing.themesSection.sectionTag')}</p>
+                <h2 className="lp-h2">
+                  <span>{t('landing.themesSection.h2Line1')}</span>
+                  <span className="lp-h2-italic"><em>{t('landing.themesSection.h2Line2')}</em></span>
+                </h2>
+                <p className="lp-section-sub">
+                  {t('landing.themesSection.sub')}
+                </p>
+              </div>
+              <div className="col-span-12 lg:col-span-9 lp-swatch-row">
+                {THEME_KEYS.map((th) => (
+                  <ThemeSwatch key={th.id} id={th.id} label={t(th.labelKey)} sub={t(th.subKey)} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CLOSING ─────────────────────────────────────────────────────── */}
+        <section className="border-t border-rule">
+          <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-24 lg:py-32 text-center">
+            <p className="lp-section-tag inline-block">{t('landing.closing.sectionTag')}</p>
+            <h2 className="lp-h-closing">
+              <span>{t('landing.closing.h1')}</span>
+              <span className="lp-h-closing-italic"><em>{t('landing.closing.h2')}</em></span>
             </h2>
-            <p className="closing-sub">
-              No setup. No accounts. Open the app and start typing — your books take shape from there.
+            <p className="lp-closing-sub">
+              {t('landing.closing.sub')}
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Link to="/dashboard" className="btn-primary btn-primary-lg group">
-                <span>Open the ledger</span>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-6">
+              <Link to="/dashboard" className="lp-btn lp-btn-primary lp-btn-lg group">
+                <span>{t('landing.hero.openApp')}</span>
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </Link>
+              <Link to="/login" className="lp-btn lp-btn-rule lp-btn-lg">
+                <span>{t('landing.hero.createAccount')}</span>
+              </Link>
             </div>
-            <Ornament className="mt-10" />
-            <p className="closing-fin">FIN.</p>
           </div>
         </section>
       </main>
 
-      {/* ╔════════════════════════ COLOPHON ═════════════════════╗ */}
       <footer className="border-t border-rule">
-        <div className="mx-auto max-w-[1280px] px-10 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-baseline">
-          <p className="eyebrow text-ink-faint">Colophon</p>
-          <p className="text-xs text-ink-muted leading-relaxed text-center md:text-left">
-            Set in <em>Fraunces</em>, <em>Instrument Sans</em>, and <em>JetBrains Mono</em>.
-            Pressed locally, printed on the open web.
-          </p>
-          <p className="text-xs text-ink-faint text-right font-display italic">
-            Your data, your device. <span className="numeric">© {now.getFullYear()}</span>
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="flex items-center gap-3">
+            <Wordmark size="sm" />
+            <span className="lp-foot-tag">{t('landing.footer.tag')}</span>
+          </div>
+          <div className="flex items-center justify-center gap-5">
+            <Link to="/dashboard" className="lp-foot-link">{t('landing.footer.openApp')}</Link>
+            <Link to="/login" className="lp-foot-link">{t('landing.footer.signIn')}</Link>
+            <a href="#features" className="lp-foot-link">{t('landing.footer.features')}</a>
+          </div>
+          <p className="lp-foot-meta md:text-right">
+            <span>© {new Date().getFullYear()}</span>
+            <span> · {t('landing.footer.meta1')} </span>
+            <em>Fraunces</em>, <em>Instrument Sans</em>, <em>JetBrains Mono</em>.
           </p>
         </div>
       </footer>
@@ -420,367 +432,644 @@ export default function LandingPage() {
   );
 }
 
-// ─── Page-scoped CSS ──────────────────────────────────────────────────────────
-
 const landingCss = `
 [data-landing-edition="true"] {
-  --leader: var(--rule-strong);
+  background: var(--canvas);
+  color: var(--ink);
 }
 
-.masthead-meta {
+/* ─── Type primitives ───────────────────────────────────────────────── */
+.lp-eyebrow {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.65rem;
-  font-weight: 500;
+  font-size: 0.7rem;
   letter-spacing: 0.18em;
   color: var(--ink-faint);
   text-transform: uppercase;
-}
-
-.cta-link {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.4rem 0.95rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: 999px;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: var(--ink);
-  transition: border-color 200ms ease, color 200ms ease, background 200ms ease;
 }
-.cta-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.cta-link-label { font-family: 'Instrument Sans', sans-serif; }
-.cta-link-arrow { display: inline-flex; transition: transform 200ms ease; }
-.cta-link:hover .cta-link-arrow { transform: translateX(2px); }
+.lp-eyebrow-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
 
-.cover-head {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 144, 'SOFT' 0;
+.lp-h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 144;
   font-weight: 400;
-  font-size: clamp(2.6rem, 4.6vw, 4.8rem);
-  line-height: 0.95;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.6rem, 5.4vw, 5rem);
+  line-height: 0.98;
+  letter-spacing: -0.038em;
   color: var(--ink);
   display: flex;
   flex-direction: column;
-  gap: 0;
-  max-width: 100%;
+  gap: 0.05em;
 }
-.cover-head-1 { padding-left: 0; }
-.cover-head-2 { color: var(--accent); padding-left: 1.6em; font-weight: 500; }
-.cover-head-3 { padding-left: 0.4em; }
-.cover-head em { font-style: italic; }
+.lp-h1-italic { color: var(--accent); font-weight: 500; }
+.lp-h1-italic em { font-style: italic; }
 
-.cover-lede {
-  font-family: 'Fraunces', serif;
+.lp-lede {
+  font-family: 'Fraunces', Georgia, serif;
   font-weight: 350;
-  font-size: 1.18rem;
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
   line-height: 1.55;
   color: var(--ink-muted);
-  max-width: 52ch;
-}
-.cover-lede em { font-style: italic; color: var(--ink); font-weight: 400; }
-
-.drop-cap {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 144;
-  font-weight: 500;
-  font-style: italic;
-  font-size: 4.6rem;
-  line-height: 0.85;
-  float: left;
-  padding: 0.18rem 0.55rem 0 0;
-  color: var(--accent);
+  max-width: 56ch;
 }
 
-.btn-primary {
+.lp-h2 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+.lp-h2-italic { color: var(--accent); font-weight: 500; }
+.lp-h2-italic em { font-style: italic; }
+
+.lp-h-closing {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2.8rem, 6vw, 4.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--ink);
   display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.7rem 1.3rem;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  font-family: 'Instrument Sans', sans-serif;
-  letter-spacing: 0.005em;
-  border: 1px solid var(--accent);
-  transition: transform 180ms ease, box-shadow 200ms ease, background 200ms ease;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 24px -10px var(--accent-soft);
+  flex-direction: column;
+  margin: 1.5rem auto 1rem;
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 2px 0 rgba(0,0,0,0.04), 0 14px 28px -8px var(--accent-soft); }
-.btn-primary:active { transform: translateY(0); }
-.btn-primary-lg { padding: 0.95rem 1.7rem; font-size: 0.95rem; }
-
-.btn-rule {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1.3rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: 4px;
-  color: var(--ink-muted);
-  font-size: 0.875rem;
-  font-family: 'Instrument Sans', sans-serif;
-  transition: color 180ms ease, border-color 180ms ease, background 200ms ease;
-}
-.btn-rule:hover { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
-.btn-rule-sm { padding: 0.4rem 0.85rem; font-size: 0.78rem; }
-
-.margin-caption {
-  font-family: 'Fraunces', serif;
+.lp-h-closing-italic { color: var(--accent); font-weight: 500; }
+.lp-h-closing-italic em { font-style: italic; }
+.lp-closing-sub {
+  font-family: 'Fraunces', Georgia, serif;
   font-style: italic;
   font-weight: 350;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--ink-faint);
-  letter-spacing: 0.005em;
+  font-size: 1.05rem;
+  color: var(--ink-muted);
+  max-width: 42ch;
+  margin: 0 auto;
+  line-height: 1.55;
 }
-.margin-caption em { color: var(--ink-muted); }
 
-.figure-frame {
-  position: relative;
-  padding: 0.75rem 0.75rem 0.5rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: 4px;
-  background: linear-gradient(180deg, transparent 0%, var(--accent-soft) 200%);
+.lp-section-tag {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
 }
-.figure-baseline {
+.lp-section-sub {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 350;
+  font-style: italic;
+  font-size: 0.98rem;
+  color: var(--ink-muted);
+  line-height: 1.55;
+  margin-top: 1.1rem;
+  max-width: 30ch;
+}
+
+.lp-section { background: var(--canvas); }
+.lp-section-alt { background: var(--surface); }
+
+/* ─── Nav ───────────────────────────────────────────────────────────── */
+.lp-nav {
+  background: color-mix(in srgb, var(--canvas) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+.lp-nav-link {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  transition: color 180ms ease, background 180ms ease;
+}
+.lp-nav-link:hover { color: var(--ink); background: var(--accent-soft); }
+
+/* ─── Buttons ───────────────────────────────────────────────────────── */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 6px;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  border: 1px solid transparent;
+  transition: transform 180ms ease, box-shadow 220ms ease, background 200ms ease, color 200ms ease, border-color 200ms ease;
+  cursor: pointer;
+}
+.lp-btn-sm { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
+.lp-btn-lg { padding: 0.85rem 1.4rem; font-size: 0.95rem; }
+
+.lp-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 14px 28px -14px var(--accent-soft);
+}
+.lp-btn-primary:hover {
+  transform: translateY(-1px);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.05), 0 22px 40px -16px var(--accent-soft);
+}
+.lp-btn-primary:active { transform: translateY(0); }
+
+.lp-btn-rule {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px solid var(--rule-strong);
+}
+.lp-btn-rule:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ─── Hero ──────────────────────────────────────────────────────────── */
+.lp-hero-grid {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 96px 96px;
+  opacity: 0.5;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 20%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 20%, transparent 100%);
+}
+[data-theme='gorka'] .lp-hero-grid,
+[data-theme='gorka-light'] .lp-hero-grid { display: none; }
+
+.lp-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin-top: 0.5rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule);
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  list-style: none;
+}
+.lp-trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.lp-trust-tick {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+/* ─── Hero composition ──────────────────────────────────────────────── */
+.lp-hero-stack {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.1rem;
+  perspective: 2000px;
+}
+.lp-hero-glow {
+  position: absolute;
+  inset: -10% -8% -10% -8%;
+  z-index: -1;
+  background: radial-gradient(60% 60% at 80% 20%, var(--accent-soft) 0%, transparent 70%),
+              radial-gradient(40% 40% at 10% 80%, var(--accent-soft) 0%, transparent 70%);
+  filter: blur(20px);
+  opacity: 0.9;
+}
+
+.lp-hero-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 30px 60px -32px rgba(0,0,0,0.45);
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 380ms ease;
+}
+.lp-hero-card:hover { transform: translateY(-2px); box-shadow: 0 36px 70px -28px rgba(0,0,0,0.55); }
+.lp-hero-card-1 { transform: translateX(0); }
+.lp-hero-card-2 { transform: translateX(2.5rem); }
+.lp-hero-card-3 { transform: translateX(-1rem); }
+@media (max-width: 1023px) {
+  .lp-hero-card-1, .lp-hero-card-2, .lp-hero-card-3 { transform: none; }
+}
+
+.lp-card-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0.35rem;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.06em;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
   color: var(--ink-faint);
   text-transform: uppercase;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--rule);
 }
-
-.dot-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.55rem;
-  font-size: 0.85rem;
-  color: var(--ink-muted);
-  padding: 0.18rem 0;
-}
-.dot-row dt { font-family: 'Instrument Sans', sans-serif; white-space: nowrap; }
-.dot-row .dot-leader {
-  flex: 1;
-  border-bottom: 1px dotted var(--leader);
-  position: relative;
-  top: -3px;
-}
-.dot-row dd {
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--ink);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.tone-positive { color: var(--positive) !important; }
-.tone-danger   { color: var(--danger) !important; }
-.tone-accent   { color: var(--accent) !important; }
-.tone-muted    { color: var(--ink-muted) !important; }
-
-.section-head {
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: 2.1rem;
-  line-height: 1;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-  display: flex;
-  flex-direction: column;
-}
-.section-head em { font-style: italic; color: var(--accent); font-weight: 500; }
-.section-sub {
-  font-family: 'Fraunces', serif;
-  font-weight: 350;
-  font-style: italic;
-  font-size: 0.95rem;
-  color: var(--ink-muted);
-  line-height: 1.5;
-}
-
-.contents-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.contents-row { border-bottom: 1px solid var(--rule); }
-.contents-row:first-child { border-top: 1px solid var(--rule); }
-.contents-link {
-  display: grid;
-  grid-template-columns: minmax(8rem, auto) 1fr 2rem;
-  align-items: baseline;
-  gap: 1.25rem;
-  padding: 1.1rem 0.5rem;
-  position: relative;
-  transition: padding 240ms cubic-bezier(0.2, 0.8, 0.2, 1), background 240ms ease;
-}
-.contents-link:hover { padding-left: 1.6rem; background: var(--accent-soft); }
-.contents-title {
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: 1.85rem;
-  color: var(--ink);
-  line-height: 1;
-  letter-spacing: -0.015em;
-  transition: color 200ms ease;
-}
-.contents-link:hover .contents-title { color: var(--accent); }
-.contents-blurb {
+.lp-tag {
   font-family: 'Fraunces', serif;
   font-style: italic;
-  font-weight: 350;
-  font-size: 0.95rem;
-  color: var(--ink-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.contents-leader {
-  border-bottom: 1px dotted var(--leader);
-  position: relative;
-  top: -5px;
-  transition: border-color 200ms ease;
-}
-.contents-link:hover .contents-leader { border-color: var(--accent); }
-.contents-arrow {
-  display: inline-flex;
-  align-items: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
   color: var(--ink-faint);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: opacity 200ms ease, transform 240ms ease, color 200ms ease;
-}
-.contents-link:hover .contents-arrow { opacity: 1; transform: translateX(0); color: var(--accent); }
-
-@media (max-width: 900px) {
-  .contents-link { grid-template-columns: 1fr 2rem; gap: 0.8rem; }
-  .contents-blurb, .contents-leader { display: none; }
+  text-transform: lowercase;
 }
 
-.letter-article {
+.lp-bignum {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 144;
+  font-weight: 400;
+  font-size: clamp(2.6rem, 4.4vw, 3.4rem);
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin: 0.85rem 0 0.3rem;
+  line-height: 1;
+}
+.lp-delta-row {
+  display: flex; gap: 0.7rem; align-items: baseline;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.82rem;
+}
+.lp-delta {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.lp-positive { color: var(--positive); }
+.lp-muted    { color: var(--ink-faint); font-size: 0.78rem; }
+
+.lp-spark {
+  height: 70px;
+  margin-top: 0.7rem;
+}
+.lp-spark-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+}
+
+.lp-holding-head {
+  display: flex; align-items: baseline; gap: 0.7rem;
+  margin-top: 0.85rem;
+}
+.lp-ticker {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--accent-soft);
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+}
+.lp-holding-name {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 350;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+}
+.lp-holding-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--rule);
+}
+.lp-holding-grid > div {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.15rem;
+}
+.lp-holding-grid .lp-muted {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lp-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.lp-goal-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 0.85rem;
+}
+.lp-goal-name {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.lp-goal-bar {
+  position: relative;
+  height: 6px;
+  background: var(--surface-sunken, var(--accent-soft));
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  margin-top: 0.55rem;
+  overflow: hidden;
+}
+.lp-goal-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: 2px;
+}
+.lp-goal-foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+.lp-goal-proj { height: 26px; }
+
+/* ─── Pillars ───────────────────────────────────────────────────────── */
+.lp-pillar {
   position: relative;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-strong);
 }
-.article-head {
+.lp-pillar-glyph {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  font-family: 'Fraunces', serif;
+  color: var(--accent);
+  font-size: 1.1rem;
+  background: var(--accent-soft);
+}
+.lp-pillar-title {
   font-family: 'Fraunces', serif;
   font-weight: 400;
   font-size: 1.45rem;
-  line-height: 1.1;
+  line-height: 1.15;
+  letter-spacing: -0.012em;
   color: var(--ink);
-  letter-spacing: -0.015em;
+  margin-bottom: 0.55rem;
 }
-.article-lede {
+.lp-pillar-body {
   font-family: 'Fraunces', serif;
   font-weight: 350;
   font-size: 0.98rem;
   line-height: 1.6;
   color: var(--ink-muted);
 }
-.article-lede em { font-style: italic; color: var(--ink); font-weight: 400; }
 
-.signature-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.85rem;
-  font-family: 'Fraunces', serif;
-}
-.signature-em { color: var(--ink-faint); font-size: 1.1rem; }
-.signature-name { font-size: 1.1rem; color: var(--ink); font-weight: 500; }
-.signature-role { color: var(--ink-muted); font-size: 0.95rem; font-weight: 350; }
-
-.specimen-frame {
-  position: relative;
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  background: var(--surface);
-  padding: 1.75rem 2rem 1.5rem;
-  box-shadow: 0 32px 80px -36px rgba(0,0,0,0.5);
-}
-.specimen-frame::before {
-  content: '';
-  position: absolute;
-  inset: 0.4rem;
-  border-radius: 6px;
+/* ─── Feature grid ──────────────────────────────────────────────────── */
+.lp-feature-grid {
+  grid-template-columns: 1fr;
+  background: var(--rule);
   border: 1px solid var(--rule);
-  opacity: 0.5;
-  pointer-events: none;
+  border-radius: 8px;
+  overflow: hidden;
 }
-.specimen-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--rule);
-}
+@media (min-width: 640px) { .lp-feature-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .lp-feature-grid { grid-template-columns: repeat(3, 1fr); } }
 
-.closing-card {
+.lp-feature {
+  display: block;
   position: relative;
-  padding: 4rem 2rem;
-  text-align: center;
-  border-top: 1px solid var(--rule-strong);
-  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface);
+  padding: 1.4rem 1.4rem 1.3rem;
+  text-decoration: none;
+  transition: background 220ms ease, transform 220ms ease;
 }
-.closing-card::before, .closing-card::after {
+.lp-feature:hover { background: var(--surface-raised, var(--surface)); }
+.lp-feature::after {
   content: '';
   position: absolute;
-  left: 50%;
-  width: 1px;
-  height: 24px;
-  background: var(--rule-strong);
-  transform: translateX(-50%);
+  left: 1.4rem; right: 1.4rem; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.closing-card::before { top: -12px; }
-.closing-card::after { bottom: -12px; }
-.closing-head {
+.lp-feature:hover::after { transform: scaleX(1); }
+
+.lp-feature-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 0.5rem;
+}
+.lp-feature-title {
   font-family: 'Fraunces', serif;
   font-weight: 400;
-  font-size: clamp(3rem, 6vw, 5.5rem);
-  line-height: 0.95;
-  letter-spacing: -0.03em;
+  font-size: 1.4rem;
   color: var(--ink);
-  display: inline-flex;
-  flex-direction: column;
-  margin: 1rem auto 1.25rem;
+  letter-spacing: -0.012em;
 }
-.closing-italic { color: var(--accent); font-weight: 500; }
-.closing-italic em { font-style: italic; }
-.closing-sub {
+.lp-feature-arrow {
+  color: var(--ink-faint);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 220ms ease, transform 220ms ease, color 220ms ease;
+}
+.lp-feature:hover .lp-feature-arrow { opacity: 1; transform: translateX(0); color: var(--accent); }
+
+.lp-feature-body {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink-muted);
+  margin-bottom: 0.85rem;
+  min-height: 2.8em;
+}
+.lp-feature-meta {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  border-top: 1px dashed var(--rule);
+  padding-top: 0.65rem;
+  width: 100%;
+}
+
+/* ─── Sync steps ────────────────────────────────────────────────────── */
+.lp-step-row { position: relative; }
+.lp-step {
+  position: relative;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule-strong);
+}
+.lp-step-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+  display: inline-block;
+}
+.lp-step-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin-bottom: 0.55rem;
+}
+.lp-step-body {
+  font-family: 'Fraunces', serif;
+  font-weight: 350;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+/* ─── Theme swatches ────────────────────────────────────────────────── */
+.lp-swatch-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 720px) { .lp-swatch-row { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1024px) { .lp-swatch-row { grid-template-columns: repeat(5, 1fr); } }
+
+.lp-swatch {
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--canvas);
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 280ms ease;
+}
+.lp-swatch:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 40px -22px rgba(0,0,0,0.4);
+}
+.lp-swatch-canvas {
+  background: var(--canvas);
+  padding: 0.85rem;
+  height: 100px;
+  display: flex;
+  align-items: stretch;
+}
+.lp-swatch-surface {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  padding: 0.6rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.lp-swatch-line {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ink-muted);
+  opacity: 0.35;
+}
+.lp-swatch-line-a { width: 65%; }
+.lp-swatch-line-b { width: 40%; }
+.lp-swatch-dot {
+  position: absolute;
+  right: 0.6rem; bottom: 0.6rem;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.lp-swatch-foot {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0.7rem 0.95rem;
+  border-top: 1px solid var(--rule-strong);
+  background: var(--surface);
+}
+.lp-swatch-label {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.lp-swatch-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* ─── Footer ────────────────────────────────────────────────────────── */
+.lp-foot-tag {
   font-family: 'Fraunces', serif;
   font-style: italic;
   font-weight: 350;
-  font-size: 1.05rem;
   color: var(--ink-muted);
-  max-width: 38ch;
-  margin: 0 auto;
-  line-height: 1.5;
+  font-size: 0.85rem;
 }
-.closing-fin {
-  margin-top: 1.5rem;
+.lp-foot-link {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  transition: color 180ms ease;
+}
+.lp-foot-link:hover { color: var(--accent); }
+.lp-foot-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+.lp-foot-meta em {
   font-family: 'Fraunces', serif;
   font-style: italic;
-  font-weight: 500;
-  letter-spacing: 0.4em;
-  font-size: 0.85rem;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
-[data-theme='gorka'] [data-landing-edition='true'],
-[data-theme='gorka-light'] [data-landing-edition='true'] {
-  --leader: rgba(148, 163, 184, 0.25);
+/* ─── Reveal animation ──────────────────────────────────────────────── */
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-[data-theme='eris'] [data-landing-edition='true'] {
-  --leader: rgba(212, 96, 122, 0.28);
+.lp-rise {
+  opacity: 0;
+  animation: lp-rise 720ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
+.lp-rise-1 { animation-delay: 80ms; }
+.lp-rise-2 { animation-delay: 160ms; }
+.lp-rise-3 { animation-delay: 280ms; }
+.lp-rise-4 { animation-delay: 380ms; }
+.lp-rise-5 { animation-delay: 460ms; }
 
+/* ─── Mobile tweaks ─────────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  .cover-head-2 { padding-left: 0.6em; }
-  .cover-head-3 { padding-left: 0; }
-  .specimen-frame { padding: 1.25rem; }
+  .lp-hero-card { padding: 1rem; }
+  .lp-bignum { font-size: 2.4rem; }
+  .lp-h1 { letter-spacing: -0.03em; }
+  .lp-h2 { font-size: 1.8rem; }
+  .lp-feature-body { min-height: auto; }
 }
 `;
