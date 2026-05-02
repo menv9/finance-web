@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FormField, Input, Button, Select } from '../ui';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useConfirm } from '../ConfirmContext';
@@ -325,9 +326,25 @@ function AssetSearch({ apiKey, onSelect }) {
             ))}
           </ul>
         ) : searched ? (
-          <p className="px-3 py-2 text-sm text-ink-muted">
-            {error || 'No matches found. You can fill the ticker and name manually below.'}
-          </p>
+          <div className="px-3 py-2 text-sm text-ink-muted">
+            {error ? (
+              apiKey ? (
+                <>Search failed: {error}. Try again, or fill the ticker manually below.</>
+              ) : (
+                <>
+                  Search failed — without a Finnhub key we route through public proxies that often time out (especially on mobile).{' '}
+                  <Link to="/settings" className="text-accent underline underline-offset-2">Add a Finnhub key</Link> for reliable search, or fill the ticker manually below.
+                </>
+              )
+            ) : apiKey ? (
+              <>No matches found. You can fill the ticker and name manually below.</>
+            ) : (
+              <>
+                No matches found. Coverage is limited without a Finnhub key —{' '}
+                <Link to="/settings" className="text-accent underline underline-offset-2">add one in Settings</Link> for broader results, or fill the ticker manually below.
+              </>
+            )}
+          </div>
         ) : (
           <p className="px-3 py-2 text-sm text-ink-muted">Type at least 2 characters to search.</p>
         )}
