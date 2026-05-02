@@ -370,6 +370,7 @@ export function AppShell({ children }) {
   const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
+  const profile = useFinanceStore((state) => state.profile);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
   const alert = useAlert();
   const locale = useMemo(() => 'en-GB', []);
@@ -396,7 +397,8 @@ export function AppShell({ children }) {
     [moduleVisible],
   );
 
-  const userHandle = supabaseUser?.email?.split('@')[0] ?? null;
+  const emailHandle = supabaseUser?.email?.split('@')[0] ?? null;
+  const userHandle = profile?.display_name || profile?.username || emailHandle;
 
   const isEris = supabaseUser?.email === 'erisbarrancop@gmail.com';
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
@@ -700,7 +702,7 @@ export function AppShell({ children }) {
             {supabaseConfigured && supabaseUser && (
               <div className="hidden sm:flex items-center gap-2 border-l border-rule pl-3">
                 <span
-                  className="eyebrow text-[0.6rem] text-ink-faint max-w-[96px] truncate"
+                  className="eyebrow text-[0.6rem] text-ink-faint max-w-[140px] truncate"
                   title={supabaseUser.email}
                 >
                   {userHandle}
@@ -809,14 +811,24 @@ export function AppShell({ children }) {
             ))}
           </nav>
         </div>
-        {/* Panel footer: balance + sign-out */}
+        {/* Panel footer: balance + debt + sign-out */}
         <div className="border-t border-rule px-4 py-4">
           <div className="flex items-end justify-between gap-3">
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="eyebrow text-[0.6rem] text-ink-muted">Total balance</span>
-              <span className="numeric text-sm text-ink truncate">
-                {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
-              </span>
+            <div className="flex items-end gap-4 min-w-0">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="eyebrow text-[0.6rem] text-ink-muted">Total balance</span>
+                <span className="numeric text-sm text-ink truncate">
+                  {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
+                </span>
+              </div>
+              {metrics.totalDebtCents > 0 && (
+                <div className="flex flex-col gap-0.5 min-w-0 border-l border-rule pl-4">
+                  <span className="eyebrow text-[0.6rem] text-ink-muted">Debt</span>
+                  <span className="numeric text-sm text-danger truncate">
+                    {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
+                  </span>
+                </div>
+              )}
             </div>
             {supabaseConfigured && supabaseUser && (
               <button
