@@ -47,8 +47,7 @@ function ProfileLine({ profile, trailing }) {
   );
 }
 
-function AvatarUploader() {
-  const profile = useFinanceStore((s) => s.profile);
+function ProfileHero({ profile }) {
   const setAvatar = useFinanceStore((s) => s.setAvatar);
   const clearAvatar = useFinanceStore((s) => s.clearAvatar);
   const alert = useAlert();
@@ -90,22 +89,33 @@ function AvatarUploader() {
     }
   };
 
+  const displayName = profile?.display_name?.trim() || profile?.username || '—';
+
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6">
       <button
         type="button"
         onClick={onPick}
         disabled={busy}
         aria-label="Change avatar"
-        className="group relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60"
+        className="group relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60"
       >
-        <Avatar profile={profile} size={64} />
-        <span className="absolute inset-0 rounded-full border border-rule-strong opacity-0 group-hover:opacity-100 group-hover:bg-canvas/30 transition-opacity flex items-center justify-center text-[0.6rem] eyebrow text-ink">
+        <Avatar profile={profile} size={128} />
+        <span className="absolute inset-0 rounded-full border border-rule-strong opacity-0 group-hover:opacity-100 group-hover:bg-canvas/40 transition-opacity flex items-center justify-center eyebrow text-ink">
           Change
         </span>
       </button>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="min-w-0 flex-1 text-center sm:text-left">
+        <h2 className="font-display text-3xl sm:text-4xl leading-tight tracking-tight text-ink break-words">
+          {displayName}
+        </h2>
+        {profile?.username ? (
+          <p className="mt-1 text-sm text-ink-muted">@{profile.username}</p>
+        ) : null}
+        {profile?.bio ? (
+          <p className="mt-3 text-sm text-ink whitespace-pre-wrap break-words">{profile.bio}</p>
+        ) : null}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <Button variant="secondary" size="sm" onClick={onPick} loading={busy}>
             {profile?.avatar_url ? 'Replace photo' : 'Upload photo'}
           </Button>
@@ -115,7 +125,7 @@ function AvatarUploader() {
             </Button>
           ) : null}
         </div>
-        <p className="text-xs text-ink-faint">JPG, PNG, WebP or GIF. Up to 5 MB.</p>
+        <p className="mt-2 text-xs text-ink-faint">JPG, PNG, WebP or GIF. Up to 5 MB.</p>
       </div>
       <input
         ref={fileRef}
@@ -179,8 +189,9 @@ function ProfileEditor() {
   };
 
   return (
-    <div className="grid gap-5">
-      <AvatarUploader />
+    <div className="grid gap-6">
+      <ProfileHero profile={profile} />
+      <div className="h-px bg-rule" />
       <form onSubmit={submit} className="grid gap-4">
         <FormField label="Username" hint="3–20 lowercase letters, numbers, or underscores.">
           {(p) => (
