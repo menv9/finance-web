@@ -2344,12 +2344,23 @@ export const useFinanceStore = create((set, get) => ({
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        // Land on /login so its <Navigate to="/dashboard" /> guard kicks in
+        // once the session is parsed from the URL hash. Returning to '/'
+        // gets immediately rerouted to '/landing' (public) and the user
+        // appears stuck even though they're authenticated.
+        redirectTo: `${window.location.origin}/login`,
       },
     });
     if (error) {
       set({ supabaseSyncStatus: 'error', supabaseError: error.message });
       throw error;
+    }
+  },
+
+  resetAuthStatus: () => {
+    const status = get().supabaseSyncStatus;
+    if (status === 'auth-pending' || status === 'error') {
+      set({ supabaseSyncStatus: 'idle', supabaseError: '' });
     }
   },
 

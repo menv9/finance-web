@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { Button } from '../components/ui';
@@ -67,6 +67,14 @@ export default function LoginPage() {
   const signUpWithPassword = useFinanceStore((s) => s.signUpWithPassword);
   const signInWithPassword = useFinanceStore((s) => s.signInWithPassword);
   const sendPasswordReset = useFinanceStore((s) => s.sendPasswordReset);
+  const resetAuthStatus = useFinanceStore((s) => s.resetAuthStatus);
+
+  // If the user lands here after backing out of an OAuth flow, the status can
+  // be stuck on 'auth-pending'. Clear it so the form is interactive again.
+  useEffect(() => {
+    if (!supabaseUser) resetAuthStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
