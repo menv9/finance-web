@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, FormField, Input, Toggle } from '../components/ui';
+import { useTranslation } from '../i18n/useTranslation';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 
@@ -18,8 +19,8 @@ export default function OnboardingPage() {
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const saveSavingsConfig = useFinanceStore((state) => state.saveSavingsConfig);
 
+  const { t, locale } = useTranslation();
   const currency = settings.baseCurrency || 'EUR';
-  const locale = settings.locale || 'en-GB';
   const [saving, setSaving] = useState(false);
   const [setup, setSetup] = useState({
     initialCash: '',
@@ -35,15 +36,15 @@ export default function OnboardingPage() {
   const savingsBalanceCents = toCents(setup.savingsBalance);
   const setupSummary = useMemo(
     () => [
-      initialCashCents > 0 ? `Available cash: ${formatCurrency(initialCashCents, currency, locale)}` : null,
-      savingsBalanceCents > 0 ? `Current savings: ${formatCurrency(savingsBalanceCents, currency, locale)}` : null,
-      setup.portfolio ? 'Portfolio module enabled' : 'Portfolio module hidden',
-      setup.buckets ? 'Savings bucket prompts enabled' : null,
-      setup.budgets ? 'Budget prompts enabled' : null,
-      setup.recurringIncome ? 'Recurring income prompts enabled' : null,
-      setup.recurringBills ? 'Recurring bill prompts enabled' : null,
+      initialCashCents > 0 ? t('onboarding.summaryAvailableCash', { amount: formatCurrency(initialCashCents, currency, locale) }) : null,
+      savingsBalanceCents > 0 ? t('onboarding.summaryCurrentSavings', { amount: formatCurrency(savingsBalanceCents, currency, locale) }) : null,
+      setup.portfolio ? t('onboarding.summaryPortfolioEnabled') : t('onboarding.summaryPortfolioHidden'),
+      setup.buckets ? t('onboarding.summaryBuckets') : null,
+      setup.budgets ? t('onboarding.summaryBudgets') : null,
+      setup.recurringIncome ? t('onboarding.summaryRecurringIncome') : null,
+      setup.recurringBills ? t('onboarding.summaryRecurringBills') : null,
     ].filter(Boolean),
-    [currency, initialCashCents, locale, savingsBalanceCents, setup],
+    [currency, initialCashCents, locale, savingsBalanceCents, setup, t],
   );
 
   const completeWithoutSetup = async () => {
@@ -116,22 +117,22 @@ export default function OnboardingPage() {
       <div className="mx-auto grid max-w-2xl gap-6">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-rule pb-5">
           <div>
-            <p className="eyebrow">FinGes setup</p>
-            <h1 className="mt-2 font-display text-4xl leading-none text-ink">Initial setup</h1>
+            <p className="eyebrow">{t('onboarding.eyebrow')}</p>
+            <h1 className="mt-2 font-display text-4xl leading-none text-ink">{t('onboarding.title')}</h1>
           </div>
           <Button variant="ghost" size="sm" onClick={completeWithoutSetup} disabled={saving}>
-            Skip for now
+            {t('onboarding.skipForNow')}
           </Button>
         </header>
 
         <Card
-          eyebrow="Essentials"
-          title="Set your starting point"
-          description="Only the basics. You can create detailed records later from each page."
+          eyebrow={t('onboarding.cardEyebrow')}
+          title={t('onboarding.cardTitle')}
+          description={t('onboarding.cardDescription')}
         >
           <div className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField label={`Available cash (${currency})`} hint="Money already available to spend.">
+              <FormField label={t('onboarding.availableCash', { currency })} hint={t('onboarding.availableCashHint')}>
                 {({ id, ...props }) => (
                   <Input
                     id={id}
@@ -146,7 +147,7 @@ export default function OnboardingPage() {
                   />
                 )}
               </FormField>
-              <FormField label={`Current savings (${currency})`} hint="Money already set aside in savings.">
+              <FormField label={t('onboarding.currentSavings', { currency })} hint={t('onboarding.currentSavingsHint')}>
                 {({ id, ...props }) => (
                   <Input
                     id={id}
@@ -168,36 +169,36 @@ export default function OnboardingPage() {
                 id="setup-portfolio"
                 checked={setup.portfolio}
                 onChange={(checked) => updateSetup('portfolio', checked)}
-                label="Use Portfolio"
-                description="Show Portfolio in navigation. It stays enabled if you already have holdings."
+                label={t('onboarding.usePortfolio')}
+                description={t('onboarding.usePortfolioDescription')}
               />
               <Toggle
                 id="setup-buckets"
                 checked={setup.buckets}
                 onChange={(checked) => updateSetup('buckets', checked)}
-                label="I want savings buckets"
-                description="FinGes can prompt you to create savings targets later."
+                label={t('onboarding.wantBuckets')}
+                description={t('onboarding.wantBucketsDescription')}
               />
               <Toggle
                 id="setup-budgets"
                 checked={setup.budgets}
                 onChange={(checked) => updateSetup('budgets', checked)}
-                label="I want category budgets"
-                description="FinGes can prompt you to plan monthly category limits later."
+                label={t('onboarding.wantBudgets')}
+                description={t('onboarding.wantBudgetsDescription')}
               />
               <Toggle
                 id="setup-recurring-income"
                 checked={setup.recurringIncome}
                 onChange={(checked) => updateSetup('recurringIncome', checked)}
-                label="I have recurring income"
-                description="FinGes can remind you to add fixed monthly income later."
+                label={t('onboarding.recurringIncome')}
+                description={t('onboarding.recurringIncomeDescription')}
               />
               <Toggle
                 id="setup-recurring-bills"
                 checked={setup.recurringBills}
                 onChange={(checked) => updateSetup('recurringBills', checked)}
-                label="I have recurring bills"
-                description="FinGes can remind you to add recurring bills later."
+                label={t('onboarding.recurringBills')}
+                description={t('onboarding.recurringBillsDescription')}
               />
             </div>
 

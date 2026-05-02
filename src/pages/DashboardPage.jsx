@@ -18,6 +18,7 @@ import { Card, Stat, Button, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { rise } from '../utils/motion';
 import ShinyText from '../components/ShinyText';
+import { useTranslation } from '../i18n/useTranslation';
 
 // Gorka-only: cursor spotlight overlay for KPI cells
 function GorkaSpotlight({ children, className = '' }) {
@@ -48,17 +49,6 @@ function GorkaSpotlight({ children, className = '' }) {
   );
 }
 
-function greeting(date = new Date()) {
-  const h = date.getHours();
-  if (h < 5) return 'Still up';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function formatLongDate(date = new Date()) {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'full' }).format(date);
-}
 
 function EyeIcon({ hidden }) {
   return (
@@ -95,12 +85,12 @@ function IncomeArrowIcon() {
   );
 }
 
-function RecentActivity({ items, currency, locale }) {
+function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription }) {
   if (!items.length) {
     return (
       <EmptyState
-        title="No recent activity"
-        description="Your ledger is quiet. Log an expense or income on the next page to see it here."
+        title={emptyTitle}
+        description={emptyDescription}
       />
     );
   }
@@ -143,6 +133,7 @@ function RecentActivity({ items, currency, locale }) {
 }
 
 export default function DashboardPage() {
+  const { t, locale } = useTranslation();
   const reportRef = useRef(null);
   const [hideKpis, setHideKpis] = useState(() => localStorage.getItem('pft-dashboard-hide-kpis') === 'true');
   const dashboard = useFinanceStore((state) => state.derived.dashboard);
@@ -155,8 +146,19 @@ export default function DashboardPage() {
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
 
   const currency = settings.baseCurrency;
-  const locale = settings.locale || 'en-GB';
   const portfolioEnabled = settings.modules?.portfolio !== false;
+
+  function greeting(date = new Date()) {
+    const h = date.getHours();
+    if (h < 5) return t('dashboard.greetingStillUp');
+    if (h < 12) return t('dashboard.greetingMorning');
+    if (h < 18) return t('dashboard.greetingAfternoon');
+    return t('dashboard.greetingEvening');
+  }
+
+  function formatLongDate(date = new Date()) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'full' }).format(date);
+  }
 
   const netWorthDelta = useMemo(() => {
     const s = dashboard.netWorthSeries || [];
@@ -206,43 +208,43 @@ export default function DashboardPage() {
   const totalDebtCents = dashboard.totalDebtCents || 0;
   const kpis = [
     {
-      label: 'Net worth',
+      label: t('dashboard.kpiNetWorth.label'),
       value: dashboard.netWorthCents,
       mode: 'currency',
       delta: netWorthDelta,
       deltaMode: 'percent',
-      info: 'Total balance plus savings and portfolio value, minus any outstanding debts. Your broad financial position.',
+      info: t('dashboard.kpiNetWorth.info'),
     },
     {
-      label: 'Total balance',
+      label: t('dashboard.kpiTotalBalance.label'),
       value: dashboard.availableBalanceCents,
       mode: 'currency',
-      hint: 'bank accounts',
-      info: 'Cash available now across your bank accounts. Manual income and expenses update the account you choose.',
+      hint: t('dashboard.kpiTotalBalance.hint'),
+      info: t('dashboard.kpiTotalBalance.info'),
     },
     {
-      label: 'Total savings',
+      label: t('dashboard.kpiTotalSavings.label'),
       value: dashboard.savingsBalanceCents,
       mode: 'currency',
-      hint: 'saved balance',
-      info: 'Current savings balance plus all logged savings entries.',
+      hint: t('dashboard.kpiTotalSavings.hint'),
+      info: t('dashboard.kpiTotalSavings.info'),
     },
     ...(portfolioEnabled
       ? [{
-          label: 'Portfolio value',
+          label: t('dashboard.kpiPortfolioValue.label'),
           value: portfolio.currentValueCents,
           mode: 'currency',
           hint: `TWRR ${(portfolio.twrr ?? 0).toFixed(2)}%`,
-          info: 'Current market value of your active portfolio holdings.',
+          info: t('dashboard.kpiPortfolioValue.info'),
         }]
       : []),
     ...(totalDebtCents > 0
       ? [{
-          label: 'Total debt',
+          label: t('dashboard.kpiTotalDebt.label'),
           value: totalDebtCents,
           mode: 'currency',
-          hint: 'outstanding',
-          info: 'Sum of all debt balances. Net worth subtracts this. Linked expense payments reduce it automatically.',
+          hint: t('dashboard.kpiTotalDebt.hint'),
+          info: t('dashboard.kpiTotalDebt.info'),
         }]
       : []),
   ];

@@ -27,10 +27,11 @@ import {
   Modal,
 } from '../components/ui';
 import { rise } from '../utils/motion';
+import { useTranslation } from '../i18n/useTranslation';
 
 const PAGE_SIZE = 5;
 
-function Pagination({ page, totalPages, onPrev, onNext }) {
+function Pagination({ page, totalPages, onPrev, onNext, tPrev, tNext }) {
   if (totalPages <= 1) return null;
   return (
     <div className="mt-4 flex items-center justify-center gap-3 text-sm">
@@ -40,7 +41,7 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === 1}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        ‹ Previous
+        ‹ {tPrev}
       </button>
       <span className="tabular text-ink-muted">
         {page} / {totalPages}
@@ -51,7 +52,7 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === totalPages}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        Next ›
+        {tNext} ›
       </button>
     </div>
   );
@@ -128,12 +129,13 @@ function ExpenseLedgerList({
   openAttachments,
   openEditExpense,
   onDeleteExpense,
+  t,
 }) {
   return (
     <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
       {rows.map((row) => {
         const attCount = attachments.filter((a) => a.expenseId === row.id).length;
-        const meta = row.category || 'Expense';
+        const meta = row.category || t('expenses.title');
         return (
           <li
             key={row.id}
@@ -143,7 +145,7 @@ function ExpenseLedgerList({
               {selectable ? (
                 <input
                   type="checkbox"
-                  aria-label="Select expense"
+                  aria-label={t('expenses.rowAriaEdit')}
                   checked={selectedIds?.has(row.id)}
                   onChange={() => onToggleRow?.(row.id)}
                   className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
@@ -152,7 +154,7 @@ function ExpenseLedgerList({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline justify-between gap-4">
                   <p className="min-w-0 truncate text-sm text-ink">
-                    {row.description || row.category || 'Expense'}
+                    {row.description || row.category || t('expenses.title')}
                   </p>
                   <span className="numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular text-danger bg-danger-soft">
                     -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
@@ -167,8 +169,8 @@ function ExpenseLedgerList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
-                        aria-label={`Open ${attCount} attachment${attCount !== 1 ? 's' : ''}`}
-                        title={`Attachments (${attCount})`}
+                        aria-label={t('expenses.rowAriaAttachments', { count: attCount, plural: attCount !== 1 ? 's' : '' })}
+                        title={t('expenses.rowAriaAttachments', { count: attCount, plural: attCount !== 1 ? 's' : '' })}
                         onClick={() => openAttachments(row.id)}
                       >
                         <PaperclipIcon />
@@ -177,8 +179,8 @@ function ExpenseLedgerList({
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                      aria-label="Edit expense"
-                      title="Edit"
+                      aria-label={t('expenses.rowAriaEdit')}
+                      title={t('common.edit')}
                       onClick={() => openEditExpense(row.id)}
                     >
                       <EditIcon />
@@ -186,8 +188,8 @@ function ExpenseLedgerList({
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                      aria-label="Delete expense"
-                      title="Delete"
+                      aria-label={t('expenses.rowAriaDelete')}
+                      title={t('common.delete')}
                       onClick={() => onDeleteExpense(row.id)}
                     >
                       <TrashIcon />
@@ -210,6 +212,7 @@ function FixedExpenseLedgerList({
   onEdit,
   onToggleStatus,
   onDelete,
+  t,
 }) {
   return (
     <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
@@ -226,7 +229,7 @@ function FixedExpenseLedgerList({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline justify-between gap-4">
                   <p className="min-w-0 truncate text-sm text-ink">
-                    {row.name || 'Recurring bill'}
+                    {row.name || t('expenses.recurringBillFallback')}
                   </p>
                   <span className="numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular text-danger bg-danger-soft">
                     -{formatCurrency(Math.abs(row.amountCents), row.currency || currency, locale).replace(/^[−-]/, '')}
@@ -236,8 +239,8 @@ function FixedExpenseLedgerList({
                   <p className="min-w-0 truncate eyebrow flex items-center gap-1.5">
                     {meta}
                     <span
-                      aria-label={row.active ? 'Active' : 'Paused'}
-                      title={row.active ? 'Active' : 'Paused'}
+                      aria-label={row.active ? t('expenses.statusActive') : t('expenses.statusPaused')}
+                      title={row.active ? t('expenses.statusActive') : t('expenses.statusPaused')}
                       className={
                         'inline-block h-1.5 w-1.5 rounded-full ' +
                         (row.active ? 'bg-positive' : 'bg-ink-faint')
@@ -248,8 +251,8 @@ function FixedExpenseLedgerList({
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                      aria-label="Edit recurring bill"
-                      title="Edit"
+                      aria-label={t('expenses.rowAriaEditRecurring')}
+                      title={t('common.edit')}
                       onClick={() => onEdit(row.id)}
                     >
                       <EditIcon />
@@ -257,8 +260,8 @@ function FixedExpenseLedgerList({
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                      aria-label={row.active ? 'Pause recurring bill' : 'Resume recurring bill'}
-                      title={row.active ? 'Pause' : 'Resume'}
+                      aria-label={row.active ? t('expenses.rowAriaPause') : t('expenses.rowAriaResume')}
+                      title={row.active ? t('expenses.statusActive') : t('expenses.statusPaused')}
                       onClick={() => onToggleStatus(row.id)}
                     >
                       {row.active ? <PauseIcon /> : <PlayIcon />}
@@ -266,8 +269,8 @@ function FixedExpenseLedgerList({
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                      aria-label="Delete recurring bill"
-                      title="Delete"
+                      aria-label={t('expenses.rowAriaDeleteRecurring')}
+                      title={t('common.delete')}
                       onClick={() => onDelete(row.id)}
                     >
                       <TrashIcon />
@@ -284,6 +287,8 @@ function FixedExpenseLedgerList({
 }
 
 export default function ExpensesPage() {
+  const { t, locale } = useTranslation();
+
   const expenses = useFinanceStore((state) => state.expenses);
   const fixedExpenses = useFinanceStore((state) => state.fixedExpenses);
   const attachments = useFinanceStore((state) => state.attachments);
@@ -307,7 +312,6 @@ export default function ExpensesPage() {
 
   const confirm = useConfirm();
   const alert = useAlert();
-  const locale = settings.locale;
   const currency = settings.baseCurrency;
   const filteredExpenses = useMemo(
     () =>
@@ -373,8 +377,8 @@ export default function ExpensesPage() {
   const handleBatchDeleteExpenses = async () => {
     const ids = [...batchSelect.selectedIds];
     const ok = await confirm({
-      title: `Delete ${ids.length} expense${ids.length !== 1 ? 's' : ''}`,
-      description: 'These expenses will be permanently removed. This cannot be undone.',
+      title: t('expenses.confirmDeleteBatch.title', { count: ids.length, plural: ids.length !== 1 ? 's' : '' }),
+      description: t('expenses.confirmDeleteBatch.description'),
     });
     if (!ok) return;
     for (const id of ids) await removeEntity('expenses', id);
@@ -382,10 +386,10 @@ export default function ExpensesPage() {
   };
 
   const expenseColumns = [
-    { key: 'date', header: 'Date', width: 110, sortable: true },
+    { key: 'date', header: t('common.edit'), width: 110, sortable: true },
     {
       key: 'description',
-      header: 'Description',
+      header: t('expenses.ledgerCard.descriptionLabel'),
       sortable: true,
       noTruncate: true,
       render: (r) => (
@@ -396,7 +400,7 @@ export default function ExpensesPage() {
     },
     {
       key: 'category',
-      header: 'Category',
+      header: t('expenses.ledgerCard.categoryLabel'),
       sortable: true,
       hideOnMobile: true,
       render: (row) => (
@@ -407,14 +411,14 @@ export default function ExpensesPage() {
     },
     {
       key: 'amountCents',
-      header: 'Amount',
+      header: t('expenses.kpiTracked.label'),
       numeric: true,
       sortable: true,
       render: (r) => <span className="text-danger">{formatCurrency(r.amountCents, r.currency, locale)}</span>,
     },
     {
       key: 'isRecurring',
-      header: 'Recurring',
+      header: t('expenses.recurringCard.title'),
       hideOnMobile: true,
       align: 'center',
       render: (r) =>
@@ -439,13 +443,13 @@ export default function ExpensesPage() {
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => openEditExpense(r.id)}>
-              Edit
+              {t('common.edit')}
             </Button>
             <Button variant="ghost" size="sm" onClick={async () => {
-              if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+              if (await confirm({ title: t('expenses.confirmDeleteOne.title'), description: t('expenses.confirmDeleteOne.description') }))
                 removeEntity('expenses', r.id);
             }}>
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         );
@@ -459,8 +463,8 @@ export default function ExpensesPage() {
                 variant="ghost"
                 size="sm"
                 className="h-10 w-10 px-0"
-                aria-label={`Open ${attCount} attachment${attCount !== 1 ? 's' : ''}`}
-                title={`Attachments (${attCount})`}
+                aria-label={t('expenses.rowAriaAttachments', { count: attCount, plural: attCount !== 1 ? 's' : '' })}
+                title={t('expenses.rowAriaAttachments', { count: attCount, plural: attCount !== 1 ? 's' : '' })}
                 onClick={() => openAttachments(r.id)}
               >
                 <PaperclipIcon />
@@ -470,8 +474,8 @@ export default function ExpensesPage() {
               variant="ghost"
               size="sm"
               className="h-10 w-10 px-0"
-              aria-label="Edit expense"
-              title="Edit"
+              aria-label={t('expenses.rowAriaEdit')}
+              title={t('common.edit')}
               onClick={() => openEditExpense(r.id)}
             >
               <EditIcon />
@@ -480,10 +484,10 @@ export default function ExpensesPage() {
               variant="ghost"
               size="sm"
               className="h-10 w-10 px-0"
-              aria-label="Delete expense"
-              title="Delete"
+              aria-label={t('expenses.rowAriaDelete')}
+              title={t('common.delete')}
               onClick={async () => {
-                if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                if (await confirm({ title: t('expenses.confirmDeleteOne.title'), description: t('expenses.confirmDeleteOne.description') }))
                   removeEntity('expenses', r.id);
               }}
             >
@@ -499,16 +503,16 @@ export default function ExpensesPage() {
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="02"
-        eyebrow="Module"
-        title="Expenses"
-        description="Variable and recurring outflows. Log transactions and see where the month goes."
+        eyebrow={t('expenses.eyebrow')}
+        title={t('expenses.title')}
+        description={t('expenses.description')}
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={exportCsv}>
-              Export CSV
+              {t('expenses.exportCsv')}
             </Button>
             <Button variant="primary" size="sm" onClick={openNewExpense}>
-              <PlusIcon /> New expense
+              <PlusIcon /> {t('expenses.newExpense')}
             </Button>
             <MonthSelector
               id="expenses-view-month"
@@ -524,41 +528,41 @@ export default function ExpensesPage() {
       <section data-tour="expenses-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
-            label="Selected month"
+            label={t('expenses.kpiSelectedMonth.label')}
             value={monthTotal}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={`${filteredExpenses.length} transactions`}
-            info="Total expenses in the selected month after the current category and search filters are applied."
+            hint={t('expenses.kpiSelectedMonth.hintTransactions', { count: filteredExpenses.length })}
+            info={t('expenses.kpiSelectedMonth.info')}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat
-            label="Fixed monthly"
+            label={t('expenses.kpiFixedMonthly.label')}
             value={fixedMonthly}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={`${fixedExpenses.filter((f) => f.active).length} active`}
-            info="Sum of active recurring bills configured in the recurring expenses schedule."
+            hint={t('expenses.kpiFixedMonthly.hintActive', { count: fixedExpenses.filter((f) => f.active).length })}
+            info={t('expenses.kpiFixedMonthly.info')}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
           <Stat
-            label="Tracked"
+            label={t('expenses.kpiTracked.label')}
             value={expenses.length}
             mode="number"
             locale={locale}
-            hint="all-time entries"
-            info="Total number of expense records stored in the app."
+            hint={t('expenses.kpiTracked.hint')}
+            info={t('expenses.kpiTracked.info')}
           />
         </div>
       </section>
 
       {/* charts */}
       <section className="grid gap-6 lg:grid-cols-12">
-        <Card eyebrow="Twelve months" title="Monthly spend" variant="chart" className={'lg:col-span-8 ' + rise(2)}>
+        <Card eyebrow={t('expenses.spendChart.eyebrow')} title={t('expenses.spendChart.title')} variant="chart" className={'lg:col-span-8 ' + rise(2)}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -575,7 +579,7 @@ export default function ExpensesPage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card data-tour="expenses-breakdown" eyebrow="Filtered month" title="By category" className={'lg:col-span-4 ' + rise(3)}>
+        <Card data-tour="expenses-breakdown" eyebrow={t('expenses.breakdownCard.eyebrow')} title={t('expenses.breakdownCard.title')} className={'lg:col-span-4 ' + rise(3)}>
           {breakdown.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[200px] w-full max-w-[220px] min-w-0">
@@ -622,12 +626,12 @@ export default function ExpensesPage() {
                   });
                 })()}
                 {breakdown.length > 5 ? (
-                  <li className="eyebrow pl-5 text-ink-faint">+{breakdown.length - 5} more</li>
+                  <li className="eyebrow pl-5 text-ink-faint">{t('expenses.breakdownCard.moreCategories', { count: breakdown.length - 5 })}</li>
                 ) : null}
               </ul>
             </div>
           ) : (
-            <EmptyState title="No data" description="Log expenses to see the split." />
+            <EmptyState title={t('expenses.breakdownCard.emptyTitle')} description={t('expenses.breakdownCard.emptyDescription')} />
           )}
         </Card>
       </section>
@@ -636,31 +640,31 @@ export default function ExpensesPage() {
       <section className="grid gap-6 lg:grid-cols-12">
         <Card
         data-tour="expenses-log"
-        eyebrow="Ledger"
-        title="Expenses"
-        description="Filter the selected month by category and description."
+        eyebrow={t('expenses.ledgerCard.eyebrow')}
+        title={t('expenses.ledgerCard.title')}
+        description={t('expenses.ledgerCard.description')}
         action={
           <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
-                Select
+                {t('expenses.select')}
               </Button>
             )}
             <Button variant="primary" size="sm" onClick={openNewExpense}>
-              <PlusIcon /> Add expense
+              <PlusIcon /> {t('expenses.addExpense')}
             </Button>
           </div>
         }
         className={'lg:col-span-8 ' + rise(3)}
       >
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label="Category" htmlFor="expenses-category">
+          <FormField label={t('expenses.ledgerCard.categoryLabel')} htmlFor="expenses-category">
             <Select
               id="expenses-category"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
-              <option value="all">All categories</option>
+              <option value="all">{t('expenses.ledgerCard.allCategories')}</option>
               {settings.categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -668,11 +672,11 @@ export default function ExpensesPage() {
               ))}
             </Select>
           </FormField>
-          <FormField label="Description" htmlFor="expenses-desc">
+          <FormField label={t('expenses.ledgerCard.descriptionLabel')} htmlFor="expenses-desc">
             <Input
               id="expenses-desc"
               type="text"
-              placeholder="Search…"
+              placeholder={t('expenses.ledgerCard.searchPlaceholder')}
               value={descSearch}
               onChange={(e) => setDescSearch(e.target.value)}
             />
@@ -684,7 +688,7 @@ export default function ExpensesPage() {
             onClick={() => setCatModalOpen(true)}
             className="text-xs text-accent hover:underline"
           >
-            Manage categories
+            {t('expenses.manageCategories')}
           </button>
         </div>
 
@@ -707,24 +711,27 @@ export default function ExpensesPage() {
               openAttachments={openAttachments}
               openEditExpense={openEditExpense}
               onDeleteExpense={async (id) => {
-                if (await confirm({ title: 'Delete expense', description: 'This expense will be permanently removed.' }))
+                if (await confirm({ title: t('expenses.confirmDeleteOne.title'), description: t('expenses.confirmDeleteOne.description') }))
                   removeEntity('expenses', id);
               }}
+              t={t}
             />
             <Pagination
               page={expensePage}
               totalPages={Math.ceil(sortedExpenses.length / PAGE_SIZE)}
               onPrev={() => setExpensePage((p) => Math.max(1, p - 1))}
               onNext={() => setExpensePage((p) => Math.min(Math.ceil(sortedExpenses.length / PAGE_SIZE), p + 1))}
+              tPrev={t('common.previous')}
+              tNext={t('common.next')}
             />
           </>
         ) : (
           <EmptyState
-            title="No expenses for this filter"
-            description="Try another month, clear the category, or add a new expense."
+            title={t('expenses.ledgerCard.emptyTitle')}
+            description={t('expenses.ledgerCard.emptyDescription')}
             action={
               <Button variant="secondary" size="sm" onClick={openNewExpense}>
-                <PlusIcon /> Add expense
+                <PlusIcon /> {t('expenses.addExpense')}
               </Button>
             }
           />
@@ -734,12 +741,12 @@ export default function ExpensesPage() {
       {/* fixed expenses */}
         <Card
         data-tour="expenses-recurring"
-        eyebrow="Schedule"
-        title="Recurring bills"
-        description="Rent, utilities, subscriptions. Pause, resume, or remove — paused bills drop out of projections."
+        eyebrow={t('expenses.recurringCard.eyebrow')}
+        title={t('expenses.recurringCard.title')}
+        description={t('expenses.recurringCard.description')}
         action={
           <Button variant="primary" size="sm" onClick={openNewFixed}>
-            <PlusIcon /> Add recurring
+            <PlusIcon /> {t('expenses.addRecurring')}
           </Button>
         }
         className={'lg:col-span-4 ' + rise(4)}
@@ -753,24 +760,25 @@ export default function ExpensesPage() {
             onToggleStatus={toggleFixedExpenseStatus}
             onDelete={async (id) => {
               const row = fixedExpenses.find((f) => f.id === id);
-              if (await confirm({ title: 'Delete recurring bill', description: `"${row?.name}" will be permanently removed.` }))
+              if (await confirm({ title: t('expenses.confirmDeleteRecurring.title'), description: t('expenses.confirmDeleteRecurring.description', { name: row?.name }) }))
                 removeEntity('fixedExpenses', id);
             }}
+            t={t}
           />
         ) : (
           <>
             {settings.setupIntent?.recurringBills && (
               <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
-                <p className="text-sm font-medium text-ink">You mentioned having recurring bills</p>
-                <p className="mt-0.5 text-xs text-ink-muted">Add rent, subscriptions, or utilities here — they stay in your monthly projections automatically.</p>
+                <p className="text-sm font-medium text-ink">{t('expenses.recurringCard.recurringBillsHint')}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{t('expenses.recurringCard.recurringBillsHintDescription')}</p>
               </div>
             )}
             <EmptyState
-              title="No recurring bills yet"
-              description="Add your first fixed expense — rent, internet, anything monthly."
+              title={t('expenses.recurringCard.emptyTitle')}
+              description={t('expenses.recurringCard.emptyDescription')}
               action={
                 <Button variant="secondary" size="sm" onClick={openNewFixed}>
-                  <PlusIcon /> Add recurring
+                  <PlusIcon /> {t('expenses.addRecurring')}
                 </Button>
               }
             />
@@ -790,9 +798,9 @@ export default function ExpensesPage() {
       <Modal
         open={expenseModal.open}
         onClose={closeExpenseModal}
-        eyebrow="Ledger entry"
-        title={editingExpense ? 'Edit expense' : 'New expense'}
-        description="Stored locally in IndexedDB. Syncs to Supabase if configured."
+        eyebrow={t('expenses.expenseModal.eyebrow')}
+        title={editingExpense ? t('expenses.expenseModal.titleEdit') : t('expenses.expenseModal.titleNew')}
+        description={t('expenses.expenseModal.description')}
         size="lg"
       >
         <ExpenseForm
@@ -810,7 +818,7 @@ export default function ExpensesPage() {
               }
               closeExpenseModal();
             } catch (error) {
-              await alert({ title: 'Unable to save expense', description: error.message || 'Something went wrong.' });
+              await alert({ title: t('expenses.expenseModal.errorSave.title'), description: error.message || t('expenses.expenseModal.errorSave.description') });
             }
           }}
           onCancel={closeExpenseModal}
@@ -820,9 +828,9 @@ export default function ExpensesPage() {
       <Modal
         open={fixedModal.open}
         onClose={closeFixedModal}
-        eyebrow="Recurring bill"
-        title={editingFixedExpense ? 'Edit recurring' : 'New recurring'}
-        description="Anything that charges monthly — rent, utilities, subscriptions."
+        eyebrow={t('expenses.recurringModal.eyebrow')}
+        title={editingFixedExpense ? t('expenses.recurringModal.titleEdit') : t('expenses.recurringModal.titleNew')}
+        description={t('expenses.recurringModal.description')}
         size="lg"
       >
         <FixedExpenseForm

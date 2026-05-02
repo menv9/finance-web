@@ -10,12 +10,7 @@ import { formatCurrency } from '../utils/formatters';
 import { useTour } from '../components/tour/TourContext';
 import { useTranslation, resolveLanguage } from '../i18n/useTranslation';
 
-const TABS = [
-  { id: 'general', label: 'General', hint: 'Appearance, currency, modules' },
-  { id: 'data',    label: 'Data',    hint: 'Categories, platforms, targets, import' },
-  { id: 'sync',    label: 'Activity', hint: 'Cloud sync, conflicts, activity' },
-  { id: 'backup',  label: 'Backup',  hint: 'Export, import, danger zone' },
-];
+const TAB_IDS = ['general', 'data', 'sync', 'backup'];
 
 // Maps section anchor id -> tab id (for hash deep-linking)
 const SECTION_TO_TAB = {
@@ -112,16 +107,16 @@ function currentRecordFromState(state, log) {
   return (state[log.recordType] || []).find((item) => item.id === log.recordId) || null;
 }
 
-function undoPreviewText(log, currentRecord) {
+function undoPreviewText(log, currentRecord, t) {
   if (!log) return [];
   const label = log.label || log.recordId;
   const lines = [];
   if (log.action === 'create') {
-    lines.push(`This will delete ${label}.`);
+    lines.push(t('settings.history.undoWillDelete', { label }));
   } else if (log.action === 'update') {
-    lines.push(`This will restore the previous version of ${label}.`);
+    lines.push(t('settings.history.undoWillRestore', { label }));
   } else if (log.action === 'delete') {
-    lines.push(`This will recreate ${label}.`);
+    lines.push(t('settings.history.undoWillRecreate', { label }));
   }
   const changedAfter =
     currentRecord &&
@@ -129,7 +124,7 @@ function undoPreviewText(log, currentRecord) {
     currentRecord.updatedAt &&
     currentRecord.updatedAt !== log.after.updatedAt;
   if (changedAfter) {
-    lines.push('This item has changed since this history entry, so undo may overwrite newer edits.');
+    lines.push(t('settings.history.undoChangedWarning'));
   }
   return lines;
 }
@@ -152,30 +147,33 @@ function movementDirection(delta) {
   return 'does not change';
 }
 
-function moneyMovementText(log, locale, baseCurrency) {
+function moneyMovementText(log, locale, baseCurrency, t) {
   const delta = getUndoAmountDelta(log);
-  if (delta == null) return 'No direct money movement is recorded for this undo.';
+  if (delta == null) return t('settings.history.moneyMovementNone');
   const record = log.before || log.after || {};
   const currency = record.currency || baseCurrency || 'EUR';
   const amount = formatCurrency(Math.abs(delta), currency, locale);
+  const dir = movementDirection(delta);
+  const dirInv = movementDirection(-delta);
 
   if (log.recordType === 'expenses') {
-    return `Money movement: expenses ${movementDirection(delta)} by ${amount}; cash available ${movementDirection(-delta)} by ${amount}.`;
+    return t('settings.history.moneyMovementExpenses', { dir, dirInv, amount });
   }
   if (log.recordType === 'incomes') {
-    return `Money movement: income ${movementDirection(delta)} by ${amount}; cash available ${movementDirection(delta)} by ${amount}.`;
+    return t('settings.history.moneyMovementIncome', { dir, amount });
   }
   if (log.recordType === 'savingsEntries') {
-    return `Money movement: savings balance ${movementDirection(delta)} by ${amount}.`;
+    return t('settings.history.moneyMovementSavings', { dir, amount });
   }
   if (log.recordType === 'portfolioCashflows') {
-    return `Money movement: portfolio cashflow ${movementDirection(delta)} by ${amount}.`;
+    return t('settings.history.moneyMovementPortfolio', { dir, amount });
   }
   if (log.recordType === 'transfers') {
     const direction = [record.fromModule, record.toModule].filter(Boolean).join(' to ');
-    return `Money movement: ${log.action === 'create' ? 'removes' : 'restores'} a ${amount}${direction ? ` ${direction}` : ''} transfer.`;
+    const verb = log.action === 'create' ? t('settings.history.transferRemoves') : t('settings.history.transferRestores');
+    return t('settings.history.moneyMovementTransfer', { verb, amount, direction: direction ? ` ${direction}` : '' });
   }
-  return `Money movement: recorded amount ${movementDirection(delta)} by ${amount}.`;
+  return t('settings.history.moneyMovementGeneric', { dir, amount });
 }
 
 export default function SettingsPage() {
@@ -229,7 +227,7 @@ export default function SettingsPage() {
         startTour();
       }
     } catch (error) {
-      await alert({ title: 'Unable to erase data', description: error.message || 'Something went wrong.' });
+      await alert({ title: t('settings.danger.unableToErase'), description: error.message || t('shell.modals.somethingWentWrong') });
     } finally {
       setWiping(false);
     }
@@ -263,8 +261,8 @@ export default function SettingsPage() {
     : ['Trade Republic', 'IBKR', 'DEGIRO'];
 
   const targetColumns = [
-    { key: 'ticker', header: 'Ticker', render: (r) => <span className="font-mono">{r.ticker}</span> },
-    { key: 'targetWeight', header: 'Target', numeric: true, render: (r) => `${r.targetWeight}%` },
+    { key: 'ticker', header: t('settings.targets.ticker'), render: (r) => <span className="font-mono">{r.ticker}</span> },
+    { key: 'targetWeight', header: t('settings.targets.target'), numeric: true, render: (r) => `${r.targetWeight}%` },
     {
       key: 'actions',
       header: '',
@@ -277,18 +275,18 @@ export default function SettingsPage() {
             size="sm"
             onClick={() => setTargetInput({ ticker: r.ticker, targetWeight: `${r.targetWeight}` })}
           >
-            Edit
+            {t('common.edit')}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() =>
               updateSettings({
-                allocationTargets: settings.allocationTargets.filter((t) => t.ticker !== r.ticker),
+                allocationTargets: settings.allocationTargets.filter((tgt) => tgt.ticker !== r.ticker),
               })
             }
           >
-            Remove
+            {t('common.remove')}
           </Button>
         </div>
       ),
@@ -318,12 +316,18 @@ export default function SettingsPage() {
     safeHistoryPage * HISTORY_PAGE_SIZE,
   );
   const undoCurrentRecord = currentRecordFromState(useFinanceStore.getState(), undoTarget);
-  const undoPreview = undoPreviewText(undoTarget, undoCurrentRecord);
-  const undoMoneyMovement = moneyMovementText(undoTarget, settings.locale, settings.baseCurrency);
+  const undoPreview = undoPreviewText(undoTarget, undoCurrentRecord, t);
+  const undoMoneyMovement = moneyMovementText(undoTarget, settings.locale, settings.baseCurrency, t);
+
+  const tabs = TAB_IDS.map((id) => ({
+    id,
+    label: t(`settings.tabs.${id}.label`),
+    hint: t(`settings.tabs.${id}.hint`),
+  }));
 
   const initialTab = (() => {
     const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
-    if (TABS.some((t) => t.id === hash)) return hash;
+    if (TAB_IDS.includes(hash)) return hash;
     if (SECTION_TO_TAB[hash]) return SECTION_TO_TAB[hash];
     return 'general';
   })();
@@ -332,14 +336,14 @@ export default function SettingsPage() {
   // Tour-driven tab switching: ensure the right tab is mounted before the spotlight measures.
   useEffect(() => {
     const tab = TOUR_TO_TAB[currentStop?.tourId];
-    if (tab && tab !== activeTab) setActiveTab(tab);
+    if (tab && tab !== activeTab) setActiveTab(tab); // eslint-disable-line react-hooks/exhaustive-deps
   }, [currentStop, activeTab]);
 
   // Hash deep-linking: react to hash changes (e.g. browser back/forward).
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.slice(1);
-      const tab = TABS.some((t) => t.id === hash) ? hash : SECTION_TO_TAB[hash];
+      const tab = TAB_IDS.includes(hash) ? hash : SECTION_TO_TAB[hash];
       if (tab) setActiveTab(tab);
       const target = hash && document.getElementById(hash);
       if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -366,8 +370,8 @@ export default function SettingsPage() {
 
       {/* Tab bar */}
       <div className="sticky top-14 z-20 -mx-4 border-b border-rule bg-canvas/85 px-4 py-2 backdrop-blur-md sm:mx-0 sm:rounded-lg sm:border sm:bg-surface/80 sm:px-2">
-        <nav aria-label="Settings tabs" className="flex flex-wrap gap-1">
-          {TABS.map((tab) => {
+        <nav aria-label={t('settings.tabsAriaLabel')} className="flex flex-wrap gap-1">
+          {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -519,9 +523,9 @@ export default function SettingsPage() {
 
           <Card
             id="cloud-sync"
-            eyebrow="Cloud"
-            title="Cloud sync"
-            description="When off, this device works fully offline. Data stays in your browser; nothing is sent to Supabase."
+            eyebrow={t('settings.cloudSync.eyebrow')}
+            title={t('settings.cloudSync.title')}
+            description={t('settings.cloudSync.description')}
             className={rise(2)}
           >
             <Toggle
@@ -534,22 +538,22 @@ export default function SettingsPage() {
                   return;
                 }
                 const ok = await confirm({
-                  title: 'Switch to local-only mode?',
+                  title: t('settings.cloudSync.switchTitle'),
                   description: supabaseUser
-                    ? 'You will be signed out on this device. Local data stays here, but no further changes will sync to the cloud until you sign in again.'
-                    : 'No further changes will sync to the cloud until you sign in again.',
-                  confirmLabel: 'Switch to local-only',
+                    ? t('settings.cloudSync.switchDescriptionSignedIn')
+                    : t('settings.cloudSync.switchDescriptionAnon'),
+                  confirmLabel: t('settings.cloudSync.switchConfirm'),
                   confirmVariant: 'primary',
                 });
                 if (ok) await enableLocalOnlyMode();
               }}
-              label={localOnlyMode ? 'Local-only mode' : 'Cloud sync enabled'}
+              label={localOnlyMode ? t('settings.cloudSync.localOnly') : t('settings.cloudSync.enabled')}
               description={
                 localOnlyMode
-                  ? 'No data is leaving this device. Turn on to sign in and sync.'
+                  ? t('settings.cloudSync.offDescription')
                   : supabaseUser
-                    ? `Signed in as ${supabaseUser.email}.`
-                    : 'Sign in from the login page to start syncing.'
+                    ? t('settings.cloudSync.signedInAs', { email: supabaseUser.email })
+                    : t('settings.cloudSync.signInPrompt')
               }
             />
           </Card>
@@ -557,9 +561,9 @@ export default function SettingsPage() {
           <Card
             id="modules"
             data-tour="settings-modules"
-            eyebrow="Workspace"
-            title="Modules"
-            description="Choose which optional modules appear in the app navigation."
+            eyebrow={t('settings.modules.eyebrow')}
+            title={t('settings.modules.title')}
+            description={t('settings.modules.description')}
             className={rise(2)}
           >
             <div className="grid gap-4">
@@ -574,14 +578,14 @@ export default function SettingsPage() {
                     },
                   })
                 }
-                label="Portfolio"
-                description="Show or hide the Portfolio module in the header navigation."
+                label={t('settings.modules.portfolio')}
+                description={t('settings.modules.portfolioHint')}
               />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rule bg-surface-raised p-4">
                 <div>
-                  <p className="text-sm font-medium text-ink">Onboarding assessment</p>
+                  <p className="text-sm font-medium text-ink">{t('settings.modules.onboarding')}</p>
                   <p className="mt-1 text-xs text-ink-muted">
-                    Restart the setup wizard without deleting existing records.
+                    {t('settings.modules.onboardingHint')}
                   </p>
                 </div>
                 <Button
@@ -592,7 +596,7 @@ export default function SettingsPage() {
                     startTour();
                   }}
                 >
-                  Restart onboarding
+                  {t('settings.modules.restartOnboarding')}
                 </Button>
               </div>
             </div>
@@ -603,9 +607,9 @@ export default function SettingsPage() {
         {activeTab === 'data' && (<>
           <Card
             id="categories"
-            eyebrow="Taxonomy"
-            title="Expense categories"
-            description="Edit, add, or remove. Categories are referenced across expense entry and filtering."
+            eyebrow={t('settings.categories.eyebrow')}
+            title={t('settings.categories.title')}
+            description={t('settings.categories.description')}
             className={rise(3)}
           >
             <div className="flex flex-wrap gap-2">
@@ -642,10 +646,10 @@ export default function SettingsPage() {
               ))}
             </div>
             <div className="mt-5 flex flex-wrap items-end gap-3">
-              <FormField label={editingCategory ? 'Edit category' : 'Add category'} className="flex-1 min-w-[220px]">
+              <FormField label={editingCategory ? t('settings.categories.editLabel') : t('settings.categories.addLabel')} className="flex-1 min-w-[220px]">
                 <Input
                   value={categoryInput}
-                  placeholder="e.g. Groceries"
+                  placeholder={t('settings.categories.placeholder')}
                   onChange={(e) => setCategoryInput(e.target.value)}
                 />
               </FormField>
@@ -664,7 +668,7 @@ export default function SettingsPage() {
                   setCategoryInput('');
                 }}
               >
-                {editingCategory ? 'Save' : 'Add'}
+                {editingCategory ? t('common.save') : t('common.add')}
               </Button>
               {editingCategory ? (
                 <Button
@@ -674,7 +678,7 @@ export default function SettingsPage() {
                     setCategoryInput('');
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               ) : null}
             </div>
@@ -682,9 +686,9 @@ export default function SettingsPage() {
 
           <Card
             id="platforms"
-            eyebrow="Portfolio"
-            title="Portfolio platforms"
-            description="Edit, add, or remove the platform options shown when creating or editing holdings."
+            eyebrow={t('settings.platforms.eyebrow')}
+            title={t('settings.platforms.title')}
+            description={t('settings.platforms.description')}
             className={rise(3)}
           >
             <div className="flex flex-wrap gap-2">
@@ -721,10 +725,10 @@ export default function SettingsPage() {
               ))}
             </div>
             <div className="mt-5 flex flex-wrap items-end gap-3">
-              <FormField label={editingPlatform ? 'Edit platform' : 'Add platform'} className="flex-1 min-w-[220px]">
+              <FormField label={editingPlatform ? t('settings.platforms.editLabel') : t('settings.platforms.addLabel')} className="flex-1 min-w-[220px]">
                 <Input
                   value={platformInput}
-                  placeholder="e.g. Trade Republic"
+                  placeholder={t('settings.platforms.placeholder')}
                   onChange={(e) => setPlatformInput(e.target.value)}
                 />
               </FormField>
@@ -742,7 +746,7 @@ export default function SettingsPage() {
                   setPlatformInput('');
                 }}
               >
-                {editingPlatform ? 'Save' : 'Add'}
+                {editingPlatform ? t('common.save') : t('common.add')}
               </Button>
               {editingPlatform ? (
                 <Button
@@ -752,7 +756,7 @@ export default function SettingsPage() {
                     setPlatformInput('');
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               ) : null}
             </div>
@@ -760,29 +764,29 @@ export default function SettingsPage() {
 
           <Card
             id="targets"
-            eyebrow="Portfolio"
-            title="Allocation targets"
-            description="Used for the actual-vs-target comparison in the Portfolio module."
+            eyebrow={t('settings.targets.eyebrow')}
+            title={t('settings.targets.title')}
+            description={t('settings.targets.description')}
             className={rise(4)}
           >
             {settings.allocationTargets?.length ? (
-              <Table columns={targetColumns} rows={settings.allocationTargets.map((t) => ({ ...t, id: t.ticker }))} density="compact" />
+              <Table columns={targetColumns} rows={settings.allocationTargets.map((tgt) => ({ ...tgt, id: tgt.ticker }))} density="compact" />
             ) : (
-              <EmptyState title="No targets set" description="Add a ticker and its target weight below." />
+              <EmptyState title={t('settings.targets.empty')} description={t('settings.targets.emptyDescription')} />
             )}
             <div className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <FormField label="Ticker">
+              <FormField label={t('settings.targets.ticker')}>
                 <Input
-                  placeholder="e.g. VWCE"
+                  placeholder={t('settings.targets.tickerPlaceholder')}
                   value={targetInput.ticker}
                   onChange={(e) => setTargetInput((p) => ({ ...p, ticker: e.target.value.toUpperCase() }))}
                 />
               </FormField>
-              <FormField label="Weight %">
+              <FormField label={t('settings.targets.weight')}>
                 <Input
                   type="number"
                   numeric
-                  placeholder="e.g. 60"
+                  placeholder={t('settings.targets.weightPlaceholder')}
                   value={targetInput.targetWeight}
                   onChange={(e) => setTargetInput((p) => ({ ...p, targetWeight: e.target.value }))}
                 />
@@ -793,14 +797,14 @@ export default function SettingsPage() {
                     if (!targetInput.ticker || !targetInput.targetWeight) return;
                     updateSettings({
                       allocationTargets: [
-                        ...settings.allocationTargets.filter((t) => t.ticker !== targetInput.ticker),
+                        ...settings.allocationTargets.filter((tgt) => tgt.ticker !== targetInput.ticker),
                         { ticker: targetInput.ticker, targetWeight: Number(targetInput.targetWeight) },
                       ],
                     });
                     setTargetInput({ ticker: '', targetWeight: '' });
                   }}
                 >
-                  Save
+                  {t('common.save')}
                 </Button>
               </div>
             </div>
@@ -808,9 +812,9 @@ export default function SettingsPage() {
 
           <Card
             id="import"
-            eyebrow="Import"
-            title="Bank import"
-            description="Upload a CSV export from your bank. Detects income vs expenses by amount sign, and auto-categorizes using MCC codes."
+            eyebrow={t('settings.import.eyebrow')}
+            title={t('settings.import.title')}
+            description={t('settings.import.description')}
             className={rise(5)}
           >
             <SmartBankImport
@@ -830,13 +834,13 @@ export default function SettingsPage() {
           <Card
             id="history"
             data-tour="settings-history"
-            eyebrow="Audit"
-            title="Activity history"
-            description="Every user-facing change is recorded here. Undo shows a confirmation before touching your data."
+            eyebrow={t('settings.history.eyebrow')}
+            title={t('settings.history.title')}
+            description={t('settings.history.description')}
             className={rise(6)}
           >
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
-              <FormField label="Module">
+              <FormField label={t('settings.history.moduleLabel')}>
                 <Select
                   value={historyModule}
                   onChange={(event) => {
@@ -846,12 +850,12 @@ export default function SettingsPage() {
                 >
                   {historyModules.map((module) => (
                     <option key={module} value={module}>
-                      {module === 'all' ? 'All modules' : module}
+                      {module === 'all' ? t('settings.history.allModules') : module}
                     </option>
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Action">
+              <FormField label={t('settings.history.actionLabel')}>
                 <Select
                   value={historyAction}
                   onChange={(event) => {
@@ -861,7 +865,7 @@ export default function SettingsPage() {
                 >
                   {historyActions.map((action) => (
                     <option key={action} value={action}>
-                      {action === 'all' ? 'All actions' : action}
+                      {action === 'all' ? t('settings.history.allActions') : action}
                     </option>
                   ))}
                 </Select>
@@ -885,7 +889,7 @@ export default function SettingsPage() {
                                 {row.summary || row.label || 'Activity'}
                               </p>
                               {row.undoneAt ? (
-                                <span className="shrink-0 text-xs text-ink-muted">undone</span>
+                                <span className="shrink-0 text-xs text-ink-muted">{t('settings.history.undone')}</span>
                               ) : null}
                             </div>
                             <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
@@ -900,7 +904,7 @@ export default function SettingsPage() {
                             disabled={!row.undoable || Boolean(row.undoneAt)}
                             onClick={() => setUndoTarget(row)}
                           >
-                            Undo
+                            {t('settings.history.undo')}
                           </button>
                         </div>
                       </li>
@@ -909,7 +913,7 @@ export default function SettingsPage() {
                 </ul>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-ink-muted">
-                    Page {safeHistoryPage} of {historyPageCount} · {filteredHistory.length} records
+                    {t('settings.history.page', { page: safeHistoryPage, total: historyPageCount, count: filteredHistory.length })}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -918,7 +922,7 @@ export default function SettingsPage() {
                       disabled={safeHistoryPage <= 1}
                       onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}
                     >
-                      Previous
+                      {t('common.previous')}
                     </Button>
                     <Button
                       variant="secondary"
@@ -926,33 +930,32 @@ export default function SettingsPage() {
                       disabled={safeHistoryPage >= historyPageCount}
                       onClick={() => setHistoryPage((page) => Math.min(historyPageCount, page + 1))}
                     >
-                      Next
+                      {t('common.next')}
                     </Button>
                   </div>
                 </div>
               </>
             ) : (
-              <EmptyState title="No history yet" description="New changes will appear here automatically." />
+              <EmptyState title={t('settings.history.empty')} description={t('settings.history.emptyDescription')} />
             )}
           </Card>
 
           {localOnlyMode ? (
             <Card
               id="sync"
-              eyebrow="Cloud"
-              title="Local-only mode"
-              description="This device is not connected to cloud sync. All data stays in your browser."
+              eyebrow={t('settings.sync.eyebrow')}
+              title={t('settings.sync.localOnlyTitle')}
+              description={t('settings.sync.localOnlyDescription')}
               action={
                 <span className="inline-flex items-center gap-1.5 text-xs text-ink-faint">
                   <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-ink-faint" />
-                  Offline
+                  {t('settings.sync.offline')}
                 </span>
               }
               className={rise(7)}
             >
               <p className="text-sm text-ink-muted leading-relaxed">
-                Sign in to enable cloud sync. Your existing local data will be uploaded
-                automatically once you sign in.
+                {t('settings.sync.localOnlyExplain')}
               </p>
               <div className="mt-4">
                 <Button
@@ -961,43 +964,43 @@ export default function SettingsPage() {
                     navigate('/login');
                   }}
                 >
-                  Sign in to enable cloud sync
+                  {t('settings.sync.signInToEnable')}
                 </Button>
               </div>
             </Card>
           ) : (
             <Card
               id="sync"
-              eyebrow="Cloud"
-              title="Sync"
-              description="Push or pull data between this device and the cloud. Sign in from the login page."
+              eyebrow={t('settings.sync.eyebrow')}
+              title={t('settings.sync.title')}
+              description={t('settings.sync.description')}
               action={
                 <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
                   <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
-                  {supabaseUser ? `Signed in as ${supabaseUser.email}` : 'Not signed in'}
+                  {supabaseUser ? t('settings.sync.signedInAs', { email: supabaseUser.email }) : t('settings.sync.notSignedIn')}
                 </span>
               }
               className={rise(7)}
             >
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
-                  Push local → cloud
+                  {t('settings.sync.push')}
                 </Button>
                 <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
-                  Pull cloud → local
+                  {t('settings.sync.pull')}
                 </Button>
                 <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
-                  Sign out
+                  {t('common.signOut')}
                 </Button>
               </div>
 
               <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
                 <div className="flex gap-3">
-                  <dt className="eyebrow w-20">Status</dt>
+                  <dt className="eyebrow w-20">{t('settings.sync.status')}</dt>
                   <dd className="text-ink">{supabaseSyncStatus}</dd>
                 </div>
                 <div className="flex gap-3">
-                  <dt className="eyebrow w-20">Last</dt>
+                  <dt className="eyebrow w-20">{t('settings.sync.last')}</dt>
                   <dd className="text-ink numeric">
                     {supabaseLastSyncedAt
                       ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
@@ -1005,9 +1008,9 @@ export default function SettingsPage() {
                   </dd>
                 </div>
                 <div className="flex gap-3">
-                  <dt className="eyebrow w-20">Error</dt>
+                  <dt className="eyebrow w-20">{t('settings.sync.error')}</dt>
                   <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
-                    {supabaseError || 'none'}
+                    {supabaseError || t('common.none')}
                   </dd>
                 </div>
               </dl>
@@ -1018,17 +1021,17 @@ export default function SettingsPage() {
                   className="text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180"
                   onClick={async () => {
                     const ok = await confirm({
-                      title: 'Switch to local-only mode?',
+                      title: t('settings.cloudSync.switchTitle'),
                       description: supabaseUser
-                        ? 'You will be signed out on this device. Your local data stays here, but no further changes will sync to the cloud until you sign in again.'
-                        : 'No further changes will sync to the cloud until you sign in again.',
-                      confirmLabel: 'Switch to local-only',
+                        ? t('settings.cloudSync.switchDescriptionSignedIn')
+                        : t('settings.cloudSync.switchDescriptionAnon'),
+                      confirmLabel: t('settings.cloudSync.switchConfirm'),
                       confirmVariant: 'primary',
                     });
                     if (ok) await enableLocalOnlyMode();
                   }}
                 >
-                  Switch to local-only mode
+                  {t('settings.sync.switchToLocalOnly')}
                 </button>
               </div>
             </Card>
@@ -1037,9 +1040,9 @@ export default function SettingsPage() {
           {!localOnlyMode && (
           <Card
             id="conflicts"
-            eyebrow="Sync"
-            title="Conflicts"
-            description="Shown when the same record changed locally and remotely after the last sync."
+            eyebrow={t('settings.conflicts.eyebrow')}
+            title={t('settings.conflicts.title')}
+            description={t('settings.conflicts.description')}
             className={rise(7)}
           >
             {conflicts.length ? (
@@ -1052,22 +1055,22 @@ export default function SettingsPage() {
                           {conflict.storeName} / {conflict.recordId}
                         </p>
                         <p className="eyebrow mt-1">
-                          remote updated {new Date(conflict.remoteUpdatedAt).toLocaleString(settings.locale)}
+                          {t('settings.conflicts.remoteUpdated', { when: new Date(conflict.remoteUpdatedAt).toLocaleString(settings.locale) })}
                         </p>
                       </div>
                       <span className="inline-flex items-center rounded-sm bg-danger-soft px-2 py-0.5 text-xs text-danger border border-danger/30">
-                        conflict
+                        {t('settings.conflicts.badge')}
                       </span>
                     </div>
                     <div className="mt-4 grid gap-3 lg:grid-cols-2">
                       <div className="rounded-md bg-surface-sunken p-3">
-                        <p className="eyebrow mb-2">Local</p>
+                        <p className="eyebrow mb-2">{t('settings.conflicts.local')}</p>
                         <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
                           {JSON.stringify(conflict.localTombstone || conflict.localRecord, null, 2)}
                         </pre>
                       </div>
                       <div className="rounded-md bg-surface-sunken p-3">
-                        <p className="eyebrow mb-2">Remote</p>
+                        <p className="eyebrow mb-2">{t('settings.conflicts.remote')}</p>
                         <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
                           {JSON.stringify(
                             conflict.remoteDeletedAt
@@ -1080,16 +1083,16 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button onClick={() => resolveConflictKeepLocal(conflict.id)}>Keep local</Button>
+                      <Button onClick={() => resolveConflictKeepLocal(conflict.id)}>{t('settings.conflicts.keepLocal')}</Button>
                       <Button variant="secondary" onClick={() => resolveConflictUseRemote(conflict.id)}>
-                        Use remote
+                        {t('settings.conflicts.useRemote')}
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-ink-muted">No sync conflicts right now.</p>
+              <p className="text-sm text-ink-muted">{t('settings.conflicts.none')}</p>
             )}
           </Card>
           )}
@@ -1100,9 +1103,9 @@ export default function SettingsPage() {
           <Card
             id="backup"
             data-tour="settings-backup"
-            eyebrow="Portability"
-            title="Backup and restore"
-            description="Export or import data as JSON — full backup or per module."
+            eyebrow={t('settings.backup.eyebrow')}
+            title={t('settings.backup.title')}
+            description={t('settings.backup.description')}
             className={rise(8)}
           >
             {(() => {
@@ -1121,35 +1124,35 @@ export default function SettingsPage() {
                 await importBackup(JSON.parse(await file.text()));
               };
               const modules = [
-                { label: 'Expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
-                { label: 'Income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
-                { label: 'Accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
-                { label: 'Portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
-                { label: 'Savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
-                { label: 'Transfers', stores: ['transfers'],                                                             file: 'transfers-backup.json' },
+                { labelKey: 'settings.backup.modules.expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
+                { labelKey: 'settings.backup.modules.income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
+                { labelKey: 'settings.backup.modules.accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
+                { labelKey: 'settings.backup.modules.portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
+                { labelKey: 'settings.backup.modules.savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
+                { labelKey: 'settings.backup.modules.transfers', stores: ['transfers'],                                                             file: 'transfers-backup.json' },
               ];
               return (
                 <div className="flex flex-col gap-5">
                   <div>
-                    <p className="eyebrow mb-2">Full backup</p>
+                    <p className="eyebrow mb-2">{t('settings.backup.full')}</p>
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" onClick={() => doExport(null, 'finance-tracker-backup.json')}>Export all</Button>
+                      <Button variant="secondary" onClick={() => doExport(null, 'finance-tracker-backup.json')}>{t('settings.backup.exportAll')}</Button>
                       <label className="inline-flex">
-                        <Button as="span" variant="primary">Import</Button>
+                        <Button as="span" variant="primary">{t('settings.backup.import')}</Button>
                         <input type="file" accept="application/json" className="hidden" onChange={doImport} />
                       </label>
                     </div>
                   </div>
                   <div>
-                    <p className="eyebrow mb-3">By module</p>
+                    <p className="eyebrow mb-3">{t('settings.backup.byModule')}</p>
                     <div className="flex flex-col divide-y divide-rule rounded-md border border-rule">
-                      {modules.map(({ label, stores, file }) => (
-                        <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
-                          <span className="text-sm text-ink">{label}</span>
+                      {modules.map(({ labelKey, stores, file }) => (
+                        <div key={labelKey} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                          <span className="text-sm text-ink">{t(labelKey)}</span>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => doExport(stores, file)}>Export</Button>
+                            <Button variant="ghost" size="sm" onClick={() => doExport(stores, file)}>{t('settings.backup.export')}</Button>
                             <label className="inline-flex">
-                              <Button as="span" variant="ghost" size="sm">Import</Button>
+                              <Button as="span" variant="ghost" size="sm">{t('settings.backup.import')}</Button>
                               <input type="file" accept="application/json" className="hidden" onChange={doImport} />
                             </label>
                           </div>
@@ -1163,13 +1166,13 @@ export default function SettingsPage() {
           </Card>
           <Card
             id="danger"
-            eyebrow="Danger zone"
-            title="Wipe all data"
-            description="Permanently deletes all financial records from this device. Settings (currency and API keys) are kept. This cannot be undone."
+            eyebrow={t('settings.danger.eyebrow')}
+            title={t('settings.danger.title')}
+            description={t('settings.danger.description')}
             className={rise(9)}
           >
             <Button variant="danger" size="sm" onClick={() => { setWipeModalOpen(true); setWipeConfirmText(''); setWipeResetAccount(false); }}>
-              Erase all data
+              {t('settings.danger.eraseButton')}
             </Button>
           </Card>
         </>)}
@@ -1178,24 +1181,24 @@ export default function SettingsPage() {
       <Modal
         open={Boolean(undoTarget)}
         onClose={() => setUndoTarget(null)}
-        eyebrow="Activity history"
-        title="Confirm undo"
+        eyebrow={t('settings.history.activity')}
+        title={t('settings.history.confirmTitle')}
         description={undoTarget?.summary || ''}
         size="sm"
       >
         <div className="grid gap-4">
           <div className="rounded-md border border-rule bg-surface-sunken p-4">
-            <p className="eyebrow mb-2">What will happen</p>
+            <p className="eyebrow mb-2">{t('settings.history.whatHappens')}</p>
             <ul className="grid gap-2 text-sm text-ink-muted">
               <li className="text-ink">{undoMoneyMovement}</li>
-              {(undoPreview.length ? undoPreview : ['This history item cannot be undone.']).map((line) => (
+              {(undoPreview.length ? undoPreview : [t('settings.history.cannotUndo')]).map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setUndoTarget(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
@@ -1213,7 +1216,7 @@ export default function SettingsPage() {
                 }
               }}
             >
-              Confirm undo
+              {t('settings.history.confirmUndo')}
             </Button>
           </div>
         </div>
@@ -1222,29 +1225,29 @@ export default function SettingsPage() {
       <Modal
         open={wipeModalOpen}
         onClose={() => { setWipeModalOpen(false); setWipeConfirmText(''); setWipeResetAccount(false); }}
-        eyebrow="Danger zone"
-        title="Erase all data"
-        description="This will permanently delete every expense, income, saving, holding, transfer, and account balance on this device. It cannot be undone."
+        eyebrow={t('settings.danger.eyebrow')}
+        title={t('settings.danger.eraseButton')}
+        description={t('settings.danger.modalDescription')}
         size="sm"
       >
         <div className="grid gap-4">
           <p className="text-sm text-ink-muted">
-            Type <span className="font-mono font-medium text-danger select-all">ERASE ALL DATA</span> to confirm.
+            {t('settings.danger.typeToConfirm', { phrase: <span key="phrase" className="font-mono font-medium text-danger select-all">{t('settings.danger.confirmPhrase')}</span> })}
           </p>
           <div className="rounded-md border border-rule bg-surface-raised p-3">
             <Checkbox
               id="wipe-reset-account"
               checked={wipeResetAccount}
               onChange={setWipeResetAccount}
-              label="Also reset setup and start as a newly created account"
+              label={t('settings.danger.resetSetup')}
             />
             <p className="mt-2 text-xs leading-relaxed text-ink-muted">
-              Resets default categories, then starts the product tour. After the tour you'll be taken to the initial setup to configure the account from zero.
+              {t('settings.danger.resetSetupHint')}
             </p>
           </div>
           <Input
             autoFocus
-            placeholder="ERASE ALL DATA"
+            placeholder={t('settings.danger.confirmPhrase')}
             value={wipeConfirmText}
             onChange={(e) => setWipeConfirmText(e.target.value)}
           />
@@ -1254,16 +1257,16 @@ export default function SettingsPage() {
               size="sm"
               onClick={() => { setWipeModalOpen(false); setWipeConfirmText(''); setWipeResetAccount(false); }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
               size="sm"
-              disabled={wipeConfirmText !== 'ERASE ALL DATA' || wiping}
+              disabled={wipeConfirmText !== t('settings.danger.confirmPhrase') || wiping}
               loading={wiping}
               onClick={handleWipe}
             >
-              Erase all data
+              {t('settings.danger.eraseButton')}
             </Button>
           </div>
         </div>

@@ -25,6 +25,7 @@ import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/fo
 import { normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
 import { rise } from '../utils/motion';
+import { useTranslation } from '../i18n/useTranslation';
 
 const COLORS = [
   'var(--accent)',
@@ -236,6 +237,7 @@ function PortfolioHoldingList({
   sellAllHoldingGroup,
   onDeleteHolding,
 }) {
+  const { t } = useTranslation();
   return (
     <ul className="space-y-4">
       {groups.map((group) => (
@@ -248,7 +250,7 @@ function PortfolioHoldingList({
                   <span className="font-mono">{group.ticker}</span>
                   <span className="ml-2 hidden text-ink-muted sm:inline">{group.name}</span>
                   <span className="ml-2 font-mono text-xs tabular text-ink-faint">
-                    {formatNumber(group.quantity, locale, quantityDigits(group))} total units
+                    {t('portfolio.holdingsCard.totalUnits', { qty: formatNumber(group.quantity, locale, quantityDigits(group)) })}
                   </span>
                 </p>
                 <p className="mt-3 font-mono text-sm tabular text-ink">
@@ -259,18 +261,18 @@ function PortfolioHoldingList({
                 </p>
                 <p className="mt-3 min-w-0 text-xs text-ink-muted">
                   <span className="block truncate sm:inline">
-                    Avg {formatCurrency(group.averageBuyPriceCents, group.currency || currency, locale)}
+                    {t('portfolio.holdingsCard.avg', { price: formatCurrency(group.averageBuyPriceCents, group.currency || currency, locale) })}
                     {group.currency && group.currency !== currency && (
                       <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
                     )}
                     {' · '}
-                    Price {formatCurrency(group.currentPriceCents, group.currency || currency, locale)}
+                    {t('portfolio.holdingsCard.price', { price: formatCurrency(group.currentPriceCents, group.currency || currency, locale) })}
                     {group.currency && group.currency !== currency && (
                       <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
                     )}
                   </span>
                   <span className="mt-1 block truncate sm:mt-0 sm:inline">
-                    <span className="hidden sm:inline"> · </span>Fees {formatCurrency(group.feeCents || 0, currency, locale)}
+                    <span className="hidden sm:inline"> · </span>{t('portfolio.holdingsCard.fees', { amount: formatCurrency(group.feeCents || 0, currency, locale) })}
                   </span>
                 </p>
               </div>
@@ -280,8 +282,8 @@ function PortfolioHoldingList({
                 <button
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
-                  aria-label={`Add ${group.ticker} operation`}
-                  title="Add operation"
+                  aria-label={t('portfolio.holdingsCard.ariaAddOperation', { ticker: group.ticker })}
+                  title={t('portfolio.addHolding')}
                   onClick={() => openAddHoldingOperation(group)}
                 >
                   <PlusIcon />
@@ -289,8 +291,8 @@ function PortfolioHoldingList({
                 <button
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-ink"
-                  aria-label={`Edit ${group.ticker}`}
-                  title="Edit"
+                  aria-label={t('portfolio.holdingsCard.ariaEdit', { ticker: group.ticker })}
+                  title={t('common.edit')}
                   onClick={() => openEditHoldingGroup(group.ticker)}
                 >
                   <EditIcon />
@@ -298,8 +300,8 @@ function PortfolioHoldingList({
                 <button
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
-                  aria-label={`Sell all ${group.ticker}`}
-                  title="Sell all"
+                  aria-label={t('portfolio.holdingsCard.ariaSellAll', { ticker: group.ticker })}
+                  title={t('portfolio.sellAll')}
                   onClick={() => sellAllHoldingGroup(group)}
                 >
                   <SellIcon />
@@ -318,16 +320,16 @@ function PortfolioHoldingList({
                       <p className="truncate text-sm font-semibold text-ink">
                         {holding.ticker}
                         <span className="ml-2 font-mono text-xs tabular text-ink-faint">
-                          {formatNumber(holding.quantity, locale, quantityDigits(holding))} units
+                          {t('portfolio.holdingsCard.units', { qty: formatNumber(holding.quantity, locale, quantityDigits(holding)) })}
                         </span>
                       </p>
-                      <p className="mt-2 truncate text-sm text-ink-muted sm:text-xs">{holding.platform || 'Platform'}</p>
+                      <p className="mt-2 truncate text-sm text-ink-muted sm:text-xs">{holding.platform || t('common.none')}</p>
                       <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
-                        Price {formatCurrency(holding.currentPriceCents, holdingCurrency, locale)}
+                        {t('portfolio.holdingsCard.price', { price: formatCurrency(holding.currentPriceCents, holdingCurrency, locale) })}
                         {holdingCurrency !== currency && (
                           <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{holdingCurrency}</span>
                         )}
-                        {' · '}Fees {formatCurrency(holding.feeCents || 0, holding.feeCurrency || holdingCurrency, locale)}
+                        {' · '}{t('portfolio.holdingsCard.fees', { amount: formatCurrency(holding.feeCents || 0, holding.feeCurrency || holdingCurrency, locale) })}
                       </p>
                     </div>
                     <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
@@ -344,8 +346,8 @@ function PortfolioHoldingList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                        aria-label={`Edit ${holding.ticker} operation ${index + 1}`}
-                        title="Edit"
+                        aria-label={t('portfolio.holdingsCard.ariaEditOperation', { ticker: holding.ticker, num: index + 1 })}
+                        title={t('common.edit')}
                         onClick={() => openEditHolding(holding.id)}
                       >
                         <EditIcon />
@@ -353,8 +355,8 @@ function PortfolioHoldingList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
-                        aria-label={`Sell ${holding.ticker} operation ${index + 1}`}
-                        title="Sell"
+                        aria-label={t('portfolio.holdingsCard.ariaSellOperation', { ticker: holding.ticker, num: index + 1 })}
+                        title={t('portfolio.sellAll')}
                         onClick={() => openSellHolding(holding.id)}
                       >
                         <SellIcon />
@@ -362,8 +364,8 @@ function PortfolioHoldingList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                        aria-label={`Delete ${holding.ticker} operation ${index + 1}`}
-                        title="Delete"
+                        aria-label={t('portfolio.holdingsCard.ariaDeleteOperation', { ticker: holding.ticker, num: index + 1 })}
+                        title={t('common.delete')}
                         onClick={() => onDeleteHolding(holding)}
                       >
                         <TrashIcon />
@@ -381,6 +383,7 @@ function PortfolioHoldingList({
 }
 
 function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccounts = [], onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const holdingCurrency = holding?.currency || currency;
   const fxRate = holdingCurrency !== currency
     ? (fxRates[holdingCurrency] ?? 1)
@@ -434,14 +437,14 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
         });
       }}
     >
-      <FormField label="Holding" className="md:col-span-2">
+      <FormField label={t('portfolio.sellModal.holdingLabel')} className="md:col-span-2">
         <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm text-ink">
           <span className="font-mono">{holding.ticker}</span>
           <span className="ml-2 text-ink-muted">{holding.name}</span>
         </div>
       </FormField>
 
-      <FormField label="Sell percentage" htmlFor="sell-percent" required>
+      <FormField label={t('portfolio.sellModal.sellPercentLabel')} htmlFor="sell-percent" required>
         {(props) => (
           <Input
             {...props}
@@ -455,7 +458,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
         )}
       </FormField>
 
-      <FormField label={`Sale price (${holdingCurrency})`} htmlFor="sell-price" required>
+      <FormField label={t('portfolio.sellModal.salePriceLabel', { currency: holdingCurrency })} htmlFor="sell-price" required>
         {(props) => (
           <Input
             {...props}
@@ -468,7 +471,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
         )}
       </FormField>
 
-      <FormField label="Sale date" htmlFor="sell-date" required>
+      <FormField label={t('portfolio.sellModal.saleDateLabel')} htmlFor="sell-date" required>
         {(props) => (
           <Input
             {...props}
@@ -479,7 +482,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
         )}
       </FormField>
 
-      <FormField label="Commission" htmlFor="sell-fee">
+      <FormField label={t('portfolio.sellModal.commissionLabel')} htmlFor="sell-fee">
         {(props) => (
           <Input
             {...props}
@@ -494,7 +497,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
       </FormField>
 
       {bankAccounts.length ? (
-        <FormField label="Destination bank" htmlFor="sell-bank" required className="md:col-span-2">
+        <FormField label={t('portfolio.sellModal.destinationBank')} htmlFor="sell-bank" required className="md:col-span-2">
           {(props) => (
             <Select
               {...props}
@@ -504,7 +507,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
             >
               {bankAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name}{account.isMain ? ' (main)' : ''}
+                  {account.name}{account.isMain ? t('portfolio.sellModal.mainSuffix') : ''}
                 </option>
               ))}
             </Select>
@@ -513,7 +516,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
       ) : null}
 
       <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm">
-        <p className="eyebrow text-ink-muted">Estimated result</p>
+        <p className="eyebrow text-ink-muted">{t('portfolio.sellModal.estimatedResult')}</p>
         <p className="mt-1 font-mono text-ink">
           {formatNumber(soldQuantity, locale, quantityDigits(holding))} qty
           {' — '}
@@ -530,10 +533,10 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
 
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" variant="primary">
-          {sale ? 'Save sale' : 'Sell holding'}
+          {sale ? t('portfolio.sellModal.saveSale') : t('portfolio.sellModal.sellHolding')}
         </Button>
       </div>
     </form>
@@ -541,6 +544,7 @@ function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccount
 }
 
 function SellAllHoldingsForm({ group, bankAccounts = [], onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const defaultBankAccountId = bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
   const [form, setForm] = useState({
     date: normalizeDateInput(new Date()),
@@ -560,21 +564,21 @@ function SellAllHoldingsForm({ group, bankAccounts = [], onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Holding" className="md:col-span-2">
+      <FormField label={t('portfolio.sellAllModal.holdingLabel')} className="md:col-span-2">
         <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 text-sm text-ink">
           <span className="font-mono">{group.ticker}</span>
           <span className="ml-2 text-ink-muted">{group.name}</span>
         </div>
       </FormField>
 
-      <FormField label="Sale date" htmlFor="sell-all-date" required>
+      <FormField label={t('portfolio.sellAllModal.saleDateLabel')} htmlFor="sell-all-date" required>
         {(props) => (
           <Input {...props} type="date" value={form.date} onChange={set('date')} required />
         )}
       </FormField>
 
       {bankAccounts.length ? (
-        <FormField label="Destination bank" htmlFor="sell-all-bank" required>
+        <FormField label={t('portfolio.sellAllModal.destinationBank')} htmlFor="sell-all-bank" required>
           {(props) => (
             <Select
               {...props}
@@ -584,7 +588,7 @@ function SellAllHoldingsForm({ group, bankAccounts = [], onSubmit, onCancel }) {
             >
               {bankAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name}{account.isMain ? ' (main)' : ''}
+                  {account.name}{account.isMain ? t('portfolio.sellAllModal.mainSuffix') : ''}
                 </option>
               ))}
             </Select>
@@ -593,15 +597,15 @@ function SellAllHoldingsForm({ group, bankAccounts = [], onSubmit, onCancel }) {
       ) : null}
 
       <p className="md:col-span-2 rounded-md border border-rule bg-surface-raised px-3 py-2 text-xs text-ink-muted">
-        This sells every open operation at its current price with no extra sale commission.
+        {t('portfolio.sellAllModal.notice')}
       </p>
 
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" variant="primary">
-          Sell all
+          {t('portfolio.sellAllModal.sellAll')}
         </Button>
       </div>
     </form>
@@ -615,6 +619,7 @@ const PRICE_CURRENCIES = [
 ];
 
 function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const currencies = PRICE_CURRENCIES.includes(baseCurrency)
     ? PRICE_CURRENCIES
     : [baseCurrency, ...PRICE_CURRENCIES];
@@ -643,25 +648,25 @@ function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Ticker" className="md:col-span-2">
+      <FormField label={t('portfolio.holdingGroupModal.tickerLabel')} className="md:col-span-2">
         <div className="rounded-md border border-rule bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink">
           {group.ticker}
         </div>
       </FormField>
 
-      <FormField label="Name" htmlFor="holding-group-name">
+      <FormField label={t('portfolio.holdingGroupModal.nameLabel')} htmlFor="holding-group-name">
         {(props) => (
-          <Input {...props} value={form.name} onChange={set('name')} placeholder="Asset name" />
+          <Input {...props} value={form.name} onChange={set('name')} placeholder={t('portfolio.holdingGroupModal.namePlaceholder')} />
         )}
       </FormField>
 
-      <FormField label="Platform" htmlFor="holding-group-platform">
+      <FormField label={t('portfolio.holdingGroupModal.platformLabel')} htmlFor="holding-group-platform">
         {(props) => (
-          <Input {...props} value={form.platform} onChange={set('platform')} placeholder="Platform" />
+          <Input {...props} value={form.platform} onChange={set('platform')} placeholder={t('portfolio.holdingGroupModal.platformPlaceholder')} />
         )}
       </FormField>
 
-      <FormField label={`Current price (${form.currency})`} htmlFor="holding-group-current-price" className="md:col-span-2">
+      <FormField label={t('portfolio.holdingGroupModal.currentPriceLabel', { currency: form.currency })} htmlFor="holding-group-current-price" className="md:col-span-2">
         {() => (
           <div className="flex rounded-md overflow-hidden border border-rule bg-surface focus-within:ring-1 focus-within:ring-accent">
             <input
@@ -677,7 +682,7 @@ function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
             <select
               value={form.currency}
               onChange={set('currency')}
-              aria-label="Currency"
+              aria-label={t('portfolio.holdingGroupModal.currencyAriaLabel')}
               className="shrink-0 border-l border-rule bg-surface-raised text-xs font-mono text-ink-muted px-2 outline-none cursor-pointer hover:bg-surface-sunken"
             >
               {currencies.map((c) => (
@@ -690,27 +695,27 @@ function HoldingGroupForm({ group, baseCurrency, onSubmit, onCancel }) {
 
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" variant="primary">
-          Save changes
+          {t('portfolio.holdingGroupModal.saveChanges')}
         </Button>
       </div>
     </form>
   );
 }
 
-function timeAgo(unixSeconds) {
+function timeAgo(unixSeconds, t, locale) {
   if (!unixSeconds) return '';
   const diffMs = Date.now() - unixSeconds * 1000;
   const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('portfolio.timeAgo.justNow');
+  if (minutes < 60) return t('portfolio.timeAgo.minutesAgo', { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('portfolio.timeAgo.hoursAgo', { hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(unixSeconds * 1000).toLocaleDateString();
+  if (days < 7) return t('portfolio.timeAgo.daysAgo', { days });
+  return new Date(unixSeconds * 1000).toLocaleDateString(locale);
 }
 
 const NEWS_PAGE_SIZE = 5;
@@ -720,6 +725,7 @@ function newsTickerStripped(ticker) {
 }
 
 function PortfolioNews({ tickers, apiKey }) {
+  const { t, locale } = useTranslation();
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | loading | ready | error
   const [error, setError] = useState('');
@@ -733,11 +739,11 @@ function PortfolioNews({ tickers, apiKey }) {
   const filterChips = useMemo(() => {
     const seen = new Set();
     const chips = [];
-    for (const t of tickers) {
-      const symbol = newsTickerStripped(t);
+    for (const ticker of tickers) {
+      const symbol = newsTickerStripped(ticker);
       if (!symbol || seen.has(symbol)) continue;
       seen.add(symbol);
-      chips.push({ symbol, label: t });
+      chips.push({ symbol, label: ticker });
     }
     return chips;
   }, [tickerKey]);
@@ -786,13 +792,13 @@ function PortfolioNews({ tickers, apiKey }) {
 
   return (
     <Card
-      eyebrow="Signals"
-      title="Portfolio news"
-      description="Recent headlines for tickers you hold. Refreshes every 30 minutes."
+      eyebrow={t('portfolio.newsCard.eyebrow')}
+      title={t('portfolio.newsCard.title')}
+      description={t('portfolio.newsCard.description')}
       action={
         apiKey && tickers.length ? (
           <Button variant="secondary" size="sm" onClick={() => load({ force: true })} loading={status === 'loading'}>
-            Refresh
+            {t('portfolio.newsCard.refresh')}
           </Button>
         ) : null
       }
@@ -800,19 +806,19 @@ function PortfolioNews({ tickers, apiKey }) {
     >
       {!apiKey ? (
         <EmptyState
-          title="Add a Finnhub API key"
-          description="News uses your existing Finnhub key. Add one in Settings to enable."
+          title={t('portfolio.newsCard.emptyNoApiKey.title')}
+          description={t('portfolio.newsCard.emptyNoApiKey.description')}
         />
       ) : !tickers.length ? (
-        <EmptyState title="No holdings yet" description="Add a position to see related news." />
+        <EmptyState title={t('portfolio.newsCard.emptyNoHoldings.title')} description={t('portfolio.newsCard.emptyNoHoldings.description')} />
       ) : status === 'loading' && !items.length ? (
-        <p className="text-sm text-ink-muted">Loading news…</p>
+        <p className="text-sm text-ink-muted">{t('portfolio.newsCard.loading')}</p>
       ) : status === 'error' ? (
         <p className="text-sm text-danger">{error}</p>
       ) : !items.length ? (
         <EmptyState
-          title="No recent headlines"
-          description="No news returned in the last 14 days for your tickers. European symbols often have limited coverage."
+          title={t('portfolio.newsCard.emptyNoHeadlines.title')}
+          description={t('portfolio.newsCard.emptyNoHeadlines.description')}
         />
       ) : (
         <div className="grid gap-4">
@@ -828,7 +834,7 @@ function PortfolioNews({ tickers, apiKey }) {
                     : 'border-rule text-ink-muted hover:border-rule-strong hover:text-ink',
                 )}
               >
-                All
+                {t('portfolio.newsCard.filterAll')}
               </button>
               {filterChips.map((chip) => {
                 const active = selected.has(chip.symbol);
@@ -853,7 +859,7 @@ function PortfolioNews({ tickers, apiKey }) {
           ) : null}
 
           {filtered.length === 0 ? (
-            <p className="text-sm text-ink-muted">No headlines match the selected tickers.</p>
+            <p className="text-sm text-ink-muted">{t('portfolio.newsCard.noMatchingTickers')}</p>
           ) : (
             <ul className="grid gap-3">
               {paged.map((item) => (
@@ -882,7 +888,7 @@ function PortfolioNews({ tickers, apiKey }) {
                         {item.source ? <span className="text-ink-faint">·</span> : null}
                         {item.source ? <span>{item.source}</span> : null}
                         <span className="text-ink-faint">·</span>
-                        <span>{timeAgo(item.datetime)}</span>
+                        <span>{timeAgo(item.datetime, t, locale)}</span>
                       </div>
                     </div>
                   </a>
@@ -894,7 +900,7 @@ function PortfolioNews({ tickers, apiKey }) {
           {filtered.length > NEWS_PAGE_SIZE ? (
             <div className="flex items-center justify-between gap-3 pt-1">
               <span className="text-xs text-ink-muted">
-                Showing {start + 1}–{Math.min(start + NEWS_PAGE_SIZE, filtered.length)} of {filtered.length}
+                {t('portfolio.newsCard.showing', { from: start + 1, to: Math.min(start + NEWS_PAGE_SIZE, filtered.length), total: filtered.length })}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -903,7 +909,7 @@ function PortfolioNews({ tickers, apiKey }) {
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={safePage === 0}
                 >
-                  Prev
+                  {t('portfolio.newsCard.prev')}
                 </Button>
                 <span className="text-xs text-ink-faint tabular">
                   {safePage + 1} / {totalPages}
@@ -914,7 +920,7 @@ function PortfolioNews({ tickers, apiKey }) {
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={safePage >= totalPages - 1}
                 >
-                  Next
+                  {t('portfolio.newsCard.next')}
                 </Button>
               </div>
             </div>
@@ -926,6 +932,7 @@ function PortfolioNews({ tickers, apiKey }) {
 }
 
 export default function PortfolioPage() {
+  const { t, locale } = useTranslation();
   const holdings = useFinanceStore((state) => state.holdings);
   const dividends = useFinanceStore((state) => state.dividends);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
@@ -971,7 +978,6 @@ export default function PortfolioPage() {
       }
     : modalHolding;
   const fxRates = useFinanceStore((state) => state.fxRates);
-  const locale = settings.locale;
   const currency = settings.baseCurrency;
   const activeHoldings = holdings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
   const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
@@ -1018,18 +1024,18 @@ export default function PortfolioPage() {
     try {
       await refreshPrices();
     } catch (err) {
-      setRefreshError(err.message || 'Price refresh failed');
+      setRefreshError(err.message || t('portfolio.priceRefreshError'));
     } finally {
       setRefreshing(false);
     }
   };
 
   const dividendColumns = [
-    { key: 'date', header: 'Date', width: 110 },
-    { key: 'ticker', header: 'Ticker' },
+    { key: 'date', header: t('portfolio.tableHeaders.date'), width: 110 },
+    { key: 'ticker', header: t('portfolio.tableHeaders.ticker') },
     {
       key: 'amountCents',
-      header: 'Amount',
+      header: t('portfolio.tableHeaders.amount'),
       numeric: true,
       render: (r) => formatCurrency(r.amountCents, r.currency, locale),
     },
@@ -1040,11 +1046,11 @@ export default function PortfolioPage() {
       noTruncate: true,
       render: (r) => (
         <div className="flex flex-wrap justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditDividend(r.id)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => openEditDividend(r.id)}>{t('common.edit')}</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete dividend', description: `Remove the ${r.ticker} dividend entry? This will also remove it from the income ledger.` }))
+            if (await confirm({ title: t('portfolio.confirmDeleteDividend.title'), description: t('portfolio.confirmDeleteDividend.description', { ticker: r.ticker }) }))
               removeDividend(r.id);
-          }}>Delete</Button>
+          }}>{t('common.delete')}</Button>
         </div>
       ),
     },
@@ -1090,16 +1096,16 @@ export default function PortfolioPage() {
   const holdingColumns = [
     {
       key: 'ticker',
-      header: 'Ticker',
+      header: t('portfolio.tableHeaders.ticker'),
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-mono text-sm font-semibold text-ink' : 'pl-5 font-mono text-sm text-ink-muted'}>
-          {r.rowType === 'group' ? r.ticker : `Operation ${r.operationNumber}`}
+          {r.rowType === 'group' ? r.ticker : t('portfolio.tableHeaders.operation', { num: r.operationNumber })}
         </span>
       ),
     },
     {
       key: 'name',
-      header: 'Name',
+      header: t('portfolio.tableHeaders.name'),
       hideOnMobile: true,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-medium text-ink' : 'text-ink-muted'}>
@@ -1109,7 +1115,7 @@ export default function PortfolioPage() {
     },
     {
       key: 'platform',
-      header: 'Platform',
+      header: t('portfolio.tableHeaders.platform'),
       hideOnMobile: true,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'text-xs text-ink' : 'text-xs text-ink-muted'}>
@@ -1117,10 +1123,10 @@ export default function PortfolioPage() {
         </span>
       ),
     },
-    { key: 'quantity', header: 'Qty', numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
+    { key: 'quantity', header: t('portfolio.tableHeaders.qty'), numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
     {
       key: 'avg',
-      header: 'Avg buy',
+      header: t('portfolio.tableHeaders.avgBuy'),
       numeric: true,
       hideOnMobile: true,
       render: (r) => (
@@ -1134,7 +1140,7 @@ export default function PortfolioPage() {
     },
     {
       key: 'price',
-      header: 'Price',
+      header: t('portfolio.tableHeaders.price'),
       numeric: true,
       hideOnMobile: true,
       render: (r) => (
@@ -1146,11 +1152,11 @@ export default function PortfolioPage() {
         </span>
       ),
     },
-    { key: 'fee', header: `Fees (${currency})`, numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
-    { key: 'value', header: `Value (${currency})`, numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
+    { key: 'fee', header: t('portfolio.tableHeaders.fees', { currency }), numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
+    { key: 'value', header: t('portfolio.tableHeaders.value', { currency }), numeric: true, render: (r) => formatCurrency(r.valueCents, currency, locale) },
     {
       key: 'pnl',
-      header: `P&L (${currency})`,
+      header: t('portfolio.tableHeaders.pnl', { currency }),
       numeric: true,
       render: (r) => (
         <span className={r.pnlCents >= 0 ? 'text-positive' : 'text-danger'}>
@@ -1166,17 +1172,17 @@ export default function PortfolioPage() {
       noTruncate: true,
       render: (r) => r.rowType === 'group' ? (
         <div className="flex flex-wrap justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditHoldingGroup(r.ticker)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => sellAllHoldingGroup(r)}>Sell all</Button>
+          <Button variant="ghost" size="sm" onClick={() => openEditHoldingGroup(r.ticker)}>{t('common.edit')}</Button>
+          <Button variant="ghost" size="sm" onClick={() => openSellAllHoldingGroup(r)}>{t('portfolio.sellAll')}</Button>
         </div>
       ) : (
         <div className="flex flex-wrap justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditHolding(r.id)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => openSellHolding(r.id)}>Sell</Button>
+          <Button variant="ghost" size="sm" onClick={() => openEditHolding(r.id)}>{t('common.edit')}</Button>
+          <Button variant="ghost" size="sm" onClick={() => openSellHolding(r.id)}>{t('portfolio.sellModal.titleSell')}</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete holding', description: `Remove ${r.ticker} from your portfolio? This cannot be undone.` }))
+            if (await confirm({ title: t('portfolio.confirmDeleteHolding.title'), description: t('portfolio.confirmDeleteHolding.description', { ticker: r.ticker }) }))
               removeEntity('holdings', r.id);
-          }}>Delete</Button>
+          }}>{t('common.delete')}</Button>
         </div>
       ),
     },
@@ -1227,26 +1233,26 @@ export default function PortfolioPage() {
   const historicalColumns = [
     {
       key: 'date',
-      header: 'Date',
+      header: t('portfolio.tableHeaders.date'),
       width: 110,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-medium text-ink' : 'text-ink-muted'}>
-          {r.rowType === 'group' ? 'Total' : r.date}
+          {r.rowType === 'group' ? t('portfolio.tableHeaders.total') : r.date}
         </span>
       ),
     },
     {
       key: 'ticker',
-      header: 'Ticker',
+      header: t('portfolio.tableHeaders.ticker'),
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-mono text-sm font-semibold text-ink' : 'pl-5 font-mono text-sm text-ink-muted'}>
-          {r.rowType === 'group' ? r.ticker : `Operation ${r.operationNumber}`}
+          {r.rowType === 'group' ? r.ticker : t('portfolio.tableHeaders.operation', { num: r.operationNumber })}
         </span>
       ),
     },
     {
       key: 'name',
-      header: 'Name',
+      header: t('portfolio.tableHeaders.name'),
       hideOnMobile: true,
       render: (r) => (
         <span className={r.rowType === 'group' ? 'font-medium text-ink' : 'text-ink-muted'}>
@@ -1254,20 +1260,20 @@ export default function PortfolioPage() {
         </span>
       ),
     },
-    { key: 'quantity', header: 'Qty sold', numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
+    { key: 'quantity', header: t('portfolio.tableHeaders.qtySold'), numeric: true, hideOnMobile: true, render: (r) => formatNumber(r.quantity, locale, quantityDigits(r)) },
     {
       key: 'percent',
-      header: 'Sold',
+      header: t('portfolio.tableHeaders.sold'),
       numeric: true,
       hideOnMobile: true,
-      render: (r) => r.rowType === 'group' ? `${r.percent} operations` : `${formatNumber(r.percent, locale, 2)}%`,
+      render: (r) => r.rowType === 'group' ? t('portfolio.holdingsCard.operations', { count: r.percent }) : `${formatNumber(r.percent, locale, 2)}%`,
     },
-    { key: 'salePrice', header: 'Sale price', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.salePriceCents, currency, locale) },
-    { key: 'fee', header: 'Fees', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
-    { key: 'proceeds', header: 'Proceeds', numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.proceedsCents, currency, locale) },
+    { key: 'salePrice', header: t('portfolio.tableHeaders.salePrice'), numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.salePriceCents, currency, locale) },
+    { key: 'fee', header: t('portfolio.tableHeaders.fees', { currency }), numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.feeCents || 0, currency, locale) },
+    { key: 'proceeds', header: t('portfolio.tableHeaders.proceeds'), numeric: true, hideOnMobile: true, render: (r) => formatCurrency(r.proceedsCents, currency, locale) },
     {
       key: 'realizedPnl',
-      header: 'Realized P&L',
+      header: t('portfolio.tableHeaders.realizedPnl'),
       numeric: true,
       render: (r) => (
         <span className={r.realizedPnlCents >= 0 ? 'text-positive' : 'text-danger'}>
@@ -1282,14 +1288,14 @@ export default function PortfolioPage() {
       align: 'right',
       noTruncate: true,
       render: (r) => r.rowType === 'group' ? (
-        <span className="eyebrow text-ink-faint">Total</span>
+        <span className="eyebrow text-ink-faint">{t('portfolio.tableHeaders.total')}</span>
       ) : (
         <div className="flex flex-wrap justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditSale(r.id)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => openEditSale(r.id)}>{t('common.edit')}</Button>
           <Button variant="ghost" size="sm" onClick={async () => {
-            if (await confirm({ title: 'Delete sale', description: `Remove the ${r.ticker} sale and restore the sold quantity to the holding?` }))
+            if (await confirm({ title: t('portfolio.confirmDeleteSale.title'), description: t('portfolio.confirmDeleteSale.description', { ticker: r.ticker }) }))
               removePortfolioSale(r.id);
-          }}>Delete</Button>
+          }}>{t('common.delete')}</Button>
         </div>
       ),
     },
@@ -1299,19 +1305,19 @@ export default function PortfolioPage() {
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="04"
-        eyebrow="Module"
-        title="Portfolio"
-        description="Holdings, allocation, performance — and dividends that mirror into the income ledger automatically."
+        eyebrow={t('portfolio.eyebrow')}
+        title={t('portfolio.title')}
+        description={t('portfolio.description')}
         actions={
           <>
             {refreshError && (
               <span className="text-xs text-danger">{refreshError}</span>
             )}
             <Button variant="secondary" size="sm" loading={refreshing} onClick={onRefresh}>
-              {refreshing ? `Refreshing… (${activeHoldings.length} tickers, ~${Math.ceil(activeHoldings.length * 13 / 60)} min)` : 'Refresh prices'}
+              {refreshing ? t('portfolio.refreshing', { count: activeHoldings.length, mins: Math.ceil(activeHoldings.length * 13 / 60) }) : t('portfolio.refreshPrices')}
             </Button>
             <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
-              <PlusIcon /> New holding
+              <PlusIcon /> {t('portfolio.newHolding')}
             </Button>
           </>
         }
@@ -1320,10 +1326,10 @@ export default function PortfolioPage() {
       {/* KPIs */}
       <section data-tour="portfolio-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Market value', value: portfolio.currentValueCents, mode: 'currency', hint: `${activeHoldings.length} holdings`, info: 'Current value of all active holdings using their latest stored prices.' },
-          { label: 'TWRR', value: portfolio.twrr, mode: 'percent', hint: 'time-weighted', info: 'Time-weighted rate of return. It measures portfolio performance while reducing the effect of deposits and withdrawals.' },
-          { label: 'XIRR', value: portfolio.xirr, mode: 'percent', hint: 'cashflow-adjusted', info: 'Annualized return based on the timing and size of your actual portfolio cashflows.' },
-          { label: 'Dividend yield', value: portfolio.dividendYield, mode: 'percent', hint: 'portfolio-wide', info: 'Dividend income as a percentage of the current portfolio value.' },
+          { label: t('portfolio.kpiMarketValue.label'), value: portfolio.currentValueCents, mode: 'currency', hint: t('portfolio.kpiMarketValue.hintHoldings', { count: activeHoldings.length }), info: t('portfolio.kpiMarketValue.info') },
+          { label: t('portfolio.kpiTwrr.label'), value: portfolio.twrr, mode: 'percent', hint: t('portfolio.kpiTwrr.hint'), info: t('portfolio.kpiTwrr.info') },
+          { label: t('portfolio.kpiXirr.label'), value: portfolio.xirr, mode: 'percent', hint: t('portfolio.kpiXirr.hint'), info: t('portfolio.kpiXirr.info') },
+          { label: t('portfolio.kpiDividendYield.label'), value: portfolio.dividendYield, mode: 'percent', hint: t('portfolio.kpiDividendYield.hint'), info: t('portfolio.kpiDividendYield.info') },
         ].map((k, i) => (
           <div key={k.label} className={'min-w-0 bg-surface p-6 ' + rise(i + 1)}>
             <Stat label={k.label} value={k.value} mode={k.mode} currency={currency} locale={locale} hint={k.hint} info={k.info} />
@@ -1333,9 +1339,9 @@ export default function PortfolioPage() {
 
       <Card
         data-tour="portfolio-value-history"
-        eyebrow="Hourly float"
-        title="Portfolio value"
-        description="Open-position market value captured once per hour."
+        eyebrow={t('portfolio.valueChart.eyebrow')}
+        title={t('portfolio.valueChart.title')}
+        description={t('portfolio.valueChart.description')}
         variant="chart"
         className={rise(2)}
       >
@@ -1386,19 +1392,19 @@ export default function PortfolioPage() {
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState title="No portfolio value yet" description="Add a holding and refresh prices to start the hourly chart." />
+          <EmptyState title={t('portfolio.valueChart.emptyTitle')} description={t('portfolio.valueChart.emptyDescription')} />
         )}
       </Card>
 
       {/* holdings */}
       <Card
         data-tour="portfolio-holdings"
-        eyebrow="Register"
-        title="Holdings"
-        description="Refresh prices manually to fetch the latest market prices."
+        eyebrow={t('portfolio.holdingsCard.eyebrow')}
+        title={t('portfolio.holdingsCard.title')}
+        description={t('portfolio.holdingsCard.description')}
         action={
           <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
-            <PlusIcon /> Add holding
+            <PlusIcon /> {t('portfolio.addHolding')}
           </Button>
         }
         className={rise(3)}
@@ -1415,17 +1421,17 @@ export default function PortfolioPage() {
             openSellHolding={openSellHolding}
             sellAllHoldingGroup={openSellAllHoldingGroup}
             onDeleteHolding={async (holding) => {
-              if (await confirm({ title: 'Delete holding', description: `Remove ${holding.ticker} from your portfolio? This cannot be undone.` }))
+              if (await confirm({ title: t('portfolio.confirmDeleteHolding.title'), description: t('portfolio.confirmDeleteHolding.description', { ticker: holding.ticker }) }))
                 removeEntity('holdings', holding.id);
             }}
           />
         ) : (
           <EmptyState
-            title="No holdings yet"
-            description="Add your first position â€” Trade Republic, IBKR, anywhere."
+            title={t('portfolio.holdingsCard.emptyTitle')}
+            description={t('portfolio.holdingsCard.emptyDescription')}
             action={
               <Button variant="secondary" size="sm" onClick={() => openNewHolding()}>
-                <PlusIcon /> Add holding
+                <PlusIcon /> {t('portfolio.addHolding')}
               </Button>
             }
           />
@@ -1437,7 +1443,7 @@ export default function PortfolioPage() {
 
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
-        <Card data-tour="portfolio-allocation" eyebrow="Split" title="Allocation" className={'order-2 lg:col-span-5 ' + rise(2)}>
+        <Card data-tour="portfolio-allocation" eyebrow={t('portfolio.allocationCard.eyebrow')} title={t('portfolio.allocationCard.title')} className={'order-2 lg:col-span-5 ' + rise(2)}>
           {portfolio.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[190px] w-full max-w-[190px] sm:h-[220px] sm:max-w-[220px]">
@@ -1488,11 +1494,11 @@ export default function PortfolioPage() {
               </ul>
             </div>
           ) : (
-            <EmptyState title="No holdings yet" description="Add a position to see the allocation." />
+            <EmptyState title={t('portfolio.allocationCard.emptyTitle')} description={t('portfolio.allocationCard.emptyDescription')} />
           )}
         </Card>
 
-        <Card eyebrow="Rebalance" title="Target vs actual" variant="chart" className={'order-1 lg:col-span-7 ' + rise(3)}>
+        <Card eyebrow={t('portfolio.rebalanceCard.eyebrow')} title={t('portfolio.rebalanceCard.title')} variant="chart" className={'order-1 lg:col-span-7 ' + rise(3)}>
           {portfolio.allocationActual?.length ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={portfolio.allocationActual} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
@@ -1500,12 +1506,12 @@ export default function PortfolioPage() {
                 <XAxis dataKey="ticker" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} width={44} />
                 <Tooltip formatter={(v) => `${formatNumber(v, locale, 1)}%`} />
-                <Bar dataKey="actualWeight" fill="var(--accent)" radius={[3, 3, 0, 0]} name="Actual" />
-                <Bar dataKey="targetWeight" fill="var(--ink-muted)" radius={[3, 3, 0, 0]} name="Target" opacity={0.45} />
+                <Bar dataKey="actualWeight" fill="var(--accent)" radius={[3, 3, 0, 0]} name={t('portfolio.rebalanceCard.barActual')} />
+                <Bar dataKey="targetWeight" fill="var(--ink-muted)" radius={[3, 3, 0, 0]} name={t('portfolio.rebalanceCard.barTarget')} opacity={0.45} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyState title="No targets set" description="Define target weights in Settings." />
+            <EmptyState title={t('portfolio.rebalanceCard.emptyTitle')} description={t('portfolio.rebalanceCard.emptyDescription')} />
           )}
         </Card>
       </section>
@@ -1525,29 +1531,29 @@ export default function PortfolioPage() {
 
       {/* historical performance */}
       <Card
-        eyebrow="History"
-        title="Portfolio historical performance"
-        description="Closed sale lots and realized performance from sold holdings."
+        eyebrow={t('portfolio.historicalCard.eyebrow')}
+        title={t('portfolio.historicalCard.title')}
+        description={t('portfolio.historicalCard.description')}
         className={rise(5)}
       >
         {historicalRows.length ? (
           <Table columns={historicalColumns} rows={historicalRows} density="compact" />
         ) : (
           <EmptyState
-            title="No sales yet"
-            description="Sold holdings will appear here with realized P&L."
+            title={t('portfolio.historicalCard.emptyTitle')}
+            description={t('portfolio.historicalCard.emptyDescription')}
           />
         )}
       </Card>
 
       <Card
-        eyebrow="Tracking"
-        title="Sales performance"
-        description="Cumulative realized P&L from sold holdings over time."
+        eyebrow={t('portfolio.salesPerformanceCard.eyebrow')}
+        title={t('portfolio.salesPerformanceCard.title')}
+        description={t('portfolio.salesPerformanceCard.description')}
         action={
           salesPerformanceSeries.length ? (
             <div className="text-right">
-              <p className="eyebrow text-ink-muted">Total P&L</p>
+              <p className="eyebrow text-ink-muted">{t('portfolio.salesPerformanceCard.totalPnl')}</p>
               <p className={salesPerformanceTotalCents >= 0 ? 'mt-1 font-mono text-lg text-positive' : 'mt-1 font-mono text-lg text-danger'}>
                 {formatCurrency(salesPerformanceTotalCents, currency, locale)}
               </p>
@@ -1586,7 +1592,7 @@ export default function PortfolioPage() {
               <Tooltip
                 formatter={(value, name) => [
                   formatCurrency(value, currency, locale),
-                  name === 'cumulativePnlCents' ? 'Cumulative P&L' : 'Sale P&L',
+                  name === 'cumulativePnlCents' ? t('portfolio.salesPerformanceCard.tooltipCumulative') : t('portfolio.salesPerformanceCard.tooltipSale'),
                 ]}
                 labelFormatter={(_, payload) => {
                   const sale = payload?.[0]?.payload;
@@ -1606,18 +1612,18 @@ export default function PortfolioPage() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState title="No sales performance yet" description="Sell a holding to start tracking realized performance." />
+          <EmptyState title={t('portfolio.salesPerformanceCard.emptyTitle')} description={t('portfolio.salesPerformanceCard.emptyDescription')} />
         )}
       </Card>
 
       {/* dividends */}
       <Card
-        eyebrow="History"
-        title="Dividends received"
-        description="Linked to holdings; included in portfolio yield calculations. Mirrors into the income ledger automatically."
+        eyebrow={t('portfolio.dividendsCard.eyebrow')}
+        title={t('portfolio.dividendsCard.title')}
+        description={t('portfolio.dividendsCard.description')}
         action={
           <Button variant="primary" size="sm" onClick={openNewDividend}>
-            <PlusIcon /> Add dividend
+            <PlusIcon /> {t('portfolio.addDividend')}
           </Button>
         }
         className={rise(7)}
@@ -1626,11 +1632,11 @@ export default function PortfolioPage() {
           <Table columns={dividendColumns} rows={dividends} density="compact" />
         ) : (
           <EmptyState
-            title="No dividends tracked yet"
-            description="Log a payout — it will also appear in the income module."
+            title={t('portfolio.dividendsCard.emptyTitle')}
+            description={t('portfolio.dividendsCard.emptyDescription')}
             action={
               <Button variant="secondary" size="sm" onClick={openNewDividend}>
-                <PlusIcon /> Add dividend
+                <PlusIcon /> {t('portfolio.addDividend')}
               </Button>
             }
           />
@@ -1640,9 +1646,9 @@ export default function PortfolioPage() {
       <Modal
         open={holdingModal.open}
         onClose={closeHolding}
-        eyebrow="Portfolio position"
-        title={editingHolding ? 'Edit holding' : 'New holding'}
-        description="Manual positions for any platform."
+        eyebrow={t('portfolio.holdingModal.eyebrow')}
+        title={editingHolding ? t('portfolio.holdingModal.titleEdit') : t('portfolio.holdingModal.titleNew')}
+        description={t('portfolio.holdingModal.description')}
         size="lg"
       >
         <HoldingForm
@@ -1667,8 +1673,8 @@ export default function PortfolioPage() {
                 if (cost > sourceBalance) {
                   throw new Error(
                     fundingSource === 'savings'
-                      ? 'Not enough savings balance for this holding.'
-                      : 'Not enough available cashflow for this holding.',
+                      ? t('portfolio.holdingModal.errorNotEnoughSavings')
+                      : t('portfolio.holdingModal.errorNotEnoughCashflow'),
                   );
                 }
               }
@@ -1691,7 +1697,7 @@ export default function PortfolioPage() {
               }
               closeHolding();
             } catch (error) {
-              await alert({ title: 'Unable to add holding', description: error.message || 'Something went wrong.' });
+              await alert({ title: t('portfolio.holdingModal.errorSave.title'), description: error.message || t('portfolio.holdingModal.errorSave.description') });
             }
           }}
           onCancel={closeHolding}
@@ -1701,9 +1707,9 @@ export default function PortfolioPage() {
       <Modal
         open={holdingGroupModal.open}
         onClose={closeHoldingGroup}
-        eyebrow="Portfolio ticker"
-        title={editingHoldingGroup ? `Edit ${editingHoldingGroup.ticker}` : 'Edit ticker'}
-        description="Update shared details across every operation for this ticker."
+        eyebrow={t('portfolio.holdingGroupModal.eyebrow')}
+        title={editingHoldingGroup ? t('portfolio.holdingGroupModal.titleEdit', { ticker: editingHoldingGroup.ticker }) : t('portfolio.holdingGroupModal.titleFallback')}
+        description={t('portfolio.holdingGroupModal.description')}
         size="md"
       >
         {editingHoldingGroup ? (
@@ -1730,9 +1736,9 @@ export default function PortfolioPage() {
       <Modal
         open={sellModal.open}
         onClose={closeSellHolding}
-        eyebrow="Portfolio sale"
-        title={editingSale ? 'Edit sale' : 'Sell holding'}
-        description={editingSale ? 'Update this historical sale and rebalance the holding quantity.' : 'Choose the percentage to sell and record the realized performance.'}
+        eyebrow={t('portfolio.sellModal.eyebrow')}
+        title={editingSale ? t('portfolio.sellModal.titleEdit') : t('portfolio.sellModal.titleSell')}
+        description={editingSale ? t('portfolio.sellModal.descriptionEdit') : t('portfolio.sellModal.descriptionSell')}
         size="lg"
       >
         {sellingHolding ? (
@@ -1759,9 +1765,9 @@ export default function PortfolioPage() {
       <Modal
         open={sellAllModal.open}
         onClose={closeSellAllHoldingGroup}
-        eyebrow="Portfolio sale"
-        title={sellingAllGroup ? `Sell all ${sellingAllGroup.ticker}` : 'Sell all'}
-        description="Choose the destination bank before selling every open operation."
+        eyebrow={t('portfolio.sellAllModal.eyebrow')}
+        title={sellingAllGroup ? t('portfolio.sellAllModal.titlePrefix', { ticker: sellingAllGroup.ticker }) : t('portfolio.sellAllModal.titleFallback')}
+        description={t('portfolio.sellAllModal.description')}
         size="md"
       >
         {sellingAllGroup ? (
@@ -1773,7 +1779,7 @@ export default function PortfolioPage() {
                 await sellAllHoldingGroup(sellingAllGroup, value);
                 closeSellAllHoldingGroup();
               } catch (error) {
-                await alert({ title: 'Unable to sell all holdings', description: error.message || 'Something went wrong.' });
+                await alert({ title: t('portfolio.sellAllModal.errorSell.title'), description: error.message || t('portfolio.sellAllModal.errorSell.description') });
               }
             }}
             onCancel={closeSellAllHoldingGroup}
@@ -1784,9 +1790,9 @@ export default function PortfolioPage() {
       <Modal
         open={dividendModal.open}
         onClose={closeDividend}
-        eyebrow="Dividend payout"
-        title={editingDividend ? 'Edit dividend' : 'New dividend'}
-        description="Logged payouts mirror into the income ledger and feed portfolio yield."
+        eyebrow={t('portfolio.dividendModal.eyebrow')}
+        title={editingDividend ? t('portfolio.dividendModal.titleEdit') : t('portfolio.dividendModal.titleNew')}
+        description={t('portfolio.dividendModal.description')}
         size="md"
       >
         <DividendForm

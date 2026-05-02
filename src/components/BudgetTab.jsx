@@ -8,6 +8,7 @@ import { cn } from './ui/cn';
 import { rise } from '../utils/motion';
 import { ManageCategoriesModal } from './ManageCategoriesModal';
 import { CategorySelect } from './forms/CategorySelect';
+import { useTranslation } from '../i18n/useTranslation';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,9 +18,9 @@ function getPrevMonth(yyyyMm) {
   return `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
-function monthLabel(yyyyMm) {
+function monthLabel(yyyyMm, locale) {
   const [y, m] = yyyyMm.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleString('en', { month: 'long', year: 'numeric' });
+  return new Date(y, m - 1, 1).toLocaleString(locale, { month: 'long', year: 'numeric' });
 }
 
 function PlusIcon() {
@@ -32,7 +33,7 @@ function PlusIcon() {
 
 // ─── budget card ──────────────────────────────────────────────────────────────
 
-function BudgetCard({ budget, spentCents, rolloverCents, currency, locale, onEdit, onRemove }) {
+function BudgetCard({ budget, spentCents, rolloverCents, currency, locale, onEdit, onRemove, t }) {
   const effectiveCents = budget.monthlyCents + rolloverCents;
   const over = effectiveCents > 0 && spentCents > effectiveCents;
   const pct = effectiveCents > 0 ? (spentCents / effectiveCents) * 100 : 0;
@@ -43,20 +44,20 @@ function BudgetCard({ budget, spentCents, rolloverCents, currency, locale, onEdi
       <div className="flex items-start justify-between gap-2">
         <p className="truncate text-sm font-medium text-ink">{budget.category}</p>
         <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
+          <Button variant="ghost" size="sm" onClick={onEdit}>{t('common.edit')}</Button>
+          <Button variant="ghost" size="sm" onClick={onRemove}>{t('common.remove')}</Button>
         </div>
       </div>
 
       <div className="mt-1 flex justify-between text-xs text-ink-muted">
         <span>
-          Spent:{' '}
+          {t('budgets.budgetsCard.spent')}{' '}
           <span className={cn('font-mono', over && 'font-medium text-danger')}>
             {formatCurrency(spentCents, currency, locale)}
           </span>
         </span>
         <span>
-          Budget: <span className="font-mono">{formatCurrency(effectiveCents, currency, locale)}</span>
+          {t('budgets.budgetsCard.budget')} <span className="font-mono">{formatCurrency(effectiveCents, currency, locale)}</span>
         </span>
       </div>
 
@@ -69,13 +70,13 @@ function BudgetCard({ budget, spentCents, rolloverCents, currency, locale, onEdi
 
       <p className={cn('mt-1 text-xs', over ? 'text-danger' : 'text-ink-muted')}>
         {over
-          ? `Over by ${formatCurrency(Math.abs(remainingCents), currency, locale)}`
-          : `${formatCurrency(remainingCents, currency, locale)} remaining`}
+          ? t('budgets.budgetsCard.overBy', { amount: formatCurrency(Math.abs(remainingCents), currency, locale) })
+          : t('budgets.budgetsCard.remaining', { amount: formatCurrency(remainingCents, currency, locale) })}
       </p>
 
       {rolloverCents > 0 && (
         <p className="mt-0.5 text-xs text-positive">
-          +{formatCurrency(rolloverCents, currency, locale)} rolled over from last month
+          {t('budgets.budgetsCard.rolledOver', { amount: formatCurrency(rolloverCents, currency, locale) })}
         </p>
       )}
     </div>
@@ -85,6 +86,8 @@ function BudgetCard({ budget, spentCents, rolloverCents, currency, locale, onEdi
 // ─── main component ───────────────────────────────────────────────────────────
 
 export function BudgetTab() {
+  const { t, locale } = useTranslation();
+
   const budgets = useFinanceStore((s) => s.budgets);
   const rollovers = useFinanceStore((s) => s.rollovers);
   const expenses = useFinanceStore((s) => s.expenses);
@@ -96,7 +99,7 @@ export function BudgetTab() {
   const updateSettings = useFinanceStore((s) => s.updateSettings);
 
   const confirm = useConfirm();
-  const { baseCurrency: currency, locale, categories: expenseCategories } = settings;
+  const { baseCurrency: currency, categories: expenseCategories } = settings;
 
   const [selectedMonth] = useState(
     () => normalizeDateInput(new Date()).slice(0, 7),
@@ -220,7 +223,7 @@ export function BudgetTab() {
       await saveSavingsEntry({
         date: `${selectedMonth}-01`,
         amountCents: item.amountCents,
-        note: `Budget rollover — ${item.category} (${monthLabel(item.fromMonth)})`,
+        note: `Budget rollover — ${item.category} (${monthLabel(item.fromMonth, locale)})`,
       });
     }
   };
@@ -232,29 +235,47 @@ export function BudgetTab() {
       {/* month selector */}
       <div className={'flex flex-wrap items-center justify-between gap-4 ' + rise(1)}>
         <p className="text-sm text-ink-muted">
-          Budgets repeat every month — viewing{' '}
-          <span className="font-medium text-ink">{monthLabel(selectedMonth)}</span>
+          {(() => {
+            const label = monthLabel(selectedMonth, locale);
+            const full = t('budgets.viewingMonth', { month: label });
+            const idx = full.indexOf(label);
+            if (idx === -1) return full;
+            return (
+              <>
+                {full.slice(0, idx)}
+                <span className="font-medium text-ink">{label}</span>
+                {full.slice(idx + label.length)}
+              </>
+            );
+          })()}
         </p>
       </div>
 
       <section data-tour="budgets-stats" className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule sm:grid-cols-2">
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat
-            label="Total budgets"
+            label={t('budgets.kpiTotalBudgets.label')}
             value={totalBudgetCents}
             formatter={(value) => formatCurrency(value, currency, locale)}
-            hint={`${budgets.length} planned ${budgets.length === 1 ? 'category' : 'categories'}`}
-            info="The sum of every planned monthly category budget."
+            hint={t('budgets.kpiTotalBudgets.hintCategory', {
+              count: budgets.length,
+              noun: budgets.length === 1
+                ? t('budgets.kpiTotalBudgets.hintCategoryOne')
+                : t('budgets.kpiTotalBudgets.hintCategoryOther'),
+            })}
+            info={t('budgets.kpiTotalBudgets.info')}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
           <Stat
-            label="Cashflow - budgets"
+            label={t('budgets.kpiCashflowAfterBudgets.label')}
             value={cashflowAfterBudgetsCents}
             formatter={(value) => formatCurrency(value, currency, locale)}
-            hint={cashflowAfterBudgetsCents >= 0 ? 'left after budgets' : 'over monthly cashflow'}
+            hint={cashflowAfterBudgetsCents >= 0
+              ? t('budgets.kpiCashflowAfterBudgets.hintPositive')
+              : t('budgets.kpiCashflowAfterBudgets.hintNegative')}
             tone={cashflowAfterBudgetsCents >= 0 ? 'positive' : 'danger'}
-            info="Current monthly cashflow minus total planned monthly budgets."
+            info={t('budgets.kpiCashflowAfterBudgets.info')}
           />
         </div>
       </section>
@@ -262,16 +283,16 @@ export function BudgetTab() {
       {/* budget cards */}
       <Card
         data-tour="budgets-cards"
-        eyebrow="Plan"
-        title="Category budgets"
-        description="Your monthly limits for variable spending. These repeat automatically — no need to set them each month."
+        eyebrow={t('budgets.budgetsCard.eyebrow')}
+        title={t('budgets.budgetsCard.title')}
+        description={t('budgets.budgetsCard.description')}
         action={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setCatModalOpen(true)}>
-              Manage categories
+              {t('budgets.manageCategories')}
             </Button>
             <Button variant="primary" size="sm" onClick={openNew}>
-              <PlusIcon /> Add budget
+              <PlusIcon /> {t('budgets.addBudget')}
             </Button>
           </div>
         }
@@ -289,9 +310,13 @@ export function BudgetTab() {
                 locale={locale}
                 onEdit={() => openEdit(b.category)}
                 onRemove={async () => {
-                  if (await confirm({ title: 'Remove budget', description: `Remove the budget for "${b.category}"? The category itself won't be affected.` }))
+                  if (await confirm({
+                    title: t('budgets.confirmRemoveBudget.title'),
+                    description: t('budgets.confirmRemoveBudget.description', { category: b.category }),
+                  }))
                     removeBudget(b.category);
                 }}
+                t={t}
               />
             ))}
           </div>
@@ -299,16 +324,16 @@ export function BudgetTab() {
           <>
             {settings.setupIntent?.budgets && (
               <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
-                <p className="text-sm font-medium text-ink">You mentioned wanting category budgets</p>
-                <p className="mt-0.5 text-xs text-ink-muted">Add a spending limit per category and track it against your real monthly expenses.</p>
+                <p className="text-sm font-medium text-ink">{t('budgets.budgetsCard.budgetsHint')}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{t('budgets.budgetsCard.budgetsHintDescription')}</p>
               </div>
             )}
             <EmptyState
-              title="No budgets yet"
-              description="Add a category to start tracking variable spending against a monthly limit."
+              title={t('budgets.budgetsCard.emptyTitle')}
+              description={t('budgets.budgetsCard.emptyDescription')}
               action={
                 <Button variant="secondary" size="sm" onClick={openNew}>
-                  <PlusIcon /> Add category
+                  <PlusIcon /> {t('budgets.addCategory')}
                 </Button>
               }
             />
@@ -319,9 +344,9 @@ export function BudgetTab() {
       {/* rollover section */}
       {pendingRollovers.length > 0 && (
         <Card
-          eyebrow="Month-end"
-          title={`Leftovers from ${monthLabel(prevMonth)}`}
-          description="You stayed under budget in these categories. Roll the surplus forward, move it to savings, or release it back to total balance."
+          eyebrow={t('budgets.rolloverCard.eyebrow')}
+          title={t('budgets.rolloverCard.titlePrefix', { month: monthLabel(prevMonth, locale) })}
+          description={t('budgets.rolloverCard.description')}
           className={rise(3)}
         >
           <ul className="divide-y divide-rule">
@@ -330,7 +355,7 @@ export function BudgetTab() {
                 <div>
                   <p className="text-sm font-medium text-ink">{item.category}</p>
                   <p className="eyebrow mt-0.5">
-                    Leftover:{' '}
+                    {t('budgets.rolloverCard.leftover')}{' '}
                     <span className="font-mono text-positive">
                       {formatCurrency(item.amountCents, currency, locale)}
                     </span>
@@ -338,13 +363,13 @@ export function BudgetTab() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" size="sm" onClick={() => handleRollover(item, 'rollover')}>
-                    Roll to {monthLabel(selectedMonth).split(' ')[0]}
+                    {t('budgets.rolloverCard.rollToMonth', { month: monthLabel(selectedMonth, locale).split(' ')[0] })}
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => handleRollover(item, 'savings')}>
-                    Move to savings
+                    {t('budgets.rolloverCard.moveToSavings')}
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => handleRollover(item, 'balance')}>
-                    Roll to total balance
+                    {t('budgets.rolloverCard.rollToBalance')}
                   </Button>
                 </div>
               </li>
@@ -359,8 +384,10 @@ export function BudgetTab() {
       <Modal
         open={modal.open}
         onClose={closeModal}
-        eyebrow="Budget"
-        title={isEditing ? `Edit budget — ${modal.category}` : 'Add budget category'}
+        eyebrow={t('budgets.modal.eyebrow')}
+        title={isEditing
+          ? t('budgets.modal.titleEdit', { category: modal.category })
+          : t('budgets.modal.titleAdd')}
         size="sm"
       >
         {/* datalist for category suggestions */}
@@ -372,7 +399,7 @@ export function BudgetTab() {
 
         <div className="grid gap-5">
           {!isEditing && (
-            <FormField label="Category" htmlFor="budget-category">
+            <FormField label={t('budgets.modal.categoryLabel')} htmlFor="budget-category">
               <CategorySelect
                 id="budget-category"
                 value={newCategory}
@@ -382,7 +409,7 @@ export function BudgetTab() {
             </FormField>
           )}
 
-          <FormField label={`Monthly limit (${currency})`} htmlFor="budget-amount">
+          <FormField label={t('budgets.modal.amountLabel', { currency })} htmlFor="budget-amount">
             <Input
               id="budget-amount"
               type="number"
@@ -397,9 +424,9 @@ export function BudgetTab() {
           </FormField>
 
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button variant="secondary" onClick={closeModal}>{t('common.cancel')}</Button>
             <Button variant="primary" onClick={saveBudget}>
-              {isEditing ? 'Save changes' : 'Add budget'}
+              {isEditing ? t('budgets.modal.saveChanges') : t('budgets.modal.addBudget')}
             </Button>
           </div>
         </div>

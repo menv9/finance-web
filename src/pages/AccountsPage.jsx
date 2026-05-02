@@ -6,6 +6,7 @@ import { SmartBankImport } from '../components/SmartBankImport';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { Button, Card, Checkbox, EmptyState, FormField, Input, Modal, Stat } from '../components/ui';
+import { useTranslation } from '../i18n/useTranslation';
 
 function centsToAmount(value) {
   return ((value || 0) / 100).toFixed(2);
@@ -19,6 +20,7 @@ function parseAmountToCents(value) {
 
 function AccountModal({ open, account, currency, onClose, onSave }) {
   const alert = useAlert();
+  const { t } = useTranslation();
   const [name, setName] = useState(account?.name || '');
   const [balance, setBalance] = useState(centsToAmount(account?.balanceCents));
   const [saving, setSaving] = useState(false);
@@ -27,12 +29,12 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
-      await alert({ title: 'Missing name', description: 'Add an account name.' });
+      await alert({ title: t('accounts.modal.errorMissingName.title'), description: t('accounts.modal.errorMissingName.description') });
       return;
     }
     const balanceCents = parseAmountToCents(balance);
     if (balanceCents < 0) {
-      await alert({ title: 'Invalid balance', description: 'Bank account balance cannot be negative.' });
+      await alert({ title: t('accounts.modal.errorNegativeBalance.title'), description: t('accounts.modal.errorNegativeBalance.description') });
       return;
     }
     setSaving(true);
@@ -46,7 +48,7 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
       if (saved === false) return;
       onClose();
     } catch (err) {
-      await alert({ title: 'Unable to save account', description: err.message || 'Something went wrong.' });
+      await alert({ title: t('accounts.modal.errorSave.title'), description: err.message || t('accounts.modal.errorSave.description') });
     } finally {
       setSaving(false);
     }
@@ -56,21 +58,21 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
     <Modal
       open={open}
       onClose={onClose}
-      eyebrow="Bank account"
-      title={account ? 'Edit account' : 'New account'}
-      description="Update the real balance held by this bank. This does not create income or expense records."
+      eyebrow={t('accounts.modal.eyebrow')}
+      title={account ? t('accounts.modal.titleEdit') : t('accounts.modal.titleNew')}
+      description={t('accounts.modal.description')}
     >
       <form id="account-form" className="grid gap-5" onSubmit={handleSubmit}>
-        <FormField label="Account name" htmlFor="account-name">
+        <FormField label={t('accounts.modal.nameLabel')} htmlFor="account-name">
           <Input
             id="account-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Santander main"
+            placeholder={t('accounts.modal.namePlaceholder')}
             autoFocus
           />
         </FormField>
-        <FormField label={`Current balance (${currency})`} htmlFor="account-balance">
+        <FormField label={t('accounts.modal.balanceLabel', { currency })} htmlFor="account-balance">
           <Input
             id="account-balance"
             type="number"
@@ -83,8 +85,8 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
           />
         </FormField>
         <div className="flex flex-wrap justify-end gap-2 border-t border-rule pt-5">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>Save account</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" loading={saving}>{t('accounts.modal.save')}</Button>
         </div>
       </form>
     </Modal>
@@ -93,6 +95,7 @@ function AccountModal({ open, account, currency, onClose, onSave }) {
 
 export default function AccountsPage() {
   const confirm = useConfirm();
+  const { t, locale } = useTranslation();
   const accounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
@@ -111,7 +114,6 @@ export default function AccountsPage() {
   }, [searchParams, setSearchParams]);
 
   const currency = settings.baseCurrency || 'EUR';
-  const locale = settings.locale || 'en-GB';
   const sortedAccounts = useMemo(
     () => [...accounts].sort((a, b) => Number(Boolean(b.isMain)) - Number(Boolean(a.isMain)) || (a.name || '').localeCompare(b.name || '')),
     [accounts],
@@ -142,9 +144,13 @@ export default function AccountsPage() {
     const balanceChanged = previous && (previous.balanceCents || 0) !== (account.balanceCents || 0);
     if (balanceChanged) {
       const ok = await confirm({
-        title: 'Update bank funds',
-        description: `Are you sure you want to change "${previous.name}" from ${formatCurrency(previous.balanceCents || 0, previous.currency || currency, locale)} to ${formatCurrency(account.balanceCents || 0, account.currency || currency, locale)}? This will update total balance directly without creating income or expense records.`,
-        confirmLabel: 'Update balance',
+        title: t('accounts.confirmUpdateBalance.title'),
+        description: t('accounts.confirmUpdateBalance.description', {
+          name: previous.name,
+          from: formatCurrency(previous.balanceCents || 0, previous.currency || currency, locale),
+          to: formatCurrency(account.balanceCents || 0, account.currency || currency, locale),
+        }),
+        confirmLabel: t('accounts.confirmUpdateBalance.confirm'),
       });
       if (!ok) return false;
     }
@@ -170,9 +176,9 @@ export default function AccountsPage() {
 
   const handleDelete = async (account) => {
     const ok = await confirm({
-      title: 'Delete account',
-      description: `Remove "${account.name}" from Accounts? This changes total balance only; income and expenses stay untouched.`,
-      confirmLabel: 'Delete account',
+      title: t('accounts.confirmDelete.title'),
+      description: t('accounts.confirmDelete.description', { name: account.name }),
+      confirmLabel: t('accounts.confirmDelete.confirm'),
     });
     if (!ok) return;
     await removeEntity('bankAccounts', account.id);
@@ -181,15 +187,21 @@ export default function AccountsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        eyebrow="Balance control"
-        title="Accounts"
-        description="Track money by bank and adjust real balances without changing income or expense history."
-        actions={<Button onClick={openNewAccount}>Add account</Button>}
+        eyebrow={t('accounts.eyebrow')}
+        title={t('accounts.title')}
+        description={t('accounts.description')}
+        actions={<Button onClick={openNewAccount}>{t('accounts.addAccount')}</Button>}
       />
 
       {bankConnectedBanner ? (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-600 dark:text-green-400">
-          <span>Bank connected! Click <strong>Sync now</strong> to pull in your latest balance.</span>
+          <span>
+            {t('accounts.bankConnected', { strong: t('accounts.bankConnectedSync') }).split(t('accounts.bankConnectedSync')).map((part, i, arr) =>
+              i < arr.length - 1
+                ? [part, <strong key={i}>{t('accounts.bankConnectedSync')}</strong>]
+                : part
+            )}
+          </span>
           <button
             type="button"
             className="shrink-0 opacity-60 hover:opacity-100"
@@ -203,25 +215,25 @@ export default function AccountsPage() {
       <div data-tour="accounts-summary" className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-lg border border-rule bg-surface p-6">
           <Stat
-            label="Total balance"
+            label={t('accounts.kpiTotalBalance.label')}
             value={formatCurrency(totalBalanceCents, currency, locale)}
-            hint="Sum of every bank account listed below."
+            hint={t('accounts.kpiTotalBalance.hint')}
           />
         </div>
         <div className="min-w-0 rounded-lg border border-rule bg-surface p-6">
           <Stat
-            label="Bank accounts"
+            label={t('accounts.kpiBankAccounts.label')}
             value={String(sortedAccounts.length)}
-            hint="Each account can be edited independently."
+            hint={t('accounts.kpiBankAccounts.hint')}
           />
         </div>
       </div>
 
       <Card
         data-tour="accounts-list"
-        title="Bank accounts"
-        description="Edit the current funds in each bank account. Changes update your total balance directly."
-        action={<Button variant="secondary" onClick={openNewAccount}>Add account</Button>}
+        title={t('accounts.listCard.title')}
+        description={t('accounts.listCard.description')}
+        action={<Button variant="secondary" onClick={openNewAccount}>{t('accounts.addAccount')}</Button>}
       >
         {sortedAccounts.length ? (
           <div className="grid gap-3 md:grid-cols-2">
@@ -236,7 +248,7 @@ export default function AccountsPage() {
                       <p className="truncate font-display text-lg text-ink">{account.name}</p>
                       {account.isMain ? (
                         <span className="shrink-0 rounded-sm border border-accent/40 bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-accent">
-                          Main
+                          {t('accounts.listCard.badgeMain')}
                         </span>
                       ) : null}
                     </div>
@@ -249,24 +261,24 @@ export default function AccountsPage() {
                 <div className="mt-4 border-t border-rule pt-3">
                   <Checkbox
                     id={`account-main-${account.id}`}
-                    label="Use as main account"
+                    label={t('accounts.listCard.useAsMain')}
                     checked={Boolean(account.isMain)}
                     onChange={(checked) => handleMainChange(account, checked)}
                   />
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setImportingAccount(account)}>Import CSV</Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEditAccount(account)}>Edit</Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(account)}>Delete</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setImportingAccount(account)}>{t('accounts.listCard.importCsv')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => openEditAccount(account)}>{t('common.edit')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(account)}>{t('common.delete')}</Button>
                 </div>
               </article>
             ))}
           </div>
         ) : (
           <EmptyState
-            title="No bank accounts yet"
-            description="Add your first bank account to make total balance editable from Accounts."
-            action={<Button onClick={openNewAccount}>Add account</Button>}
+            title={t('accounts.listCard.emptyTitle')}
+            description={t('accounts.listCard.emptyDescription')}
+            action={<Button onClick={openNewAccount}>{t('accounts.addAccount')}</Button>}
           />
         )}
       </Card>
@@ -287,9 +299,9 @@ export default function AccountsPage() {
           key={`import-${importingAccount.id}`}
           open
           onClose={() => setImportingAccount(null)}
-          eyebrow="Bank account"
-          title={`Import CSV — ${importingAccount.name}`}
-          description="Imported transactions will be tagged to this account, and the bank balance will be updated to match the latest running balance from the file."
+          eyebrow={t('accounts.importModal.eyebrow')}
+          title={t('accounts.importModal.titlePrefix', { name: importingAccount.name })}
+          description={t('accounts.importModal.description')}
           size="lg"
         >
           <SmartBankImport

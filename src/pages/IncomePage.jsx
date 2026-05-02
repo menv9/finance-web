@@ -25,12 +25,13 @@ import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
+import { useTranslation } from '../i18n/useTranslation';
 
 const COLORS = ['var(--accent)', '#8FB97E', '#C9A96E', '#7A9CC6', '#B48EAD'];
 
 const PAGE_SIZE = 5;
 
-function Pagination({ page, totalPages, onPrev, onNext }) {
+function Pagination({ page, totalPages, onPrev, onNext, t }) {
   if (totalPages <= 1) return null;
   return (
     <div className="mt-4 flex items-center justify-center gap-3 text-sm">
@@ -40,7 +41,7 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === 1}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        ‹ Previous
+        ‹ {t('common.previous')}
       </button>
       <span className="tabular text-ink-muted">
         {page} / {totalPages}
@@ -51,7 +52,7 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === totalPages}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        Next ›
+        {t('common.next')} ›
       </button>
     </div>
   );
@@ -100,6 +101,7 @@ function IncomeLedgerList({
   onToggleRow,
   openEdit,
   onDeleteIncome,
+  t,
 }) {
   return (
     <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
@@ -122,7 +124,7 @@ function IncomeLedgerList({
                 isEditable ? (
                   <input
                     type="checkbox"
-                    aria-label="Select income"
+                    aria-label={t('income.rowAriaSelect')}
                     checked={selectedIds?.has(row.id)}
                     onChange={() => onToggleRow?.(row.id)}
                     className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
@@ -134,7 +136,7 @@ function IncomeLedgerList({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline justify-between gap-4">
                   <p className="min-w-0 truncate text-sm text-ink">
-                    {row.source || 'Income'}
+                    {row.source || t('income.incomeFallback')}
                   </p>
                   <span
                     className={`numeric shrink-0 rounded px-1.5 py-0.5 text-sm tabular ${
@@ -149,7 +151,7 @@ function IncomeLedgerList({
                 </div>
                 {incomeReportMonth(row) && incomeReportMonth(row) !== row.date?.slice(0, 7) ? (
                   <p className="mt-1 text-xs text-ink-muted">
-                    Reports in {incomeReportMonth(row)}
+                    {t('income.reportsIn', { month: incomeReportMonth(row) })}
                   </p>
                 ) : null}
                 <div className="mt-1 flex min-w-0 items-center justify-between gap-4">
@@ -161,8 +163,8 @@ function IncomeLedgerList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                        aria-label="Edit income"
-                        title="Edit"
+                        aria-label={t('income.rowAriaEdit')}
+                        title={t('income.rowAriaEdit')}
                         onClick={() => openEdit(row.id)}
                       >
                         <EditIcon />
@@ -170,15 +172,15 @@ function IncomeLedgerList({
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                        aria-label="Delete income"
-                        title="Delete"
+                        aria-label={t('income.rowAriaDelete')}
+                        title={t('income.rowAriaDelete')}
                         onClick={() => onDeleteIncome(row.id)}
                       >
                         <TrashIcon />
                       </button>
                     </div>
                   ) : (
-                    <span className="shrink-0 text-xs text-ink-faint">via Portfolio</span>
+                    <span className="shrink-0 text-xs text-ink-faint">{t('income.viaPortfolio')}</span>
                   )}
                 </div>
               </div>
@@ -191,6 +193,7 @@ function IncomeLedgerList({
 }
 
 export default function IncomePage() {
+  const { t, locale } = useTranslation();
   const incomes = useFinanceStore((state) => state.incomes);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
@@ -201,7 +204,6 @@ export default function IncomePage() {
   const [modal, setModal] = useState({ open: false, id: null });
   const [incomePage, setIncomePage] = useState(1);
   const currency = settings.baseCurrency;
-  const locale = settings.locale;
   const editingIncome = incomes.find((income) => income.id === modal.id);
 
   const openNew = () => setModal({ open: true, id: null });
@@ -212,6 +214,83 @@ export default function IncomePage() {
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [filterKind, setFilterKind] = useState('all');
   const [sourceSearch, setSourceSearch] = useState('');
+
+  const incomeColumns = [
+    { key: 'date', header: t('income.tableHeaders.received'), width: 110, sortable: true },
+    {
+      key: 'accountingMonth',
+      header: t('income.tableHeaders.reportsIn'),
+      width: 115,
+      sortable: true,
+      hideOnMobile: true,
+      render: (r) => incomeReportMonth(r) || '-',
+    },
+    { key: 'source', header: t('income.tableHeaders.source'), sortable: true },
+    {
+      key: 'incomeKind',
+      header: t('income.tableHeaders.kind'),
+      sortable: true,
+      hideOnMobile: true,
+      render: (r) => (
+        <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
+          {r.incomeKind}
+        </span>
+      ),
+    },
+    {
+      key: 'details',
+      header: t('income.tableHeaders.details'),
+      hideOnMobile: true,
+      render: (r) =>
+        r.incomeKind === 'fixed'
+          ? `${r.frequency} · day ${r.payDay}`
+          : r.incomeKind === 'variable'
+          ? `${r.client || '—'} · ${r.invoiceStatus || 'draft'}`
+          : r.assetTicker || 'asset pending',
+    },
+    {
+      key: 'amountCents',
+      header: t('income.tableHeaders.amount'),
+      numeric: true,
+      sortable: true,
+      render: (r) => {
+        const isPortfolioSaleLoss = r.incomeKind === 'portfolio_sale' && (r.realizedPnlCents || 0) < 0;
+        const displayAmountCents = isPortfolioSaleLoss ? r.realizedPnlCents : r.amountCents;
+        return (
+          <span
+            className={
+              r.incomeKind === 'portfolio_sale'
+                ? displayAmountCents > 0
+                  ? 'text-positive'
+                  : 'text-danger'
+                : 'text-positive'
+            }
+          >
+            {formatCurrency(displayAmountCents, r.currency, locale)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      noTruncate: true,
+      render: (r) => (
+        r.ledgerType === 'income' ? (
+          <div className="flex flex-wrap justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>{t('common.edit')}</Button>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              if (await confirm({ title: t('income.confirmDeleteOne.title'), description: t('income.confirmDeleteOne.description') }))
+                removeEntity('incomes', r.id);
+            }}>{t('common.delete')}</Button>
+          </div>
+        ) : (
+          <span className="text-xs text-ink-faint px-2 py-1">{t('income.viaPortfolio')}</span>
+        )
+      ),
+    },
+  ];
 
   const incomeLedgerRows = useMemo(
     () => [
@@ -263,8 +342,8 @@ export default function IncomePage() {
   const handleBatchDeleteIncomes = async () => {
     const ids = [...batchSelect.selectedIds];
     const ok = await confirm({
-      title: `Delete ${ids.length} income record${ids.length !== 1 ? 's' : ''}`,
-      description: 'These income entries will be permanently removed. This cannot be undone.',
+      title: t('income.confirmDeleteBatch.title', { count: ids.length, plural: ids.length !== 1 ? 's' : '' }),
+      description: t('income.confirmDeleteBatch.description'),
     });
     if (!ok) return;
     for (const id of ids) await removeEntity('incomes', id);
@@ -295,94 +374,17 @@ export default function IncomePage() {
     [incomes],
   );
 
-  const incomeColumns = [
-    { key: 'date', header: 'Received', width: 110, sortable: true },
-    {
-      key: 'accountingMonth',
-      header: 'Reports in',
-      width: 115,
-      sortable: true,
-      hideOnMobile: true,
-      render: (r) => incomeReportMonth(r) || '-',
-    },
-    { key: 'source', header: 'Source', sortable: true },
-    {
-      key: 'incomeKind',
-      header: 'Kind',
-      sortable: true,
-      hideOnMobile: true,
-      render: (r) => (
-        <span className="inline-flex items-center rounded-sm bg-surface-sunken px-2 py-0.5 text-xs text-ink-muted border border-rule">
-          {r.incomeKind}
-        </span>
-      ),
-    },
-    {
-      key: 'details',
-      header: 'Details',
-      hideOnMobile: true,
-      render: (r) =>
-        r.incomeKind === 'fixed'
-          ? `${r.frequency} · day ${r.payDay}`
-          : r.incomeKind === 'variable'
-          ? `${r.client || '—'} · ${r.invoiceStatus || 'draft'}`
-          : r.assetTicker || 'asset pending',
-    },
-    {
-      key: 'amountCents',
-      header: 'Amount',
-      numeric: true,
-      sortable: true,
-      render: (r) => {
-        const isPortfolioSaleLoss = r.incomeKind === 'portfolio_sale' && (r.realizedPnlCents || 0) < 0;
-        const displayAmountCents = isPortfolioSaleLoss ? r.realizedPnlCents : r.amountCents;
-        return (
-          <span
-            className={
-              r.incomeKind === 'portfolio_sale'
-                ? displayAmountCents > 0
-                  ? 'text-positive'
-                  : 'text-danger'
-                : 'text-positive'
-            }
-          >
-            {formatCurrency(displayAmountCents, r.currency, locale)}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      noTruncate: true,
-      render: (r) => (
-        r.ledgerType === 'income' ? (
-          <div className="flex flex-wrap justify-end gap-1">
-            <Button variant="ghost" size="sm" onClick={() => openEdit(r.id)}>Edit</Button>
-            <Button variant="ghost" size="sm" onClick={async () => {
-              if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
-                removeEntity('incomes', r.id);
-            }}>Delete</Button>
-          </div>
-        ) : (
-          <span className="text-xs text-ink-faint px-2 py-1">via Portfolio</span>
-        )
-      ),
-    },
-  ];
-
   return (
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="03"
-        eyebrow="Module"
-        title="Income"
-        description="Salary, freelance, dividends — three models rolled into a single monthly cashflow view."
+        eyebrow={t('income.eyebrow')}
+        title={t('income.title')}
+        description={t('income.description')}
         actions={
           <>
             <Button variant="primary" size="sm" onClick={openNew}>
-              <PlusIcon /> New income
+              <PlusIcon /> {t('income.newIncome')}
             </Button>
             <MonthSelector
               id="income-view-month"
@@ -398,40 +400,40 @@ export default function IncomePage() {
       <section data-tour="income-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
-            label="Selected month"
+            label={t('income.kpiSelectedMonth.label')}
             value={selectedMonthIncome}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint={`${selectedMonthRows.length} records`}
-            info="Total income assigned to the selected accounting month."
+            hint={t('income.kpiSelectedMonth.hintRecords', { count: selectedMonthRows.length })}
+            info={t('income.kpiSelectedMonth.info')}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(2)}>
           <Stat
-            label="Side income"
+            label={t('income.kpiSideIncome.label')}
             value={selectedMonthSideIncome}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="variable this month"
-            info="Income marked as variable and assigned to the selected accounting month."
+            hint={t('income.kpiSideIncome.hint')}
+            info={t('income.kpiSideIncome.info')}
           />
         </div>
         <div className={'min-w-0 bg-surface p-6 ' + rise(3)}>
           <Stat
-            label="Top source"
+            label={t('income.kpiTopSource.label')}
             value={topSource ? formatCurrency(topSource.value, currency, locale) : '—'}
             mode="custom"
-            hint={topSource?.name || 'no records'}
-            info="The income source with the highest total in the selected accounting month."
+            hint={topSource?.name || t('income.kpiTopSource.hintNoRecords')}
+            info={t('income.kpiTopSource.info')}
           />
         </div>
       </section>
 
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
-        <Card data-tour="income-chart" eyebrow="Twelve months" title="Monthly income" variant="chart" className="lg:col-span-8">
+        <Card data-tour="income-chart" eyebrow={t('income.chartCard.eyebrow')} title={t('income.chartCard.title')} variant="chart" className="lg:col-span-8">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -448,7 +450,7 @@ export default function IncomePage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card eyebrow="Filtered month" title="By source" className="lg:col-span-4">
+        <Card eyebrow={t('income.sourceCard.eyebrow')} title={t('income.sourceCard.title')} className="lg:col-span-4">
           {sourceBreakdown.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[200px] w-full max-w-[200px]">
@@ -497,7 +499,7 @@ export default function IncomePage() {
               </ul>
             </div>
           ) : (
-            <EmptyState title="No data yet" description="Log income to see the source split." />
+            <EmptyState title={t('income.sourceCard.emptyTitle')} description={t('income.sourceCard.emptyDescription')} />
           )}
         </Card>
       </section>
@@ -506,38 +508,38 @@ export default function IncomePage() {
       <section className="grid gap-6 lg:grid-cols-12">
       <Card
         data-tour="income-log"
-        eyebrow="Ledger"
-        title="Income"
-        description="Filter the selected month by kind and source."
+        eyebrow={t('income.ledgerCard.eyebrow')}
+        title={t('income.ledgerCard.title')}
+        description={t('income.ledgerCard.description')}
         action={
           <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && sortedIncomeRows.some((row) => row.ledgerType === 'income') && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
-                Select
+                {t('income.select')}
               </Button>
             )}
             <Button variant="primary" size="sm" onClick={openNew}>
-              <PlusIcon /> Add income
+              <PlusIcon /> {t('income.addIncome')}
             </Button>
           </div>
         }
         className={'lg:col-span-8 ' + rise(5)}
       >
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label="Kind" htmlFor="income-kind">
+          <FormField label={t('income.ledgerCard.kindLabel')} htmlFor="income-kind">
             <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
-              <option value="all">All kinds</option>
-              <option value="variable">Variable</option>
-              <option value="dividend">Dividend</option>
-              <option value="portfolio_sale">Portfolio sale</option>
-              <option value="portfolio_sale_cashflow">Portfolio sale cashflow</option>
+              <option value="all">{t('income.ledgerCard.allKinds')}</option>
+              <option value="variable">{t('income.ledgerCard.kindVariable')}</option>
+              <option value="dividend">{t('income.ledgerCard.kindDividend')}</option>
+              <option value="portfolio_sale">{t('income.ledgerCard.kindPortfolioSale')}</option>
+              <option value="portfolio_sale_cashflow">{t('income.ledgerCard.kindPortfolioSaleCashflow')}</option>
             </Select>
           </FormField>
-          <FormField label="Source" htmlFor="income-source">
+          <FormField label={t('income.ledgerCard.sourceLabel')} htmlFor="income-source">
             <Input
               id="income-source"
               type="text"
-              placeholder="Search…"
+              placeholder={t('income.ledgerCard.searchPlaceholder')}
               value={sourceSearch}
               onChange={(e) => setSourceSearch(e.target.value)}
             />
@@ -560,25 +562,27 @@ export default function IncomePage() {
               onToggleRow={batchSelect.toggle}
               openEdit={openEdit}
               onDeleteIncome={async (id) => {
-                if (await confirm({ title: 'Delete income record', description: 'This income entry will be permanently removed.' }))
+                if (await confirm({ title: t('income.confirmDeleteOne.title'), description: t('income.confirmDeleteOne.description') }))
                   removeEntity('incomes', id);
               }}
+              t={t}
             />
             <Pagination
               page={incomePage}
               totalPages={Math.ceil(sortedIncomeRows.length / PAGE_SIZE)}
               onPrev={() => setIncomePage((p) => Math.max(1, p - 1))}
               onNext={() => setIncomePage((p) => Math.min(Math.ceil(sortedIncomeRows.length / PAGE_SIZE), p + 1))}
+              t={t}
             />
           </>
         ) : (
           <EmptyState
-            title={incomeLedgerRows.length ? 'No results for this filter' : 'No income records yet'}
-            description={incomes.length ? 'Try adjusting the month, kind, or source.' : 'Add salary, freelance invoices, or dividends to get started.'}
+            title={incomeLedgerRows.length ? t('income.ledgerCard.emptyTitleFiltered') : t('income.ledgerCard.emptyTitleEmpty')}
+            description={incomes.length ? t('income.ledgerCard.emptyDescriptionFiltered') : t('income.ledgerCard.emptyDescriptionEmpty')}
             action={
               !incomeLedgerRows.length && (
                 <Button variant="secondary" size="sm" onClick={openNew}>
-                  <PlusIcon /> Add income
+                  <PlusIcon /> {t('income.addIncome')}
                 </Button>
               )
             }
@@ -588,12 +592,12 @@ export default function IncomePage() {
 
       <Card
         data-tour="income-fixed"
-        eyebrow="Schedule"
-        title="Fixed incomes"
-        description="Salary and other stable income entries."
+        eyebrow={t('income.fixedCard.eyebrow')}
+        title={t('income.fixedCard.title')}
+        description={t('income.fixedCard.description')}
         action={
           <Button variant="primary" size="sm" onClick={openNew}>
-            <PlusIcon /> Add fixed
+            <PlusIcon /> {t('income.addFixed')}
           </Button>
         }
         className={'lg:col-span-4 ' + rise(6)}
@@ -607,24 +611,25 @@ export default function IncomePage() {
             selectedIds={new Set()}
             openEdit={openEdit}
             onDeleteIncome={async (id) => {
-              if (await confirm({ title: 'Delete fixed income', description: 'This income entry will be permanently removed.' }))
+              if (await confirm({ title: t('income.confirmDeleteFixed.title'), description: t('income.confirmDeleteFixed.description') }))
                 removeEntity('incomes', id);
             }}
+            t={t}
           />
         ) : (
           <>
             {settings.setupIntent?.recurringIncome && (
               <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
-                <p className="text-sm font-medium text-ink">You mentioned having recurring income</p>
-                <p className="mt-0.5 text-xs text-ink-muted">Add your salary or regular sources here — they feed directly into monthly cashflow.</p>
+                <p className="text-sm font-medium text-ink">{t('income.fixedCard.recurringIncomeHint')}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{t('income.fixedCard.recurringIncomeHintDescription')}</p>
               </div>
             )}
             <EmptyState
-              title="No fixed income yet"
-              description="Add salary or another recurring income source."
+              title={t('income.fixedCard.emptyTitle')}
+              description={t('income.fixedCard.emptyDescription')}
               action={
                 <Button variant="secondary" size="sm" onClick={openNew}>
-                  <PlusIcon /> Add fixed
+                  <PlusIcon /> {t('income.addFixed')}
                 </Button>
               }
             />
@@ -636,9 +641,9 @@ export default function IncomePage() {
       <Modal
         open={modal.open}
         onClose={close}
-        eyebrow="Income entry"
-        title={editingIncome ? 'Edit income' : 'New income'}
-        description="Choose fixed (salary), variable (freelance), or asset-linked (dividends)."
+        eyebrow={t('income.modal.eyebrow')}
+        title={editingIncome ? t('income.modal.titleEdit') : t('income.modal.titleNew')}
+        description={t('income.modal.description')}
         size="lg"
       >
         <IncomeForm

@@ -24,10 +24,12 @@ import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
+import { useTranslation } from '../i18n/useTranslation';
 
 // ── Withdrawal modal ────────────────────────────────────────────────────────
 
 function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAccounts = [], onSubmit }) {
+  const { t } = useTranslation();
   const alert = useAlert();
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(() => normalizeDateInput(new Date()));
@@ -47,7 +49,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
     try {
       await onSubmit({ amountCents, date, description: description.trim(), bankAccountId });
     } catch (err) {
-      await alert({ title: 'Unable to process withdrawal', description: err.message || 'Something went wrong.' });
+      await alert({ title: t('savings.withdrawalModal.errorWithdrawal.title'), description: err.message || t('savings.withdrawalModal.errorWithdrawal.description') });
     } finally {
       setSubmitting(false);
     }
@@ -57,15 +59,15 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
     <Modal
       open={open}
       onClose={onClose}
-      eyebrow="Savings"
-      title="Withdraw from savings"
-      description="Move money back to your available balance."
+      eyebrow={t('savings.withdrawalModal.eyebrow')}
+      title={t('savings.withdrawalModal.title')}
+      description={t('savings.withdrawalModal.description')}
       size="sm"
     >
       <div className="grid gap-5">
         {/* Balance pill */}
         <div className="flex items-center justify-between rounded-lg border border-rule bg-surface-raised px-4 py-3">
-          <p className="text-sm text-ink-muted">Available in savings</p>
+          <p className="text-sm text-ink-muted">{t('savings.withdrawalModal.availableLabel')}</p>
           <p className="numeric text-sm font-semibold text-ink">
             {formatCurrency(balanceCents, currency, locale)}
           </p>
@@ -73,7 +75,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
 
         {/* Amount + Date */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label={`Amount (${currency})`} htmlFor="wd-amount">
+          <FormField label={t('savings.withdrawalModal.amountLabel', { currency })} htmlFor="wd-amount">
             <Input
               id="wd-amount"
               type="number"
@@ -86,7 +88,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
               autoFocus
             />
           </FormField>
-          <FormField label="Date" htmlFor="wd-date">
+          <FormField label={t('savings.withdrawalModal.dateLabel')} htmlFor="wd-date">
             <Input
               id="wd-date"
               type="date"
@@ -97,7 +99,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
         </div>
 
         {bankAccounts.length ? (
-          <FormField label="Destination bank" htmlFor="wd-bank" required>
+          <FormField label={t('savings.withdrawalModal.destinationBank')} htmlFor="wd-bank" required>
             {(props) => (
               <Select
                 {...props}
@@ -107,7 +109,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
               >
                 {bankAccounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.name}{account.isMain ? ' (main)' : ''}
+                    {account.name}{account.isMain ? t('savings.withdrawalModal.mainSuffix') : ''}
                   </option>
                 ))}
               </Select>
@@ -118,31 +120,30 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
         {/* Overdraft warning */}
         {isOver && (
           <p className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
-            This exceeds your savings balance of{' '}
-            {formatCurrency(balanceCents, currency, locale)}.
+            {t('savings.withdrawalModal.overdraftWarning', { amount: formatCurrency(balanceCents, currency, locale) })}
           </p>
         )}
 
         {/* Description */}
-        <FormField label="Description (optional)" htmlFor="wd-desc">
+        <FormField label={t('savings.withdrawalModal.descriptionLabel')} htmlFor="wd-desc">
           <Input
             id="wd-desc"
             type="text"
-            placeholder="e.g. Emergency fund use"
+            placeholder={t('savings.withdrawalModal.descriptionPlaceholder')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </FormField>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             onClick={handleSubmit}
             loading={submitting}
             disabled={!canSubmit}
           >
-            Withdraw
+            {t('savings.withdrawalModal.withdraw')}
           </Button>
         </div>
       </div>
@@ -220,6 +221,7 @@ function TrashIcon() {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 function SavingsTooltip({ active, payload, label, currency, locale }) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   const amountCents = payload.find((item) => item.dataKey === 'amountCents')?.value ?? payload[0]?.payload?.amountCents;
   if (amountCents == null) return null;
@@ -228,13 +230,14 @@ function SavingsTooltip({ active, payload, label, currency, locale }) {
     <div className="rounded-md border border-rule-strong bg-surface-raised px-3 py-2 shadow-card">
       <p className="text-xs uppercase tracking-wide text-ink-muted">{label}</p>
       <p className="mt-1 text-sm font-medium text-ink">
-        Saved this month: {formatCurrency(amountCents, currency, locale)}
+        {t('savings.evolutionChart.savedTooltip', { amount: formatCurrency(amountCents, currency, locale) })}
       </p>
     </div>
   );
 }
 
 function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: initialValue?.name || '',
     target: initialValue?.targetCents ? (initialValue.targetCents / 100).toFixed(2) : '',
@@ -254,18 +257,18 @@ function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Name" htmlFor="savings-goal-name" required>
+      <FormField label={t('savings.goalModal.nameLabel')} htmlFor="savings-goal-name" required>
         {(props) => (
           <Input
             {...props}
             value={form.name}
             onChange={set('name')}
-            placeholder="e.g. Trip, car, emergency fund"
+            placeholder={t('savings.goalModal.namePlaceholder')}
             required
           />
         )}
       </FormField>
-      <FormField label={`Target (${currency})`} htmlFor="savings-goal-target" required>
+      <FormField label={t('savings.goalModal.targetLabel', { currency })} htmlFor="savings-goal-target" required>
         {(props) => (
           <Input
             {...props}
@@ -282,10 +285,10 @@ function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
       </FormField>
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" variant="primary">
-          {initialValue ? 'Save changes' : 'Add goal'}
+          {initialValue ? t('savings.goalModal.saveChanges') : t('savings.goalModal.addGoal')}
         </Button>
       </div>
     </form>
@@ -293,6 +296,7 @@ function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
 }
 
 function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     date: normalizeDateInput(new Date()),
     amount: '',
@@ -315,10 +319,10 @@ function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
         });
       }}
     >
-      <FormField label="Date" htmlFor="bucket-spend-date">
+      <FormField label={t('savings.bucketSpendModal.dateLabel')} htmlFor="bucket-spend-date">
         {(props) => <Input {...props} type="date" value={form.date} onChange={set('date')} required />}
       </FormField>
-      <FormField label={`Amount (${currency})`} htmlFor="bucket-spend-amount" required>
+      <FormField label={t('savings.bucketSpendModal.amountLabel', { currency })} htmlFor="bucket-spend-amount" required>
         {(props) => (
           <Input
             {...props}
@@ -333,7 +337,7 @@ function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
           />
         )}
       </FormField>
-      <FormField label="Category" htmlFor="bucket-spend-category">
+      <FormField label={t('savings.bucketSpendModal.categoryLabel')} htmlFor="bucket-spend-category">
         {(props) => (
           <Select {...props} value={form.category} onChange={set('category')}>
             {categories.map((category) => (
@@ -344,22 +348,22 @@ function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
           </Select>
         )}
       </FormField>
-      <FormField label="Description" htmlFor="bucket-spend-description">
+      <FormField label={t('savings.bucketSpendModal.descriptionLabel')} htmlFor="bucket-spend-description">
         {(props) => (
           <Input
             {...props}
             value={form.description}
             onChange={set('description')}
-            placeholder="What did you spend it on?"
+            placeholder={t('savings.bucketSpendModal.descriptionPlaceholder')}
           />
         )}
       </FormField>
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" variant="primary">
-          Create expense
+          {t('savings.bucketSpendModal.createExpense')}
         </Button>
       </div>
     </form>
@@ -367,6 +371,8 @@ function BucketSpendForm({ goal, categories, currency, onSubmit, onCancel }) {
 }
 
 export default function SavingsPage() {
+  const { t, locale } = useTranslation();
+
   const savingsConfig      = useFinanceStore((state) => state.savingsConfig);
   const savingsEntries     = useFinanceStore((state) => state.savingsEntries);
   const savingsGoals       = useFinanceStore((state) => state.savingsGoals);
@@ -382,7 +388,6 @@ export default function SavingsPage() {
   const confirm = useConfirm();
   const alert = useAlert();
   const currency = settings.baseCurrency;
-  const locale   = settings.locale;
 
   // ── Config form state ──
   const [config, setConfig] = useState({
@@ -593,8 +598,8 @@ export default function SavingsPage() {
   const handleBatchDeleteEntries = async () => {
     const ids = [...batchSelect.selectedIds];
     const ok = await confirm({
-      title: `Delete ${ids.length} savings entr${ids.length !== 1 ? 'ies' : 'y'}`,
-      description: 'These entries will be permanently removed from your log.',
+      title: t('savings.confirmDeleteBatch.title', { count: ids.length, plural: ids.length !== 1 ? 'ies' : 'y' }),
+      description: t('savings.confirmDeleteBatch.description'),
     });
     if (!ok) return;
     for (const id of ids) await removeSavingsEntry(id);
@@ -605,14 +610,14 @@ export default function SavingsPage() {
     const hasEntries = savingsEntries.some((entry) => entry.goalId === goal.id);
     if (hasEntries) {
       await alert({
-        title: 'Goal has entries',
-        description: 'This goal has savings entries. Withdraw, edit, or delete those entries before deleting the goal.',
+        title: t('savings.goalHasEntries.title'),
+        description: t('savings.goalHasEntries.description'),
       });
       return;
     }
     const ok = await confirm({
-      title: 'Delete savings goal',
-      description: `Delete "${goal.name}"? This cannot be undone.`,
+      title: t('savings.confirmDeleteGoal.title'),
+      description: t('savings.confirmDeleteGoal.description', { name: goal.name }),
     });
     if (!ok) return;
     await removeSavingsGoal(goal.id);
@@ -623,8 +628,8 @@ export default function SavingsPage() {
     if (!rows.length) {
       return (
         <EmptyState
-          title="No results for this filter"
-          description="Try a different month or type."
+          title={t('savings.logCard.emptyFilterTitle')}
+          description={t('savings.logCard.emptyFilterDescription')}
         />
       );
     }
@@ -632,7 +637,10 @@ export default function SavingsPage() {
       <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
         {rows.map((r) => {
           const goalName = r.goalId ? goalLookup.get(r.goalId) : null;
-          const meta = [r.amountCents < 0 ? 'withdrawal' : 'deposit', goalName ? `for ${goalName}` : null]
+          const meta = [
+            r.amountCents < 0 ? t('savings.logCard.entryWithdrawal') : t('savings.logCard.entryDeposit'),
+            goalName ? t('savings.logCard.entryFor', { goal: goalName }) : null,
+          ]
             .filter(Boolean)
             .join(' / ');
           return (
@@ -645,7 +653,7 @@ export default function SavingsPage() {
                 isEntrySelectable(r) ? (
                   <input
                     type="checkbox"
-                    aria-label="Select entry"
+                    aria-label={t('savings.logCard.rowAriaSelect')}
                     checked={batchSelect.selectedIds.has(r.id)}
                     onChange={() => batchSelect.toggle(r.id)}
                     className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded accent-[color:var(--accent)]"
@@ -669,14 +677,14 @@ export default function SavingsPage() {
                     {meta} / {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(r.date))}
                   </p>
                   {r.transferId ? (
-                    <span className="shrink-0 text-xs text-ink-faint">via transfer</span>
+                    <span className="shrink-0 text-xs text-ink-faint">{t('savings.logCard.viaTransfer')}</span>
                   ) : (
                     <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                        aria-label="Edit entry"
-                        title="Edit"
+                        aria-label={t('savings.logCard.rowAriaEdit')}
+                        title={t('common.edit')}
                         onClick={() => openEdit(r.id)}
                       >
                         <EditIcon />
@@ -684,10 +692,10 @@ export default function SavingsPage() {
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                        aria-label="Delete entry"
-                        title="Delete"
+                        aria-label={t('savings.logCard.rowAriaDelete')}
+                        title={t('common.delete')}
                         onClick={async () => {
-                          if (await confirm({ title: 'Delete savings entry', description: 'This entry will be permanently removed from your log.' }))
+                          if (await confirm({ title: t('savings.confirmDeleteEntry.title'), description: t('savings.confirmDeleteEntry.description') }))
                             removeSavingsEntry(r.id);
                         }}
                       >
@@ -709,16 +717,16 @@ export default function SavingsPage() {
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="05"
-        eyebrow="Module"
-        title="Savings"
-        description="Log what you put aside and project how your money grows over time."
+        eyebrow={t('savings.eyebrow')}
+        title={t('savings.title')}
+        description={t('savings.description')}
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={() => setTransferOpen(true)}>
-              Withdrawal
+              {t('savings.withdrawal')}
             </Button>
             <Button variant="primary" size="sm" onClick={() => openNew()}>
-              <PlusIcon /> Add saving
+              <PlusIcon /> {t('savings.addSaving')}
             </Button>
           </>
         }
@@ -728,21 +736,21 @@ export default function SavingsPage() {
       <section data-tour="savings-stats" className="flex w-full flex-col gap-5 md:h-[172px] md:flex-row md:items-stretch md:justify-center">
         <div className={'min-w-0 rounded-lg border border-rule bg-surface p-6 md:flex md:min-w-[360px] md:flex-col md:items-center md:justify-center ' + rise(1)}>
           <Stat
-            label="Total saved"
+            label={t('savings.kpiTotalSaved.label')}
             value={totalSavedCents}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="starting balance + logged entries"
+            hint={t('savings.kpiTotalSaved.hint')}
             align="center"
             valueClassName="text-accent-strong"
-            info="Starting savings balance plus every logged saving entry and transfer into savings."
+            info={t('savings.kpiTotalSaved.info')}
           />
         </div>
         <div className={'relative min-w-0 overflow-hidden rounded-lg border border-rule bg-surface p-3 md:w-[420px] ' + rise(2)}>
           <div className="mb-2 flex items-center justify-center gap-1.5">
-            <p className="eyebrow">Savings evolution</p>
-            <InfoPopover info="A compact chart showing how your total saved amount has changed over time." />
+            <p className="eyebrow">{t('savings.evolutionChart.eyebrow')}</p>
+            <InfoPopover info={t('savings.evolutionChart.info')} />
           </div>
           <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
             {savingsTrendData.length > 0 ? (
@@ -762,7 +770,7 @@ export default function SavingsPage() {
                     axisLine={false}
                     width={0}
                   />
-                  <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Saved']} />
+                  <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), t('savings.kpiTotalSaved.label')]} />
                   <Area
                     type="monotone"
                     dataKey="savedCents"
@@ -776,7 +784,7 @@ export default function SavingsPage() {
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center text-center text-xs text-ink-faint">
-                Add savings to see the curve.
+                {t('savings.evolutionChart.addToSee')}
               </div>
             )}
           </div>
@@ -784,30 +792,30 @@ export default function SavingsPage() {
         <div className="grid min-w-0 gap-px overflow-hidden rounded-lg border border-rule bg-rule md:grid-cols-2">
           <div className={'min-w-0 bg-surface p-4 md:flex md:min-w-[260px] md:flex-col md:items-center md:justify-center md:px-6 md:py-2 ' + rise(3)}>
             <Stat
-              label="This month"
+              label={t('savings.kpiThisMonth.label')}
               value={savedThisMonthCents}
               mode="currency"
               currency={currency}
               locale={locale}
-              hint="saved so far this month"
+              hint={t('savings.kpiThisMonth.hint')}
               size="compact"
               align="center"
               tone="muted"
-              info="Savings entries and transfers into savings logged during the current month."
+              info={t('savings.kpiThisMonth.info')}
             />
           </div>
           <div className={'min-w-0 bg-surface p-4 md:flex md:min-w-[260px] md:flex-col md:items-center md:justify-center md:px-6 md:py-2 ' + rise(4)}>
             <Stat
-              label="Monthly avg"
+              label={t('savings.kpiMonthlyAvg.label')}
               value={realAvgCents}
               mode="currency"
               currency={currency}
               locale={locale}
-              hint="avg per month from your log"
+              hint={t('savings.kpiMonthlyAvg.hint')}
               size="compact"
               align="center"
               tone="muted"
-              info="Average monthly amount saved based on your logged savings history."
+              info={t('savings.kpiMonthlyAvg.info')}
             />
           </div>
         </div>
@@ -815,20 +823,20 @@ export default function SavingsPage() {
 
       <Card
         data-tour="savings-buckets"
-        eyebrow="Buckets"
-        title="Savings targets"
-        description="Set money aside for specific things while keeping it inside your total savings."
+        eyebrow={t('savings.bucketsCard.eyebrow')}
+        title={t('savings.bucketsCard.title')}
+        description={t('savings.bucketsCard.description')}
         className={rise(2)}
         action={
           <Button variant="primary" size="sm" onClick={openNewGoal}>
-            <PlusIcon /> Add goal
+            <PlusIcon /> {t('savings.addGoal')}
           </Button>
         }
       >
         {!goalsWithBalances.length && settings.setupIntent?.buckets && (
           <div className="mb-4 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
-            <p className="text-sm font-medium text-ink">You mentioned wanting savings buckets</p>
-            <p className="mt-0.5 text-xs text-ink-muted">Create a goal for a trip, emergency fund, or any target — money stays in your total savings but is earmarked.</p>
+            <p className="text-sm font-medium text-ink">{t('savings.bucketsCard.bucketsHint')}</p>
+            <p className="mt-0.5 text-xs text-ink-muted">{t('savings.bucketsCard.bucketsHintDescription')}</p>
           </div>
         )}
         {goalsWithBalances.length ? (
@@ -841,8 +849,10 @@ export default function SavingsPage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink">{goal.name}</p>
                       <p className="mt-1 text-xs text-ink-muted">
-                        {formatCurrency(goal.savedCents, currency, locale)} of{' '}
-                        {formatCurrency(goal.targetCents || 0, currency, locale)}
+                        {t('savings.bucketsCard.savedOf', {
+                          saved: formatCurrency(goal.savedCents, currency, locale),
+                          target: formatCurrency(goal.targetCents || 0, currency, locale),
+                        })}
                       </p>
                     </div>
                     <p className="numeric shrink-0 text-sm text-ink">{goal.progress.toFixed(0)}%</p>
@@ -855,12 +865,12 @@ export default function SavingsPage() {
                   </div>
                   <p className="mt-2 text-xs text-ink-muted">
                     {remainingCents > 0
-                      ? `${formatCurrency(remainingCents, currency, locale)} remaining`
-                      : 'Goal reached'}
+                      ? t('savings.bucketsCard.remaining', { amount: formatCurrency(remainingCents, currency, locale) })
+                      : t('savings.bucketsCard.goalReached')}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button variant="secondary" size="sm" onClick={() => openNew(goal.id)}>
-                      Add money
+                      {t('savings.bucketsCard.addMoney')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -868,7 +878,7 @@ export default function SavingsPage() {
                       onClick={() => openWithdraw(goal.id)}
                       disabled={goal.savedCents <= 0}
                     >
-                      Withdraw
+                      {t('savings.bucketsCard.withdraw')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -876,13 +886,13 @@ export default function SavingsPage() {
                       onClick={() => openBucketSpend(goal.id)}
                       disabled={goal.savedCents <= 0}
                     >
-                      Spend
+                      {t('savings.bucketsCard.spend')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEditGoal(goal.id)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDeleteGoal(goal)}>
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 </div>
@@ -891,11 +901,11 @@ export default function SavingsPage() {
           </div>
         ) : (
           <EmptyState
-            title="No savings goals yet"
-            description="Create a goal like a trip, car, or emergency fund."
+            title={t('savings.bucketsCard.emptyTitle')}
+            description={t('savings.bucketsCard.emptyDescription')}
             action={
               <Button variant="secondary" size="sm" onClick={openNewGoal}>
-                <PlusIcon /> Add goal
+                <PlusIcon /> {t('savings.addGoal')}
               </Button>
             }
           />
@@ -904,25 +914,25 @@ export default function SavingsPage() {
 
       {/* Entries chart */}
       <Card
-        eyebrow="History"
-        title="Savings over time"
-        description="Monthly totals from your logged entries."
+        eyebrow={t('savings.historyChart.eyebrow')}
+        title={t('savings.historyChart.title')}
+        description={t('savings.historyChart.description')}
         variant="chart"
         className={rise(2)}
         action={
           <>
             <Select
-              aria-label="Savings chart period"
+              aria-label={t('savings.historyChart.ariaLabel')}
               value={savingsChartPeriod}
               onChange={(e) => setSavingsChartPeriod(e.target.value)}
               className="h-10 min-w-[150px] py-2 text-sm"
             >
-              <option value="6">Last 6 months</option>
-              <option value="12">Last year</option>
-              <option value="24">Last 2 years</option>
+              <option value="6">{t('savings.historyChart.last6')}</option>
+              <option value="12">{t('savings.historyChart.lastYear')}</option>
+              <option value="24">{t('savings.historyChart.last2Years')}</option>
             </Select>
             <Button variant="primary" size="sm" onClick={() => openNew()}>
-              <PlusIcon /> Add saving
+              <PlusIcon /> {t('savings.addSaving')}
             </Button>
           </>
         }
@@ -978,7 +988,7 @@ export default function SavingsPage() {
           </ResponsiveContainer>
         ) : (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-ink-faint">No entries yet — add your first saving to see the chart.</p>
+            <p className="text-sm text-ink-faint">{t('savings.historyChart.noEntries')}</p>
           </div>
         )}
       </Card>
@@ -987,25 +997,25 @@ export default function SavingsPage() {
 
       {/* Entries log */}
       <Card
-        eyebrow="Log"
-        title="Savings entries"
-        description="Every time you put money aside, log it here."
+        eyebrow={t('savings.logCard.eyebrow')}
+        title={t('savings.logCard.title')}
+        description={t('savings.logCard.description')}
         className={rise(3)}
         action={
           <div className="flex flex-wrap justify-end gap-2">
             {!batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
-                Select
+                {t('savings.select')}
               </Button>
             )}
             <Button variant="primary" size="sm" onClick={() => openNew()}>
-              <PlusIcon /> Add saving
+              <PlusIcon /> {t('savings.addSaving')}
             </Button>
           </div>
         }
       >
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label="Month" htmlFor="savings-month">
+          <FormField label={t('savings.logCard.monthLabel')} htmlFor="savings-month">
             <Input
               id="savings-month"
               type="month"
@@ -1013,11 +1023,11 @@ export default function SavingsPage() {
               onChange={(e) => setFilterMonth(e.target.value)}
             />
           </FormField>
-          <FormField label="Type" htmlFor="savings-type">
+          <FormField label={t('savings.logCard.typeLabel')} htmlFor="savings-type">
             <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">All entries</option>
-              <option value="deposit">Deposits only</option>
-              <option value="withdrawal">Withdrawals only</option>
+              <option value="all">{t('savings.logCard.typeAll')}</option>
+              <option value="deposit">{t('savings.logCard.typeDeposit')}</option>
+              <option value="withdrawal">{t('savings.logCard.typeWithdrawal')}</option>
             </Select>
           </FormField>
         </div>
@@ -1031,11 +1041,11 @@ export default function SavingsPage() {
           <SavingsEntryList rows={sortedEntries} />
         ) : (
           <EmptyState
-            title="No savings logged yet"
-            description="Start logging what you put aside each month."
+            title={t('savings.logCard.emptyTitle')}
+            description={t('savings.logCard.emptyDescription')}
             action={
               <Button variant="secondary" size="sm" onClick={() => openNew()}>
-                <PlusIcon /> Add saving
+                <PlusIcon /> {t('savings.addSaving')}
               </Button>
             }
           />
@@ -1047,20 +1057,20 @@ export default function SavingsPage() {
       {/* Projection config */}
       <Card
         data-tour="savings-projection"
-        eyebrow="Projection"
-        title="Future projection setup"
-        description="Set your starting balance, how much you save each month, interest rate, and goal. Independent from your entry log."
+        eyebrow={t('savings.projectionCard.eyebrow')}
+        title={t('savings.projectionCard.title')}
+        description={t('savings.projectionCard.description')}
         className={rise(4)}
         action={
           <Button variant={configDirty ? 'primary' : 'secondary'} size="sm" onClick={saveConfig} disabled={!configDirty}>
-            {configDirty ? 'Save changes' : 'Saved'}
+            {configDirty ? t('savings.projectionCard.saveChanges') : t('savings.projectionCard.saved')}
           </Button>
         }
       >
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <FormField
-            label={`Starting balance (${currency})`}
-            hint="What you currently have saved"
+            label={t('savings.projectionCard.startingBalance', { currency })}
+            hint={t('savings.projectionCard.startingBalanceHint')}
           >
             {({ id, ...a11y }) => (
               <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
@@ -1069,8 +1079,8 @@ export default function SavingsPage() {
           </FormField>
 
           <FormField
-            label={`Monthly savings (${currency})`}
-            hint="How much you plan to save each month"
+            label={t('savings.projectionCard.monthlySavings', { currency })}
+            hint={t('savings.projectionCard.monthlySavingsHint')}
           >
             {({ id, ...a11y }) => (
               <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
@@ -1079,8 +1089,8 @@ export default function SavingsPage() {
           </FormField>
 
           <FormField
-            label="Interest rate (%)"
-            hint="0 for cash savings, or your account's rate"
+            label={t('savings.projectionCard.interestRate')}
+            hint={t('savings.projectionCard.interestRateHint')}
           >
             {({ id, ...a11y }) => (
               <Input id={id} type="number" min="0" max="100" step="0.1" numeric placeholder="0"
@@ -1089,8 +1099,8 @@ export default function SavingsPage() {
           </FormField>
 
           <FormField
-            label={`Savings goal (${currency})`}
-            hint="Optional target amount"
+            label={t('savings.projectionCard.savingsGoal', { currency })}
+            hint={t('savings.projectionCard.savingsGoalHint')}
           >
             {({ id, ...a11y }) => (
               <Input id={id} type="number" min="0" step="0.01" numeric placeholder="0.00"
@@ -1102,8 +1112,8 @@ export default function SavingsPage() {
 
       {/* Projection chart */}
       <Card
-        eyebrow={`${projectionYears}-year projection`}
-        title="Growth over time"
+        eyebrow={t('savings.projectionChartCard.eyebrowYears', { count: projectionYears })}
+        title={t('savings.projectionChartCard.title')}
         variant="chart"
         className={rise(5)}
         action={
@@ -1111,11 +1121,11 @@ export default function SavingsPage() {
             <select
               value={config.projectionYears}
               onChange={changeConfig('projectionYears')}
-              aria-label="Projection period"
+              aria-label={t('savings.projectionChartCard.ariaLabel')}
               className="appearance-none cursor-pointer rounded-md border border-rule-strong bg-surface-raised pl-3 pr-7 h-8 text-xs text-ink-muted hover:text-ink hover:border-ink-faint transition-colors duration-180 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent font-sans"
             >
               {[5, 10, 15, 20, 25, 30, 40, 50].map((y) => (
-                <option key={y} value={y}>{y} years</option>
+                <option key={y} value={y}>{t('savings.projectionChartCard.yearsOption', { count: y })}</option>
               ))}
             </select>
             <svg aria-hidden viewBox="0 0 12 12" className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-ink-faint">
@@ -1138,13 +1148,13 @@ export default function SavingsPage() {
               tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
               tickLine={false} axisLine={false} width={60}
             />
-            <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), 'Value']} />
+            <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), t('savings.kpiTotalSaved.label')]} />
             {goalCents > 0 && (
               <ReferenceLine
                 y={goalCents}
                 stroke="var(--positive)"
                 strokeDasharray="4 4"
-                label={{ value: 'Goal', position: 'insideTopRight', fill: 'var(--positive)', fontSize: 11 }}
+                label={{ value: t('savings.projectionChartCard.goalLabel'), position: 'insideTopRight', fill: 'var(--positive)', fontSize: 11 }}
               />
             )}
             <Area
@@ -1162,12 +1172,12 @@ export default function SavingsPage() {
 
       {/* Goal progress */}
       {goalCents > 0 && (
-        <Card eyebrow="Goal" title="Progress towards target" className={rise(6)}>
+        <Card eyebrow={t('savings.goalProgressCard.eyebrow')} title={t('savings.goalProgressCard.title')} className={rise(6)}>
           <div className="grid gap-5">
             <div className="flex items-baseline justify-between">
               <p className="text-sm text-ink-muted">
                 {formatCurrency(totalSavedCents, currency, locale)}{' '}
-                <span className="text-ink-faint">of</span>{' '}
+                <span className="text-ink-faint">{t('savings.goalProgressCard.of')}</span>{' '}
                 {formatCurrency(goalCents, currency, locale)}
               </p>
               <p className="numeric text-sm font-medium text-ink">{goalProgress.toFixed(1)}%</p>
@@ -1180,16 +1190,12 @@ export default function SavingsPage() {
             </div>
             <p className="text-sm text-ink-muted">
               {goalYear === 0 ? (
-                <span className="text-positive font-medium">You&apos;ve already reached your goal!</span>
+                <span className="text-positive font-medium">{t('savings.goalProgressCard.alreadyReached')}</span>
               ) : goalYear !== null ? (
-                <>
-                  At your current rate you&apos;ll reach your goal in{' '}
-                  <span className="text-ink font-medium">{goalYear} year{goalYear !== 1 ? 's' : ''}</span>.
-                </>
+                t('savings.goalProgressCard.willReach', { years: goalYear, plural: goalYear !== 1 ? 's' : '' })
               ) : (
                 <span className="text-danger">
-                  Your current savings rate won&apos;t reach the goal within {projectionYears} years.
-                  Try increasing your monthly savings, interest rate, or projection period.
+                  {t('savings.goalProgressCard.wontReach', { years: projectionYears })}
                 </span>
               )}
             </p>
@@ -1201,9 +1207,9 @@ export default function SavingsPage() {
       <Modal
         open={modal.open}
         onClose={close}
-        eyebrow="Savings entry"
-        title={editingEntry ? 'Edit entry' : modal.withdraw ? 'Withdraw from goal' : 'Log a saving'}
-        description={modal.withdraw ? 'Record money used from this savings goal.' : 'Record an amount you set aside.'}
+        eyebrow={t('savings.entryModal.eyebrow')}
+        title={editingEntry ? t('savings.entryModal.titleEdit') : modal.withdraw ? t('savings.entryModal.titleWithdraw') : t('savings.entryModal.titleNew')}
+        description={modal.withdraw ? t('savings.entryModal.descriptionWithdraw') : t('savings.entryModal.descriptionDeposit')}
       >
         <SavingsEntryForm
           initialValue={editingEntry}
@@ -1213,13 +1219,13 @@ export default function SavingsPage() {
           goalLocked={modal.withdraw}
           showBucketSource={Boolean(modal.goalId && !modal.withdraw && !editingEntry)}
           unallocatedSavingsCents={unallocatedSavingsCents}
-          submitLabel={modal.withdraw ? 'Withdraw' : undefined}
+          submitLabel={modal.withdraw ? t('savings.withdrawalModal.withdraw') : undefined}
           onSubmit={async (value) => {
             try {
               if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
                 await alert({
-                  title: 'Withdrawal too large',
-                  description: 'You cannot withdraw more than this goal currently has saved.',
+                  title: t('savings.entryModal.errorWithdrawalTooLarge.title'),
+                  description: t('savings.entryModal.errorWithdrawalTooLarge.description'),
                 });
                 return;
               }
@@ -1231,8 +1237,8 @@ export default function SavingsPage() {
                 value.amountCents > unallocatedSavingsCents
               ) {
                 await alert({
-                  title: 'Allocation too large',
-                  description: 'You cannot allocate more than your unallocated total savings.',
+                  title: t('savings.entryModal.errorAllocationTooLarge.title'),
+                  description: t('savings.entryModal.errorAllocationTooLarge.description'),
                 });
                 return;
               }
@@ -1243,15 +1249,15 @@ export default function SavingsPage() {
                 source: bucketSource === 'savings' ? 'allocation' : undefined,
                 note: value.note || (
                   modal.withdraw
-                    ? 'Goal withdrawal'
+                    ? t('savings.entryModal.noteWithdrawal')
                     : bucketSource === 'savings'
-                      ? 'Allocated from total savings'
-                      : value.goalId ? 'Goal saving' : ''
+                      ? t('savings.entryModal.noteAllocation')
+                      : value.goalId ? t('savings.entryModal.noteGoalSaving') : ''
                 ),
               });
               close();
             } catch (error) {
-              await alert({ title: 'Unable to add saving', description: error.message || 'Something went wrong.' });
+              await alert({ title: t('savings.entryModal.errorSave.title'), description: error.message || t('savings.entryModal.errorSave.description') });
             }
           }}
           onCancel={close}
@@ -1261,9 +1267,9 @@ export default function SavingsPage() {
       <Modal
         open={goalModal.open}
         onClose={closeGoal}
-        eyebrow="Savings for"
-        title={editingGoal ? 'Edit goal' : 'Add goal'}
-        description="Create a dedicated savings goal inside your total savings."
+        eyebrow={t('savings.goalModal.eyebrow')}
+        title={editingGoal ? t('savings.goalModal.titleEdit') : t('savings.goalModal.titleNew')}
+        description={t('savings.goalModal.description')}
       >
         <SavingsGoalForm
           initialValue={editingGoal}
@@ -1280,9 +1286,9 @@ export default function SavingsPage() {
       <Modal
         open={bucketSpendModal.open}
         onClose={closeBucketSpend}
-        eyebrow="Bucket spend"
-        title={spendingGoal ? `Spend from ${spendingGoal.name}` : 'Spend from bucket'}
-        description="Create an expense paid from this bucket. The amount is deducted from the bucket balance."
+        eyebrow={t('savings.bucketSpendModal.eyebrow')}
+        title={spendingGoal ? t('savings.bucketSpendModal.titlePrefix', { name: spendingGoal.name }) : t('savings.bucketSpendModal.titleFallback')}
+        description={t('savings.bucketSpendModal.description')}
       >
         {spendingGoal ? (
           <BucketSpendForm
@@ -1293,8 +1299,8 @@ export default function SavingsPage() {
               if (!value.amountCents || value.amountCents <= 0) return;
               if (value.amountCents > spendingGoal.savedCents) {
                 await alert({
-                  title: 'Spend too large',
-                  description: 'You cannot spend more than this bucket currently has saved.',
+                  title: t('savings.bucketSpendModal.errorTooLarge.title'),
+                  description: t('savings.bucketSpendModal.errorTooLarge.description'),
                 });
                 return;
               }

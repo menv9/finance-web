@@ -16,6 +16,7 @@ import { Card, Stat, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { MonthSelector } from '../components/MonthSelector';
 import { rise } from '../utils/motion';
+import { useTranslation } from '../i18n/useTranslation';
 
 function currentMonthKey() {
   return normalizeDateInput(new Date()).slice(0, 7);
@@ -23,7 +24,7 @@ function currentMonthKey() {
 
 const PAGE_SIZE = 10;
 
-function Pagination({ page, totalPages, onPrev, onNext }) {
+function Pagination({ page, totalPages, onPrev, onNext, t }) {
   if (totalPages <= 1) return null;
   return (
     <div className="mt-4 flex items-center justify-center gap-3 text-sm">
@@ -33,7 +34,7 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === 1}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        ‹ Previous
+        {t('thisMonth.pagination.previous')}
       </button>
       <span className="tabular text-ink-muted">
         {page} / {totalPages}
@@ -44,14 +45,14 @@ function Pagination({ page, totalPages, onPrev, onNext }) {
         disabled={page === totalPages}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
-        Next ›
+        {t('thisMonth.pagination.next')}
       </button>
     </div>
   );
 }
 
 // Progress-bar cell that contextualises the cashflow number with income as denominator
-function CashflowIncomeCell({ incomeCents, cashflowCents, currency, locale, className }) {
+function CashflowIncomeCell({ incomeCents, cashflowCents, currency, locale, className, t }) {
   const incomeTotalCents = Math.max(incomeCents, 0);
   // spentCents = everything that left income (expenses + saved + invested)
   const spentCents = Math.max(incomeCents - cashflowCents, 0);
@@ -61,19 +62,14 @@ function CashflowIncomeCell({ incomeCents, cashflowCents, currency, locale, clas
 
   return (
     <div className={`min-w-0 bg-surface p-6 ${className || ''}`}>
-      <p className="eyebrow mb-3">Net cashflow</p>
+      <p className="eyebrow mb-3">{t('thisMonth.kpiNetCashflow')}</p>
       {incomeTotalCents > 0 ? (
         <>
           <p className="text-sm text-ink mb-3">
-            Spent{' '}
-            <span className="font-semibold numeric">
-              {formatCurrency(spentCents, currency, locale)}
-            </span>{' '}
-            of{' '}
-            <span className="font-semibold numeric">
-              {formatCurrency(incomeTotalCents, currency, locale)}
-            </span>{' '}
-            income
+            {t('thisMonth.cashflowSpentOf', {
+              spent: <span key="spent" className="font-semibold numeric">{formatCurrency(spentCents, currency, locale)}</span>,
+              income: <span key="income" className="font-semibold numeric">{formatCurrency(incomeTotalCents, currency, locale)}</span>,
+            })}
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-surface-sunken">
             <div
@@ -83,21 +79,21 @@ function CashflowIncomeCell({ incomeCents, cashflowCents, currency, locale, clas
           </div>
           <p className={`mt-2.5 text-sm font-semibold numeric ${isOver ? 'text-danger' : 'text-positive'}`}>
             {isOver
-              ? `+${formatCurrency(differenceCents, currency, locale).replace(/^[−-]/, '')} over`
-              : `${formatCurrency(differenceCents, currency, locale)} left`}
+              ? t('thisMonth.cashflowOver', { amount: `+${formatCurrency(differenceCents, currency, locale).replace(/^[−-]/, '')}` })
+              : t('thisMonth.cashflowLeft', { amount: formatCurrency(differenceCents, currency, locale) })}
           </p>
         </>
       ) : (
-        <p className="text-sm text-ink-muted">No income logged this month.</p>
+        <p className="text-sm text-ink-muted">{t('thisMonth.noIncome')}</p>
       )}
     </div>
   );
 }
 
-function monthDisplayLabel(month) {
+function monthDisplayLabel(month, locale) {
   if (!month) return '';
   const [year, m] = month.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
     new Date(year, m - 1, 1),
   );
 }
@@ -106,6 +102,8 @@ export default function ThisMonthPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [activityPage, setActivityPage] = useState(1);
   useEffect(() => { setActivityPage(1); }, [selectedMonth]);
+
+  const { t, locale } = useTranslation();
 
   const dashboard = useFinanceStore((s) => s.derived.dashboard);
   const incomes = useFinanceStore((s) => s.incomes);
@@ -116,7 +114,6 @@ export default function ThisMonthPage() {
   const settings = useFinanceStore((s) => s.settings);
 
   const currency = settings.baseCurrency;
-  const locale = settings.locale || 'en-GB';
 
   // Compute monthly KPIs from raw data for the selected month
   const metrics = useMemo(() => {
@@ -226,13 +223,32 @@ export default function ThisMonthPage() {
   const chartData = dashboard.cashflowSeries || [];
   const selectedMonthChartLabel = chartMonthLabel(`${selectedMonth}-01`);
 
+  const savedHint = metrics.savedCents >= 0
+    ? t('thisMonth.kpiSaved.hintPositive')
+    : t('thisMonth.kpiSaved.hintNegative');
+
+  const savedInvestedKpis = [
+    {
+      label: t('thisMonth.kpiSaved.label'),
+      value: metrics.savedCents,
+      hint: savedHint,
+      info: t('thisMonth.kpiSaved.info'),
+    },
+    {
+      label: t('thisMonth.kpiInvested.label'),
+      value: metrics.investedCents,
+      hint: t('thisMonth.kpiInvested.hint'),
+      info: t('thisMonth.kpiInvested.info'),
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-8">
       <PageHeader
         number="02"
-        eyebrow={monthDisplayLabel(selectedMonth)}
-        title="This month"
-        description="A snapshot of your monthly income, spending, and cashflow."
+        eyebrow={monthDisplayLabel(selectedMonth, locale)}
+        title={t('thisMonth.title')}
+        description={t('thisMonth.description')}
         className="mb-0 pb-6"
         actions={
           <MonthSelector
@@ -246,31 +262,31 @@ export default function ThisMonthPage() {
 
       {/* Monthly KPIs */}
       <section
-        aria-label="Monthly figures"
+        aria-label={t('thisMonth.monthlySection')}
         data-tour="this-month-kpis"
         className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3"
       >
         <div className={`min-w-0 bg-surface p-6 ${rise(1)}`}>
           <Stat
-            label="Income"
+            label={t('thisMonth.kpiIncome.label')}
             value={metrics.incomeCents}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="this month"
-            info="Total income assigned to this month."
+            hint={t('thisMonth.kpiIncome.hint')}
+            info={t('thisMonth.kpiIncome.info')}
             animate
           />
         </div>
         <div className={`min-w-0 bg-surface p-6 ${rise(2)}`}>
           <Stat
-            label="Expenses"
+            label={t('thisMonth.kpiExpenses.label')}
             value={metrics.expenseCents}
             mode="currency"
             currency={currency}
             locale={locale}
-            hint="this month"
-            info="Total expenses logged this month."
+            hint={t('thisMonth.kpiExpenses.hint')}
+            info={t('thisMonth.kpiExpenses.info')}
             animate
           />
         </div>
@@ -280,25 +296,13 @@ export default function ThisMonthPage() {
           currency={currency}
           locale={locale}
           className={rise(3)}
+          t={t}
         />
       </section>
 
       {/* Saved / Invested */}
       <section className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2">
-        {[
-          {
-            label: 'Saved',
-            value: metrics.savedCents,
-            hint: metrics.savedCents >= 0 ? 'to savings' : 'withdrawn from savings',
-            info: 'Net savings movement this month: deposits minus withdrawals.',
-          },
-          {
-            label: 'Invested',
-            value: metrics.investedCents,
-            hint: 'to portfolio',
-            info: 'Transfers to your portfolio this month.',
-          },
-        ].map((kpi, i) => (
+        {savedInvestedKpis.map((kpi, i) => (
           <div key={kpi.label} className={`min-w-0 bg-surface p-6 ${rise(i + 4)}`}>
             <Stat
               label={kpi.label}
@@ -317,9 +321,9 @@ export default function ThisMonthPage() {
       {/* 12-month bar chart */}
       <Card
         data-tour="this-month-chart"
-        eyebrow="12-month view"
-        title="Income vs. expenses"
-        description="Your monthly rhythm over the last year. Selected month is highlighted."
+        eyebrow={t('thisMonth.chartCard.eyebrow')}
+        title={t('thisMonth.chartCard.title')}
+        description={t('thisMonth.chartCard.description')}
         variant="chart"
         className={rise(5)}
       >
@@ -339,7 +343,7 @@ export default function ThisMonthPage() {
                 width={60}
               />
               <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-              <Bar dataKey="incomeCents" name="Income" radius={[3, 3, 0, 0]}>
+              <Bar dataKey="incomeCents" name={t('thisMonth.chartCard.barIncome')} radius={[3, 3, 0, 0]}>
                 {chartData.map((entry) => (
                   <Cell
                     key={entry.month}
@@ -348,7 +352,7 @@ export default function ThisMonthPage() {
                   />
                 ))}
               </Bar>
-              <Bar dataKey="expenseCents" name="Expenses" radius={[3, 3, 0, 0]}>
+              <Bar dataKey="expenseCents" name={t('thisMonth.chartCard.barExpenses')} radius={[3, 3, 0, 0]}>
                 {chartData.map((entry) => (
                   <Cell
                     key={entry.month}
@@ -360,15 +364,15 @@ export default function ThisMonthPage() {
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState title="No data yet" description="Log income or expenses to see this chart." />
+          <EmptyState title={t('thisMonth.chartCard.emptyTitle')} description={t('thisMonth.chartCard.emptyDescription')} />
         )}
       </Card>
 
       {/* Activity log */}
       <Card
         data-tour="this-month-activity"
-        eyebrow="Activity"
-        title={`Transactions in ${monthDisplayLabel(selectedMonth)}`}
+        eyebrow={t('thisMonth.activityCard.eyebrow')}
+        title={t('thisMonth.activityCard.transactionsIn', { month: monthDisplayLabel(selectedMonth, locale) })}
         className={rise(6)}
       >
         {activityLog.length ? (
@@ -411,12 +415,13 @@ export default function ThisMonthPage() {
             totalPages={Math.ceil(activityLog.length / PAGE_SIZE)}
             onPrev={() => setActivityPage((p) => Math.max(1, p - 1))}
             onNext={() => setActivityPage((p) => Math.min(Math.ceil(activityLog.length / PAGE_SIZE), p + 1))}
+            t={t}
           />
           </>
         ) : (
           <EmptyState
-            title="No activity this month"
-            description="Nothing logged for this period."
+            title={t('thisMonth.activityCard.emptyTitle')}
+            description={t('thisMonth.activityCard.emptyDescription')}
           />
         )}
       </Card>

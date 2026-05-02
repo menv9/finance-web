@@ -4,6 +4,7 @@ import { Button, Card, EmptyState, FormField, Input, Textarea } from '../compone
 import { useAlert } from '../components/ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { AVATAR_LIMITS, validateUsername } from '../utils/profilesApi';
+import { useTranslation } from '../i18n/useTranslation';
 
 function Avatar({ profile, size = 40 }) {
   const initials = (profile?.display_name || profile?.username || '?')
@@ -48,6 +49,7 @@ function ProfileLine({ profile, trailing }) {
 }
 
 function ProfileHero({ profile }) {
+  const { t } = useTranslation();
   const setAvatar = useFinanceStore((s) => s.setAvatar);
   const clearAvatar = useFinanceStore((s) => s.clearAvatar);
   const alert = useAlert();
@@ -61,18 +63,27 @@ function ProfileHero({ profile }) {
     event.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      await alert({ title: 'Not an image', description: 'Pick a JPG, PNG, WebP, or GIF.' });
+      await alert({
+        title: t('profile.avatar.errorNotImage.title'),
+        description: t('profile.avatar.errorNotImage.description'),
+      });
       return;
     }
     if (file.size > AVATAR_LIMITS.maxBytes) {
-      await alert({ title: 'Image too large', description: 'Avatar must be 5 MB or smaller.' });
+      await alert({
+        title: t('profile.avatar.errorTooLarge.title'),
+        description: t('profile.avatar.errorTooLarge.description'),
+      });
       return;
     }
     setBusy(true);
     try {
       await setAvatar(file);
     } catch (err) {
-      await alert({ title: 'Upload failed', description: err?.message || 'Could not upload avatar.' });
+      await alert({
+        title: t('profile.avatar.errorUpload.title'),
+        description: err?.message || t('profile.avatar.errorUpload.description'),
+      });
     } finally {
       setBusy(false);
     }
@@ -83,7 +94,10 @@ function ProfileHero({ profile }) {
     try {
       await clearAvatar();
     } catch (err) {
-      await alert({ title: 'Could not remove', description: err?.message || 'Something went wrong.' });
+      await alert({
+        title: t('profile.avatar.errorRemove.title'),
+        description: err?.message || t('profile.avatar.errorRemove.description'),
+      });
     } finally {
       setBusy(false);
     }
@@ -97,12 +111,12 @@ function ProfileHero({ profile }) {
         type="button"
         onClick={onPick}
         disabled={busy}
-        aria-label="Change avatar"
+        aria-label={t('profile.avatar.ariaChange')}
         className="group relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60"
       >
         <Avatar profile={profile} size={128} />
         <span className="absolute inset-0 rounded-full border border-rule-strong opacity-0 group-hover:opacity-100 group-hover:bg-canvas/40 transition-opacity flex items-center justify-center eyebrow text-ink">
-          Change
+          {t('profile.avatar.changeOverlay')}
         </span>
       </button>
       <div className="min-w-0 flex-1 text-center sm:text-left">
@@ -117,15 +131,15 @@ function ProfileHero({ profile }) {
         ) : null}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <Button variant="secondary" size="sm" onClick={onPick} loading={busy}>
-            {profile?.avatar_url ? 'Replace photo' : 'Upload photo'}
+            {profile?.avatar_url ? t('profile.avatar.replacePhoto') : t('profile.avatar.uploadPhoto')}
           </Button>
           {profile?.avatar_url ? (
             <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>
-              Remove
+              {t('profile.avatar.remove')}
             </Button>
           ) : null}
         </div>
-        <p className="mt-2 text-xs text-ink-faint">JPG, PNG, WebP or GIF. Up to 5 MB.</p>
+        <p className="mt-2 text-xs text-ink-faint">{t('profile.avatar.hint')}</p>
       </div>
       <input
         ref={fileRef}
@@ -139,6 +153,7 @@ function ProfileHero({ profile }) {
 }
 
 function ProfileEditor() {
+  const { t } = useTranslation();
   const profile = useFinanceStore((s) => s.profile);
   const updateProfile = useFinanceStore((s) => s.updateProfile);
   const [form, setForm] = useState({ username: '', display_name: '', bio: '' });
@@ -156,7 +171,7 @@ function ProfileEditor() {
   }, [profile]);
 
   if (!profile) {
-    return <p className="text-sm text-ink-muted">Loading profile…</p>;
+    return <p className="text-sm text-ink-muted">{t('profile.loadingProfile')}</p>;
   }
 
   const dirty =
@@ -181,8 +196,8 @@ function ProfileEditor() {
       });
       setSavedAt(Date.now());
     } catch (err) {
-      const msg = err?.message || 'Could not save profile';
-      setError(/duplicate|unique/i.test(msg) ? 'That username is taken.' : msg);
+      const msg = err?.message || t('profile.form.errorSave');
+      setError(/duplicate|unique/i.test(msg) ? t('profile.form.errorTaken') : msg);
     } finally {
       setSaving(false);
     }
@@ -193,7 +208,7 @@ function ProfileEditor() {
       <ProfileHero profile={profile} />
       <div className="h-px bg-rule" />
       <form onSubmit={submit} className="grid gap-4">
-        <FormField label="Username" hint="3–20 lowercase letters, numbers, or underscores.">
+        <FormField label={t('profile.form.username')} hint={t('profile.form.usernameHint')}>
           {(p) => (
             <Input
               {...p}
@@ -205,7 +220,7 @@ function ProfileEditor() {
             />
           )}
         </FormField>
-        <FormField label="Display name" hint="What friends see. Optional.">
+        <FormField label={t('profile.form.displayName')} hint={t('profile.form.displayNameHint')}>
           {(p) => (
             <Input
               {...p}
@@ -215,7 +230,7 @@ function ProfileEditor() {
             />
           )}
         </FormField>
-        <FormField label="Bio">
+        <FormField label={t('profile.form.bio')}>
           {(p) => (
             <Textarea
               {...p}
@@ -229,9 +244,9 @@ function ProfileEditor() {
         {error ? <p className="text-xs text-danger">{error}</p> : null}
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={!dirty || saving} loading={saving}>
-            Save
+            {t('profile.form.save')}
           </Button>
-          {savedAt && !dirty ? <span className="text-xs text-ink-muted">Saved.</span> : null}
+          {savedAt && !dirty ? <span className="text-xs text-ink-muted">{t('profile.saved')}</span> : null}
         </div>
       </form>
     </div>
@@ -239,12 +254,13 @@ function ProfileEditor() {
 }
 
 function FriendsList() {
+  const { t } = useTranslation();
   const friends = useFinanceStore((s) => s.friends);
   const removeFriend = useFinanceStore((s) => s.removeFriend);
   const [busyId, setBusyId] = useState(null);
 
   if (!friends.length) {
-    return <EmptyState title="No friends yet" description="Find someone in the section below and send them a request." />;
+    return <EmptyState title={t('profile.friends.empty')} description={t('profile.friends.emptyDescription')} />;
   }
   return (
     <ul className="grid gap-3">
@@ -262,7 +278,7 @@ function FriendsList() {
                   try { await removeFriend(f.otherId); } finally { setBusyId(null); }
                 }}
               >
-                Remove
+                {t('profile.friends.remove')}
               </Button>
             }
           />
@@ -273,6 +289,7 @@ function FriendsList() {
 }
 
 function PendingRequests() {
+  const { t } = useTranslation();
   const incoming = useFinanceStore((s) => s.pendingIncoming);
   const outgoing = useFinanceStore((s) => s.pendingOutgoing);
   const accept = useFinanceStore((s) => s.acceptFriendRequest);
@@ -281,7 +298,7 @@ function PendingRequests() {
   const [busyId, setBusyId] = useState(null);
 
   if (!incoming.length && !outgoing.length) {
-    return <p className="text-sm text-ink-muted">No pending requests.</p>;
+    return <p className="text-sm text-ink-muted">{t('profile.pending.none')}</p>;
   }
 
   const guarded = (id, fn) => async () => {
@@ -293,7 +310,7 @@ function PendingRequests() {
     <div className="grid gap-5">
       {incoming.length ? (
         <div className="grid gap-2">
-          <p className="eyebrow text-ink-muted">Incoming ({incoming.length})</p>
+          <p className="eyebrow text-ink-muted">{t('profile.pending.incoming', { count: incoming.length })}</p>
           <ul className="grid gap-2">
             {incoming.map((r) => (
               <li key={r.requesterId} className="flex items-center gap-3 rounded-md border border-rule px-3 py-2.5">
@@ -302,10 +319,10 @@ function PendingRequests() {
                   trailing={
                     <>
                       <Button size="sm" loading={busyId === r.requesterId} onClick={guarded(r.requesterId, () => accept(r.requesterId))}>
-                        Accept
+                        {t('profile.pending.accept')}
                       </Button>
                       <Button variant="ghost" size="sm" loading={busyId === r.requesterId} onClick={guarded(r.requesterId, () => decline(r.requesterId))}>
-                        Decline
+                        {t('profile.pending.decline')}
                       </Button>
                     </>
                   }
@@ -317,7 +334,7 @@ function PendingRequests() {
       ) : null}
       {outgoing.length ? (
         <div className="grid gap-2">
-          <p className="eyebrow text-ink-muted">Sent ({outgoing.length})</p>
+          <p className="eyebrow text-ink-muted">{t('profile.pending.sent', { count: outgoing.length })}</p>
           <ul className="grid gap-2">
             {outgoing.map((r) => (
               <li key={r.addresseeId} className="flex items-center gap-3 rounded-md border border-rule px-3 py-2.5">
@@ -325,7 +342,7 @@ function PendingRequests() {
                   profile={r.profile}
                   trailing={
                     <Button variant="ghost" size="sm" loading={busyId === r.addresseeId} onClick={guarded(r.addresseeId, () => cancel(r.addresseeId))}>
-                      Cancel
+                      {t('profile.pending.cancel')}
                     </Button>
                   }
                 />
@@ -339,6 +356,7 @@ function PendingRequests() {
 }
 
 function FindFriends() {
+  const { t } = useTranslation();
   const searchByUsername = useFinanceStore((s) => s.searchUsersByUsername);
   const searchByEmail = useFinanceStore((s) => s.searchUserByEmail);
   const sendRequest = useFinanceStore((s) => s.sendFriendRequest);
@@ -362,6 +380,11 @@ function FindFriends() {
     return map;
   }, [friends, pendingIncoming, pendingOutgoing]);
 
+  const tabs = [
+    { id: 'username', label: t('profile.findFriends.tabUsername') },
+    { id: 'email', label: t('profile.findFriends.tabEmail') },
+  ];
+
   const submit = async (event) => {
     event.preventDefault();
     setError('');
@@ -376,7 +399,7 @@ function FindFriends() {
         setResults(row ? [row] : []);
       }
     } catch (err) {
-      setError(err?.message || 'Search failed');
+      setError(err?.message || t('profile.findFriends.errorSearch'));
       setResults([]);
     } finally {
       setSearching(false);
@@ -388,7 +411,7 @@ function FindFriends() {
     try {
       await sendRequest(userId);
     } catch (err) {
-      setError(err?.message || 'Could not send request');
+      setError(err?.message || t('profile.findFriends.errorSend'));
     } finally {
       setBusyId(null);
     }
@@ -397,10 +420,7 @@ function FindFriends() {
   return (
     <div className="grid gap-4">
       <div className="inline-flex rounded-md border border-rule p-0.5 w-max text-xs">
-        {[
-          { id: 'username', label: 'Username' },
-          { id: 'email', label: 'Email' },
-        ].map((opt) => (
+        {tabs.map((opt) => (
           <button
             key={opt.id}
             type="button"
@@ -414,13 +434,13 @@ function FindFriends() {
       <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
         <Input
           type={mode === 'email' ? 'email' : 'text'}
-          placeholder={mode === 'email' ? 'friend@example.com' : 'username'}
+          placeholder={mode === 'email' ? t('profile.findFriends.placeholderEmail') : t('profile.findFriends.placeholderUsername')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoCapitalize="none"
           autoCorrect="off"
         />
-        <Button type="submit" loading={searching} disabled={!query.trim()}>Search</Button>
+        <Button type="submit" loading={searching} disabled={!query.trim()}>{t('profile.findFriends.search')}</Button>
       </form>
       {error ? <p className="text-xs text-danger">{error}</p> : null}
       {searched && !searching ? (
@@ -434,14 +454,14 @@ function FindFriends() {
                     profile={profile}
                     trailing={
                       rel === 'friend' ? (
-                        <span className="text-xs text-ink-muted">Friends</span>
+                        <span className="text-xs text-ink-muted">{t('profile.findFriends.statusFriend')}</span>
                       ) : rel === 'sent' ? (
-                        <span className="text-xs text-ink-muted">Request sent</span>
+                        <span className="text-xs text-ink-muted">{t('profile.findFriends.statusSent')}</span>
                       ) : rel === 'incoming' ? (
-                        <span className="text-xs text-ink-muted">They sent you a request</span>
+                        <span className="text-xs text-ink-muted">{t('profile.findFriends.statusIncoming')}</span>
                       ) : (
                         <Button size="sm" loading={busyId === profile.user_id} onClick={() => sendTo(profile.user_id)}>
-                          Add friend
+                          {t('profile.findFriends.addFriend')}
                         </Button>
                       )
                     }
@@ -451,7 +471,7 @@ function FindFriends() {
             })}
           </ul>
         ) : (
-          <p className="text-sm text-ink-muted">No matches.</p>
+          <p className="text-sm text-ink-muted">{t('profile.findFriends.noMatches')}</p>
         )
       ) : null}
     </div>
@@ -459,6 +479,7 @@ function FindFriends() {
 }
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
   const profileStatus = useFinanceStore((s) => s.profileStatus);
   const profileError = useFinanceStore((s) => s.profileError);
@@ -475,7 +496,7 @@ export default function ProfilePage() {
   if (!supabaseUser) {
     return (
       <div className="grid gap-8">
-        <PageHeader title="Profile" description="Sign in to set up your profile and find friends." />
+        <PageHeader title={t('profile.pageTitle')} description={t('profile.pageDescriptionAnon')} />
       </div>
     );
   }
@@ -483,8 +504,8 @@ export default function ProfilePage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        title="Profile"
-        description="Your public-facing identity and your friends. Your finance data stays private."
+        title={t('profile.pageTitle')}
+        description={t('profile.pageDescription')}
       />
       {profileError ? (
         <div className="rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -492,23 +513,23 @@ export default function ProfilePage() {
         </div>
       ) : null}
 
-      <Card title="My profile" eyebrow="Identity">
+      <Card title={t('profile.myProfile.title')} eyebrow={t('profile.myProfile.eyebrow')}>
         {profileStatus === 'loading' ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <p className="text-sm text-ink-muted">{t('profile.loading')}</p>
         ) : (
           <ProfileEditor />
         )}
       </Card>
 
-      <Card title={`Friends${friends.length ? ` (${friends.length})` : ''}`} eyebrow="People">
+      <Card title={`Friends${friends.length ? ` (${friends.length})` : ''}`} eyebrow={t('profile.friends.eyebrow')}>
         <FriendsList />
       </Card>
 
-      <Card title="Pending" eyebrow="Requests">
+      <Card title={t('profile.pending.title')} eyebrow={t('profile.pending.eyebrow')}>
         <PendingRequests />
       </Card>
 
-      <Card title="Find friends" eyebrow="Discovery" description="Search by username or email.">
+      <Card title={t('profile.findFriends.title')} eyebrow={t('profile.findFriends.eyebrow')} description={t('profile.findFriends.description')}>
         <FindFriends />
       </Card>
     </div>
