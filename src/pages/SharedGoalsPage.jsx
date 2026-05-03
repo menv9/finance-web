@@ -420,9 +420,9 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Shared goals body — usable as a standalone section ───────────────────────
 
-export default function SharedGoalsPage() {
+export function SharedGoalsSection() {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
@@ -464,21 +464,16 @@ export default function SharedGoalsPage() {
   const handleCloseForm = () => { setFormOpen(false); setEditingGoal(null); };
 
   const loading = socialStatus === 'loading' && sharedGoals.length === 0;
-
   const active = sharedGoals.filter((g) => !g.completed_at);
   const completed = sharedGoals.filter((g) => !!g.completed_at);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t('sharedGoals.title')}
-        description={t('sharedGoals.description')}
-        actions={
-          <Button onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
-            {t('sharedGoals.newGoal')}
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
+          {t('sharedGoals.newGoal')}
+        </Button>
+      </div>
 
       {loading ? (
         <div className="space-y-3">
@@ -546,6 +541,21 @@ export default function SharedGoalsPage() {
         currency={currency}
         onSave={handleSave}
       />
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function SharedGoalsPage() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={t('sharedGoals.title')}
+        description={t('sharedGoals.description')}
+      />
+      <SharedGoalsSection />
     </div>
   );
 }

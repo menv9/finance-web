@@ -40,6 +40,7 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
 const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
+const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
@@ -117,6 +118,7 @@ export default function App() {
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/activity" element={<ActivityFeedPage />} />
                       <Route path="/shared-goals" element={<SharedGoalsPage />} />
+                      <Route path="/friends" element={<FriendsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

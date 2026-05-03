@@ -142,20 +142,30 @@ export async function fetchSharedGoals(userId) {
 export async function createSharedGoal(creatorId, { name, targetCents, currency, description, emoji, inviteIds = [] }) {
   const c = client();
 
-  const { data: goal, error: gErr } = await c
+  // Generate ID client-side so we can add the creator as a participant before
+  // selecting the goal back — the SELECT policy requires participant membership.
+  const goalId = crypto.randomUUID();
+
+  const { error: gErr } = await c
     .from('shared_goals')
-    .insert({ creator_id: creatorId, name, target_cents: targetCents, currency, description, emoji })
-    .select('*')
-    .single();
+    .insert({ id: goalId, creator_id: creatorId, name, target_cents: targetCents, currency, description, emoji });
   if (gErr) throw gErr;
 
   // Add creator + invitees as participants
   const participants = [creatorId, ...inviteIds.filter((id) => id !== creatorId)].map((uid) => ({
-    goal_id: goal.id,
+    goal_id: goalId,
     user_id: uid,
   }));
   const { error: pErr } = await c.from('shared_goal_participants').insert(participants);
   if (pErr) throw pErr;
+
+  // Now we're a participant so the SELECT policy allows this read
+  const { data: goal, error: rErr } = await c
+    .from('shared_goals')
+    .select('*')
+    .eq('id', goalId)
+    .single();
+  if (rErr) throw rErr;
 
   return goal;
 }

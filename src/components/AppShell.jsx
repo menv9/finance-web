@@ -46,7 +46,7 @@ const NAV_GROUPS = [
     labelKey: 'nav.social',
     items: [
       { to: '/activity', labelKey: 'nav.activity' },
-      { to: '/shared-goals', labelKey: 'nav.sharedGoals' },
+      { to: '/friends', labelKey: 'nav.friends' },
     ],
   },
   { kind: 'link', to: '/profile', labelKey: 'nav.profile' },
@@ -61,7 +61,7 @@ const MORE_LINKS = [
   { to: '/savings', labelKey: 'nav.savings' },
   { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
   { to: '/activity', labelKey: 'nav.activity' },
-  { to: '/shared-goals', labelKey: 'nav.sharedGoals' },
+  { to: '/friends', labelKey: 'nav.friends' },
   { to: '/profile', labelKey: 'nav.profile' },
   { to: '/settings', labelKey: 'nav.settings' },
 ];

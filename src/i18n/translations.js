@@ -38,6 +38,7 @@ export const translations = {
       portfolio: 'Portfolio',
       social: 'Social',
       activity: 'Activity',
+      friends: 'Friends',
       sharedGoals: 'Shared Goals',
       accounts: 'Accounts',
       debts: 'Debts',
@@ -514,6 +515,7 @@ export const translations = {
     },
     sharedGoals: {
       title: 'Shared Goals',
+      eyebrow: 'Together',
       description: 'Save together for trips, big purchases, or anything you want to achieve with others.',
       newGoal: 'New goal',
       editGoal: 'Edit goal',
@@ -554,6 +556,8 @@ export const translations = {
       },
       friends: {
         eyebrow: 'People',
+        title: 'Friends',
+        pageDescription: 'Find people, manage requests, and keep up with your connections.',
         empty: 'No friends yet',
         emptyDescription: 'Find someone in the section below and send them a request.',
         remove: 'Remove',
@@ -1539,6 +1543,7 @@ export const translations = {
       portfolio: 'Cartera',
       social: 'Social',
       activity: 'Actividad',
+      friends: 'Amigos',
       sharedGoals: 'Metas compartidas',
       accounts: 'Cuentas',
       debts: 'Deudas',
@@ -2021,6 +2026,7 @@ export const translations = {
     },
     sharedGoals: {
       title: 'Metas compartidas',
+      eyebrow: 'Juntos',
       description: 'Ahorrad juntos para viajes, grandes compras o cualquier cosa que queráis lograr.',
       newGoal: 'Nueva meta',
       editGoal: 'Editar meta',
@@ -2061,6 +2067,8 @@ export const translations = {
       },
       friends: {
         eyebrow: 'Personas',
+        title: 'Amigos',
+        pageDescription: 'Encuentra personas, gestiona solicitudes y mantente en contacto.',
         empty: 'Sin amigos aún',
         emptyDescription: 'Busca a alguien en la sección de abajo y envíale una solicitud.',
         remove: 'Quitar',
