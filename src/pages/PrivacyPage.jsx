@@ -9,7 +9,7 @@ const SECTIONS = [
     id: 'overview',
     title: 'Overview',
     icon: '◐',
-    content: `This app is a local-first personal finance tracker. By design, your financial data lives on your device — it is never transmitted to our servers, never sold, and never used to build a profile about you. This policy explains what little data we do handle and why.`,
+    content: `FinGes is a personal finance tracker that syncs your data to a secure cloud database so you can access it across all your devices. Your data is never sold, never shared with advertisers, and never used to build a profile about you. This policy explains what we store, why, and how you can control it.`,
   },
   {
     id: 'data-collected',
@@ -17,8 +17,16 @@ const SECTIONS = [
     icon: '↗',
     items: [
       {
-        label: 'Nothing financial',
-        body: 'Account balances, transactions, budgets, and goals are stored exclusively in your browser\'s local storage. We have no access to them.',
+        label: 'Financial data',
+        body: 'Account balances, transactions, budgets, goals, and portfolio data are stored in a secure cloud database to enable cross-device sync. This data is associated with your account and is only accessible by you.',
+      },
+      {
+        label: 'Account information',
+        body: 'Your email address is collected when you sign up and is used to authenticate your account and communicate with you about your account.',
+      },
+      {
+        label: 'Local-only mode',
+        body: 'If you enable local-only mode in Settings, your financial data is stored exclusively on your device and is never synced to our servers.',
       },
       {
         label: 'Anonymous analytics (optional)',
@@ -29,22 +37,26 @@ const SECTIONS = [
         body: 'Crash reports help us fix bugs. These contain stack traces and device metadata (browser version, OS). They are never linked to your identity.',
       },
       {
-        label: 'Contact information',
+        label: 'Support correspondence',
         body: 'If you reach out to support via email, we retain your email address solely to respond to your inquiry.',
       },
     ],
   },
   {
     id: 'local-storage',
-    title: 'Local Storage & Your Device',
+    title: 'Data Storage & Sync',
     icon: '◇',
-    content: `All financial data is persisted using your browser's IndexedDB and localStorage APIs. This means your data is stored on your own device, under your control. Clearing your browser data will erase it. We recommend using the built-in export feature to back up your data regularly.`,
+    content: `By default, your financial data is stored in a secure cloud database (Supabase) and synced across all your devices when you are signed in. A local copy is also kept in your browser for offline access and performance. If you enable local-only mode in Settings, cloud sync is disabled and your data stays exclusively on your device — be sure to use the export feature to back it up regularly.`,
   },
   {
     id: 'third-parties',
     title: 'Third-Party Services',
     icon: '→',
     items: [
+      {
+        label: 'Supabase',
+        body: 'We use Supabase as our cloud database and authentication provider. Your financial data and account credentials are stored on Supabase infrastructure. Supabase is SOC 2 compliant. See supabase.com/privacy for their policy.',
+      },
       {
         label: 'Font delivery',
         body: 'We load fonts from Google Fonts. Google may log the request (IP address, browser headers) per their own privacy policy.',
@@ -71,7 +83,7 @@ const SECTIONS = [
     icon: '◈',
     items: [
       { label: 'Access & portability', body: 'Export all your data at any time from Settings → Export Data.' },
-      { label: 'Deletion', body: 'Clearing your browser data removes all financial data instantly. For any server-side records (error logs, support emails), contact us and we will delete them within 30 days.' },
+      { label: 'Deletion', body: 'You can request full account and data deletion by contacting us at privacy@finges.xyz. We will delete your account and all associated financial data from our servers within 30 days. In local-only mode, clearing your browser data removes all local data instantly.' },
       { label: 'Opt-out', body: 'Disable analytics and error reporting at any time from Settings → Privacy.' },
     ],
   },
@@ -133,7 +145,7 @@ export default function PrivacyPage() {
           <div className="pp-tldr lp-rise lp-rise-2">
             <span className="pp-tldr-label eyebrow">tl;dr</span>
             <p className="pp-tldr-text">
-              Your financial data never leaves your device. We collect no personal information unless you opt in to anonymous analytics or contact support.
+            Your financial data syncs to a secure cloud database so it's available across all your devices. We never sell it or share it with advertisers. You can switch to local-only mode in Settings if you prefer to keep everything on-device.
             </p>
           </div>
 
