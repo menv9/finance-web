@@ -598,7 +598,7 @@ export function AppShell({ children }) {
                 </div>
               ) : null}
             </div>
-            <div className="hidden md:flex items-center gap-4 border-l border-rule pl-4">
+            <div className="hidden lg:flex items-center gap-4 border-l border-rule pl-4">
               <div className="flex flex-col items-end">
                 <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">{t('shell.header.totalBalance')}</span>
                 <span className="numeric text-sm text-ink leading-none">

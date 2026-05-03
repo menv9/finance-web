@@ -1,11 +1,55 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Handshake, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  BadgeCheck, Car, Cpu, GraduationCap, Handshake, Heart, Home,
+  Music, Palmtree, Pencil, Plane, Plus, ShoppingBag, Trash2, Trophy, X,
+} from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Modal, SectionDivider, Skeleton, Textarea } from '../components/ui';
 import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { useTranslation } from '../i18n/useTranslation';
+
+const GOAL_ICONS = [
+  { key: 'plane',    Icon: Plane },
+  { key: 'home',     Icon: Home },
+  { key: 'car',      Icon: Car },
+  { key: 'trophy',   Icon: Trophy },
+  { key: 'heart',    Icon: Heart },
+  { key: 'palmtree', Icon: Palmtree },
+  { key: 'shopping', Icon: ShoppingBag },
+  { key: 'music',    Icon: Music },
+  { key: 'edu',      Icon: GraduationCap },
+  { key: 'tech',     Icon: Cpu },
+];
+
+function GoalIconPicker({ value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {GOAL_ICONS.map(({ key, Icon }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onChange(key)}
+          className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
+            value === key
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-rule bg-surface-raised text-ink-muted hover:border-accent/40 hover:text-ink'
+          }`}
+        >
+          <Icon size={16} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GoalIcon({ iconKey, size = 16 }) {
+  const found = GOAL_ICONS.find((g) => g.key === iconKey);
+  if (!found) return null;
+  const { Icon } = found;
+  return <Icon size={size} />;
+}
 
 function Avatar({ profile, size = 28 }) {
   const initials = (profile?.display_name || profile?.username || '?')
@@ -54,7 +98,7 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [desc, setDesc] = useState('');
-  const [emoji, setEmoji] = useState('');
+  const [emoji, setEmoji] = useState(GOAL_ICONS[0].key);
   const [inviteIds, setInviteIds] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +107,7 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
       setName(goal?.name || '');
       setTarget(goal ? String(goal.target_cents / 100) : '');
       setDesc(goal?.description || '');
-      setEmoji(goal?.emoji || '');
+      setEmoji(goal?.emoji || GOAL_ICONS[0].key);
       setInviteIds(
         isEdit
           ? (goal.shared_goal_participants || [])
@@ -95,14 +139,12 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? t('sharedGoals.editGoal') : t('sharedGoals.newGoal')} size="sm">
       <div className="space-y-4">
-        <div className="flex gap-3">
-          <FormField label="Emoji" className="w-20 shrink-0">
-            <Input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="🏖️" maxLength={2} />
-          </FormField>
-          <FormField label={t('sharedGoals.goalName')} className="flex-1">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('sharedGoals.goalNamePlaceholder')} maxLength={100} />
-          </FormField>
-        </div>
+        <FormField label={t('sharedGoals.goalName')}>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('sharedGoals.goalNamePlaceholder')} maxLength={100} />
+        </FormField>
+        <FormField label={t('sharedGoals.icon')}>
+          <GoalIconPicker value={emoji} onChange={setEmoji} />
+        </FormField>
         <FormField label={t('sharedGoals.target')}>
           <Input
             type="number"
@@ -305,7 +347,7 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
       <Card className="p-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            {goal.emoji && <span className="text-xl">{goal.emoji}</span>}
+            {goal.emoji && <span className="text-ink-muted shrink-0"><GoalIcon iconKey={goal.emoji} size={18} /></span>}
             <div className="min-w-0">
               <p className="font-medium text-ink truncate">
                 {goal.name}
