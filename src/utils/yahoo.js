@@ -211,13 +211,15 @@ async function tryFetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
   }
 }
 
-async function firstJsonFromUrls(urls, timeoutMs = FETCH_TIMEOUT_MS) {
-  const attempts = urls.map((url) => tryFetchJson(url, timeoutMs));
-  try {
-    return await Promise.any(attempts);
-  } catch {
-    return null;
-  }
+async function firstJsonFromUrls(urls, timeoutMs = FETCH_TIMEOUT_MS, isUsable = null) {
+  const attempts = await Promise.allSettled(urls.map((url) => tryFetchJson(url, timeoutMs)));
+  const fulfilled = attempts
+    .filter((attempt) => attempt.status === 'fulfilled' && attempt.value)
+    .map((attempt) => attempt.value);
+
+  if (!fulfilled.length) return null;
+  if (isUsable) return fulfilled.find(isUsable) || null;
+  return fulfilled[0];
 }
 
 async function fetchFromYahoo(ticker) {
@@ -229,7 +231,11 @@ async function fetchFromYahoo(ticker) {
     ...directUrls,
     ...PROXIES.flatMap((makeProxy) => directUrls.map((url) => makeProxy(url))),
   ];
-  const data = await firstJsonFromUrls(candidateUrls);
+  const data = await firstJsonFromUrls(
+    candidateUrls,
+    FETCH_TIMEOUT_MS,
+    (payload) => Boolean(parseYahooPriceData(payload)),
+  );
   const priceData = parseYahooPriceData(data);
   if (priceData) return priceData;
 
@@ -282,7 +288,11 @@ async function searchYahooAssets(query) {
     ...directUrls,
     ...PROXIES.flatMap((makeProxy) => directUrls.map((url) => makeProxy(url))),
   ];
-  const data = await firstJsonFromUrls(candidateUrls, SEARCH_TIMEOUT_MS);
+  const data = await firstJsonFromUrls(
+    candidateUrls,
+    SEARCH_TIMEOUT_MS,
+    (payload) => Boolean(payload?.quotes?.length),
+  );
   const assets = uniqueAssets((data?.quotes || []).map(normalizeYahooAsset).filter(Boolean));
   if (assets.length) return assets;
 
@@ -295,7 +305,7 @@ function readSearchCache(cacheKey) {
     const cached = sessionStorage.getItem(cacheKey);
     if (!cached) return null;
     const parsed = JSON.parse(cached);
-    if (Date.now() - parsed.timestamp < SEARCH_TTL_MS) return parsed.results || [];
+    if (Date.now() - parsed.timestamp < SEARCH_TTL_MS && parsed.results?.length) return parsed.results;
   } catch {
     return null;
   }
@@ -372,6 +382,6 @@ export async function searchAssets(query, finnhubApiKey = '') {
   }
 
   const results = await searchYahooAssets(searchQuery);
-  writeSearchCache(cacheKey, results);
+  if (results.length) writeSearchCache(cacheKey, results);
   return results;
 }

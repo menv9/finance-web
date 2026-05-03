@@ -14,6 +14,7 @@ function mockSessionStorage() {
     getItem: vi.fn((key) => store.get(key) || null),
     setItem: vi.fn((key, value) => store.set(key, value)),
   });
+  return store;
 }
 
 afterEach(() => {
@@ -72,6 +73,38 @@ describe('yahoo asset helpers', () => {
       type: 'EQUITY',
       currency: 'USD',
     });
+  });
+
+  it('ignores cached empty Yahoo search results after a transient miss', async () => {
+    const store = mockSessionStorage();
+    store.set('asset-search:apple:yh', JSON.stringify({ timestamp: Date.now(), results: [] }));
+    vi.stubGlobal('fetch', vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ quotes: [] }))
+      .mockResolvedValueOnce(jsonResponse({
+        quotes: [
+          {
+            symbol: 'AAPL',
+            longname: 'Apple Inc.',
+            exchDisp: 'NASDAQ',
+            quoteType: 'EQUITY',
+            currency: 'USD',
+          },
+        ],
+      })));
+
+    const results = await searchAssets('apple');
+
+    expect(results[0]).toMatchObject({ ticker: 'AAPL', name: 'Apple Inc.' });
+  });
+
+  it('does not cache empty Yahoo search results', async () => {
+    mockSessionStorage();
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ quotes: [] })));
+
+    await expect(searchAssets('missing')).resolves.toEqual([]);
+
+    expect(sessionStorage.setItem).not.toHaveBeenCalled();
   });
 
   it('does not search empty or one-character queries', async () => {
