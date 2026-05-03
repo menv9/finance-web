@@ -1232,7 +1232,11 @@ export default function SettingsPage() {
       >
         <div className="grid gap-4">
           <p className="text-sm text-ink-muted">
-            {t('settings.danger.typeToConfirm', { phrase: <span key="phrase" className="font-mono font-medium text-danger select-all">{t('settings.danger.confirmPhrase')}</span> })}
+            {(() => {
+              const phrase = t('settings.danger.confirmPhrase');
+              const parts = t('settings.danger.typeToConfirm', { phrase: '\x00' }).split('\x00');
+              return <>{parts[0]}<span className="font-mono font-medium text-danger select-all">{phrase}</span>{parts[1]}</>;
+            })()}
           </p>
           <div className="rounded-md border border-rule bg-surface-raised p-3">
             <Checkbox
