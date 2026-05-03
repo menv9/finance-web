@@ -324,7 +324,9 @@ function GoalDetail({ goal, currentUserId, friends, currency, onContribute, onDe
         </div>
       </div>
 
-      <Button size="sm" onClick={onContribute}>{t('sharedGoals.addContribution')}</Button>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={onContribute}><Plus size={12} /> {t('sharedGoals.addContribution')}</Button>
+      </div>
     </div>
   );
 }
@@ -403,9 +405,11 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
         )}
 
         {!expanded && (
-          <Button size="sm" className="mt-3" onClick={() => setContributeOpen(true)}>
-            {t('sharedGoals.addContribution')}
-          </Button>
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" onClick={() => setContributeOpen(true)}>
+              <Plus size={12} /> {t('sharedGoals.addContribution')}
+            </Button>
+          </div>
         )}
       </Card>
 
