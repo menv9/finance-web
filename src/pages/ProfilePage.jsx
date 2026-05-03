@@ -7,6 +7,31 @@ import { AVATAR_LIMITS, validateUsername } from '../utils/profilesApi';
 import { useTranslation } from '../i18n/useTranslation';
 import { SharedGoalsSection } from './SharedGoalsPage';
 
+function SharedGoalsCard() {
+  const { t } = useTranslation();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+  return (
+    <Card
+      title={t('sharedGoals.title')}
+      eyebrow={t('sharedGoals.eyebrow')}
+      action={
+        <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
+          {t('sharedGoals.newGoal')}
+        </Button>
+      }
+    >
+      <SharedGoalsSection
+        hideNewButton
+        formOpen={formOpen}
+        setFormOpen={setFormOpen}
+        editingGoal={editingGoal}
+        setEditingGoal={setEditingGoal}
+      />
+    </Card>
+  );
+}
+
 function Avatar({ profile, size = 40 }) {
   const initials = (profile?.display_name || profile?.username || '?')
     .replace(/[^a-zA-Z0-9]/g, ' ')
@@ -285,9 +310,7 @@ export default function ProfilePage() {
         )}
       </Card>
 
-      <Card title={t('sharedGoals.title')} eyebrow={t('sharedGoals.eyebrow')} description={t('sharedGoals.description')}>
-        <SharedGoalsSection />
-      </Card>
+      <SharedGoalsCard />
     </div>
   );
 }

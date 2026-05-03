@@ -422,7 +422,13 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
 
 // ── Shared goals body — usable as a standalone section ───────────────────────
 
-export function SharedGoalsSection() {
+export function SharedGoalsSection({
+  formOpen: formOpenProp,
+  setFormOpen: setFormOpenProp,
+  editingGoal: editingGoalProp,
+  setEditingGoal: setEditingGoalProp,
+  hideNewButton = false,
+} = {}) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
@@ -441,8 +447,14 @@ export function SharedGoalsSection() {
   const addGoalParticipant = useFinanceStore((s) => s.addGoalParticipant);
   const removeGoalParticipant = useFinanceStore((s) => s.removeGoalParticipant);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState(null);
+  const [formOpenLocal, setFormOpenLocal] = useState(false);
+  const [editingGoalLocal, setEditingGoalLocal] = useState(null);
+
+  const controlled = formOpenProp !== undefined;
+  const formOpen = controlled ? formOpenProp : formOpenLocal;
+  const setFormOpen = controlled ? setFormOpenProp : setFormOpenLocal;
+  const editingGoal = controlled ? editingGoalProp : editingGoalLocal;
+  const setEditingGoal = controlled ? setEditingGoalProp : setEditingGoalLocal;
 
   useEffect(() => { loadSharedGoals(); }, [loadSharedGoals]);
 
@@ -470,11 +482,13 @@ export function SharedGoalsSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
-          {t('sharedGoals.newGoal')}
-        </Button>
-      </div>
+      {!hideNewButton && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
+            {t('sharedGoals.newGoal')}
+          </Button>
+        </div>
+      )}
 
       {socialStatus === 'error' && socialError && (
         <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
