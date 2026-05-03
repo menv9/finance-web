@@ -130,13 +130,39 @@ export async function fetchSharedGoals(userId) {
       joined_at,
       shared_goals (
         id, creator_id, name, target_cents, currency, description, emoji, created_at, completed_at,
-        shared_goal_participants ( goal_id, user_id, joined_at, profiles(username, display_name, avatar_url) ),
+        shared_goal_participants ( goal_id, user_id, joined_at, status, profiles(username, display_name, avatar_url) ),
         shared_goal_contributions ( id, goal_id, user_id, amount_cents, note, created_at )
       )
     `)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
   if (error) throw error;
   return (data ?? []).map((row) => row.shared_goals).filter(Boolean);
+}
+
+export async function fetchGoalInvitations(userId) {
+  const { data, error } = await client()
+    .from('shared_goal_participants')
+    .select(`
+      goal_id,
+      shared_goals (
+        id, creator_id, name, target_cents, currency, description, emoji, created_at,
+        shared_goal_participants ( goal_id, user_id, status, profiles(username, display_name, avatar_url) )
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'invited');
+  if (error) throw error;
+  return (data ?? []).map((row) => row.shared_goals).filter(Boolean);
+}
+
+export async function acceptGoalInvitation(goalId, userId) {
+  const { error } = await client()
+    .from('shared_goal_participants')
+    .update({ status: 'accepted' })
+    .eq('goal_id', goalId)
+    .eq('user_id', userId);
+  if (error) throw error;
 }
 
 export async function createSharedGoal(creatorId, { name, targetCents, currency, description, emoji, inviteIds = [] }) {
@@ -151,11 +177,12 @@ export async function createSharedGoal(creatorId, { name, targetCents, currency,
     .insert({ id: goalId, creator_id: creatorId, name, target_cents: targetCents, currency, description, emoji });
   if (gErr) throw gErr;
 
-  // Add creator + invitees as participants
-  const participants = [creatorId, ...inviteIds.filter((id) => id !== creatorId)].map((uid) => ({
-    goal_id: goalId,
-    user_id: uid,
-  }));
+  // Add creator (accepted) + invitees (invited) as participants
+  const uniqueInviteIds = inviteIds.filter((id) => id !== creatorId);
+  const participants = [
+    { goal_id: goalId, user_id: creatorId, status: 'accepted' },
+    ...uniqueInviteIds.map((uid) => ({ goal_id: goalId, user_id: uid, status: 'invited' })),
+  ];
   const { error: pErr } = await c.from('shared_goal_participants').insert(participants);
   if (pErr) throw pErr;
 
@@ -200,7 +227,7 @@ export async function deleteSharedGoal(goalId) {
 export async function addGoalParticipant(goalId, userId) {
   const { error } = await client()
     .from('shared_goal_participants')
-    .insert({ goal_id: goalId, user_id: userId });
+    .insert({ goal_id: goalId, user_id: userId, status: 'invited' });
   if (error) throw error;
 }
 

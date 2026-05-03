@@ -424,6 +424,48 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
   );
 }
 
+// ── Goal invitation card ──────────────────────────────────────────────────────
+
+function GoalInvitationCard({ goal, onAccept, onDecline }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+
+  const creatorProfile = (goal.shared_goal_participants || [])
+    .find((p) => p.user_id === goal.creator_id)?.profiles || null;
+  const creatorName = creatorProfile?.display_name || creatorProfile?.username || '…';
+
+  const handle = async (fn) => {
+    setBusy(true);
+    try { await fn(); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
+      <div className="flex-1 min-w-0">
+        <p className="eyebrow text-accent mb-0.5">{t('sharedGoals.invitationEyebrow')}</p>
+        <p className="text-sm font-medium text-ink truncate">
+          {goal.emoji && <span className="mr-1.5"><GoalIcon iconKey={goal.emoji} size={14} /></span>}
+          {goal.name}
+        </p>
+        <p className="text-xs text-ink-muted mt-0.5">
+          {t('sharedGoals.invitationDesc').replace('{name}', creatorName)}
+        </p>
+        {goal.description && (
+          <p className="text-xs text-ink-faint mt-1 truncate">{goal.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0 mt-0.5">
+        <Button size="sm" onClick={() => handle(onAccept)} disabled={busy}>
+          {t('sharedGoals.invitationAccept')}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handle(onDecline)} disabled={busy}>
+          {t('sharedGoals.invitationDecline')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared goals body — usable as a standalone section ───────────────────────
 
 export function SharedGoalsSection({
@@ -438,11 +480,14 @@ export function SharedGoalsSection({
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
   const friends = useFinanceStore((s) => s.friends);
   const sharedGoals = useFinanceStore((s) => s.sharedGoals);
+  const goalInvitations = useFinanceStore((s) => s.goalInvitations);
   const socialStatus = useFinanceStore((s) => s.socialStatus);
   const settings = useFinanceStore((s) => s.settings);
   const currency = settings?.defaultCurrency || 'EUR';
 
   const loadSharedGoals = useFinanceStore((s) => s.loadSharedGoals);
+  const acceptGoalInvitation = useFinanceStore((s) => s.acceptGoalInvitation);
+  const declineGoalInvitation = useFinanceStore((s) => s.declineGoalInvitation);
   const createSharedGoal = useFinanceStore((s) => s.createSharedGoal);
   const updateSharedGoal = useFinanceStore((s) => s.updateSharedGoal);
   const deleteSharedGoal = useFinanceStore((s) => s.deleteSharedGoal);
@@ -491,6 +536,19 @@ export function SharedGoalsSection({
           <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
             {t('sharedGoals.newGoal')}
           </Button>
+        </div>
+      )}
+
+      {goalInvitations.length > 0 && (
+        <div className="space-y-2">
+          {goalInvitations.map((goal) => (
+            <GoalInvitationCard
+              key={goal.id}
+              goal={goal}
+              onAccept={() => acceptGoalInvitation(goal.id)}
+              onDecline={() => declineGoalInvitation(goal.id)}
+            />
+          ))}
         </div>
       )}
 

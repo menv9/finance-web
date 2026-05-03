@@ -218,6 +218,7 @@ create table if not exists public.shared_goal_participants (
   goal_id    uuid not null references public.shared_goals(id) on delete cascade,
   user_id    uuid not null references public.profiles(user_id) on delete cascade,
   joined_at  timestamptz not null default timezone('utc', now()),
+  status     text not null default 'accepted' check (status in ('invited', 'accepted')),
   primary key (goal_id, user_id)
 );
 
@@ -234,6 +235,12 @@ drop policy if exists "sgp insert by creator" on public.shared_goal_participants
 create policy "sgp insert by creator"
   on public.shared_goal_participants for insert to authenticated
   with check (public.is_goal_creator(goal_id, auth.uid()));
+
+drop policy if exists "sgp accept own invitation" on public.shared_goal_participants;
+create policy "sgp accept own invitation"
+  on public.shared_goal_participants for update to authenticated
+  using (user_id = auth.uid() and status = 'invited')
+  with check (user_id = auth.uid() and status = 'accepted');
 
 drop policy if exists "sgp delete by creator or self" on public.shared_goal_participants;
 create policy "sgp delete by creator or self"

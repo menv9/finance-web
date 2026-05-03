@@ -47,9 +47,11 @@ import {
 import {
   addComment as apiAddComment,
   addContribution as apiAddContribution,
+  acceptGoalInvitation as apiAcceptGoalInvitation,
   addGoalParticipant,
   addReaction as apiAddReaction,
   createSharedGoal as apiCreateSharedGoal,
+  fetchGoalInvitations,
   deleteActivity as apiDeleteActivity,
   deleteComment as apiDeleteComment,
   deleteContribution as apiDeleteContribution,
@@ -537,6 +539,7 @@ export const useFinanceStore = create((set, get) => ({
   activityFeed: [],
   activityPrivacy: null,
   sharedGoals: [],
+  goalInvitations: [],
   socialStatus: 'idle',
   socialError: '',
   syncMeta: {
@@ -2467,6 +2470,7 @@ export const useFinanceStore = create((set, get) => ({
       activityFeed: [],
       activityPrivacy: null,
       sharedGoals: [],
+      goalInvitations: [],
       socialStatus: 'idle',
       socialError: '',
     });
@@ -3006,11 +3010,28 @@ export const useFinanceStore = create((set, get) => ({
     if (!user) return;
     set({ socialStatus: 'loading', socialError: '' });
     try {
-      const goals = await fetchSharedGoals(user.id);
-      set({ sharedGoals: goals, socialStatus: 'idle' });
+      const [goals, invitations] = await Promise.all([
+        fetchSharedGoals(user.id),
+        fetchGoalInvitations(user.id),
+      ]);
+      set({ sharedGoals: goals, goalInvitations: invitations, socialStatus: 'idle' });
     } catch (err) {
       set({ socialStatus: 'error', socialError: err.message || 'Failed to load goals' });
     }
+  },
+
+  acceptGoalInvitation: async (goalId) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    await apiAcceptGoalInvitation(goalId, user.id);
+    await get().loadSharedGoals();
+  },
+
+  declineGoalInvitation: async (goalId) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    await removeGoalParticipant(goalId, user.id);
+    set((state) => ({ goalInvitations: state.goalInvitations.filter((g) => g.id !== goalId) }));
   },
 
   createSharedGoal: async ({ name, targetCents, currency, description, emoji, inviteIds = [] }) => {

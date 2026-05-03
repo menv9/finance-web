@@ -542,6 +542,11 @@ export const translations = {
       confirmDeleteDesc: 'This will permanently remove the goal and all contributions.',
       emptyTitle: 'No shared goals yet',
       emptyDescription: 'Create a goal and invite friends to save together.',
+      invitationEyebrow: 'Invitations',
+      invitationTitle: 'Goal invitation',
+      invitationDesc: '{name} invited you to join this goal.',
+      invitationAccept: 'Accept',
+      invitationDecline: 'Decline',
     },
     profile: {
       pageTitle: 'Profile',
@@ -2053,6 +2058,11 @@ export const translations = {
       confirmDeleteDesc: 'Se eliminará la meta y todas las aportaciones permanentemente.',
       emptyTitle: 'Sin metas compartidas aún',
       emptyDescription: 'Crea una meta e invita a amigos para ahorrar juntos.',
+      invitationEyebrow: 'Invitaciones',
+      invitationTitle: 'Invitación a meta',
+      invitationDesc: '{name} te ha invitado a unirte a esta meta.',
+      invitationAccept: 'Aceptar',
+      invitationDecline: 'Rechazar',
     },
     profile: {
       pageTitle: 'Perfil',
