@@ -2,11 +2,14 @@ import { create } from 'zustand';
 import { DEFAULT_SETTINGS } from '../data/defaults';
 import {
   clearAllStores,
+  clearActiveUserId,
+  clearLocalUserData,
   deleteRecord,
   ensureEntitySyncFields,
   ensureSeedData,
   exportDatabaseSnapshot,
   getAllRecords,
+  getActiveUserId,
   getRecord,
   importDatabaseSnapshot,
   loadSyncMeta,
@@ -15,6 +18,7 @@ import {
   saveSettings,
   saveSyncMeta,
   sanitizeSettingsForSync,
+  setActiveUserId,
 } from '../utils/storage';
 import { computeDashboardData, computePortfolioMetrics } from '../utils/finance';
 import {
@@ -752,13 +756,22 @@ export const useFinanceStore = create((set, get) => ({
       });
 
       if (event === 'SIGNED_IN') {
-        window.setTimeout(() => {
+        const newUserId = session?.user?.id;
+        window.setTimeout(async () => {
+          const storedUserId = getActiveUserId();
+          if (newUserId && storedUserId && newUserId !== storedUserId) {
+            await clearAllStores();
+            clearLocalUserData();
+            await get().reloadStoreData();
+          }
+          if (newUserId) setActiveUserId(newUserId);
           get().pullFromSupabase().catch(() => {});
           get().loadProfile().catch(() => {});
           get().loadFriendships().catch(() => {});
         }, 0);
       }
       if (event === 'SIGNED_OUT') {
+        clearActiveUserId();
         set({
           profile: null,
           friends: [],

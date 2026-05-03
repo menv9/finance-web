@@ -145,6 +145,25 @@ export function saveSyncMeta(meta) {
   localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
 }
 
+const ACTIVE_USER_KEY = 'pft-active-user';
+
+export function getActiveUserId() {
+  return localStorage.getItem(ACTIVE_USER_KEY);
+}
+
+export function setActiveUserId(id) {
+  localStorage.setItem(ACTIVE_USER_KEY, id);
+}
+
+export function clearActiveUserId() {
+  localStorage.removeItem(ACTIVE_USER_KEY);
+}
+
+export function clearLocalUserData() {
+  localStorage.removeItem(SETTINGS_KEY);
+  localStorage.removeItem(SYNC_META_KEY);
+}
+
 // Optional demo seed. Drop a file at `src/data/demo.json` exported from
 // Settings → Backup → Export JSON and it will be used as the seed for any
 // fresh browser instead of the hardcoded defaults. Safe if absent.
