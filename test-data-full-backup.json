@@ -1,0 +1,635 @@
+{
+  "version": 1,
+  "exportedAt": "2026-05-03T15:30:00.000Z",
+  "settings": {
+    "baseCurrency": "EUR",
+    "locale": "en-GB",
+    "language": "en",
+    "theme": "light",
+    "onboardingCompleted": true,
+    "onboardingCompletedAt": "2026-04-01T08:00:00.000Z",
+    "onboardingTutorialCompleted": true,
+    "startTutorialAfterSetup": false,
+    "initialSetupCompleted": true,
+    "initialSetupCompletedAt": "2026-04-01T08:00:00.000Z",
+    "initialCashBalanceCents": 0,
+    "categories": [
+      "Housing",
+      "Transport",
+      "Food",
+      "Groceries",
+      "Restaurants",
+      "Health",
+      "Subscriptions",
+      "Travel",
+      "Education",
+      "Shopping",
+      "Other"
+    ],
+    "holdingPlatforms": [
+      "Trade Republic",
+      "IBKR",
+      "DEGIRO",
+      "Revolut"
+    ],
+    "finnhubApiKey": "",
+    "supabaseUrl": "",
+    "supabaseAnonKey": "",
+    "localOnlyMode": true,
+    "modules": {
+      "portfolio": true
+    },
+    "setupIntent": {
+      "buckets": true,
+      "budgets": true,
+      "recurringIncome": true,
+      "recurringBills": true
+    },
+    "allocationTargets": [
+      { "ticker": "VWCE.DE", "targetWeight": 55 },
+      { "ticker": "AAPL", "targetWeight": 20 },
+      { "ticker": "MSFT", "targetWeight": 15 },
+      { "ticker": "BTC/EUR", "targetWeight": 10 }
+    ],
+    "csvMapping": {
+      "date": "date",
+      "amount": "amount",
+      "category": "category",
+      "description": "description",
+      "currency": "currency"
+    }
+  },
+  "data": {
+    "bankAccounts": [
+      {
+        "id": "bank-main",
+        "name": "N26 Main",
+        "balanceCents": 482350,
+        "currency": "EUR",
+        "isMain": true,
+        "updatedAt": "2026-05-03T10:00:00.000Z"
+      },
+      {
+        "id": "bank-emergency",
+        "name": "Revolut Buffer",
+        "balanceCents": 126040,
+        "currency": "EUR",
+        "isMain": false,
+        "updatedAt": "2026-05-03T10:00:00.000Z"
+      },
+      {
+        "id": "bank-usd",
+        "name": "Wise USD",
+        "balanceCents": 218500,
+        "currency": "USD",
+        "isMain": false,
+        "updatedAt": "2026-05-03T10:00:00.000Z"
+      }
+    ],
+    "incomes": [
+      {
+        "id": "inc-salary-2026-05",
+        "date": "2026-05-01",
+        "accountingMonth": "2026-05",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "incomeKind": "fixed",
+        "source": "Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-05-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2026-04",
+        "date": "2026-04-19",
+        "accountingMonth": "2026-04",
+        "amountCents": 82000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Northwind Analytics",
+        "invoiceStatus": "paid",
+        "updatedAt": "2026-04-19T12:00:00.000Z"
+      },
+      {
+        "id": "inc-div-aapl-2026-04",
+        "date": "2026-04-25",
+        "accountingMonth": "2026-04",
+        "amountCents": 1840,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "incomeKind": "dividend",
+        "source": "AAPL dividend",
+        "assetTicker": "AAPL",
+        "updatedAt": "2026-04-25T09:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2026-04",
+        "date": "2026-04-01",
+        "accountingMonth": "2026-04",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "incomeKind": "fixed",
+        "source": "Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-04-01T07:15:00.000Z"
+      }
+    ],
+    "expenses": [
+      {
+        "id": "exp-rent-2026-05",
+        "date": "2026-05-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-02T08:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2026-05-01",
+        "date": "2026-05-01",
+        "amountCents": 6845,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-01T18:22:00.000Z"
+      },
+      {
+        "id": "exp-dinner-2026-04-28",
+        "date": "2026-04-28",
+        "amountCents": 4630,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Restaurants",
+        "description": "Dinner with friends",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-28T21:10:00.000Z"
+      },
+      {
+        "id": "exp-train-2026-04-22",
+        "date": "2026-04-22",
+        "amountCents": 1190,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Transport",
+        "description": "City train pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-22T07:40:00.000Z"
+      },
+      {
+        "id": "exp-course-2026-04-12",
+        "date": "2026-04-12",
+        "amountCents": 12900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Education",
+        "description": "React performance workshop",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-12T16:00:00.000Z"
+      },
+      {
+        "id": "exp-card-payment-2026-04",
+        "date": "2026-04-15",
+        "amountCents": 25000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main",
+        "category": "Other",
+        "description": "Credit card repayment",
+        "isRecurring": false,
+        "linkedDebtId": "debt-visa",
+        "updatedAt": "2026-04-15T10:30:00.000Z"
+      }
+    ],
+    "fixedExpenses": [
+      {
+        "id": "fix-rent",
+        "name": "Apartment rent",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "chargeDay": 2,
+        "category": "Housing",
+        "active": true,
+        "alerts": true,
+        "updatedAt": "2026-04-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-gym",
+        "name": "Gym membership",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "chargeDay": 7,
+        "category": "Health",
+        "active": true,
+        "alerts": true,
+        "updatedAt": "2026-04-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-streaming",
+        "name": "Streaming bundle",
+        "amountCents": 1998,
+        "currency": "EUR",
+        "chargeDay": 14,
+        "category": "Subscriptions",
+        "active": true,
+        "alerts": false,
+        "updatedAt": "2026-04-01T08:00:00.000Z"
+      }
+    ],
+    "budgets": [
+      {
+        "id": "bud-housing-2026-05",
+        "month": "2026-05",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-food-2026-05",
+        "month": "2026-05",
+        "category": "Groceries",
+        "amountCents": 36000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2026-05",
+        "month": "2026-05",
+        "category": "Restaurants",
+        "amountCents": 18000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2026-05",
+        "month": "2026-05",
+        "category": "Transport",
+        "amountCents": 9000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      }
+    ],
+    "rollovers": [
+      {
+        "id": "rol-groceries-2026-04",
+        "month": "2026-04",
+        "category": "Groceries",
+        "amountCents": 4220,
+        "updatedAt": "2026-05-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2026-04",
+        "month": "2026-04",
+        "category": "Restaurants",
+        "amountCents": -3850,
+        "updatedAt": "2026-05-01T06:05:00.000Z"
+      }
+    ],
+    "savings": [
+      {
+        "id": "savings-config",
+        "currentBalanceCents": 950000,
+        "monthlyOverrideCents": 65000,
+        "annualReturnRate": 4.5,
+        "goalCents": 2500000,
+        "projectionYears": 8,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      }
+    ],
+    "savingsEntries": [
+      {
+        "id": "sav-2026-05",
+        "date": "2026-05-01",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "updatedAt": "2026-05-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-2026-04",
+        "date": "2026-04-01",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "updatedAt": "2026-04-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-bonus-2026-04",
+        "date": "2026-04-20",
+        "amountCents": 30000,
+        "source": "bonus",
+        "note": "Freelance surplus",
+        "updatedAt": "2026-04-20T10:00:00.000Z"
+      }
+    ],
+    "savingsGoals": [
+      {
+        "id": "goal-emergency",
+        "name": "Emergency fund",
+        "targetCents": 1200000,
+        "currentCents": 820000,
+        "color": "#7A9CC6",
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "goal-travel",
+        "name": "Japan trip",
+        "targetCents": 450000,
+        "currentCents": 130000,
+        "color": "#C9A96E",
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "goal-house",
+        "name": "Future down payment",
+        "targetCents": 2000000,
+        "currentCents": 0,
+        "color": "#8FB97E",
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      }
+    ],
+    "debts": [
+      {
+        "id": "debt-visa",
+        "name": "Visa card",
+        "originalBalanceCents": 185000,
+        "currentBalanceCents": 122500,
+        "interestRate": 17.9,
+        "minimumPaymentCents": 9000,
+        "dueDay": 15,
+        "updatedAt": "2026-04-15T10:30:00.000Z"
+      },
+      {
+        "id": "debt-student",
+        "name": "Student loan",
+        "originalBalanceCents": 820000,
+        "currentBalanceCents": 654000,
+        "interestRate": 3.2,
+        "minimumPaymentCents": 18000,
+        "dueDay": 28,
+        "updatedAt": "2026-04-28T08:00:00.000Z"
+      }
+    ],
+    "holdings": [
+      {
+        "id": "hold-vwce-1",
+        "ticker": "VWCE.DE",
+        "name": "Vanguard FTSE All-World UCITS ETF",
+        "platform": "Trade Republic",
+        "quantity": 18.426,
+        "quantityDecimals": 3,
+        "averageBuyPriceCents": 10380,
+        "currentPriceCents": 11940,
+        "feeCents": 100,
+        "currency": "EUR",
+        "feeCurrency": "EUR",
+        "bankAccountId": "bank-main",
+        "createdAt": "2026-03-04T09:00:00.000Z",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      },
+      {
+        "id": "hold-vwce-2",
+        "ticker": "VWCE.DE",
+        "name": "Vanguard FTSE All-World UCITS ETF",
+        "platform": "Trade Republic",
+        "quantity": 7.125,
+        "quantityDecimals": 3,
+        "averageBuyPriceCents": 11220,
+        "currentPriceCents": 11940,
+        "feeCents": 100,
+        "currency": "EUR",
+        "feeCurrency": "EUR",
+        "bankAccountId": "bank-main",
+        "createdAt": "2026-04-05T09:00:00.000Z",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      },
+      {
+        "id": "hold-aapl",
+        "ticker": "AAPL",
+        "name": "Apple Inc.",
+        "platform": "IBKR",
+        "quantity": 6,
+        "quantityDecimals": 0,
+        "averageBuyPriceCents": 17230,
+        "currentPriceCents": 19480,
+        "feeCents": 135,
+        "currency": "USD",
+        "feeCurrency": "USD",
+        "bankAccountId": "bank-usd",
+        "createdAt": "2026-02-14T14:30:00.000Z",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      },
+      {
+        "id": "hold-msft",
+        "ticker": "MSFT",
+        "name": "Microsoft Corporation",
+        "platform": "IBKR",
+        "quantity": 3.5,
+        "quantityDecimals": 1,
+        "averageBuyPriceCents": 38200,
+        "currentPriceCents": 42150,
+        "feeCents": 120,
+        "currency": "USD",
+        "feeCurrency": "USD",
+        "bankAccountId": "bank-usd",
+        "createdAt": "2026-03-18T14:30:00.000Z",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      },
+      {
+        "id": "hold-btc",
+        "ticker": "BTC/EUR",
+        "name": "Bitcoin",
+        "platform": "Revolut",
+        "quantity": 0.0185,
+        "quantityDecimals": 8,
+        "averageBuyPriceCents": 6250000,
+        "currentPriceCents": 7120000,
+        "feeCents": 320,
+        "currency": "EUR",
+        "feeCurrency": "EUR",
+        "bankAccountId": "bank-emergency",
+        "createdAt": "2026-01-10T11:00:00.000Z",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      }
+    ],
+    "dividends": [
+      {
+        "id": "div-aapl-2026-04",
+        "date": "2026-04-25",
+        "ticker": "AAPL",
+        "amountCents": 1840,
+        "currency": "EUR",
+        "linkedIncomeId": "inc-div-aapl-2026-04",
+        "updatedAt": "2026-04-25T09:00:00.000Z"
+      },
+      {
+        "id": "div-vwce-2026-03",
+        "date": "2026-03-29",
+        "ticker": "VWCE.DE",
+        "amountCents": 920,
+        "currency": "EUR",
+        "linkedIncomeId": null,
+        "updatedAt": "2026-03-29T09:00:00.000Z"
+      }
+    ],
+    "portfolioCashflows": [
+      {
+        "id": "pcf-vwce-1",
+        "date": "2026-03-04",
+        "amountCents": 191390,
+        "holdingId": "hold-vwce-1",
+        "ticker": "VWCE.DE",
+        "kind": "buy",
+        "bankAccountId": "bank-main",
+        "updatedAt": "2026-03-04T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-vwce-2",
+        "date": "2026-04-05",
+        "amountCents": 80093,
+        "holdingId": "hold-vwce-2",
+        "ticker": "VWCE.DE",
+        "kind": "buy",
+        "bankAccountId": "bank-main",
+        "updatedAt": "2026-04-05T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-sale-vwce",
+        "date": "2026-04-21",
+        "amountCents": 36450,
+        "holdingId": "hold-vwce-sold-demo",
+        "ticker": "VWCE.DE",
+        "kind": "sell",
+        "linkedSaleId": "sale-vwce-demo",
+        "bankAccountId": "bank-main",
+        "updatedAt": "2026-04-21T11:00:00.000Z"
+      }
+    ],
+    "portfolioSales": [
+      {
+        "id": "sale-vwce-demo",
+        "date": "2026-04-21",
+        "holdingId": "hold-vwce-sold-demo",
+        "ticker": "VWCE.DE",
+        "name": "Vanguard FTSE All-World UCITS ETF",
+        "platform": "Trade Republic",
+        "percent": 100,
+        "quantity": 3,
+        "quantityDecimals": 0,
+        "averageBuyPriceCents": 10400,
+        "salePriceCents": 12180,
+        "grossProceedsCents": 36540,
+        "feeCents": 90,
+        "buyFeeCents": 100,
+        "proceedsCents": 36450,
+        "costBasisCents": 31300,
+        "realizedPnlCents": 5150,
+        "cashflowCents": 36450,
+        "linkedIncomeId": "inc-sale-vwce-2026-04",
+        "bankAccountId": "bank-main",
+        "updatedAt": "2026-04-21T11:00:00.000Z"
+      }
+    ],
+    "transfers": [
+      {
+        "id": "trf-cash-to-savings-2026-05",
+        "date": "2026-05-01",
+        "amountCents": 65000,
+        "fromModule": "cashflow",
+        "fromId": null,
+        "toModule": "savings",
+        "description": "Monthly savings transfer",
+        "category": "Savings",
+        "bankAccountId": "bank-main",
+        "linkedSavingsEntryId": "sav-2026-05",
+        "updatedAt": "2026-05-01T08:05:00.000Z"
+      },
+      {
+        "id": "trf-main-to-buffer-2026-04",
+        "date": "2026-04-18",
+        "amountCents": 20000,
+        "fromModule": "cashflow",
+        "fromId": "bank-main",
+        "toModule": "cashflow",
+        "toId": "bank-emergency",
+        "description": "Move cash to buffer",
+        "category": "Transfer",
+        "bankAccountId": "bank-main",
+        "updatedAt": "2026-04-18T13:00:00.000Z"
+      }
+    ],
+    "portfolioSnapshots": [
+      {
+        "id": "psn-2026-04-27T09",
+        "capturedAt": "2026-04-27T09:00:00.000Z",
+        "valueCents": 492000,
+        "investedCents": 455000,
+        "source": "manual_demo",
+        "updatedAt": "2026-04-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-2026-04-29T09",
+        "capturedAt": "2026-04-29T09:00:00.000Z",
+        "valueCents": 501800,
+        "investedCents": 455000,
+        "source": "manual_demo",
+        "updatedAt": "2026-04-29T09:00:00.000Z"
+      },
+      {
+        "id": "psn-2026-05-01T09",
+        "capturedAt": "2026-05-01T09:00:00.000Z",
+        "valueCents": 513900,
+        "investedCents": 455000,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
+      },
+      {
+        "id": "psn-2026-05-03T09",
+        "capturedAt": "2026-05-03T09:00:00.000Z",
+        "valueCents": 528400,
+        "investedCents": 455000,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-03T09:00:00.000Z"
+      }
+    ],
+    "attachments": [
+      {
+        "id": "att-rent-receipt",
+        "expenseId": "exp-rent-2026-05",
+        "fileName": "rent-receipt-demo.pdf",
+        "mimeType": "application/pdf",
+        "size": 48216,
+        "storagePath": null,
+        "updatedAt": "2026-05-02T08:35:00.000Z"
+      }
+    ],
+    "activityLog": [
+      {
+        "id": "log-import-demo",
+        "createdAt": "2026-05-03T15:30:00.000Z",
+        "module": "Settings",
+        "action": "create",
+        "recordType": "settings",
+        "recordId": "demo-backup",
+        "label": "Demo backup",
+        "summary": "Loaded full demo dataset",
+        "before": null,
+        "after": { "id": "demo-backup" },
+        "undoable": false,
+        "undoneAt": null,
+        "undoneByLogId": null,
+        "updatedAt": "2026-05-03T15:30:00.000Z"
+      }
+    ],
+    "attachmentBlobs": []
+  }
+}
