@@ -216,7 +216,7 @@ alter table public.shared_goals enable row level security;
 -- Created before shared_goals policies so the select policy can reference it.
 create table if not exists public.shared_goal_participants (
   goal_id    uuid not null references public.shared_goals(id) on delete cascade,
-  user_id    uuid not null references auth.users(id) on delete cascade,
+  user_id    uuid not null references public.profiles(user_id) on delete cascade,
   joined_at  timestamptz not null default timezone('utc', now()),
   primary key (goal_id, user_id)
 );
@@ -276,7 +276,7 @@ create policy "shared_goals delete by creator"
 create table if not exists public.shared_goal_contributions (
   id           uuid primary key default gen_random_uuid(),
   goal_id      uuid not null references public.shared_goals(id) on delete cascade,
-  user_id      uuid not null references auth.users(id) on delete cascade,
+  user_id      uuid not null references public.profiles(user_id) on delete cascade,
   amount_cents bigint not null check (amount_cents > 0),
   note         text,
   created_at   timestamptz not null default timezone('utc', now())
