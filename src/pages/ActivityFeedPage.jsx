@@ -23,6 +23,7 @@ import { Button, Card, Checkbox, EmptyState, FormField, Modal, SectionDivider, S
 import { useFinanceStore } from '../store/useFinanceStore';
 import { ACTIVITY_TYPES } from '../utils/socialApi';
 import { useTranslation } from '../i18n/useTranslation';
+import { GoalInvitationCard } from './SharedGoalsPage';
 import { formatCurrency } from '../utils/formatters';
 
 const QUICK_REACTIONS = [
@@ -328,8 +329,12 @@ export default function ActivityFeedPage() {
   const activityFeed = useFinanceStore((s) => s.activityFeed);
   const activityPrivacy = useFinanceStore((s) => s.activityPrivacy);
   const socialStatus = useFinanceStore((s) => s.socialStatus);
+  const goalInvitations = useFinanceStore((s) => s.goalInvitations);
+  const acceptGoalInvitation = useFinanceStore((s) => s.acceptGoalInvitation);
+  const declineGoalInvitation = useFinanceStore((s) => s.declineGoalInvitation);
 
   const loadActivityFeed = useFinanceStore((s) => s.loadActivityFeed);
+  const loadSharedGoals = useFinanceStore((s) => s.loadSharedGoals);
   const deleteActivity = useFinanceStore((s) => s.deleteActivity);
   const updateActivityPrivacy = useFinanceStore((s) => s.updateActivityPrivacy);
   const addReaction = useFinanceStore((s) => s.addReaction);
@@ -339,7 +344,7 @@ export default function ActivityFeedPage() {
 
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
-  useEffect(() => { loadActivityFeed(); }, [loadActivityFeed]);
+  useEffect(() => { loadActivityFeed(); loadSharedGoals(); }, [loadActivityFeed, loadSharedGoals]);
 
   const loading = socialStatus === 'loading' && activityFeed.length === 0;
 
@@ -355,6 +360,19 @@ export default function ActivityFeedPage() {
           </Button>
         }
       />
+
+      {goalInvitations.length > 0 && (
+        <div className="space-y-2">
+          {goalInvitations.map((goal) => (
+            <GoalInvitationCard
+              key={goal.id}
+              goal={goal}
+              onAccept={() => acceptGoalInvitation(goal.id)}
+              onDecline={() => declineGoalInvitation(goal.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

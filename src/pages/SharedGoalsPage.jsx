@@ -426,7 +426,7 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
 
 // ── Goal invitation card ──────────────────────────────────────────────────────
 
-function GoalInvitationCard({ goal, onAccept, onDecline }) {
+export function GoalInvitationCard({ goal, onAccept, onDecline }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
