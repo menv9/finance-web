@@ -22,12 +22,14 @@ grant execute on function public.are_friends(uuid, uuid) to authenticated;
 -- policies to avoid infinite recursion from self-referential RLS.
 create or replace function public.is_goal_participant(p_goal_id uuid, p_user_id uuid)
 returns boolean
-language sql stable security definer set search_path = public
+language plpgsql stable security definer set search_path = public
 as $$
-  select exists (
+begin
+  return exists (
     select 1 from public.shared_goal_participants
     where goal_id = p_goal_id and user_id = p_user_id
   );
+end;
 $$;
 
 grant execute on function public.is_goal_participant(uuid, uuid) to authenticated;
