@@ -463,6 +463,7 @@ export function SharedGoalsSection() {
   const handleEdit = (goal) => { setEditingGoal(goal); setFormOpen(true); };
   const handleCloseForm = () => { setFormOpen(false); setEditingGoal(null); };
 
+  const socialError = useFinanceStore((s) => s.socialError);
   const loading = socialStatus === 'loading' && sharedGoals.length === 0;
   const active = sharedGoals.filter((g) => !g.completed_at);
   const completed = sharedGoals.filter((g) => !!g.completed_at);
@@ -474,6 +475,12 @@ export function SharedGoalsSection() {
           {t('sharedGoals.newGoal')}
         </Button>
       </div>
+
+      {socialStatus === 'error' && socialError && (
+        <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+          {socialError}
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

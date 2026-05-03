@@ -247,11 +247,15 @@ export default function ProfilePage() {
   const profileStatus = useFinanceStore((s) => s.profileStatus);
   const profileError = useFinanceStore((s) => s.profileError);
   const loadProfile = useFinanceStore((s) => s.loadProfile);
+  const loadFriendships = useFinanceStore((s) => s.loadFriendships);
+  const loadSharedGoals = useFinanceStore((s) => s.loadSharedGoals);
 
   useEffect(() => {
     if (!supabaseUser) return;
     loadProfile().catch(() => {});
-  }, [supabaseUser, loadProfile]);
+    loadFriendships().catch(() => {});
+    loadSharedGoals().catch(() => {});
+  }, [supabaseUser, loadProfile, loadFriendships, loadSharedGoals]);
 
   if (!supabaseUser) {
     return (
