@@ -18,6 +18,22 @@ $$;
 
 grant execute on function public.are_friends(uuid, uuid) to authenticated;
 
+-- Bypasses RLS to check goal creator — used in shared_goal_participants insert
+-- policy so it can read shared_goals without hitting the participant-gated SELECT RLS.
+create or replace function public.is_goal_creator(p_goal_id uuid, p_user_id uuid)
+returns boolean
+language plpgsql stable security definer set search_path = public
+as $$
+begin
+  return exists (
+    select 1 from public.shared_goals
+    where id = p_goal_id and creator_id = p_user_id
+  );
+end;
+$$;
+
+grant execute on function public.is_goal_creator(uuid, uuid) to authenticated;
+
 -- Bypasses RLS to check goal participation — used in shared_goal_participants
 -- policies to avoid infinite recursion from self-referential RLS.
 create or replace function public.is_goal_participant(p_goal_id uuid, p_user_id uuid)
@@ -217,12 +233,7 @@ create policy "sgp read by participants"
 drop policy if exists "sgp insert by creator" on public.shared_goal_participants;
 create policy "sgp insert by creator"
   on public.shared_goal_participants for insert to authenticated
-  with check (
-    exists (
-      select 1 from public.shared_goals sg
-      where sg.id = goal_id and sg.creator_id = auth.uid()
-    )
-  );
+  with check (public.is_goal_creator(goal_id, auth.uid()));
 
 drop policy if exists "sgp delete by creator or self" on public.shared_goal_participants;
 create policy "sgp delete by creator or self"
