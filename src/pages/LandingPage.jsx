@@ -167,9 +167,16 @@ function SyncStep({ n, title, body, delay }) {
   );
 }
 
-function ThemeSwatch({ id, label, sub }) {
+function ThemeSwatch({ id, label, sub, active, onClick }) {
   return (
-    <div className="lp-swatch" data-theme={id}>
+    <div
+      className={`lp-swatch${active ? ' lp-swatch-active' : ''}`}
+      data-theme={id}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+    >
       <div className="lp-swatch-canvas">
         <div className="lp-swatch-surface">
           <span className="lp-swatch-line lp-swatch-line-a" />
@@ -188,6 +195,7 @@ function ThemeSwatch({ id, label, sub }) {
 export default function LandingPage() {
   const { t } = useTranslation();
   const theme = useFinanceStore((s) => s.settings?.theme);
+  const setTheme = useFinanceStore((s) => s.setTheme);
   const appliedTheme = VALID_THEMES.includes(theme) ? theme : 'dark';
 
   useEffect(() => {
@@ -209,7 +217,7 @@ export default function LandingPage() {
 
       {appliedTheme === 'gorka' && (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1, background: '#08101F' }}>
-          <Silk speed={1} scale={1.5} color="#1E2C44" noiseIntensity={2} rotation={0.6} />
+          <Silk speed={1.2} scale={1.3} color="#1E2C44" noiseIntensity={0.8} rotation={0.6} />
         </div>
       )}
 
@@ -379,7 +387,7 @@ export default function LandingPage() {
               </div>
               <div className="col-span-12 lg:col-span-9 lp-swatch-row">
                 {THEME_KEYS.map((th) => (
-                  <ThemeSwatch key={th.id} id={th.id} label={t(th.labelKey)} sub={t(th.subKey)} />
+                  <ThemeSwatch key={th.id} id={th.id} label={t(th.labelKey)} sub={t(th.subKey)} active={appliedTheme === th.id} onClick={() => setTheme(th.id)} />
                 ))}
               </div>
             </div>
@@ -389,7 +397,7 @@ export default function LandingPage() {
         {/* CLOSING ─────────────────────────────────────────────────────── */}
         <section className="border-t border-rule">
           <div className="mx-auto max-w-[1280px] px-6 lg:px-10 py-24 lg:py-32 text-center">
-            <p className="lp-section-tag inline-block">{t('landing.closing.sectionTag')}</p>
+            <p className="lp-section-tag" style={{ marginBottom: '1.5rem' }}>{t('landing.closing.sectionTag')}</p>
             <h2 className="lp-h-closing">
               <span>{t('landing.closing.h1')}</span>
               <span className="lp-h-closing-italic"><em>{t('landing.closing.h2')}</em></span>
@@ -422,6 +430,7 @@ export default function LandingPage() {
             <a href="#features" className="lp-foot-link">{t('landing.footer.features')}</a>
             <Link to="/privacy" className="lp-foot-link">Privacy</Link>
             <Link to="/terms" className="lp-foot-link">Terms</Link>
+            <Link to="/contact" className="lp-foot-link">Contact</Link>
           </div>
           <p className="lp-foot-meta md:text-right">
             <span>© {new Date().getFullYear()}</span>
@@ -438,6 +447,11 @@ const landingCss = `
 [data-landing-edition="true"] {
   background: var(--canvas);
   color: var(--ink);
+}
+[data-theme='gorka'] [data-landing-edition="true"],
+[data-theme='gorka-light'] [data-landing-edition="true"],
+[data-theme='eris'] [data-landing-edition="true"] {
+  background: transparent;
 }
 
 /* ─── Type primitives ───────────────────────────────────────────────── */
@@ -505,7 +519,7 @@ const landingCss = `
   color: var(--ink);
   display: inline-flex;
   flex-direction: column;
-  margin: 1.5rem auto 1rem;
+  margin: 0 auto 1rem;
 }
 .lp-h-closing-italic { color: var(--accent); font-weight: 500; }
 .lp-h-closing-italic em { font-style: italic; }
@@ -541,6 +555,13 @@ const landingCss = `
 
 .lp-section { background: var(--canvas); }
 .lp-section-alt { background: var(--surface); }
+
+[data-theme='gorka'] .lp-section,
+[data-theme='gorka'] .lp-section-alt,
+[data-theme='gorka-light'] .lp-section,
+[data-theme='gorka-light'] .lp-section-alt,
+[data-theme='eris'] .lp-section,
+[data-theme='eris'] .lp-section-alt { background: transparent; }
 
 /* ─── Nav ───────────────────────────────────────────────────────────── */
 .lp-nav {
@@ -963,11 +984,16 @@ const landingCss = `
   border-radius: 8px;
   overflow: hidden;
   background: var(--canvas);
-  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 280ms ease;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 280ms ease, border-color 180ms ease;
+  cursor: pointer;
 }
 .lp-swatch:hover {
   transform: translateY(-3px);
   box-shadow: 0 22px 40px -22px rgba(0,0,0,0.4);
+}
+.lp-swatch-active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .lp-swatch-canvas {
   background: var(--canvas);

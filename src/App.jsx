@@ -8,6 +8,11 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useFinanceStore } from './store/useFinanceStore';
 import { LITE_PATHS } from './utils/appMode';
 
+function RootRedirect() {
+  const supabaseUser = useFinanceStore((s) => s.supabaseUser);
+  return <Navigate to={supabaseUser ? '/dashboard' : '/landing'} replace />;
+}
+
 function LiteGuard({ children }) {
   const appMode = useFinanceStore((s) => s.appMode);
   const tourActive = useFinanceStore((s) => s.tourActive);
@@ -33,8 +38,11 @@ const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
+const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -68,7 +76,7 @@ export default function App() {
       <Suspense fallback={<LoadingScreen label="Loading..." />}>
         <Routes>
           {/* Root redirect */}
-          <Route path="/" element={<Navigate to="/landing" replace />} />
+          <Route path="/" element={<RootRedirect />} />
 
           {/* Public — standalone pages (no AppShell) */}
           <Route path="/landing" element={<LandingPage />} />
@@ -76,6 +84,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
           {/* Protected — all app routes behind auth gate + shared shell */}
@@ -106,6 +115,8 @@ export default function App() {
                         }
                       />
                       <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/activity" element={<ActivityFeedPage />} />
+                      <Route path="/shared-goals" element={<SharedGoalsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

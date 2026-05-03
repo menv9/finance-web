@@ -44,6 +44,25 @@ import {
   uploadAvatar,
   validateUsername,
 } from '../utils/profilesApi';
+import {
+  addComment as apiAddComment,
+  addContribution as apiAddContribution,
+  addGoalParticipant,
+  addReaction as apiAddReaction,
+  createSharedGoal as apiCreateSharedGoal,
+  deleteActivity as apiDeleteActivity,
+  deleteComment as apiDeleteComment,
+  deleteContribution as apiDeleteContribution,
+  deleteSharedGoal as apiDeleteSharedGoal,
+  fetchActivityPrivacy,
+  fetchFeedForUser,
+  fetchSharedGoals,
+  insertActivity,
+  removeGoalParticipant,
+  removeReaction as apiRemoveReaction,
+  updateSharedGoal as apiUpdateSharedGoal,
+  upsertActivityPrivacy,
+} from '../utils/socialApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
@@ -515,6 +534,11 @@ export const useFinanceStore = create((set, get) => ({
   pendingOutgoing: [],
   profileStatus: 'idle',
   profileError: '',
+  activityFeed: [],
+  activityPrivacy: null,
+  sharedGoals: [],
+  socialStatus: 'idle',
+  socialError: '',
   syncMeta: {
     lastPulledAt: {},
     deletedRecords: {},
@@ -2440,6 +2464,11 @@ export const useFinanceStore = create((set, get) => ({
       pendingOutgoing: [],
       profileStatus: 'idle',
       profileError: '',
+      activityFeed: [],
+      activityPrivacy: null,
+      sharedGoals: [],
+      socialStatus: 'idle',
+      socialError: '',
     });
   },
 
@@ -2871,4 +2900,167 @@ export const useFinanceStore = create((set, get) => ({
       return { syncMeta: nextSyncMeta };
     });
   },
+
+  // ── Social: activity feed ─────────────────────────────────────────────────
+
+  loadActivityFeed: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    set({ socialStatus: 'loading', socialError: '' });
+    try {
+      const friendIds = get().friends.map((f) => f.otherId);
+      const [feed, privacy] = await Promise.all([
+        fetchFeedForUser(user.id, friendIds),
+        fetchActivityPrivacy(user.id),
+      ]);
+      set({ activityFeed: feed, activityPrivacy: privacy, socialStatus: 'idle' });
+    } catch (err) {
+      set({ socialStatus: 'error', socialError: err.message || 'Failed to load feed' });
+    }
+  },
+
+  postActivity: async (type, payload = {}) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    try {
+      const item = await insertActivity(user.id, type, payload);
+      set((state) => ({ activityFeed: [item, ...state.activityFeed] }));
+    } catch {
+      // non-critical — don't surface to user
+    }
+  },
+
+  deleteActivity: async (activityId) => {
+    await apiDeleteActivity(activityId);
+    set((state) => ({ activityFeed: state.activityFeed.filter((a) => a.id !== activityId) }));
+  },
+
+  updateActivityPrivacy: async (patch) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const updated = await upsertActivityPrivacy(user.id, patch);
+    set({ activityPrivacy: updated });
+  },
+
+  addReaction: async (activityId, emoji) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const reaction = await apiAddReaction(activityId, user.id, emoji);
+    set((state) => ({
+      activityFeed: state.activityFeed.map((a) =>
+        a.id !== activityId ? a : {
+          ...a,
+          activity_reactions: [
+            ...(a.activity_reactions || []).filter((r) => r.user_id !== user.id),
+            reaction,
+          ],
+        }
+      ),
+    }));
+  },
+
+  removeReaction: async (activityId) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    await apiRemoveReaction(activityId, user.id);
+    set((state) => ({
+      activityFeed: state.activityFeed.map((a) =>
+        a.id !== activityId ? a : {
+          ...a,
+          activity_reactions: (a.activity_reactions || []).filter((r) => r.user_id !== user.id),
+        }
+      ),
+    }));
+  },
+
+  addComment: async (activityId, body) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const comment = await apiAddComment(activityId, user.id, body);
+    set((state) => ({
+      activityFeed: state.activityFeed.map((a) =>
+        a.id !== activityId ? a : {
+          ...a,
+          activity_comments: [...(a.activity_comments || []), comment],
+        }
+      ),
+    }));
+  },
+
+  deleteComment: async (activityId, commentId) => {
+    await apiDeleteComment(commentId);
+    set((state) => ({
+      activityFeed: state.activityFeed.map((a) =>
+        a.id !== activityId ? a : {
+          ...a,
+          activity_comments: (a.activity_comments || []).filter((c) => c.id !== commentId),
+        }
+      ),
+    }));
+  },
+
+  // ── Social: shared goals ──────────────────────────────────────────────────
+
+  loadSharedGoals: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    set({ socialStatus: 'loading', socialError: '' });
+    try {
+      const goals = await fetchSharedGoals(user.id);
+      set({ sharedGoals: goals, socialStatus: 'idle' });
+    } catch (err) {
+      set({ socialStatus: 'error', socialError: err.message || 'Failed to load goals' });
+    }
+  },
+
+  createSharedGoal: async ({ name, targetCents, currency, description, emoji, inviteIds = [] }) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const goal = await apiCreateSharedGoal(user.id, { name, targetCents, currency, description, emoji, inviteIds });
+    await get().postActivity('shared_goal_created', { goalId: goal.id, goalName: name });
+    await get().loadSharedGoals();
+    return goal;
+  },
+
+  updateSharedGoal: async (goalId, patch) => {
+    await apiUpdateSharedGoal(goalId, patch);
+    await get().loadSharedGoals();
+  },
+
+  deleteSharedGoal: async (goalId) => {
+    await apiDeleteSharedGoal(goalId);
+    set((state) => ({ sharedGoals: state.sharedGoals.filter((g) => g.id !== goalId) }));
+  },
+
+  addGoalParticipant: async (goalId, userId) => {
+    await addGoalParticipant(goalId, userId);
+    await get().loadSharedGoals();
+  },
+
+  removeGoalParticipant: async (goalId, userId) => {
+    await removeGoalParticipant(goalId, userId);
+    await get().loadSharedGoals();
+  },
+
+  addContribution: async (goalId, amountCents, note = '') => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    await apiAddContribution(goalId, user.id, amountCents, note);
+    const goals = await fetchSharedGoals(user.id);
+    const goal = goals.find((g) => g.id === goalId);
+    if (goal) {
+      const totalCents = (goal.shared_goal_contributions || []).reduce((s, c) => s + c.amount_cents, 0);
+      if (totalCents >= goal.target_cents && !goal.completed_at) {
+        await apiUpdateSharedGoal(goalId, { completedAt: new Date().toISOString() });
+        await get().postActivity('shared_goal_reached', { goalId, goalName: goal.name, targetCents: goal.target_cents });
+      }
+    }
+    set({ sharedGoals: goals });
+  },
+
+  deleteContribution: async (goalId, contributionId) => {
+    await apiDeleteContribution(contributionId);
+    await get().loadSharedGoals();
+  },
+
 }));

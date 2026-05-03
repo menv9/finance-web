@@ -40,6 +40,15 @@ const NAV_GROUPS = [
     ],
   },
   { kind: 'link', to: '/portfolio', labelKey: 'nav.investing', module: 'portfolio' },
+  {
+    kind: 'menu',
+    id: 'social',
+    labelKey: 'nav.social',
+    items: [
+      { to: '/activity', labelKey: 'nav.activity' },
+      { to: '/shared-goals', labelKey: 'nav.sharedGoals' },
+    ],
+  },
   { kind: 'link', to: '/profile', labelKey: 'nav.profile' },
 ];
 
@@ -51,6 +60,8 @@ const MORE_LINKS = [
   { to: '/budgets', labelKey: 'nav.budgets' },
   { to: '/savings', labelKey: 'nav.savings' },
   { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
+  { to: '/activity', labelKey: 'nav.activity' },
+  { to: '/shared-goals', labelKey: 'nav.sharedGoals' },
   { to: '/profile', labelKey: 'nav.profile' },
   { to: '/settings', labelKey: 'nav.settings' },
 ];
@@ -1011,9 +1022,14 @@ export function AppShell({ children }) {
       <footer className="mx-auto max-w-wide border-t border-rule px-4 py-8 lg:px-10 mt-20">
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-ink-muted">
           <p className="font-display italic">{t('shell.footer.tagline')}</p>
-          <p className="numeric text-ink-faint">
-            {new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date())}
-          </p>
+          <div className="flex items-center gap-4">
+            <Link to="/contact" className="text-ink-faint hover:text-ink transition-colors">Contact</Link>
+            <Link to="/privacy" className="text-ink-faint hover:text-ink transition-colors">Privacy</Link>
+            <Link to="/terms" className="text-ink-faint hover:text-ink transition-colors">Terms</Link>
+            <p className="numeric text-ink-faint">
+              {new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date())}
+            </p>
+          </div>
         </div>
       </footer>
 

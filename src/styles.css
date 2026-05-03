@@ -72,6 +72,29 @@ input[type="month"] {
   color-scheme: dark;
 }
 
+[data-theme='dark'] {
+  --canvas: #141B26;
+  --surface: #1B2434;
+  --surface-raised: #232E42;
+  --surface-sunken: #0F1620;
+  --rule: rgba(210, 220, 240, 0.09);
+  --rule-strong: rgba(210, 220, 240, 0.18);
+  --ink: #E6EAF2;
+  --ink-muted: #A5AEC3;
+  --ink-faint: #6F788E;
+  --ink-inverse: #141B26;
+  --accent: #8896A8;
+  --accent-strong: #A4B0BF;
+  --accent-soft: rgba(136, 150, 168, 0.16);
+  --accent-ink: #141B26;
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.16);
+  --positive: #4ADE80;
+  --positive-soft: rgba(74, 222, 128, 0.15);
+  --grain: 0.03;
+  color-scheme: dark;
+}
+
 /* ——————————————————————————————————————————————
    Tokens — Light
 —————————————————————————————————————————————— */
