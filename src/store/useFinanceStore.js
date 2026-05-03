@@ -2950,6 +2950,10 @@ export const useFinanceStore = create((set, get) => ({
   addReaction: async (activityId, emoji) => {
     const user = get().supabaseUser;
     if (!user) return;
+    const existing = get().activityFeed
+      .find((a) => a.id === activityId)
+      ?.activity_reactions?.find((r) => r.user_id === user.id);
+    if (existing) await apiRemoveReaction(activityId, user.id);
     const reaction = await apiAddReaction(activityId, user.id, emoji);
     set((state) => ({
       activityFeed: state.activityFeed.map((a) =>

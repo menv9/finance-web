@@ -113,7 +113,7 @@ function ReactionBar({ activity, currentUserId, onAdd, onRemove }) {
         <button className="inline-flex items-center justify-center rounded-full border border-rule bg-surface-raised text-ink-muted hover:border-accent/40 w-6 h-6 transition-colors">
           <Plus size={12} />
         </button>
-        <div className="absolute bottom-full left-0 mb-1 hidden group-hover:flex gap-1 bg-surface border border-rule rounded-lg shadow-lg p-1.5 z-10">
+        <div className="absolute bottom-full left-0 hidden group-hover:flex gap-1 bg-surface border border-rule rounded-lg shadow-lg p-1.5 z-10">
           {QUICK_REACTIONS.map(({ key, Icon: RIcon, label }) => (
             <button
               key={key}
