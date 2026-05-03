@@ -18,6 +18,34 @@ $$;
 
 grant execute on function public.are_friends(uuid, uuid) to authenticated;
 
+-- ── activity_privacy ─────────────────────────────────────────────────────────
+-- Defined before social_activity so the friend-read policy can reference it.
+create table if not exists public.activity_privacy (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  feed_enabled  boolean not null default true,
+  visible_types text[] not null default array[
+    'goal_reached', 'debt_paid', 'savings_milestone',
+    'goal_created', 'shared_goal_created', 'shared_goal_reached'
+  ]
+);
+
+alter table public.activity_privacy enable row level security;
+
+drop policy if exists "privacy own read" on public.activity_privacy;
+create policy "privacy own read"
+  on public.activity_privacy for select to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "privacy own write" on public.activity_privacy;
+create policy "privacy own write"
+  on public.activity_privacy for insert to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "privacy own update" on public.activity_privacy;
+create policy "privacy own update"
+  on public.activity_privacy for update to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ── social_activity ───────────────────────────────────────────────────────────
 -- One row per milestone event. Friends can read based on privacy settings.
 create table if not exists public.social_activity (
@@ -64,34 +92,6 @@ drop policy if exists "activity own delete" on public.social_activity;
 create policy "activity own delete"
   on public.social_activity for delete to authenticated
   using (auth.uid() = user_id);
-
--- ── activity_privacy ─────────────────────────────────────────────────────────
--- Per-user control over which milestone types friends can see.
-create table if not exists public.activity_privacy (
-  user_id       uuid primary key references auth.users(id) on delete cascade,
-  feed_enabled  boolean not null default true,
-  visible_types text[] not null default array[
-    'goal_reached', 'debt_paid', 'savings_milestone',
-    'goal_created', 'shared_goal_created', 'shared_goal_reached'
-  ]
-);
-
-alter table public.activity_privacy enable row level security;
-
-drop policy if exists "privacy own read" on public.activity_privacy;
-create policy "privacy own read"
-  on public.activity_privacy for select to authenticated
-  using (auth.uid() = user_id);
-
-drop policy if exists "privacy own write" on public.activity_privacy;
-create policy "privacy own write"
-  on public.activity_privacy for insert to authenticated
-  with check (auth.uid() = user_id);
-
-drop policy if exists "privacy own update" on public.activity_privacy;
-create policy "privacy own update"
-  on public.activity_privacy for update to authenticated
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ── activity_reactions ────────────────────────────────────────────────────────
 -- Emoji reactions on feed items. One reaction per user per activity.
