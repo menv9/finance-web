@@ -18,6 +18,20 @@ $$;
 
 grant execute on function public.are_friends(uuid, uuid) to authenticated;
 
+-- Bypasses RLS to check goal participation — used in shared_goal_participants
+-- policies to avoid infinite recursion from self-referential RLS.
+create or replace function public.is_goal_participant(p_goal_id uuid, p_user_id uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.shared_goal_participants
+    where goal_id = p_goal_id and user_id = p_user_id
+  );
+$$;
+
+grant execute on function public.is_goal_participant(uuid, uuid) to authenticated;
+
 -- ── activity_privacy ─────────────────────────────────────────────────────────
 -- Defined before social_activity so the friend-read policy can reference it.
 create table if not exists public.activity_privacy (
@@ -98,7 +112,7 @@ create policy "activity own delete"
 create table if not exists public.activity_reactions (
   id          uuid primary key default gen_random_uuid(),
   activity_id uuid not null references public.social_activity(id) on delete cascade,
-  user_id     uuid not null references auth.users(id) on delete cascade,
+  user_id     uuid not null references public.profiles(user_id) on delete cascade,
   emoji       text not null,
   created_at  timestamptz not null default timezone('utc', now()),
   unique (activity_id, user_id)
@@ -134,7 +148,7 @@ create policy "reactions own delete"
 create table if not exists public.activity_comments (
   id          uuid primary key default gen_random_uuid(),
   activity_id uuid not null references public.social_activity(id) on delete cascade,
-  user_id     uuid not null references auth.users(id) on delete cascade,
+  user_id     uuid not null references public.profiles(user_id) on delete cascade,
   body        text not null check (char_length(body) between 1 and 500),
   created_at  timestamptz not null default timezone('utc', now())
 );
@@ -196,20 +210,13 @@ alter table public.shared_goal_participants enable row level security;
 drop policy if exists "sgp read by participants" on public.shared_goal_participants;
 create policy "sgp read by participants"
   on public.shared_goal_participants for select to authenticated
-  using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from public.shared_goal_participants self
-      where self.goal_id = shared_goal_participants.goal_id and self.user_id = auth.uid()
-    )
-  );
+  using (public.is_goal_participant(goal_id, auth.uid()));
 
-drop policy if exists "sgp insert by creator or self" on public.shared_goal_participants;
-create policy "sgp insert by creator or self"
+drop policy if exists "sgp insert by creator" on public.shared_goal_participants;
+create policy "sgp insert by creator"
   on public.shared_goal_participants for insert to authenticated
   with check (
-    user_id = auth.uid()
-    or exists (
+    exists (
       select 1 from public.shared_goals sg
       where sg.id = goal_id and sg.creator_id = auth.uid()
     )
@@ -269,22 +276,14 @@ alter table public.shared_goal_contributions enable row level security;
 drop policy if exists "sgc read by participants" on public.shared_goal_contributions;
 create policy "sgc read by participants"
   on public.shared_goal_contributions for select to authenticated
-  using (
-    exists (
-      select 1 from public.shared_goal_participants sgp
-      where sgp.goal_id = shared_goal_contributions.goal_id and sgp.user_id = auth.uid()
-    )
-  );
+  using (public.is_goal_participant(goal_id, auth.uid()));
 
 drop policy if exists "sgc insert by participant" on public.shared_goal_contributions;
 create policy "sgc insert by participant"
   on public.shared_goal_contributions for insert to authenticated
   with check (
     auth.uid() = user_id
-    and exists (
-      select 1 from public.shared_goal_participants sgp
-      where sgp.goal_id = goal_id and sgp.user_id = auth.uid()
-    )
+    and public.is_goal_participant(goal_id, auth.uid())
   );
 
 drop policy if exists "sgc delete own" on public.shared_goal_contributions;
