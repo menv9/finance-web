@@ -299,12 +299,17 @@ export default function DashboardPage() {
         <section
           aria-label="Key figures"
           data-tour="dashboard-kpis"
-          className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule"
-          style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}
+          className={`grid gap-px border border-rule rounded-lg overflow-hidden bg-rule ${
+            kpis.length <= 3
+              ? ['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3'][kpis.length]
+              : kpis.length === 4
+              ? 'grid-cols-2 sm:grid-cols-4'
+              : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
+          }`}
         >
           {kpis.map((k, i) => (
             isGorka ? (
-              <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface px-4 py-4 ${rise(i + 1)}`}>
+              <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface px-3 py-3 sm:px-4 sm:py-4 ${rise(i + 1)}`}>
                 <Stat
                   label={k.label}
                   value={hideKpis ? '****' : k.value}
@@ -319,7 +324,7 @@ export default function DashboardPage() {
                 />
               </GorkaSpotlight>
             ) : (
-              <div key={k.label} className={`min-w-0 bg-surface px-4 py-4 ${rise(i + 1)}`}>
+              <div key={k.label} className={`min-w-0 bg-surface px-3 py-3 sm:px-4 sm:py-4 ${rise(i + 1)}`}>
                 <Stat
                   label={k.label}
                   value={hideKpis ? '****' : k.value}

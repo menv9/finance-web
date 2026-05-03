@@ -534,7 +534,7 @@ export function SharedGoalsSection({
       {!hideNewButton && (
         <div className="flex justify-end">
           <Button size="sm" onClick={() => { setEditingGoal(null); setFormOpen(true); }}>
-            {t('sharedGoals.newGoal')}
+            <Plus size={12} /> {t('sharedGoals.newGoal')}
           </Button>
         </div>
       )}
