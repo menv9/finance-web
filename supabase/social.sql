@@ -107,11 +107,17 @@ create policy "activity friend read"
   using (
     auth.uid() <> user_id
     and public.are_friends(auth.uid(), user_id)
-    and exists (
-      select 1 from public.activity_privacy ap
-      where ap.user_id = social_activity.user_id
-        and ap.feed_enabled = true
-        and social_activity.type = any(ap.visible_types)
+    and (
+      not exists (
+        select 1 from public.activity_privacy
+        where user_id = social_activity.user_id
+      )
+      or exists (
+        select 1 from public.activity_privacy ap
+        where ap.user_id = social_activity.user_id
+          and ap.feed_enabled = true
+          and social_activity.type = any(ap.visible_types)
+      )
     )
   );
 

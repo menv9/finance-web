@@ -2912,6 +2912,7 @@ export const useFinanceStore = create((set, get) => ({
     if (!user) return;
     set({ socialStatus: 'loading', socialError: '' });
     try {
+      await get().loadFriendships();
       const friendIds = get().friends.map((f) => f.otherId);
       const [feed, privacy] = await Promise.all([
         fetchFeedForUser(user.id, friendIds),
