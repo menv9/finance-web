@@ -180,32 +180,8 @@ create table if not exists public.shared_goals (
 
 alter table public.shared_goals enable row level security;
 
-drop policy if exists "shared_goals read by participants" on public.shared_goals;
-create policy "shared_goals read by participants"
-  on public.shared_goals for select to authenticated
-  using (
-    exists (
-      select 1 from public.shared_goal_participants sgp
-      where sgp.goal_id = id and sgp.user_id = auth.uid()
-    )
-  );
-
-drop policy if exists "shared_goals insert by creator" on public.shared_goals;
-create policy "shared_goals insert by creator"
-  on public.shared_goals for insert to authenticated
-  with check (auth.uid() = creator_id);
-
-drop policy if exists "shared_goals update by creator" on public.shared_goals;
-create policy "shared_goals update by creator"
-  on public.shared_goals for update to authenticated
-  using (auth.uid() = creator_id);
-
-drop policy if exists "shared_goals delete by creator" on public.shared_goals;
-create policy "shared_goals delete by creator"
-  on public.shared_goals for delete to authenticated
-  using (auth.uid() = creator_id);
-
 -- ── shared_goal_participants ──────────────────────────────────────────────────
+-- Created before shared_goals policies so the select policy can reference it.
 create table if not exists public.shared_goal_participants (
   goal_id    uuid not null references public.shared_goals(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
@@ -249,6 +225,32 @@ create policy "sgp delete by creator or self"
       where sg.id = goal_id and sg.creator_id = auth.uid()
     )
   );
+
+-- ── shared_goals policies (after participants table exists) ───────────────────
+drop policy if exists "shared_goals read by participants" on public.shared_goals;
+create policy "shared_goals read by participants"
+  on public.shared_goals for select to authenticated
+  using (
+    exists (
+      select 1 from public.shared_goal_participants sgp
+      where sgp.goal_id = id and sgp.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "shared_goals insert by creator" on public.shared_goals;
+create policy "shared_goals insert by creator"
+  on public.shared_goals for insert to authenticated
+  with check (auth.uid() = creator_id);
+
+drop policy if exists "shared_goals update by creator" on public.shared_goals;
+create policy "shared_goals update by creator"
+  on public.shared_goals for update to authenticated
+  using (auth.uid() = creator_id);
+
+drop policy if exists "shared_goals delete by creator" on public.shared_goals;
+create policy "shared_goals delete by creator"
+  on public.shared_goals for delete to authenticated
+  using (auth.uid() = creator_id);
 
 -- ── shared_goal_contributions ─────────────────────────────────────────────────
 create table if not exists public.shared_goal_contributions (
