@@ -33,6 +33,8 @@ const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -72,6 +74,8 @@ export default function App() {
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
           {/* Protected — all app routes behind auth gate + shared shell */}

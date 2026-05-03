@@ -420,6 +420,8 @@ export default function LandingPage() {
             <Link to="/dashboard" className="lp-foot-link">{t('landing.footer.openApp')}</Link>
             <Link to="/login" className="lp-foot-link">{t('landing.footer.signIn')}</Link>
             <a href="#features" className="lp-foot-link">{t('landing.footer.features')}</a>
+            <Link to="/privacy" className="lp-foot-link">Privacy</Link>
+            <Link to="/terms" className="lp-foot-link">Terms</Link>
           </div>
           <p className="lp-foot-meta md:text-right">
             <span>© {new Date().getFullYear()}</span>
