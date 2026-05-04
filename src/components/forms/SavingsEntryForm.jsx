@@ -7,6 +7,7 @@ const defaultValue = {
   amountCents: '',
   note: '',
   goalId: '',
+  bankAccountId: '',
 };
 
 export function SavingsEntryForm({
@@ -17,14 +18,17 @@ export function SavingsEntryForm({
   goalLocked = false,
   showBucketSource = false,
   unallocatedSavingsCents = 0,
+  bankAccounts = [],
   submitLabel,
   onSubmit,
   onCancel,
 }) {
+  const defaultBankAccountId = bankAccounts.find((a) => a.isMain)?.id || bankAccounts[0]?.id || '';
   const [form, setForm] = useState({
     ...defaultValue,
     goalId: defaultGoalId,
     bucketSource: 'balance',
+    bankAccountId: defaultBankAccountId,
     ...initialValue,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
@@ -42,6 +46,7 @@ export function SavingsEntryForm({
           amountCents: Math.round(Number(form.amountCents || 0) * 100),
           goalId: form.goalId || null,
           bucketSource: form.bucketSource,
+          bankAccountId: form.bankAccountId || null,
         });
       }}
     >
@@ -93,6 +98,21 @@ export function SavingsEntryForm({
           />
         )}
       </FormField>
+
+      {bankAccounts.length && form.bucketSource !== 'savings' ? (
+        <FormField label="Deduct from account" htmlFor="saving-bank" hint="Optional" className="md:col-span-2">
+          {(props) => (
+            <Select {...props} value={form.bankAccountId || ''} onChange={set('bankAccountId')}>
+              <option value="">None (don't adjust bank balance)</option>
+              {bankAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}{account.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      ) : null}
 
       {goals.length ? (
         <FormField label="Savings for" htmlFor="saving-goal" className="md:col-span-2">

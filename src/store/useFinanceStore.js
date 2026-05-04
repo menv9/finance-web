@@ -847,13 +847,33 @@ export const useFinanceStore = create((set, get) => ({
       const nextPositive = Math.max(entry.amountCents || 0, 0);
       assertSourceHasFunds(get(), 'cashflow', nextPositive - previousPositive);
     }
+    const timestamp = new Date().toISOString();
     const record = ensureEntitySyncFields(
       { ...entry, id: entry.id || `sav-${crypto.randomUUID()}` },
-      new Date().toISOString(),
+      timestamp,
     );
+    // Deduct from linked bank account (reverse previous, apply new)
+    const bankAdjustments = new Map();
+    if (!record.transferId && record.source !== 'allocation') {
+      if (previous?.bankAccountId && previous.amountCents) {
+        bankAdjustments.set(previous.bankAccountId, (bankAdjustments.get(previous.bankAccountId) || 0) + previous.amountCents);
+      }
+      if (record.bankAccountId && record.amountCents) {
+        bankAdjustments.set(record.bankAccountId, (bankAdjustments.get(record.bankAccountId) || 0) - record.amountCents);
+      }
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAdjustments, timestamp);
     await putRecord('savingsEntries', record);
+    if (bankAdjustments.size) {
+      await Promise.all(
+        adjustedBankAccounts
+          .filter((account) => bankAdjustments.has(account.id))
+          .map((account) => putRecord('bankAccounts', account)),
+      );
+    }
     set((state) => {
-      const nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record) };
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAdjustments, timestamp);
+      const nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record), bankAccounts: nextBankAccounts };
       return { ...nextState, derived: buildDerived(nextState) };
     });
     await persistActivityLogs(set, [buildActivityLog({
@@ -868,9 +888,24 @@ export const useFinanceStore = create((set, get) => ({
 
   removeSavingsEntry: async (id) => {
     const previous = get().savingsEntries.find((item) => item.id === id);
+    const timestamp = new Date().toISOString();
+    // Reverse the bank account deduction that was applied when the entry was saved
+    const bankAdjustments = new Map();
+    if (previous && !previous.transferId && previous.source !== 'allocation' && previous.bankAccountId && previous.amountCents) {
+      bankAdjustments.set(previous.bankAccountId, previous.amountCents);
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAdjustments, timestamp);
     await deleteRecord('savingsEntries', id);
+    if (bankAdjustments.size) {
+      await Promise.all(
+        adjustedBankAccounts
+          .filter((account) => bankAdjustments.has(account.id))
+          .map((account) => putRecord('bankAccounts', account)),
+      );
+    }
     set((state) => {
-      const nextState = { ...state, savingsEntries: state.savingsEntries.filter((e) => e.id !== id) };
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAdjustments, timestamp);
+      const nextState = { ...state, savingsEntries: state.savingsEntries.filter((e) => e.id !== id), bankAccounts: nextBankAccounts };
       return { ...nextState, derived: buildDerived(nextState) };
     });
     if (previous) {

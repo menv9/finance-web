@@ -1219,6 +1219,7 @@ export default function SavingsPage() {
           goalLocked={modal.withdraw}
           showBucketSource={Boolean(modal.goalId && !modal.withdraw && !editingEntry)}
           unallocatedSavingsCents={unallocatedSavingsCents}
+          bankAccounts={modal.withdraw ? [] : bankAccounts}
           submitLabel={modal.withdraw ? t('savings.withdrawalModal.withdraw') : undefined}
           onSubmit={async (value) => {
             try {
