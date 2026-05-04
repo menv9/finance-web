@@ -2549,6 +2549,7 @@ export const useFinanceStore = create((set, get) => ({
         createdAt: row.created_at,
         profile: profileById.get(otherId) || null,
       };
+      if (entry.profile?.social_enabled === false) continue;
       if (row.status === 'accepted') friends.push(entry);
       else if (row.addressee_id === user.id) pendingIncoming.push(entry);
       else pendingOutgoing.push(entry);
