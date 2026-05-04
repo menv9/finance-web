@@ -296,6 +296,7 @@ export function AppShell({ children }) {
   const [openNavMenu, setOpenNavMenu] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [settingsHover, setSettingsHover] = useState(false);
   const baseCurrency = settings.baseCurrency;
   const moduleVisible = useMemo(
     () => (item) => {
@@ -668,19 +669,53 @@ export function AppShell({ children }) {
               })}
             </div>
 
-            <NavLink
-              to="/settings"
-              aria-label={t('nav.settings')}
-              title={t('nav.settings')}
-              className={({ isActive }) =>
-                cn(
-                  'hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
-                  isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
-                )
-              }
-            >
-              <SettingsIcon />
-            </NavLink>
+            {(() => {
+              const hiddenModuleLinks = [
+                ...(settings.modules?.portfolio === false ? [{ label: t('nav.portfolio'), to: '/portfolio' }] : []),
+                ...(settings.modules?.social === false ? [
+                  { label: t('nav.profile'), to: '/profile' },
+                  { label: t('nav.activity'), to: '/activity' },
+                  { label: t('nav.friends'), to: '/friends' },
+                ] : []),
+              ];
+              return (
+                <div
+                  className="relative hidden sm:block"
+                  onMouseEnter={() => setSettingsHover(true)}
+                  onMouseLeave={() => setSettingsHover(false)}
+                >
+                  <NavLink
+                    to="/settings"
+                    aria-label={t('nav.settings')}
+                    title={t('nav.settings')}
+                    className={({ isActive }) =>
+                      cn(
+                        'inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+                        isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
+                      )
+                    }
+                  >
+                    <SettingsIcon />
+                  </NavLink>
+                  {settingsHover && hiddenModuleLinks.length > 0 && (
+                    <div className="hidden lg:block absolute right-0 top-9 pt-1.5 z-40">
+                      <div className="w-44 rounded-lg border border-rule bg-surface shadow-lift p-1">
+                        <p className="px-3 pt-1.5 pb-1 eyebrow text-[0.6rem] text-ink-faint">Hidden modules</p>
+                        {hiddenModuleLinks.map((m) => (
+                          <Link
+                            key={m.to}
+                            to={m.to}
+                            className="flex w-full items-center rounded-md px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-raised hover:text-ink transition-colors duration-150"
+                          >
+                            {m.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="relative" onClick={(event) => event.stopPropagation()}>
               {(() => {
                 const ActiveIcon = (THEME_OPTIONS.find((o) => o.value === appliedTheme)?.Icon) || SunIcon;
