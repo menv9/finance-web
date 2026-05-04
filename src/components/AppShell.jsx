@@ -710,8 +710,8 @@ export function AppShell({ children }) {
                             enabled ? 'bg-accent border-accent' : 'bg-surface-raised border-rule-strong',
                           )}>
                             <span className={cn(
-                              'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-180',
-                              enabled ? 'left-[13px]' : 'left-0.5',
+                              'absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-180',
+                              enabled ? 'translate-x-3' : 'translate-x-0',
                             )} />
                           </span>
                         </button>
