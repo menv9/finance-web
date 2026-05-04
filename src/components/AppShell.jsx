@@ -717,6 +717,27 @@ export function AppShell({ children }) {
                         </button>
                       );
                     })}
+                    <div className="border-t border-rule pt-2 grid gap-1.5">
+                      <p className="eyebrow text-[0.6rem] text-ink-faint">Language</p>
+                      <div className="flex rounded-md border border-rule p-0.5 bg-surface-raised">
+                        {['en', 'es'].map((lang) => {
+                          const active = (settings.language || 'en') === lang;
+                          return (
+                            <button
+                              key={lang}
+                              type="button"
+                              onClick={() => updateSettings({ language: lang })}
+                              className={cn(
+                                'flex-1 rounded px-2 py-1 text-xs transition-colors duration-150',
+                                active ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+                              )}
+                            >
+                              {lang.toUpperCase()}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
