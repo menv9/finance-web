@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 
-const LAST_UPDATED = 'May 2025';
+const LAST_UPDATED = 'May 2026';
 
 const SECTIONS = [
   {
@@ -23,6 +23,10 @@ const SECTIONS = [
       {
         label: 'Account information',
         body: 'Your email address is collected when you sign up and is used to authenticate your account and communicate with you about your account.',
+      },
+      {
+        label: 'Google Sign-In data',
+        body: 'If you choose to sign in with Google, we receive your name, email address, and Google profile picture URL from Google via OAuth 2.0. This data is used exclusively to create and identify your FinGes account. It is stored securely in Supabase (our authentication provider) and is not used for advertising, profiling, or any purpose beyond authentication.',
       },
       {
         label: 'Local-only mode',
@@ -56,6 +60,10 @@ const SECTIONS = [
       {
         label: 'Supabase',
         body: 'We use Supabase as our cloud database and authentication provider. Your financial data and account credentials are stored on Supabase infrastructure. Supabase is SOC 2 compliant. See supabase.com/privacy for their policy.',
+      },
+      {
+        label: 'Google Sign-In (OAuth)',
+        body: 'If you use "Sign in with Google", your authentication is handled via Google OAuth 2.0 through Supabase. We receive only your name, email address, and profile picture URL — the minimum data needed to create your account. We do not receive access to your Google Drive, Gmail, Calendar, Contacts, or any other Google service. Google user data is used solely for authentication and is never shared with third parties, sold, or used for advertising. You can revoke FinGes\'s access at any time from your Google Account permissions page (myaccount.google.com/permissions).',
       },
       {
         label: 'Font delivery',
