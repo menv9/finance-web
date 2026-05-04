@@ -32,7 +32,7 @@ export function Toggle({ checked, onChange, label, description, disabled, id }) 
           className={cn(
             'absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-ink shadow-sm',
             'transition-transform duration-180 ease-editorial',
-            'peer-checked:translate-x-4 peer-checked:bg-accent-ink',
+            'peer-checked:translate-x-4 peer-checked:bg-white',
           )}
         />
       </span>
@@ -76,7 +76,7 @@ export function Checkbox({ checked, onChange, label, id, disabled }) {
         <svg
           aria-hidden
           viewBox="0 0 12 12"
-          className="relative z-10 h-4 w-4 text-accent-ink opacity-0 peer-checked:opacity-100 transition-opacity"
+          className="relative z-10 h-4 w-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
         >
           <path d="M2.5 6.2l2.4 2.4 4.6-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
