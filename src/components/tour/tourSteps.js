@@ -168,22 +168,6 @@ export const TOUR_STEPS = [
     ],
   },
   {
-    route: '/transfers',
-    page: 'Transfers',
-    stops: [
-      {
-        tourId: 'transfers-quick-actions',
-        label: 'Quick transfers',
-        desc: 'Shortcut buttons for the two most common moves: pulling from savings to cover an expense, or investing from savings into your portfolio.',
-      },
-      {
-        tourId: 'transfers-history',
-        label: 'Transfer history',
-        desc: 'Every transfer you\'ve made, filterable by month, source, and destination. Deleting a transfer also removes the linked records in both connected modules.',
-      },
-    ],
-  },
-  {
     route: '/portfolio',
     page: 'Portfolio',
     stops: [
