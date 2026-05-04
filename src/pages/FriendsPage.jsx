@@ -286,15 +286,15 @@ export default function FriendsPage() {
     <div className="grid gap-8">
       <PageHeader title={t('nav.friends')} description={t('profile.friends.pageDescription')} />
 
-      <Card title={t('profile.findFriends.title')} eyebrow={t('profile.findFriends.eyebrow')} description={t('profile.findFriends.description')}>
+      <Card data-tour="friends-search" title={t('profile.findFriends.title')} eyebrow={t('profile.findFriends.eyebrow')} description={t('profile.findFriends.description')}>
         <FindFriends />
       </Card>
 
-      <Card title={t('profile.pending.title')} eyebrow={t('profile.pending.eyebrow')}>
+      <Card data-tour="friends-pending" title={t('profile.pending.title')} eyebrow={t('profile.pending.eyebrow')}>
         <PendingRequests />
       </Card>
 
-      <Card title={`${t('profile.friends.title')}${friends.length ? ` (${friends.length})` : ''}`} eyebrow={t('profile.friends.eyebrow')}>
+      <Card data-tour="friends-list" title={`${t('profile.friends.title')}${friends.length ? ` (${friends.length})` : ''}`} eyebrow={t('profile.friends.eyebrow')}>
         <FriendsList />
       </Card>
     </div>

@@ -171,7 +171,7 @@ export default function TransfersPage() {
       />
 
       {/* Quick actions */}
-      <section className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-2">
+      <section data-tour="transfers-quick-actions" className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-2">
         {[
           {
             label: 'Savings → Expenses',
@@ -198,6 +198,7 @@ export default function TransfersPage() {
 
       {/* History */}
       <Card
+        data-tour="transfers-history"
         eyebrow="History"
         title="All transfers"
         description="Deleting a transfer also removes the linked records from savings, expenses, or portfolio."

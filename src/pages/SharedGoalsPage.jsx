@@ -638,7 +638,7 @@ export default function SharedGoalsPage() {
         title={t('sharedGoals.title')}
         description={t('sharedGoals.description')}
       />
-      <SharedGoalsSection />
+      <div data-tour="shared-goals-list"><SharedGoalsSection /></div>
     </div>
   );
 }

@@ -168,6 +168,22 @@ export const TOUR_STEPS = [
     ],
   },
   {
+    route: '/transfers',
+    page: 'Transfers',
+    stops: [
+      {
+        tourId: 'transfers-quick-actions',
+        label: 'Quick transfers',
+        desc: 'Shortcut buttons for the two most common moves: pulling from savings to cover an expense, or investing from savings into your portfolio.',
+      },
+      {
+        tourId: 'transfers-history',
+        label: 'Transfer history',
+        desc: 'Every transfer you\'ve made, filterable by month, source, and destination. Deleting a transfer also removes the linked records in both connected modules.',
+      },
+    ],
+  },
+  {
     route: '/portfolio',
     page: 'Portfolio',
     stops: [
@@ -190,6 +206,70 @@ export const TOUR_STEPS = [
         tourId: 'portfolio-allocation',
         label: 'Allocation',
         desc: 'A breakdown of your portfolio by asset type or sector. Useful for checking diversification at a glance.',
+      },
+    ],
+  },
+  {
+    route: '/activity',
+    page: 'Activity',
+    stops: [
+      {
+        tourId: 'activity-privacy',
+        label: 'Privacy controls',
+        desc: 'Use the Privacy button to choose which milestones appear on your friends\' feeds — goal completions, savings milestones, paid-off debts, and more.',
+      },
+      {
+        tourId: 'activity-feed',
+        label: 'Activity feed',
+        desc: 'A live stream of financial milestones from you and your friends. React, comment, and celebrate wins together.',
+      },
+    ],
+  },
+  {
+    route: '/friends',
+    page: 'Friends',
+    stops: [
+      {
+        tourId: 'friends-search',
+        label: 'Find friends',
+        desc: 'Search by username or email to find other FinGes users. Send a friend request and they\'ll appear in your feed once they accept.',
+      },
+      {
+        tourId: 'friends-pending',
+        label: 'Pending requests',
+        desc: 'Incoming friend requests waiting for your response, and outgoing requests you\'ve sent that haven\'t been accepted yet.',
+      },
+      {
+        tourId: 'friends-list',
+        label: 'Your friends',
+        desc: 'Everyone you\'re connected with. You can see their activity in your feed and invite them to shared savings goals.',
+      },
+    ],
+  },
+  {
+    route: '/profile',
+    page: 'Profile',
+    stops: [
+      {
+        tourId: 'profile-card',
+        label: 'Your profile',
+        desc: 'Set your username, display name, bio, and avatar. Your username is how friends find and recognise you across the app.',
+      },
+      {
+        tourId: 'profile-shared-goals',
+        label: 'Shared goals',
+        desc: 'Savings goals you\'re working on together with friends. Contributions from all participants roll up into a shared progress bar.',
+      },
+    ],
+  },
+  {
+    route: '/shared-goals',
+    page: 'Shared goals',
+    stops: [
+      {
+        tourId: 'shared-goals-list',
+        label: 'Shared goals',
+        desc: 'Create a savings goal and invite friends to contribute. Track the combined progress, manage contributions, and celebrate when you hit the target together.',
       },
     ],
   },

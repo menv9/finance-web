@@ -302,7 +302,7 @@ export default function ProfilePage() {
         </div>
       ) : null}
 
-      <Card title={t('profile.myProfile.title')} eyebrow={t('profile.myProfile.eyebrow')}>
+      <Card data-tour="profile-card" title={t('profile.myProfile.title')} eyebrow={t('profile.myProfile.eyebrow')}>
         {profileStatus === 'loading' ? (
           <p className="text-sm text-ink-muted">{t('profile.loading')}</p>
         ) : (
@@ -310,7 +310,7 @@ export default function ProfilePage() {
         )}
       </Card>
 
-      <SharedGoalsCard />
+      <div data-tour="profile-shared-goals"><SharedGoalsCard /></div>
     </div>
   );
 }

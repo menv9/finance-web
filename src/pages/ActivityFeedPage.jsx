@@ -351,6 +351,7 @@ export default function ActivityFeedPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        data-tour="activity-privacy"
         title={t('activity.title')}
         description={t('activity.description')}
         actions={
@@ -385,7 +386,7 @@ export default function ActivityFeedPage() {
           description={t('activity.emptyDescription')}
         />
       ) : (
-        <div className="space-y-3">
+        <div data-tour="activity-feed" className="space-y-3">
           {activityFeed.map((item) => (
             <ActivityCard
               key={item.id}
