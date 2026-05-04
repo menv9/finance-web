@@ -44,12 +44,13 @@ const NAV_GROUPS = [
     kind: 'menu',
     id: 'social',
     labelKey: 'nav.social',
+    module: 'social',
     items: [
-      { to: '/activity', labelKey: 'nav.activity' },
-      { to: '/friends', labelKey: 'nav.friends' },
+      { to: '/activity', labelKey: 'nav.activity', module: 'social' },
+      { to: '/friends', labelKey: 'nav.friends', module: 'social' },
     ],
   },
-  { kind: 'link', to: '/profile', labelKey: 'nav.profile' },
+  { kind: 'link', to: '/profile', labelKey: 'nav.profile', module: 'social' },
 ];
 
 const MORE_LINKS = [
@@ -60,9 +61,9 @@ const MORE_LINKS = [
   { to: '/budgets', labelKey: 'nav.budgets' },
   { to: '/savings', labelKey: 'nav.savings' },
   { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
-  { to: '/activity', labelKey: 'nav.activity' },
-  { to: '/friends', labelKey: 'nav.friends' },
-  { to: '/profile', labelKey: 'nav.profile' },
+  { to: '/activity', labelKey: 'nav.activity', module: 'social' },
+  { to: '/friends', labelKey: 'nav.friends', module: 'social' },
+  { to: '/profile', labelKey: 'nav.profile', module: 'social' },
   { to: '/settings', labelKey: 'nav.settings' },
 ];
 
@@ -297,8 +298,12 @@ export function AppShell({ children }) {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const baseCurrency = settings.baseCurrency;
   const moduleVisible = useMemo(
-    () => (item) => item.module !== 'portfolio' || settings.modules?.portfolio !== false,
-    [settings.modules?.portfolio],
+    () => (item) => {
+      if (item.module === 'portfolio' && settings.modules?.portfolio === false) return false;
+      if (item.module === 'social' && settings.modules?.social === false) return false;
+      return true;
+    },
+    [settings.modules?.portfolio, settings.modules?.social],
   );
   const isLite = appMode === 'lite';
   const navGroups = useMemo(
@@ -308,8 +313,8 @@ export function AppShell({ children }) {
           { kind: 'link', to: '/this-month', labelKey: 'nav.month' },
           { kind: 'link', to: '/expenses',   labelKey: 'nav.expenses' },
           { kind: 'link', to: '/income',     labelKey: 'nav.income' },
-          { kind: 'link', to: '/profile',    labelKey: 'nav.profile' },
-        ];
+          { kind: 'link', to: '/profile',    labelKey: 'nav.profile', module: 'social' },
+        ].filter(moduleVisible);
       }
       return NAV_GROUPS
         .filter(moduleVisible)

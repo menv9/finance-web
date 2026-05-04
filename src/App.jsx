@@ -49,6 +49,7 @@ export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
   const hydrated = useFinanceStore((state) => state.hydrated);
   const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
+  const socialEnabled = useFinanceStore((state) => state.settings.modules?.social !== false);
   const tourActive = useFinanceStore((state) => state.tourActive);
 
   useEffect(() => {
@@ -115,10 +116,10 @@ export default function App() {
                           )
                         }
                       />
-                      <Route path="/profile" element={<ProfilePage />} />
-                      <Route path="/activity" element={<ActivityFeedPage />} />
-                      <Route path="/shared-goals" element={<SharedGoalsPage />} />
-                      <Route path="/friends" element={<FriendsPage />} />
+                      <Route path="/profile" element={socialEnabled ? <ProfilePage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/activity" element={socialEnabled ? <ActivityFeedPage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/shared-goals" element={socialEnabled ? <SharedGoalsPage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/friends" element={socialEnabled ? <FriendsPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

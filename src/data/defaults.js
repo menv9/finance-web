@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = {
   localOnlyMode: false,
   modules: {
     portfolio: false,
+    social: true,
   },
   setupIntent: {
     buckets: false,

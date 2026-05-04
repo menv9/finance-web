@@ -815,6 +815,12 @@ export const useFinanceStore = create((set, get) => ({
     const log = buildSettingsActivity(previousSettings, settings, partial);
     if (log) await persistActivityLogs(set, [log]);
     get().triggerAutoPush();
+    if (partial.modules?.social !== undefined && partial.modules.social !== previousSettings.modules?.social) {
+      const user = get().supabaseUser;
+      if (user && get().profile) {
+        updateOwnProfile(user.id, { social_enabled: partial.modules.social !== false }).catch(() => {});
+      }
+    }
   },
 
   saveSavingsConfig: async (config) => {

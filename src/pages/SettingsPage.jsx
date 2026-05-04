@@ -581,6 +581,20 @@ export default function SettingsPage() {
                 label={t('settings.modules.portfolio')}
                 description={t('settings.modules.portfolioHint')}
               />
+              <Toggle
+                id="module-social"
+                checked={settings.modules?.social !== false}
+                onChange={(checked) =>
+                  updateSettings({
+                    modules: {
+                      ...(settings.modules || {}),
+                      social: checked,
+                    },
+                  })
+                }
+                label={t('settings.modules.social')}
+                description={t('settings.modules.socialHint')}
+              />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rule bg-surface-raised p-4">
                 <div>
                   <p className="text-sm font-medium text-ink">{t('settings.modules.onboarding')}</p>

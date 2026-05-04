@@ -67,6 +67,7 @@ export async function updateOwnProfile(userId, patch) {
   if (patch.display_name !== undefined) allowed.display_name = patch.display_name;
   if (patch.bio !== undefined) allowed.bio = patch.bio;
   if (patch.avatar_url !== undefined) allowed.avatar_url = patch.avatar_url;
+  if (patch.social_enabled !== undefined) allowed.social_enabled = patch.social_enabled;
   const { data, error } = await client()
     .from('profiles')
     .update(allowed)
@@ -85,6 +86,7 @@ export async function searchProfilesByUsername(query, currentUserId) {
     .select('*')
     .ilike('username', `${q}%`)
     .neq('user_id', currentUserId)
+    .neq('social_enabled', false)
     .limit(20);
   if (error) throw error;
   return data ?? [];
@@ -102,6 +104,7 @@ export async function searchProfileByEmail(email, currentUserId) {
     .eq('user_id', userId)
     .maybeSingle();
   if (pErr) throw pErr;
+  if (profile?.social_enabled === false) return null;
   return profile ?? null;
 }
 
