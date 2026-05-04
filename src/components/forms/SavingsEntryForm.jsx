@@ -100,10 +100,10 @@ export function SavingsEntryForm({
       </FormField>
 
       {bankAccounts.length && form.bucketSource !== 'savings' ? (
-        <FormField label="Deduct from account" htmlFor="saving-bank" hint="Optional" className="md:col-span-2">
+        <FormField label="Deduct from account" htmlFor="saving-bank" className="md:col-span-2" required>
           {(props) => (
-            <Select {...props} value={form.bankAccountId || ''} onChange={set('bankAccountId')}>
-              <option value="">None (don't adjust bank balance)</option>
+            <Select {...props} value={form.bankAccountId || ''} onChange={set('bankAccountId')} required>
+              <option value="" disabled>Select account</option>
               {bankAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}{account.isMain ? ' (main)' : ''}
