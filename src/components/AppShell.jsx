@@ -288,6 +288,7 @@ export function AppShell({ children }) {
   const appMode = useFinanceStore((state) => state.appMode);
   const setAppMode = useFinanceStore((state) => state.setAppMode);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
+  const updateSettings = useFinanceStore((state) => state.updateSettings);
   const alert = useAlert();
   const { t, locale } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -669,53 +670,57 @@ export function AppShell({ children }) {
               })}
             </div>
 
-            {(() => {
-              const hiddenModuleLinks = [
-                ...(settings.modules?.portfolio === false ? [{ label: t('nav.portfolio'), to: '/portfolio' }] : []),
-                ...(settings.modules?.social === false ? [
-                  { label: t('nav.profile'), to: '/profile' },
-                  { label: t('nav.activity'), to: '/activity' },
-                  { label: t('nav.friends'), to: '/friends' },
-                ] : []),
-              ];
-              return (
-                <div
-                  className="relative hidden sm:block"
-                  onMouseEnter={() => setSettingsHover(true)}
-                  onMouseLeave={() => setSettingsHover(false)}
-                >
-                  <NavLink
-                    to="/settings"
-                    aria-label={t('nav.settings')}
-                    title={t('nav.settings')}
-                    className={({ isActive }) =>
-                      cn(
-                        'inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
-                        isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
-                      )
-                    }
-                  >
-                    <SettingsIcon />
-                  </NavLink>
-                  {settingsHover && hiddenModuleLinks.length > 0 && (
-                    <div className="hidden lg:block absolute right-0 top-9 pt-1.5 z-40">
-                      <div className="w-44 rounded-lg border border-rule bg-surface shadow-lift p-1">
-                        <p className="px-3 pt-1.5 pb-1 eyebrow text-[0.6rem] text-ink-faint">Hidden modules</p>
-                        {hiddenModuleLinks.map((m) => (
-                          <Link
-                            key={m.to}
-                            to={m.to}
-                            className="flex w-full items-center rounded-md px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-raised hover:text-ink transition-colors duration-150"
-                          >
-                            {m.label}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            <div
+              className="relative hidden sm:block"
+              onMouseEnter={() => setSettingsHover(true)}
+              onMouseLeave={() => setSettingsHover(false)}
+            >
+              <NavLink
+                to="/settings"
+                aria-label={t('nav.settings')}
+                title={t('nav.settings')}
+                className={({ isActive }) =>
+                  cn(
+                    'inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+                    isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
+                  )
+                }
+              >
+                <SettingsIcon />
+              </NavLink>
+              {settingsHover && (
+                <div className="hidden lg:block absolute right-0 top-9 pt-1.5 z-40">
+                  <div className="w-48 rounded-lg border border-rule bg-surface shadow-lift p-3 grid gap-3">
+                    <p className="eyebrow text-[0.6rem] text-ink-faint">Modules</p>
+                    {[
+                      { key: 'portfolio', label: t('settings.modules.portfolio') },
+                      { key: 'social',    label: t('settings.modules.social') },
+                    ].map(({ key, label }) => {
+                      const enabled = settings.modules?.[key] !== false;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => updateSettings({ modules: { ...(settings.modules || {}), [key]: !enabled } })}
+                          className="flex items-center justify-between gap-3 text-sm text-ink-muted hover:text-ink transition-colors duration-150"
+                        >
+                          <span>{label}</span>
+                          <span className={cn(
+                            'relative inline-flex h-4 w-7 shrink-0 rounded-full border transition-colors duration-180',
+                            enabled ? 'bg-accent border-accent' : 'bg-surface-raised border-rule-strong',
+                          )}>
+                            <span className={cn(
+                              'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-180',
+                              enabled ? 'left-[13px]' : 'left-0.5',
+                            )} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })()}
+              )}
+            </div>
             <div className="relative" onClick={(event) => event.stopPropagation()}>
               {(() => {
                 const ActiveIcon = (THEME_OPTIONS.find((o) => o.value === appliedTheme)?.Icon) || SunIcon;
