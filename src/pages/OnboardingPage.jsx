@@ -49,25 +49,31 @@ function InlineItemsField({ items, onAdd, onRemove, currency, locale, namePlaceh
           ))}
         </ul>
       )}
-      <div className="flex gap-2">
-        <Input
-          value={draftName}
-          placeholder={namePlaceholder}
-          onChange={(e) => setDraftName(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="flex-1"
-        />
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          numeric
-          value={draftAmount}
-          placeholder={`0.00 ${currency}`}
-          onChange={(e) => setDraftAmount(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-32"
-        />
+      <div className="grid grid-cols-[1fr_9rem_auto] items-end gap-2">
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">{t('onboarding.itemNameLabel')}</label>
+          <Input
+            value={draftName}
+            placeholder={namePlaceholder}
+            onChange={(e) => setDraftName(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">
+            {t('onboarding.itemAmountLabel', { currency })}
+          </label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            numeric
+            value={draftAmount}
+            placeholder="0.00"
+            onChange={(e) => setDraftAmount(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
         <Button
           type="button"
           size="sm"
