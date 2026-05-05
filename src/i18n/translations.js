@@ -1318,13 +1318,18 @@ export const translations = {
     portfolio: {
       eyebrow: 'Module',
       title: 'Portfolio',
-      description: 'Holdings, allocation, performance — and dividends that mirror into the income ledger automatically.',
+      description: 'Holdings, allocation, activity, and performance with Portfolio as the source of truth.',
       refreshPrices: 'Refresh prices',
       refreshing: 'Refreshing… ({count} tickers, ~{mins} min)',
       newHolding: 'New holding',
       addHolding: 'Add holding',
       addDividend: 'Add dividend',
       sellAll: 'Sell all',
+      views: {
+        holdings: 'Holdings',
+        activity: 'Activity',
+        performance: 'Performance',
+      },
       kpiMarketValue: {
         label: 'Market value',
         hintHoldings: '{count} holdings',
@@ -1420,9 +1425,9 @@ export const translations = {
       dividendsCard: {
         eyebrow: 'History',
         title: 'Dividends received',
-        description: 'Linked to holdings; included in portfolio yield calculations. Mirrors into the income ledger automatically.',
+        description: 'Linked to holdings and a destination bank account. Income reads these from Portfolio.',
         emptyTitle: 'No dividends tracked yet',
-        emptyDescription: 'Log a payout — it will also appear in the income module.',
+        emptyDescription: 'Log a payout to increase the selected bank account and portfolio dividend totals.',
       },
       tableHeaders: {
         ticker: 'Ticker',
@@ -1454,7 +1459,7 @@ export const translations = {
       },
       confirmDeleteDividend: {
         title: 'Delete dividend',
-        description: 'Remove the {ticker} dividend entry? This will also remove it from the income ledger.',
+        description: 'Remove the {ticker} dividend entry and reverse its bank movement?',
       },
       holdingModal: {
         eyebrow: 'Portfolio position',
@@ -2840,13 +2845,18 @@ export const translations = {
     portfolio: {
       eyebrow: 'Módulo',
       title: 'Cartera',
-      description: 'Posiciones, asignación, rendimiento — y dividendos que se reflejan automáticamente en el libro de ingresos.',
+      description: 'Posiciones, asignación, actividad y rendimiento con Cartera como fuente de verdad.',
       refreshPrices: 'Actualizar precios',
       refreshing: 'Actualizando… ({count} tickers, ~{mins} min)',
       newHolding: 'Nueva posición',
       addHolding: 'Añadir posición',
       addDividend: 'Añadir dividendo',
       sellAll: 'Vender todo',
+      views: {
+        holdings: 'Posiciones',
+        activity: 'Actividad',
+        performance: 'Rendimiento',
+      },
       kpiMarketValue: {
         label: 'Valor de mercado',
         hintHoldings: '{count} posiciones',
@@ -2942,9 +2952,9 @@ export const translations = {
       dividendsCard: {
         eyebrow: 'Historial',
         title: 'Dividendos recibidos',
-        description: 'Vinculados a posiciones; incluidos en los cálculos de rentabilidad de cartera. Se reflejan automáticamente en el libro de ingresos.',
+        description: 'Vinculados a posiciones y a una cuenta bancaria destino. Ingresos los lee desde Cartera.',
         emptyTitle: 'Sin dividendos registrados aún',
-        emptyDescription: 'Registra un pago — también aparecerá en el módulo de ingresos.',
+        emptyDescription: 'Registra un pago para aumentar la cuenta bancaria elegida y los totales de dividendos.',
       },
       tableHeaders: {
         ticker: 'Ticker',
@@ -2976,7 +2986,7 @@ export const translations = {
       },
       confirmDeleteDividend: {
         title: 'Eliminar dividendo',
-        description: '¿Eliminar la entrada de dividendo de {ticker}? También se eliminará del libro de ingresos.',
+        description: '¿Eliminar el dividendo de {ticker} y revertir su movimiento bancario?',
       },
       holdingModal: {
         eyebrow: 'Posición en cartera',

@@ -966,6 +966,7 @@ export default function PortfolioPage() {
   const [sellAllModal, setSellAllModal] = useState({ open: false, ticker: null });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
+  const [activeView, setActiveView] = useState('holdings');
   const editingHolding = holdings.find((item) => item.id === holdingModal.id);
   const editingDividend = dividends.find((item) => item.id === dividendModal.id);
   const editingSale = portfolioSales.find((item) => item.id === sellModal.saleId);
@@ -1229,6 +1230,11 @@ export default function PortfolioPage() {
   const salesPerformanceTotalCents = salesPerformanceSeries.at(-1)?.cumulativePnlCents || 0;
   const salesPerformanceActiveColor =
     salesPerformanceTotalCents < 0 ? 'var(--danger)' : 'var(--positive)';
+  const portfolioViews = [
+    { id: 'holdings', label: t('portfolio.views.holdings') },
+    { id: 'activity', label: t('portfolio.views.activity') },
+    { id: 'performance', label: t('portfolio.views.performance') },
+  ];
 
   const historicalColumns = [
     {
@@ -1337,6 +1343,26 @@ export default function PortfolioPage() {
         ))}
       </section>
 
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule">
+        {portfolioViews.map((view) => (
+          <button
+            key={view.id}
+            type="button"
+            className={cn(
+              'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+              activeView === view.id
+                ? 'border-accent text-ink'
+                : 'border-transparent text-ink-muted hover:text-ink',
+            )}
+            onClick={() => setActiveView(view.id)}
+          >
+            {view.label}
+          </button>
+        ))}
+      </div>
+
+      {activeView === 'holdings' ? (
+      <>
       <Card
         data-tour="portfolio-value-history"
         eyebrow={t('portfolio.valueChart.eyebrow')}
@@ -1515,6 +1541,8 @@ export default function PortfolioPage() {
           )}
         </Card>
       </section>
+      </>
+      ) : null}
 
       {/*
           <EmptyState
@@ -1530,6 +1558,7 @@ export default function PortfolioPage() {
       */}
 
       {/* historical performance */}
+      {activeView === 'activity' ? (
       <Card
         eyebrow={t('portfolio.historicalCard.eyebrow')}
         title={t('portfolio.historicalCard.title')}
@@ -1545,7 +1574,9 @@ export default function PortfolioPage() {
           />
         )}
       </Card>
+      ) : null}
 
+      {activeView === 'performance' ? (
       <Card
         eyebrow={t('portfolio.salesPerformanceCard.eyebrow')}
         title={t('portfolio.salesPerformanceCard.title')}
@@ -1615,8 +1646,10 @@ export default function PortfolioPage() {
           <EmptyState title={t('portfolio.salesPerformanceCard.emptyTitle')} description={t('portfolio.salesPerformanceCard.emptyDescription')} />
         )}
       </Card>
+      ) : null}
 
       {/* dividends */}
+      {activeView === 'activity' ? (
       <Card
         eyebrow={t('portfolio.dividendsCard.eyebrow')}
         title={t('portfolio.dividendsCard.title')}
@@ -1642,6 +1675,7 @@ export default function PortfolioPage() {
           />
         )}
       </Card>
+      ) : null}
 
       <Modal
         open={holdingModal.open}
@@ -1797,6 +1831,7 @@ export default function PortfolioPage() {
       >
         <DividendForm
           holdings={holdings}
+          bankAccounts={bankAccounts}
           initialValue={editingDividend}
           onSubmit={async (value) => {
             await saveDividend(value);

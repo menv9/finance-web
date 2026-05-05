@@ -287,6 +287,136 @@ describe('account-backed transaction saves', () => {
     expect(useFinanceStore.getState().derived.dashboard.totalIncomeCents).toBe(100000);
     expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(110000);
   });
+
+  it('sells a holding without creating hidden income and preserves realized losses', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{
+        id: 'hold-loss',
+        ticker: 'LOSS',
+        name: 'Loss Co',
+        quantity: 1,
+        averageBuyPriceCents: 10000,
+        currentPriceCents: 8000,
+        feeCents: 0,
+        currency: 'EUR',
+      }],
+    }));
+
+    const sale = await useFinanceStore.getState().sellHolding({
+      holdingId: 'hold-loss',
+      percent: 100,
+      salePriceCents: 8000,
+      feeCents: 0,
+      date: '2026-05-02',
+      bankAccountId: 'bank-a',
+    });
+
+    expect(sale.realizedPnlCents).toBe(-2000);
+    expect(useFinanceStore.getState().portfolioSales).toHaveLength(1);
+    expect(useFinanceStore.getState().portfolioCashflows).toHaveLength(1);
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(18000);
+  });
+
+  it('edits and deletes portfolio sales without leaving income records behind', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{
+        id: 'hold-sale',
+        ticker: 'EDIT',
+        name: 'Edit Co',
+        quantity: 2,
+        averageBuyPriceCents: 10000,
+        currentPriceCents: 10000,
+        feeCents: 0,
+        currency: 'EUR',
+      }],
+    }));
+
+    const sale = await useFinanceStore.getState().sellHolding({
+      holdingId: 'hold-sale',
+      percent: 50,
+      salePriceCents: 12000,
+      feeCents: 0,
+      date: '2026-05-02',
+      bankAccountId: 'bank-a',
+    });
+
+    await useFinanceStore.getState().updatePortfolioSale({
+      saleId: sale.id,
+      percent: 50,
+      salePriceCents: 9000,
+      feeCents: 0,
+      date: '2026-05-03',
+      bankAccountId: 'bank-a',
+    });
+
+    expect(useFinanceStore.getState().portfolioSales[0].realizedPnlCents).toBe(-1000);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(19000);
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+
+    await useFinanceStore.getState().removePortfolioSale(sale.id);
+
+    expect(useFinanceStore.getState().portfolioSales).toEqual([]);
+    expect(useFinanceStore.getState().portfolioCashflows).toEqual([]);
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(10000);
+  });
+
+  it('saves, edits, and deletes dividends as bank-backed portfolio records without income mirrors', async () => {
+    const dividend = await useFinanceStore.getState().saveDividend({
+      date: '2026-05-02',
+      amountCents: 1000,
+      currency: 'EUR',
+      ticker: 'DIV',
+      bankAccountId: 'bank-a',
+    });
+
+    expect(useFinanceStore.getState().dividends).toHaveLength(1);
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(11000);
+
+    await useFinanceStore.getState().saveDividend({
+      ...dividend,
+      amountCents: 1500,
+      bankAccountId: 'bank-a',
+    });
+
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(11500);
+
+    await useFinanceStore.getState().removeDividend(dividend.id);
+
+    expect(useFinanceStore.getState().dividends).toEqual([]);
+    expect(useFinanceStore.getState().incomes).toEqual([]);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(10000);
+  });
+
+  it('cleans up only generated portfolio income mirrors', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      dividends: [{ id: 'div-a', date: '2026-05-01', amountCents: 500, ticker: 'DIV', linkedIncomeId: 'inc-div' }],
+      portfolioSales: [{ id: 'sale-a', date: '2026-05-01', proceedsCents: 4000, realizedPnlCents: -1000, linkedIncomeId: 'inc-sale' }],
+      incomes: [
+        { id: 'inc-div', date: '2026-05-01', amountCents: 500, incomeKind: 'dividend' },
+        { id: 'inc-sale', date: '2026-05-01', amountCents: 0, incomeKind: 'portfolio_sale', linkedSaleId: 'sale-a' },
+        { id: 'inc-manual', date: '2026-05-01', amountCents: 700, incomeKind: 'variable', source: 'Manual' },
+      ],
+    }));
+
+    await useFinanceStore.getState().cleanupGeneratedPortfolioIncomes();
+
+    expect(useFinanceStore.getState().incomes).toEqual([
+      { id: 'inc-manual', date: '2026-05-01', amountCents: 700, incomeKind: 'variable', source: 'Manual' },
+    ]);
+    expect(useFinanceStore.getState().dividends[0].linkedIncomeId).toBeNull();
+    expect(useFinanceStore.getState().portfolioSales[0]).toMatchObject({
+      linkedIncomeId: null,
+      cashflowCents: 4000,
+      realizedPnlCents: -1000,
+    });
+  });
 });
 
 describe('portfolio price refresh', () => {

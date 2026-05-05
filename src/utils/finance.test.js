@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { computeDashboardData, computePortfolioMetrics, yearlySideIncome } from './finance';
+import { buildDividendIncomeRows, computeDashboardData, computeIncomeSeries, computePortfolioMetrics, yearlySideIncome } from './finance';
 
 describe('finance metrics', () => {
   it('computes portfolio totals and allocation weights', () => {
@@ -243,5 +243,52 @@ describe('finance metrics', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('counts portfolio dividends as derived income without counting portfolio sale proceeds', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-05T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [{ id: 'div-a', amountCents: 1200, date: '2026-05-02', ticker: 'DIV', bankAccountId: 'bank-main' }],
+        portfolioCashflows: [],
+        portfolioSales: [{ id: 'sale-a', date: '2026-05-02', proceedsCents: 100000, realizedPnlCents: -5000 }],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 101200 }],
+      });
+
+      expect(result.totalIncomeCents).toBe(1200);
+      expect(result.cashflowCents).toBe(1200);
+      expect(result.portfolioSaleCashflowCents).toBe(0);
+      expect(result.incomeSeries.at(-1).amountCents).toBe(1200);
+      expect(result.cashflowSeries.at(-1).incomeCents).toBe(1200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('builds read-only income rows from dividends for the income UI', () => {
+    const rows = buildDividendIncomeRows([
+      { id: 'div-a', amountCents: 1200, date: '2026-05-02', ticker: 'DIV', currency: 'EUR', bankAccountId: 'bank-a' },
+    ]);
+
+    expect(rows[0]).toMatchObject({
+      id: 'portfolio-dividend-div-a',
+      sourceId: 'div-a',
+      incomeKind: 'dividend',
+      ledgerType: 'portfolio-dividend',
+      accountingMonth: '2026-05',
+      amountCents: 1200,
+      bankAccountId: 'bank-a',
+      readOnly: true,
+    });
+    expect(computeIncomeSeries([], rows).at(-1).amountCents).toBe(1200);
   });
 });

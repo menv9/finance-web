@@ -7,13 +7,16 @@ const defaultValue = {
   amountCents: '',
   ticker: '',
   currency: 'EUR',
+  bankAccountId: '',
 };
 
-export function DividendForm({ holdings, initialValue, onSubmit, onCancel }) {
+export function DividendForm({ holdings, bankAccounts = [], initialValue, onSubmit, onCancel }) {
+  const defaultBankAccountId = initialValue?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
+    bankAccountId: initialValue?.bankAccountId || defaultBankAccountId,
   });
 
   const tickers = [...new Set(holdings.map((holding) => holding.ticker))];
@@ -81,6 +84,25 @@ export function DividendForm({ holdings, initialValue, onSubmit, onCancel }) {
           </Select>
         )}
       </FormField>
+
+      {bankAccounts.length ? (
+        <FormField label="Destination bank" htmlFor="dividend-bank" required className="md:col-span-2">
+          {(props) => (
+            <Select
+              {...props}
+              value={form.bankAccountId || defaultBankAccountId}
+              onChange={set('bankAccountId')}
+              required
+            >
+              {bankAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}{account.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+      ) : null}
 
       <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-rule">
         {onCancel ? (

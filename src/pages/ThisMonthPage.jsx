@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { buildDividendIncomeRows } from '../utils/finance';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, normalizeDateInput } from '../utils/dates';
 import { Card, Stat, EmptyState } from '../components/ui';
@@ -110,7 +111,7 @@ export default function ThisMonthPage() {
   const expenses = useFinanceStore((s) => s.expenses);
   const transfers = useFinanceStore((s) => s.transfers);
   const savingsEntries = useFinanceStore((s) => s.savingsEntries);
-  const portfolioSales = useFinanceStore((s) => s.portfolioSales);
+  const dividends = useFinanceStore((s) => s.dividends);
   const settings = useFinanceStore((s) => s.settings);
 
   const currency = settings.baseCurrency;
@@ -126,7 +127,8 @@ export default function ThisMonthPage() {
 
     // Exclude transfer incomes (savings withdrawals) — they affect balance but
     // should not inflate the monthly cashflow/income metrics.
-    const monthIncomes = incomes.filter(
+    const dividendIncomeRows = buildDividendIncomeRows(dividends);
+    const monthIncomes = [...incomes, ...dividendIncomeRows].filter(
       (e) =>
         (e.accountingMonth || e.date?.slice(0, 7)) === selectedMonth &&
         e.incomeKind !== 'transfer',
@@ -150,13 +152,8 @@ export default function ThisMonthPage() {
       .filter((e) => e.date?.startsWith(selectedMonth) && e.source !== 'allocation')
       .reduce((s, e) => s + (e.amountCents || 0), 0);
 
-    const saleCashflowCents = (portfolioSales || [])
-      .filter((sale) => sale.date?.slice(0, 7) === selectedMonth)
-      .reduce((acc, sale) => acc + Math.max((sale.proceedsCents || 0) - (sale.feeCents || 0), 0), 0);
-
     const cashflowCents =
       cashflowIncomeCents +
-      saleCashflowCents -
       expenseCents -
       distributedToPortfolioCents;
 
@@ -167,14 +164,14 @@ export default function ThisMonthPage() {
       savedCents: netSavedThisMonthCents,
       investedCents: distributedToPortfolioCents,
     };
-  }, [incomes, expenses, transfers, savingsEntries, portfolioSales, selectedMonth]);
+  }, [incomes, dividends, expenses, transfers, savingsEntries, selectedMonth]);
 
   // Combined activity log for the selected month
   const activityLog = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const rows = [];
 
-    incomes
+    [...incomes, ...buildDividendIncomeRows(dividends)]
       .filter(
         (e) =>
           (e.accountingMonth || e.date?.slice(0, 7)) === selectedMonth && e.date <= today,
@@ -217,7 +214,7 @@ export default function ThisMonthPage() {
       );
 
     return rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [incomes, expenses, transfers, selectedMonth]);
+  }, [incomes, dividends, expenses, transfers, selectedMonth]);
 
   // 12-month bar chart data + selected month highlight label
   const chartData = dashboard.cashflowSeries || [];

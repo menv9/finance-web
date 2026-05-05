@@ -191,34 +191,6 @@ function portfolioSnapshotId(timestamp = new Date().toISOString()) {
   return `psn-${timestamp.slice(0, 13)}`;
 }
 
-function buildDividendIncome(dividend, existingIncomeId) {
-  return {
-    id: existingIncomeId || dividend.linkedIncomeId || makeId('inc'),
-    date: dividend.date,
-    amountCents: dividend.amountCents,
-    currency: dividend.currency || 'EUR',
-    incomeKind: 'dividend',
-    source: `${dividend.ticker} dividend`,
-    assetTicker: dividend.ticker,
-  };
-}
-
-function buildPortfolioSaleIncome(sale, existingIncomeId, currency = 'EUR') {
-  const gainCents = Math.max(sale.realizedPnlCents || 0, 0);
-  return {
-    id: existingIncomeId || sale.linkedIncomeId || makeId('inc'),
-    date: sale.date,
-    accountingMonth: sale.date?.slice(0, 7),
-    amountCents: gainCents,
-    currency,
-    incomeKind: 'portfolio_sale',
-    source: `${sale.name || sale.ticker} sale`,
-    assetTicker: sale.ticker,
-    linkedSaleId: sale.id,
-    realizedPnlCents: sale.realizedPnlCents || 0,
-  };
-}
-
 function portfolioSaleCashflowCents(sale) {
   return Math.max(sale.proceedsCents || 0, 0);
 }
@@ -380,7 +352,7 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, dat
     costBasisCents,
     realizedPnlCents: proceedsCents - costBasisCents,
     cashflowCents: portfolioSaleCashflowCents({ proceedsCents, realizedPnlCents: proceedsCents - costBasisCents }),
-    linkedIncomeId: sale?.linkedIncomeId || null,
+    linkedIncomeId: null,
     bankAccountId: bankAccountId ?? sale?.bankAccountId ?? null,
     updatedAt: timestamp,
   }, timestamp);
@@ -516,6 +488,85 @@ function buildSettingsActivity(previousSettings, nextSettings, partial, summary 
   });
 }
 
+async function cleanupGeneratedPortfolioIncomesForState(get, set) {
+  const { portfolioSales, dividends, incomes } = get();
+  const timestamp = new Date().toISOString();
+  const dividendLinkedIncomeIds = new Set((dividends || []).map((item) => item.linkedIncomeId).filter(Boolean));
+  const saleLinkedIncomeIds = new Set((portfolioSales || []).map((item) => item.linkedIncomeId).filter(Boolean));
+  const incomeIdsToDelete = new Set(
+    (incomes || [])
+      .filter((income) =>
+        (income.incomeKind === 'portfolio_sale' && (income.linkedSaleId || saleLinkedIncomeIds.has(income.id))) ||
+        dividendLinkedIncomeIds.has(income.id)
+      )
+      .map((income) => income.id),
+  );
+  const salesToUpdate = (portfolioSales || [])
+    .filter((sale) => sale.linkedIncomeId || sale.cashflowCents !== portfolioSaleCashflowCents(sale))
+    .map((sale) => ensureEntitySyncFields({
+      ...sale,
+      linkedIncomeId: null,
+      cashflowCents: portfolioSaleCashflowCents(sale),
+      updatedAt: timestamp,
+    }, timestamp));
+  const dividendsToUpdate = (dividends || [])
+    .filter((dividend) => dividend.linkedIncomeId)
+    .map((dividend) => ensureEntitySyncFields({
+      ...dividend,
+      linkedIncomeId: null,
+      updatedAt: timestamp,
+    }, timestamp));
+
+  if (!incomeIdsToDelete.size && !salesToUpdate.length && !dividendsToUpdate.length) return;
+
+  await Promise.all([
+    ...[...incomeIdsToDelete].map((id) => deleteRecord('incomes', id)),
+    ...salesToUpdate.map((record) => putRecord('portfolioSales', record)),
+    ...dividendsToUpdate.map((record) => putRecord('dividends', record)),
+  ]);
+  set((state) => {
+    const deletedIncomeIds = new Set(incomeIdsToDelete);
+    const updatedSaleIds = new Set(salesToUpdate.map((sale) => sale.id));
+    const updatedDividendIds = new Set(dividendsToUpdate.map((dividend) => dividend.id));
+    const nextIncomes = state.incomes.filter((income) => !deletedIncomeIds.has(income.id));
+    const nextPortfolioSales = state.portfolioSales.map((sale) =>
+      updatedSaleIds.has(sale.id) ? salesToUpdate.find((item) => item.id === sale.id) : sale
+    );
+    const nextDividends = state.dividends.map((dividend) =>
+      updatedDividendIds.has(dividend.id) ? dividendsToUpdate.find((item) => item.id === dividend.id) : dividend
+    );
+    const nextDeletedRecords = {
+      ...state.syncMeta.deletedRecords,
+      incomes: [
+        ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => !deletedIncomeIds.has(item.id)),
+        ...[...deletedIncomeIds].map((id) => ({ id, updatedAt: timestamp, deletedAt: timestamp })),
+      ],
+      portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => !updatedSaleIds.has(item.id)),
+      dividends: (state.syncMeta.deletedRecords.dividends || []).filter((item) => !updatedDividendIds.has(item.id)),
+    };
+    const nextSyncMeta = {
+      ...state.syncMeta,
+      deletedRecords: nextDeletedRecords,
+      conflicts: state.syncMeta.conflicts.filter(
+        (item) =>
+          !deletedIncomeIds.has(item.id?.replace('incomes:', '')) &&
+          !updatedSaleIds.has(item.id?.replace('portfolioSales:', '')) &&
+          !updatedDividendIds.has(item.id?.replace('dividends:', '')),
+      ),
+    };
+    saveSyncMeta(nextSyncMeta);
+    const nextState = {
+      ...state,
+      incomes: nextIncomes,
+      portfolioSales: nextPortfolioSales,
+      dividends: nextDividends,
+      syncMeta: nextSyncMeta,
+    };
+    return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+  });
+  if (typeof get().triggerAutoPush === 'function') get().triggerAutoPush();
+}
+
 async function persistActivityLogs(set, logs) {
   if (!logs?.length) return [];
   await Promise.all(logs.map((log) => putRecord('activityLog', log)));
@@ -630,7 +681,7 @@ export const useFinanceStore = create((set, get) => ({
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
-    await get().ensurePortfolioSaleIncomes();
+    await cleanupGeneratedPortfolioIncomesForState(get, set);
   },
 
   bootstrap: async () => {
@@ -671,7 +722,7 @@ export const useFinanceStore = create((set, get) => ({
       syncMeta,
     };
     set({ ...nextState, derived: buildDerived(nextState) });
-    await get().ensurePortfolioSaleIncomes();
+    await cleanupGeneratedPortfolioIncomesForState(get, set);
     await get().autoCreateFixedExpenses();
     await get().initializeSupabase();
     set({ hydrated: true });
@@ -1332,8 +1383,7 @@ export const useFinanceStore = create((set, get) => ({
       nativeSale, nativeCashflow,
       holding.currency, get().fxRates || {}, baseCurrency,
     );
-    const income = ensureEntitySyncFields(buildPortfolioSaleIncome(rawSale, null, baseCurrency), timestamp);
-    const sale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+    const sale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: null, updatedAt: timestamp }, timestamp);
     const bankAccountAdjustments = new Map();
     if (sale.bankAccountId && sale.proceedsCents) {
       bankAccountAdjustments.set(sale.bankAccountId, sale.proceedsCents);
@@ -1343,7 +1393,6 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('holdings', nextHolding);
     await putRecord('portfolioSales', sale);
     await putRecord('portfolioCashflows', cashflow);
-    await putRecord('incomes', income);
     await Promise.all(
       adjustedBankAccounts
         .filter((account) => bankAccountAdjustments.has(account.id))
@@ -1354,14 +1403,12 @@ export const useFinanceStore = create((set, get) => ({
       const nextHoldings = upsertItem(state.holdings, nextHolding);
       const nextPortfolioSales = upsertItem(state.portfolioSales, sale);
       const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, cashflow);
-      const nextIncomes = upsertItem(state.incomes, income);
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
         portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
         portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
-        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
         ...(bankAccountAdjustments.size
           ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
           : {}),
@@ -1374,7 +1421,6 @@ export const useFinanceStore = create((set, get) => ({
             item.id !== `holdings:${nextHolding.id}` &&
             item.id !== `portfolioSales:${sale.id}` &&
             item.id !== `portfolioCashflows:${cashflow.id}` &&
-            item.id !== `incomes:${income.id}` &&
             (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
@@ -1384,14 +1430,12 @@ export const useFinanceStore = create((set, get) => ({
         holdings: nextHoldings,
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
-        incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
       };
       return {
         holdings: nextHoldings,
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
-        incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
@@ -1402,7 +1446,6 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName: 'holdings', action: 'update', before: holding, after: nextHolding }),
       buildActivityLog({ storeName: 'portfolioSales', action: 'create', before: null, after: sale }),
       buildActivityLog({ storeName: 'portfolioCashflows', action: 'create', before: null, after: cashflow }),
-      buildActivityLog({ storeName: 'incomes', action: 'create', before: null, after: income }),
     ]);
     get().triggerAutoPush();
     return sale;
@@ -1447,11 +1490,7 @@ export const useFinanceStore = create((set, get) => ({
       nativeRawSale, nativeNextCashflow,
       holding.currency, get().fxRates || {}, baseCurrencyUpd,
     );
-    const income = ensureEntitySyncFields(
-      buildPortfolioSaleIncome(rawSale, currentSale.linkedIncomeId, baseCurrencyUpd),
-      timestamp,
-    );
-    const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp);
+    const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: null, updatedAt: timestamp }, timestamp);
     const bankAccountAdjustments = new Map();
     if (currentSale.bankAccountId && currentSale.proceedsCents) {
       bankAccountAdjustments.set(
@@ -1470,7 +1509,7 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('holdings', nextHolding);
     await putRecord('portfolioSales', nextSale);
     await putRecord('portfolioCashflows', nextCashflow);
-    await putRecord('incomes', income);
+    if (currentIncome) await deleteRecord('incomes', currentIncome.id);
     await Promise.all(
       adjustedBankAccounts
         .filter((account) => bankAccountAdjustments.has(account.id))
@@ -1481,14 +1520,21 @@ export const useFinanceStore = create((set, get) => ({
       const nextHoldings = upsertItem(state.holdings, nextHolding);
       const nextPortfolioSales = upsertItem(state.portfolioSales, nextSale);
       const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, nextCashflow);
-      const nextIncomes = upsertItem(state.incomes, income);
+      const nextIncomes = currentIncome
+        ? state.incomes.filter((item) => item.id !== currentIncome.id)
+        : state.incomes;
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
         portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== nextSale.id),
         portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== nextCashflow.id),
-        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
+        incomes: currentIncome
+          ? [
+              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== currentIncome.id),
+              { id: currentIncome.id, updatedAt: timestamp, deletedAt: timestamp },
+            ]
+          : state.syncMeta.deletedRecords.incomes || [],
         ...(bankAccountAdjustments.size
           ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
           : {}),
@@ -1501,7 +1547,7 @@ export const useFinanceStore = create((set, get) => ({
             item.id !== `holdings:${nextHolding.id}` &&
             item.id !== `portfolioSales:${nextSale.id}` &&
             item.id !== `portfolioCashflows:${nextCashflow.id}` &&
-            item.id !== `incomes:${income.id}` &&
+            item.id !== `incomes:${currentIncome?.id}` &&
             (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
@@ -1529,7 +1575,7 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName: 'holdings', action: 'update', before: holding, after: nextHolding }),
       buildActivityLog({ storeName: 'portfolioSales', action: 'update', before: currentSale, after: nextSale }),
       buildActivityLog({ storeName: 'portfolioCashflows', action: currentCashflow ? 'update' : 'create', before: currentCashflow || null, after: nextCashflow }),
-      buildActivityLog({ storeName: 'incomes', action: currentIncome ? 'update' : 'create', before: currentIncome || null, after: income }),
+      ...(currentIncome ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: currentIncome, after: null })] : []),
     ]);
     get().triggerAutoPush();
     return nextSale;
@@ -1644,80 +1690,8 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
-  ensurePortfolioSaleIncomes: async () => {
-    const { portfolioSales, incomes, settings } = get();
-    const timestamp = new Date().toISOString();
-    const toPut = [];
-
-    for (const sale of portfolioSales) {
-      const saleWithCashflow = {
-        ...sale,
-        cashflowCents: portfolioSaleCashflowCents(sale),
-      };
-      const existingIncome = sale.linkedIncomeId
-        ? incomes.find((item) => item.id === sale.linkedIncomeId)
-        : incomes.find((item) => item.linkedSaleId === sale.id);
-      if (existingIncome) {
-        const updatedIncome = ensureEntitySyncFields(
-          buildPortfolioSaleIncome(saleWithCashflow, existingIncome.id, settings.baseCurrency),
-          timestamp,
-        );
-        if (
-          existingIncome.amountCents !== updatedIncome.amountCents ||
-          existingIncome.date !== updatedIncome.date ||
-          existingIncome.currency !== updatedIncome.currency ||
-          existingIncome.incomeKind !== updatedIncome.incomeKind ||
-          existingIncome.source !== updatedIncome.source ||
-          existingIncome.linkedSaleId !== updatedIncome.linkedSaleId ||
-          existingIncome.realizedPnlCents !== updatedIncome.realizedPnlCents
-        ) {
-          toPut.push({ storeName: 'incomes', record: updatedIncome });
-        }
-        if (sale.linkedIncomeId !== existingIncome.id || sale.cashflowCents !== saleWithCashflow.cashflowCents) {
-          toPut.push({
-            storeName: 'portfolioSales',
-            record: ensureEntitySyncFields({
-              ...saleWithCashflow,
-              linkedIncomeId: existingIncome.id,
-              updatedAt: timestamp,
-            }, timestamp),
-          });
-        }
-        continue;
-      }
-
-      const income = ensureEntitySyncFields(
-        buildPortfolioSaleIncome(saleWithCashflow, null, settings.baseCurrency),
-        timestamp,
-      );
-      toPut.push({ storeName: 'incomes', record: income });
-      toPut.push({
-        storeName: 'portfolioSales',
-        record: ensureEntitySyncFields({ ...saleWithCashflow, linkedIncomeId: income.id, updatedAt: timestamp }, timestamp),
-      });
-    }
-
-    if (!toPut.length) return;
-
-    await Promise.all(toPut.map(({ storeName, record }) => putRecord(storeName, record)));
-    set((state) => {
-      let nextState = { ...state };
-      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
-      let nextConflicts = state.syncMeta.conflicts;
-      for (const { storeName, record } of toPut) {
-        nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], record) };
-        nextDeletedRecords[storeName] = (nextDeletedRecords[storeName] || []).filter((item) => item.id !== record.id);
-        nextConflicts = nextConflicts.filter((item) => item.id !== `${storeName}:${record.id}`);
-      }
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: nextConflicts,
-      };
-      saveSyncMeta(nextSyncMeta);
-      return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
-    });
-    get().triggerAutoPush();
+  cleanupGeneratedPortfolioIncomes: async () => {
+    await cleanupGeneratedPortfolioIncomesForState(get, set);
   },
 
   saveFixedExpense: async (entity) => get().saveEntity('fixedExpenses', entity),
@@ -1809,38 +1783,70 @@ export const useFinanceStore = create((set, get) => ({
     const prefix = 'div';
     const current = entity.id ? get().dividends.find((item) => item.id === entity.id) : null;
     const currentIncome = current?.linkedIncomeId ? get().incomes.find((item) => item.id === current.linkedIncomeId) : null;
-    const linkedIncome = buildDividendIncome(entity, current?.linkedIncomeId);
+    if ((get().bankAccounts || []).length && !entity.bankAccountId) {
+      throw new Error('Select a destination bank account for this dividend.');
+    }
     const timestamp = new Date().toISOString();
     const record = ensureEntitySyncFields({
       ...entity,
       id: entity.id || makeId(prefix),
-      linkedIncomeId: linkedIncome.id,
+      linkedIncomeId: null,
     }, timestamp);
-    const syncedIncome = ensureEntitySyncFields(linkedIncome, timestamp);
+    const bankAccountAdjustments = new Map();
+    if (current?.bankAccountId && current.amountCents) {
+      bankAccountAdjustments.set(current.bankAccountId, -Math.abs(current.amountCents || 0));
+    }
+    if (record.bankAccountId && record.amountCents) {
+      bankAccountAdjustments.set(
+        record.bankAccountId,
+        (bankAccountAdjustments.get(record.bankAccountId) || 0) + Math.abs(record.amountCents || 0),
+      );
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
     await putRecord('dividends', record);
-    await putRecord('incomes', syncedIncome);
+    if (currentIncome) await deleteRecord('incomes', currentIncome.id);
+    await Promise.all(
+      adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    );
 
     set((state) => {
       const nextDividends = upsertItem(state.dividends, record);
-      const nextIncomes = upsertItem(state.incomes, syncedIncome);
+      const nextIncomes = currentIncome
+        ? state.incomes.filter((income) => income.id !== currentIncome.id)
+        : state.incomes;
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         dividends: (state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== record.id),
-        incomes: (state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== syncedIncome.id),
+        incomes: currentIncome
+          ? [
+              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== currentIncome.id),
+              { id: currentIncome.id, updatedAt: timestamp, deletedAt: timestamp },
+            ]
+          : state.syncMeta.deletedRecords.incomes || [],
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
         deletedRecords: nextDeletedRecords,
         conflicts: state.syncMeta.conflicts.filter(
-          (item) => item.id !== `dividends:${record.id}` && item.id !== `incomes:${syncedIncome.id}`,
+          (item) =>
+            item.id !== `dividends:${record.id}` &&
+            item.id !== `incomes:${currentIncome?.id}` &&
+            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes };
+      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes, bankAccounts: nextBankAccounts };
       return {
         dividends: nextDividends,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
@@ -1848,7 +1854,7 @@ export const useFinanceStore = create((set, get) => ({
 
     await persistActivityLogs(set, [
       buildActivityLog({ storeName: 'dividends', action: current ? 'update' : 'create', before: current, after: record }),
-      buildActivityLog({ storeName: 'incomes', action: currentIncome ? 'update' : 'create', before: currentIncome, after: syncedIncome }),
+      ...(currentIncome ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: currentIncome, after: null })] : []),
     ]);
     get().triggerAutoPush();
     return record;
@@ -1897,29 +1903,47 @@ export const useFinanceStore = create((set, get) => ({
     if (current.linkedIncomeId) {
       await deleteRecord('incomes', current.linkedIncomeId);
     }
+    const timestamp = new Date().toISOString();
+    const bankAccountAdjustments = new Map();
+    if (current.bankAccountId && current.amountCents) {
+      bankAccountAdjustments.set(current.bankAccountId, -Math.abs(current.amountCents || 0));
+    }
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
+    await Promise.all(
+      adjustedBankAccounts
+        .filter((account) => bankAccountAdjustments.has(account.id))
+        .map((account) => putRecord('bankAccounts', account)),
+    );
     set((state) => {
       const nextDividends = state.dividends.filter((item) => item.id !== id);
       const nextIncomes = current.linkedIncomeId ? state.incomes.filter((item) => item.id !== current.linkedIncomeId) : state.incomes;
-      const timestamp = new Date().toISOString();
+      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
       const nextDeletedRecords = {
         ...state.syncMeta.deletedRecords,
         dividends: [...(state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== id), { id, updatedAt: timestamp, deletedAt: timestamp }],
         incomes: current.linkedIncomeId
           ? [...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== current.linkedIncomeId), { id: current.linkedIncomeId, updatedAt: timestamp, deletedAt: timestamp }]
           : state.syncMeta.deletedRecords.incomes || [],
+        ...(bankAccountAdjustments.size
+          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
+          : {}),
       };
       const nextSyncMeta = {
         ...state.syncMeta,
         deletedRecords: nextDeletedRecords,
         conflicts: state.syncMeta.conflicts.filter(
-          (item) => item.id !== `dividends:${id}` && item.id !== `incomes:${current.linkedIncomeId}`,
+          (item) =>
+            item.id !== `dividends:${id}` &&
+            item.id !== `incomes:${current.linkedIncomeId}` &&
+            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
         ),
       };
       saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes };
+      const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes, bankAccounts: nextBankAccounts };
       return {
         dividends: nextDividends,
         incomes: nextIncomes,
+        bankAccounts: nextBankAccounts,
         syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };

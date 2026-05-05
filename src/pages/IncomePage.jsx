@@ -20,7 +20,7 @@ import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
 import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
+import { buildDividendIncomeRows, computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
@@ -56,10 +56,6 @@ function Pagination({ page, totalPages, onPrev, onNext, t }) {
       </button>
     </div>
   );
-}
-
-function saleCashflowCents(sale) {
-  return Math.max(sale.proceedsCents || 0, 0);
 }
 
 function incomeReportMonth(row) {
@@ -213,7 +209,7 @@ function IncomeLedgerList({
 export default function IncomePage() {
   const { t, locale } = useTranslation();
   const incomes = useFinanceStore((state) => state.incomes);
-  const portfolioSales = useFinanceStore((state) => state.portfolioSales);
+  const dividends = useFinanceStore((state) => state.dividends);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
@@ -311,23 +307,14 @@ export default function IncomePage() {
     },
   ];
 
+  const dividendIncomeRows = useMemo(() => buildDividendIncomeRows(dividends), [dividends]);
+
   const incomeLedgerRows = useMemo(
     () => [
       ...incomes.filter(isReceivedIncome).map((income) => ({ ...income, ledgerType: 'income' })),
-      ...(portfolioSales || [])
-        .map((sale) => ({
-          id: `portfolio-sale-cashflow-${sale.id}`,
-          date: sale.date,
-          source: `${sale.ticker} sale cashflow`,
-          incomeKind: 'portfolio_sale_cashflow',
-          amountCents: sale.cashflowCents ?? saleCashflowCents(sale),
-          currency,
-          assetTicker: `Returned capital - ${sale.ticker}`,
-          ledgerType: 'portfolio-sale-cashflow',
-        }))
-        .filter((row) => row.amountCents > 0),
+      ...dividendIncomeRows,
     ],
-    [currency, incomes, portfolioSales],
+    [dividendIncomeRows, incomes],
   );
 
   const fixedSchedules = useMemo(
@@ -401,7 +388,7 @@ export default function IncomePage() {
   };
 
   const sourceBreakdown = useMemo(() => {
-    const portfolioKinds = new Set(['dividend', 'portfolio_sale', 'portfolio_sale_cashflow']);
+    const portfolioKinds = new Set(['dividend']);
     const totals = selectedMonthRows.reduce((acc, i) => {
       const key = portfolioKinds.has(i.incomeKind) ? 'Holdings' : i.source;
       acc[key] = (acc[key] || 0) + i.amountCents;
@@ -484,7 +471,7 @@ export default function IncomePage() {
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
         <Card data-tour="income-chart" eyebrow={t('income.chartCard.eyebrow')} title={t('income.chartCard.title')} variant="chart" className="lg:col-span-8">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={computeIncomeSeries(incomes)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={computeIncomeSeries(incomes, dividendIncomeRows)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis
@@ -581,8 +568,6 @@ export default function IncomePage() {
               <option value="variable">{t('income.ledgerCard.kindVariable')}</option>
               <option value="fixed_payment">{t('income.ledgerCard.kindFixedPayment')}</option>
               <option value="dividend">{t('income.ledgerCard.kindDividend')}</option>
-              <option value="portfolio_sale">{t('income.ledgerCard.kindPortfolioSale')}</option>
-              <option value="portfolio_sale_cashflow">{t('income.ledgerCard.kindPortfolioSaleCashflow')}</option>
             </Select>
           </FormField>
           <FormField label={t('income.ledgerCard.sourceLabel')} htmlFor="income-source">

@@ -12,6 +12,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { buildDividendIncomeRows } from '../utils/finance';
 import { exportElementToPdf } from '../utils/pdf';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
@@ -141,6 +142,7 @@ export default function DashboardPage() {
   const settings = useFinanceStore((state) => state.settings);
   const expenses = useFinanceStore((state) => state.expenses);
   const incomes = useFinanceStore((state) => state.incomes);
+  const dividends = useFinanceStore((state) => state.dividends);
 
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
@@ -182,7 +184,7 @@ export default function DashboardPage() {
       date: e.date,
       direction: 'out',
     }));
-    const incomeRows = incomes.map((i) => ({
+    const incomeRows = [...incomes, ...buildDividendIncomeRows(dividends)].map((i) => ({
       id: i.id,
       type: 'income',
       label: i.source || 'Income',
@@ -196,7 +198,7 @@ export default function DashboardPage() {
       .filter((item) => item.date <= today)
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 8);
-  }, [expenses, incomes]);
+  }, [dividends, expenses, incomes]);
 
   const upcoming = dashboard.upcomingEvents || [];
 
