@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, HandCoins, SendHorizonal, X } from 'lucide-react';
+
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Modal, Skeleton } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -195,18 +196,27 @@ function AcceptPaymentModal({ entry, open, onClose }) {
 
 // ── Send payment modal ────────────────────────────────────────────────────────
 
-function SendPaymentModal({ open, onClose }) {
+function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCents = 0 }) {
   const { t } = useTranslation();
   const friends = useFinanceStore((s) => s.friends);
   const sendPayment = useFinanceStore((s) => s.sendPayment);
   const settings = useFinanceStore((s) => s.settings);
   const currency = settings.currency || 'EUR';
 
-  const [friendId, setFriendId] = useState('');
-  const [amount, setAmount] = useState('');
+  const [friendId, setFriendId] = useState(prefillFriendId);
+  const [amount, setAmount] = useState(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setFriendId(prefillFriendId);
+      setAmount(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
+      setError('');
+      setBusy(false);
+    }
+  }, [open, prefillFriendId, prefillAmountCents]);
 
   function reset() { setFriendId(''); setAmount(''); setNote(''); setError(''); setBusy(false); }
   function handleClose() { reset(); onClose(); }
@@ -361,7 +371,7 @@ function CreateIOUModal({ open, onClose }) {
 
 // ── IOU row (manual IOUs) ─────────────────────────────────────────────────────
 
-function LedgerRow({ entry, currentUserId, onSettleClick, onCancel }) {
+function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const iAmCreditor = entry.creditor_id === currentUserId;
@@ -389,6 +399,11 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onCancel }) {
         </span>
         {isPending && (
           <div className="flex gap-1.5">
+            {!iAmCreditor && (
+              <Button size="xs" variant="ghost" onClick={() => onSendPayment(entry)} disabled={busy} title={t('friendsMoney.payment.sendTitle')}>
+                <SendHorizonal size={13} />
+              </Button>
+            )}
             <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} disabled={busy} title={t('friendsMoney.settle.title')}>
               <Check size={13} />
             </Button>
@@ -447,7 +462,7 @@ export default function FriendsMoneyPage() {
 
   const [tab, setTab] = useState('oweYou');
   const [createOpen, setCreateOpen] = useState(false);
-  const [sendOpen, setSendOpen] = useState(false);
+  const [sendEntry, setSendEntry] = useState(null);
   const [settleEntry, setSettleEntry] = useState(null);
   const [acceptEntry, setAcceptEntry] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -478,16 +493,10 @@ export default function FriendsMoneyPage() {
         description={t('friendsMoney.description')}
         actions={
           supabaseUser && (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setSendOpen(true)}>
-                <SendHorizonal size={15} className="mr-1.5" />
-                {t('friendsMoney.payment.sendTitle')}
-              </Button>
-              <Button onClick={() => setCreateOpen(true)}>
-                <HandCoins size={15} className="mr-1.5" />
-                {t('friendsMoney.createIOU')}
-              </Button>
-            </div>
+            <Button onClick={() => setCreateOpen(true)}>
+              <HandCoins size={15} className="mr-1.5" />
+              {t('friendsMoney.createIOU')}
+            </Button>
           )
         }
       />
@@ -548,6 +557,7 @@ export default function FriendsMoneyPage() {
                 entry={entry}
                 currentUserId={uid}
                 onSettleClick={setSettleEntry}
+                onSendPayment={setSendEntry}
                 onCancel={cancelLedgerEntry}
               />
             ))}
@@ -556,7 +566,12 @@ export default function FriendsMoneyPage() {
       )}
 
       <CreateIOUModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      <SendPaymentModal open={sendOpen} onClose={() => setSendOpen(false)} />
+      <SendPaymentModal
+        open={!!sendEntry}
+        onClose={() => setSendEntry(null)}
+        prefillFriendId={sendEntry?.creditor_id ?? ''}
+        prefillAmountCents={sendEntry?.amount_cents ?? 0}
+      />
       <SettleModal entry={settleEntry} currentUserId={uid} open={!!settleEntry} onClose={() => setSettleEntry(null)} />
       <AcceptPaymentModal entry={acceptEntry} open={!!acceptEntry} onClose={() => setAcceptEntry(null)} />
     </div>
