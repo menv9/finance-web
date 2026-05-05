@@ -3541,4 +3541,27 @@ export const useFinanceStore = create((set, get) => ({
     }));
   },
 
+  createMoneyRequest: async ({ friendId, amountCents, currency = 'EUR', note = '' }) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const entry = await apiCreateLedgerEntry({
+      creditorId: user.id,
+      debtorId: friendId,
+      amountCents,
+      currency,
+      kind: 'request',
+      note,
+      createdBy: user.id,
+    });
+    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
+    return entry;
+  },
+
+  rejectRequest: async (entryId) => {
+    const updated = await apiRejectLedgerEntry(entryId);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
+  },
+
 }));

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Check, HandCoins, SendHorizonal, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Check, HandCoins, SendHorizonal, X, BellDot } from 'lucide-react';
 
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Modal, Skeleton } from '../components/ui';
@@ -393,15 +394,103 @@ function CreateIOUModal({ open, onClose }) {
   );
 }
 
-// ── IOU row (manual IOUs) ─────────────────────────────────────────────────────
+// ── Create money request modal ────────────────────────────────────────────────
 
-function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel }) {
+function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
+  const { t } = useTranslation();
+  const friends = useFinanceStore((s) => s.friends);
+  const createMoneyRequest = useFinanceStore((s) => s.createMoneyRequest);
+  const settings = useFinanceStore((s) => s.settings);
+  const currency = settings.currency || 'EUR';
+
+  const [friendId, setFriendId] = useState(prefillFriendId);
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setFriendId(prefillFriendId);
+      setAmount('');
+      setNote('');
+      setError('');
+      setBusy(false);
+    }
+  }, [open, prefillFriendId]);
+
+  function handleClose() { onClose(); }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    const cents = Math.round(parseFloat(amount) * 100);
+    if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
+    if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
+    setBusy(true);
+    try {
+      await createMoneyRequest({ friendId, amountCents: cents, currency, note: note.trim() });
+      handleClose();
+    } catch (err) {
+      setError(err.message || 'Something went wrong.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title={t('friendsMoney.request.createTitle')} size="sm">
+      <form onSubmit={handleSubmit} className="grid gap-4 pt-1">
+        <FormField label={t('friendsMoney.form.friend')}>
+          <select
+            className="w-full rounded-md border border-rule bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+            value={friendId}
+            onChange={(e) => setFriendId(e.target.value)}
+          >
+            <option value="">{t('friendsMoney.form.selectFriend')}</option>
+            {friends.map((f) => (
+              <option key={f.otherId} value={f.otherId}>
+                {f.profile?.display_name || f.profile?.username || f.otherId}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label={t('friendsMoney.form.amount')}>
+          <Input
+            type="number" min="0.01" step="0.01" placeholder="0.00"
+            value={amount} onChange={(e) => setAmount(e.target.value)}
+          />
+        </FormField>
+
+        <FormField label={t('friendsMoney.form.note')}>
+          <Input
+            type="text" placeholder={t('friendsMoney.form.notePlaceholder')}
+            value={note} onChange={(e) => setNote(e.target.value)} maxLength={200}
+          />
+        </FormField>
+
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
+          <Button type="submit" disabled={busy}>
+            {busy ? t('common.loading') : t('friendsMoney.request.send')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ── IOU / request row ──────────────────────────────────────────────────────────
+
+function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel, onReject }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const iAmCreditor = entry.creditor_id === currentUserId;
   const counterpart = iAmCreditor ? entry.debtor : entry.creditor;
   const isPending = entry.status === 'pending';
   const isCreator = entry.created_by === currentUserId;
+  const isRequest = entry.kind === 'request';
   const date = new Date(entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
   async function handleCancel() {
@@ -409,11 +498,23 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
     try { await onCancel(entry.id); } finally { setBusy(false); }
   }
 
+  async function handleReject() {
+    setBusy(true);
+    try { await onReject(entry.id); } finally { setBusy(false); }
+  }
+
   return (
     <li className="flex items-start gap-3 py-3 border-b border-rule last:border-0">
       <Avatar profile={counterpart} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-ink font-medium truncate">{displayName(counterpart)}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm text-ink font-medium truncate">{displayName(counterpart)}</p>
+          {isRequest && (
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-accent border border-accent/40 rounded-full px-1.5 py-0.5 leading-none">
+              {t('friendsMoney.request.badge')}
+            </span>
+          )}
+        </div>
         {entry.note && <p className="text-xs text-ink-muted truncate">{entry.note}</p>}
         <p className="text-xs text-ink-muted">{date}</p>
       </div>
@@ -436,7 +537,17 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
             <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} disabled={busy} title={t('friendsMoney.settle.title')}>
               <Check size={13} />
             </Button>
-            {isCreator && (
+            {isRequest && !iAmCreditor && (
+              <Button size="xs" variant="ghost" onClick={handleReject} disabled={busy} title={t('friendsMoney.request.decline')}>
+                <X size={13} />
+              </Button>
+            )}
+            {!isRequest && isCreator && (
+              <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
+                <X size={13} />
+              </Button>
+            )}
+            {isRequest && iAmCreditor && (
               <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
                 <X size={13} />
               </Button>
@@ -479,7 +590,7 @@ function IncomingPaymentRow({ entry, onAcceptClick }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-const TABS = ['oweYou', 'youOwe', 'incoming', 'history'];
+const TABS = ['oweYou', 'youOwe', 'requests', 'incoming', 'history'];
 
 export default function FriendsMoneyPage() {
   const { t } = useTranslation();
@@ -487,10 +598,14 @@ export default function FriendsMoneyPage() {
   const friendLedger = useFinanceStore((s) => s.friendLedger);
   const loadFriendLedger = useFinanceStore((s) => s.loadFriendLedger);
   const cancelLedgerEntry = useFinanceStore((s) => s.cancelLedgerEntry);
+  const rejectRequest = useFinanceStore((s) => s.rejectRequest);
   const settings = useFinanceStore((s) => s.settings);
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState('oweYou');
   const [createOpen, setCreateOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestPrefillFriend, setRequestPrefillFriend] = useState('');
   const [sendEntry, setSendEntry] = useState(null);
   const [settleEntry, setSettleEntry] = useState(null);
   const [acceptEntry, setAcceptEntry] = useState(null);
@@ -500,19 +615,33 @@ export default function FriendsMoneyPage() {
     loadFriendLedger().finally(() => setLoading(false));
   }, [loadFriendLedger]);
 
+  // Handle ?requestFriend= deep-link from FriendsPage
+  useEffect(() => {
+    const friendId = searchParams.get('requestFriend');
+    if (friendId) {
+      setRequestPrefillFriend(friendId);
+      setRequestOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const uid = supabaseUser?.id;
   const currency = settings.currency || 'EUR';
 
-  const oweYouEntries  = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind !== 'payment');
-  const youOweEntries  = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending');
+  // "They owe me" — manual IOUs or requests where I'm creditor (excl. payments)
+  const oweYouEntries   = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind !== 'payment');
+  // "I owe" — manual IOUs only (requests get their own tab)
+  const youOweEntries   = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending' && e.kind !== 'request');
+  // Incoming money requests — someone asking me to pay them
+  const requestEntries  = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending' && e.kind === 'request');
   const incomingEntries = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind === 'payment');
-  const historyEntries = friendLedger.filter((e) => e.status !== 'pending');
+  const historyEntries  = friendLedger.filter((e) => e.status !== 'pending');
 
-  const tabEntries = { oweYou: oweYouEntries, youOwe: youOweEntries, incoming: incomingEntries, history: historyEntries };
+  const tabEntries = { oweYou: oweYouEntries, youOwe: youOweEntries, requests: requestEntries, incoming: incomingEntries, history: historyEntries };
   const entries = tabEntries[tab] || [];
 
   const oweYouTotal = oweYouEntries.reduce((s, e) => s + e.amount_cents, 0);
-  const youOweTotal = youOweEntries.reduce((s, e) => s + e.amount_cents, 0);
+  const youOweTotal = [...youOweEntries, ...requestEntries].reduce((s, e) => s + e.amount_cents, 0);
 
   return (
     <div>
@@ -522,10 +651,16 @@ export default function FriendsMoneyPage() {
         description={t('friendsMoney.description')}
         actions={
           supabaseUser && (
-            <Button onClick={() => setCreateOpen(true)}>
-              <HandCoins size={15} className="mr-1.5" />
-              {t('friendsMoney.createIOU')}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setRequestOpen(true)}>
+                <BellDot size={15} className="mr-1.5" />
+                {t('friendsMoney.request.create')}
+              </Button>
+              <Button onClick={() => setCreateOpen(true)}>
+                <HandCoins size={15} className="mr-1.5" />
+                {t('friendsMoney.createIOU')}
+              </Button>
+            </div>
           )
         }
       />
@@ -543,13 +678,13 @@ export default function FriendsMoneyPage() {
         </div>
       )}
 
-      <div className="flex gap-1 mb-4 border-b border-rule">
+      <div className="flex gap-1 mb-4 border-b border-rule overflow-x-auto">
         {TABS.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`relative px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`relative shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === key ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
             }`}
           >
@@ -557,6 +692,11 @@ export default function FriendsMoneyPage() {
             {key === 'incoming' && incomingEntries.length > 0 && (
               <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-accent text-accent-ink text-[10px] font-bold w-4 h-4">
                 {incomingEntries.length}
+              </span>
+            )}
+            {key === 'requests' && requestEntries.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-danger text-white text-[10px] font-bold w-4 h-4">
+                {requestEntries.length}
               </span>
             )}
           </button>
@@ -588,6 +728,7 @@ export default function FriendsMoneyPage() {
                 onSettleClick={setSettleEntry}
                 onSendPayment={setSendEntry}
                 onCancel={cancelLedgerEntry}
+                onReject={rejectRequest}
               />
             ))}
           </ul>
@@ -595,6 +736,7 @@ export default function FriendsMoneyPage() {
       )}
 
       <CreateIOUModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateRequestModal open={requestOpen} onClose={() => { setRequestOpen(false); setRequestPrefillFriend(''); }} prefillFriendId={requestPrefillFriend} />
       <SendPaymentModal
         open={!!sendEntry}
         onClose={() => setSendEntry(null)}

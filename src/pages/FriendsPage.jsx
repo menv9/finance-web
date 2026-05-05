@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, Input } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -50,6 +51,7 @@ function FriendsList() {
   const { t } = useTranslation();
   const friends = useFinanceStore((s) => s.friends);
   const removeFriend = useFinanceStore((s) => s.removeFriend);
+  const navigate = useNavigate();
   const [busyId, setBusyId] = useState(null);
 
   if (!friends.length) {
@@ -62,17 +64,27 @@ function FriendsList() {
           <ProfileLine
             profile={f.profile}
             trailing={
-              <Button
-                variant="ghost"
-                size="sm"
-                loading={busyId === f.otherId}
-                onClick={async () => {
-                  setBusyId(f.otherId);
-                  try { await removeFriend(f.otherId); } finally { setBusyId(null); }
-                }}
-              >
-                {t('profile.friends.remove')}
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/friends/money?requestFriend=${f.otherId}`)}
+                  title={t('friendsMoney.request.create')}
+                >
+                  {t('friendsMoney.request.create')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={busyId === f.otherId}
+                  onClick={async () => {
+                    setBusyId(f.otherId);
+                    try { await removeFriend(f.otherId); } finally { setBusyId(null); }
+                  }}
+                >
+                  {t('profile.friends.remove')}
+                </Button>
+              </>
             }
           />
         </li>
