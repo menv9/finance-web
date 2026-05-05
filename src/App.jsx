@@ -46,6 +46,7 @@ const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const FriendsMoneyPage = lazy(() => import('./pages/FriendsMoneyPage'));
 const CoingamePage = lazy(() => import('./pages/CoingamePage'));
 const CoingameMarketPage = lazy(() => import('./pages/CoingameMarketPage'));
+const CoingameCoinPage = lazy(() => import('./pages/CoingameCoinPage'));
 const CoingameTransactionsPage = lazy(() => import('./pages/CoingameTransactionsPage'));
 const CoingameLeaderboardPage = lazy(() => import('./pages/CoingameLeaderboardPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
@@ -99,6 +100,7 @@ export default function App() {
                       <Routes>
                         <Route path="/" element={<CoingamePage />} />
                         <Route path="/market" element={<CoingameMarketPage />} />
+                        <Route path="/coin/:coinId" element={<CoingameCoinPage />} />
                         <Route path="/history" element={<CoingameTransactionsPage />} />
                         <Route path="/leaderboard" element={<CoingameLeaderboardPage />} />
                         <Route path="*" element={<CoingamePage />} />

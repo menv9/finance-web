@@ -878,6 +878,274 @@
   transition: width 0.4s ease;
 }
 
+/* Coin detail */
+.cg-coin-detail-page {
+  max-width: 1280px;
+}
+
+.cg-coin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 0.75rem;
+}
+
+.cg-coin-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cg-coin-hero,
+.cg-chart-card,
+.cg-trade-panel,
+.cg-coin-stat-strip,
+.cg-coin-info-grid > div {
+  background: rgba(17,17,17,0.94);
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+}
+
+.cg-coin-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.85rem;
+}
+
+.cg-coin-hero-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cg-font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #000;
+  background: var(--cg-accent);
+  box-shadow: 0 0 20px rgba(23,245,0,0.22);
+  flex-shrink: 0;
+}
+
+.cg-coin-hero h1 {
+  font-family: var(--cg-font-display);
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.cg-coin-eyebrow {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--cg-font-mono);
+  font-size: 0.68rem;
+  color: var(--cg-accent);
+  text-transform: uppercase;
+}
+
+.cg-coin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  font-family: var(--cg-font-mono);
+  font-size: 0.72rem;
+  color: var(--cg-text-3);
+}
+
+.cg-coin-market-link {
+  margin-left: auto;
+}
+
+.cg-coin-stat-strip,
+.cg-coin-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.cg-coin-info-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cg-coin-stat-strip > div,
+.cg-coin-info-grid > div {
+  padding: 0.85rem 1rem;
+}
+
+.cg-coin-stat-strip span,
+.cg-coin-info-grid span {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--cg-text-3);
+}
+
+.cg-coin-stat-strip strong,
+.cg-coin-info-grid strong {
+  font-family: var(--cg-font-mono);
+  font-size: 0.95rem;
+  color: var(--cg-text);
+}
+
+.cg-chart-card {
+  overflow: hidden;
+}
+
+.cg-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--cg-border);
+}
+
+.cg-chart-toolbar strong {
+  font-family: var(--cg-font-display);
+  font-size: 0.9rem;
+}
+
+.cg-chart-pill {
+  border: 1px solid var(--cg-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-family: var(--cg-font-mono);
+  font-size: 0.68rem;
+  color: var(--cg-text-3);
+}
+
+.cg-big-chart {
+  height: 430px;
+  padding: 0.75rem 0.75rem 0.35rem;
+}
+
+.cg-trade-panel {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+  padding: 0.8rem;
+}
+
+.cg-trade-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.cg-trade-tabs button {
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cg-text-2);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.cg-trade-tabs button.active {
+  background: var(--cg-accent);
+  color: #000;
+  font-weight: 800;
+}
+
+.cg-trade-balance,
+.cg-trade-preview div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cg-trade-balance {
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--cg-text-3);
+}
+
+.cg-trade-balance strong,
+.cg-trade-preview strong {
+  color: var(--cg-text);
+  font-family: var(--cg-font-mono);
+}
+
+.cg-trade-amount {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 58px;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--cg-border);
+  background: var(--cg-surface-raised);
+}
+
+.cg-trade-amount input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cg-text);
+  font-family: var(--cg-font-mono);
+  font-size: 1.8rem;
+}
+
+.cg-trade-amount span {
+  font-family: var(--cg-font-mono);
+  font-size: 0.75rem;
+  color: var(--cg-text-3);
+}
+
+.cg-trade-quick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.cg-trade-quick button {
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--cg-border);
+  background: var(--cg-surface);
+  color: var(--cg-text-2);
+  font-family: var(--cg-font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.cg-trade-quick button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.cg-trade-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+  font-size: 0.78rem;
+  color: var(--cg-text-3);
+}
+
+.cg-trade-note {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  background: rgba(23,245,0,0.08);
+  color: var(--cg-text-2);
+  font-size: 0.76rem;
+}
+
+.cg-trade-submit {
+  width: 100%;
+  justify-content: center;
+}
+
 /* ── Coin entry animation ─────────────────────────────────────────────────── */
 .cg-coin-overlay {
   position: fixed;
@@ -967,4 +1235,10 @@
   .cg-sidebar-logo { justify-content: center; padding: 1rem 0.5rem; }
   .cg-stat-row { grid-template-columns: 1fr 1fr; }
   .cg-grid { grid-template-columns: repeat(2, 1fr); }
+  .cg-coin-layout { grid-template-columns: 1fr; }
+  .cg-trade-panel { position: static; }
+  .cg-coin-stat-strip,
+  .cg-coin-info-grid { grid-template-columns: 1fr 1fr; }
+  .cg-big-chart { height: 320px; }
+  .cg-coin-market-link { display: none; }
 }

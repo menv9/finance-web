@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, searchCoins, sellProceeds, spotPrice } from '../utils/coingameApi';
 
@@ -51,6 +52,9 @@ function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
 
       {!isOwnCoin && (
         <div className="cg-coin-card-actions">
+          <Link className="cg-btn cg-btn-secondary cg-btn-sm" style={{ flex: 1, justifyContent: 'center' }} to={`/coingame/coin/${coin.coin_id}`}>
+            Open
+          </Link>
           <button className="cg-btn cg-btn-primary cg-btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onBuy(coin)}>
             Buy
           </button>
@@ -63,7 +67,9 @@ function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
       )}
       {isOwnCoin && (
         <div className="cg-coin-card-actions">
-          <span style={{ fontSize: '0.75rem', color: 'var(--cg-text-3)', width: '100%', textAlign: 'center' }}>Your coin</span>
+          <Link className="cg-btn cg-btn-secondary cg-btn-sm" style={{ flex: 1, justifyContent: 'center' }} to={`/coingame/coin/${coin.coin_id}`}>
+            Open coin
+          </Link>
         </div>
       )}
     </div>

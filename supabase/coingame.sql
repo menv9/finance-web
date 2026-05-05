@@ -60,7 +60,7 @@ alter table public.coingame_wallets enable row level security;
 drop policy if exists "wallets readable by owner" on public.coingame_wallets;
 create policy "wallets readable by owner"
   on public.coingame_wallets for select to authenticated
-  using (auth.uid() = user_id);
+  using (auth.uid() = coingame_wallets.user_id);
 
 -- No insert/update/delete policies: all mutations go through SECURITY DEFINER RPCs.
 
@@ -126,7 +126,7 @@ create policy "holdings readable by holder or coin owner"
   using (
     auth.uid() = holder_user_id
     or auth.uid() in (
-      select owner_user_id from public.coingame_coins where coin_id = coingame_holdings.coin_id
+      select c.owner_user_id from public.coingame_coins c where c.coin_id = coingame_holdings.coin_id
     )
   );
 
@@ -255,7 +255,7 @@ begin
   -- Wallet
   insert into public.coingame_wallets (user_id, fc_balance)
     values (uid, public.cg_const_starter_fc())
-    on conflict (user_id) do nothing;
+    on conflict on constraint coingame_wallets_pkey do nothing;
   if found then granted := true; end if;
 
   if granted then
@@ -304,7 +304,7 @@ begin
 
   insert into public.coingame_wallets (user_id, fc_balance)
     values (uid, public.cg_const_starter_fc())
-    on conflict (user_id) do nothing;
+    on conflict on constraint coingame_wallets_pkey do nothing;
   if found then granted := true; end if;
 
   if granted then
@@ -315,7 +315,7 @@ begin
 
   insert into public.coingame_coins (owner_user_id, coin_name)
     values (uid, clean_name)
-    on conflict (owner_user_id) do update
+    on conflict on constraint coingame_coins_owner_user_id_key do update
       set coin_name = excluded.coin_name
     returning * into created_coin;
 
@@ -373,7 +373,7 @@ begin
     (user_id, week_start_date, gains_fc, volume_fc, trades_count)
   values
     (p_user, public.cg_current_week_start(), p_gain, p_volume, 1)
-  on conflict (user_id, week_start_date) do update
+  on conflict on constraint coingame_leaderboard_weekly_pkey do update
     set gains_fc = public.coingame_leaderboard_weekly.gains_fc + excluded.gains_fc,
         volume_fc = public.coingame_leaderboard_weekly.volume_fc + excluded.volume_fc,
         trades_count = public.coingame_leaderboard_weekly.trades_count + 1,
@@ -405,9 +405,9 @@ begin
   if uid is null then raise exception 'not authenticated'; end if;
   if p_tokens is null or p_tokens <= 0 then raise exception 'tokens must be positive'; end if;
 
-  select coin_id, owner_user_id, base_price, tokens_minted, created_at
+  select coin.coin_id, coin.owner_user_id, coin.base_price, coin.tokens_minted, coin.created_at
     into c
-    from public.coingame_coins where coin_id = p_coin_id for update;
+    from public.coingame_coins coin where coin.coin_id = p_coin_id for update;
   if not found then raise exception 'coin not found'; end if;
   if c.owner_user_id = uid then raise exception 'cannot buy your own coin'; end if;
 
@@ -427,7 +427,7 @@ begin
 
   -- Lock buyer wallet.
   select fc_balance into current_balance
-    from public.coingame_wallets where user_id = uid for update;
+    from public.coingame_wallets w where w.user_id = uid for update;
   if not found then raise exception 'wallet not initialized — call cg_ensure_wallet first'; end if;
   if current_balance < total_charge then
     raise exception 'insufficient balance (need %, have %)', total_charge, current_balance;
@@ -449,9 +449,9 @@ begin
   end if;
 
   -- Mutations.
-  update public.coingame_wallets
+  update public.coingame_wallets w
     set fc_balance = fc_balance - total_charge
-    where user_id = uid;
+    where w.user_id = uid;
 
   update public.coingame_coins
     set tokens_minted = tokens_minted + p_tokens
@@ -554,9 +554,9 @@ begin
   realized := proceeds - (h.avg_buy_price * p_tokens);
 
   -- Mutations.
-  update public.coingame_wallets
+  update public.coingame_wallets w
     set fc_balance = fc_balance + net_proceeds
-    where user_id = uid;
+    where w.user_id = uid;
 
   update public.coingame_coins
     set tokens_minted = tokens_minted - p_tokens
@@ -622,8 +622,8 @@ declare
 begin
   if uid is null then raise exception 'not authenticated'; end if;
 
-  select user_id, fc_balance, login_streak, last_daily_claim_at into w
-    from public.coingame_wallets where user_id = uid for update;
+  select wallet.user_id, wallet.fc_balance, wallet.login_streak, wallet.last_daily_claim_at into w
+    from public.coingame_wallets wallet where wallet.user_id = uid for update;
   if not found then raise exception 'wallet not initialized'; end if;
 
   last_day := (w.last_daily_claim_at at time zone 'UTC')::date;
@@ -640,12 +640,12 @@ begin
   -- Reward scales mildly with streak, capped: 50 + 10*min(streak, 30).
   reward := 50 + 10 * least(new_streak, 30);
 
-  update public.coingame_wallets
+  update public.coingame_wallets wallet
     set fc_balance = fc_balance + reward,
         login_streak = new_streak,
         last_daily_claim_at = timezone('utc', now()),
         last_login_at = timezone('utc', now())
-    where user_id = uid;
+    where wallet.user_id = uid;
 
   insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
     values ('reward', uid, reward,
