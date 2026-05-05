@@ -275,6 +275,7 @@ export function AppShell({ children }) {
   const appMode = useFinanceStore((state) => state.appMode);
   const setAppMode = useFinanceStore((state) => state.setAppMode);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
+  const hideAmounts = useFinanceStore((state) => state.hideAmounts);
   const updateSettings = useFinanceStore((state) => state.updateSettings);
   const alert = useAlert();
   const { t, locale } = useTranslation();
@@ -598,14 +599,14 @@ export function AppShell({ children }) {
               <div className="flex flex-col items-end">
                 <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5 whitespace-nowrap">{t('shell.header.totalBalance')}</span>
                 <span className="numeric text-sm text-ink leading-none">
-                  {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
+                  {hideAmounts ? '••••' : formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
                 </span>
               </div>
               {metrics.totalDebtCents > 0 && (
                 <div className="flex flex-col items-end border-l border-rule pl-4">
                   <span className="eyebrow text-[0.6rem] text-ink-muted leading-none mb-0.5">{t('shell.header.debt')}</span>
                   <span className="numeric text-sm text-danger leading-none">
-                    {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
+                    {hideAmounts ? '••••' : formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
                   </span>
                 </div>
               )}
@@ -951,14 +952,14 @@ export function AppShell({ children }) {
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="eyebrow text-[0.6rem] text-ink-muted">{t('shell.header.totalBalance')}</span>
                 <span className="numeric text-sm text-ink truncate">
-                  {formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
+                  {hideAmounts ? '••••' : formatCurrency(metrics.availableBalanceCents, baseCurrency, locale)}
                 </span>
               </div>
               {metrics.totalDebtCents > 0 && (
                 <div className="flex flex-col gap-0.5 min-w-0 border-l border-rule pl-4">
                   <span className="eyebrow text-[0.6rem] text-ink-muted">{t('shell.header.debt')}</span>
                   <span className="numeric text-sm text-danger truncate">
-                    {formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
+                    {hideAmounts ? '••••' : formatCurrency(metrics.totalDebtCents, baseCurrency, locale)}
                   </span>
                 </div>
               )}

@@ -136,7 +136,8 @@ function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription 
 export default function DashboardPage() {
   const { t, locale } = useTranslation();
   const reportRef = useRef(null);
-  const [hideKpis, setHideKpis] = useState(() => localStorage.getItem('pft-dashboard-hide-kpis') === 'true');
+  const hideKpis = useFinanceStore((state) => state.hideAmounts);
+  const toggleHideAmounts = useFinanceStore((state) => state.toggleHideAmounts);
   const dashboard = useFinanceStore((state) => state.derived.dashboard);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
   const settings = useFinanceStore((state) => state.settings);
@@ -251,9 +252,6 @@ export default function DashboardPage() {
       : []),
   ];
 
-  useEffect(() => {
-    localStorage.setItem('pft-dashboard-hide-kpis', String(hideKpis));
-  }, [hideKpis]);
 
   return (
     <div ref={reportRef} className="grid grid-cols-1 gap-8">
@@ -272,7 +270,7 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-3 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink transition-colors"
             aria-label={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
             title={hideKpis ? 'Show KPI values' : 'Hide KPI values'}
-            onClick={() => setHideKpis((value) => !value)}
+            onClick={toggleHideAmounts}
           >
             <EyeIcon hidden={hideKpis} />
             {hideKpis ? 'Show' : 'Hide'}

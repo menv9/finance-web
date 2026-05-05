@@ -685,6 +685,7 @@ const _cascadingDeletes = new Set();
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
   tourActive: false,
+  hideAmounts: localStorage.getItem('pft-dashboard-hide-kpis') === 'true',
   appMode: loadAppMode(),
   fxRates: {},
   settings: DEFAULT_SETTINGS,
@@ -978,6 +979,12 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   setTourActive: (value) => set({ tourActive: value }),
+
+  toggleHideAmounts: () => set((state) => {
+    const next = !state.hideAmounts;
+    localStorage.setItem('pft-dashboard-hide-kpis', String(next));
+    return { hideAmounts: next };
+  }),
 
   setAppMode: (mode) => {
     const next = mode === 'lite' ? 'lite' : 'pro';
