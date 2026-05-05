@@ -75,8 +75,16 @@ export function Table({
   onToggleRow,
   onToggleAll,
   isRowSelectable,
+  allowHorizontalScroll = true,
 }) {
   const pad = density === 'compact' ? 'px-3 py-2' : 'px-4 py-3';
+  const visibilityClass = (column) => cn(
+    column.hideOnMobile && 'hidden sm:table-cell',
+    column.hideBelow === 'md' && 'hidden md:table-cell',
+    column.hideBelow === 'lg' && 'hidden lg:table-cell',
+    column.hideBelow === 'xl' && 'hidden xl:table-cell',
+    column.hideBelow === '2xl' && 'hidden 2xl:table-cell',
+  );
 
   if (loading) {
     return (
@@ -107,8 +115,17 @@ export function Table({
   const someChecked = selectable && !allChecked && selectableRows.some((r) => selectedIds?.has(r.id));
 
   return (
-    <div className={cn('min-w-0 rounded-lg border border-rule bg-surface overflow-x-auto overflow-y-hidden', className)}>
-      <table className="w-full min-w-[520px] table-fixed border-collapse sm:min-w-full sm:table-auto">
+    <div
+      className={cn(
+        'min-w-0 rounded-lg border border-rule bg-surface overflow-y-hidden',
+        allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden',
+        className,
+      )}
+    >
+      <table className={cn(
+        'w-full border-collapse',
+        allowHorizontalScroll ? 'min-w-[520px] table-fixed sm:min-w-full sm:table-auto' : 'min-w-0 table-fixed',
+      )}>
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
           <tr>
@@ -145,11 +162,13 @@ export function Table({
                     pad,
                     isSortable && 'cursor-pointer select-none hover:text-ink transition-colors duration-120',
                     isActive && 'text-ink',
-                    c.hideOnMobile && 'hidden sm:table-cell',
+                    visibilityClass(c),
                   )}
                 >
-                  <span className="inline-flex min-w-0 max-w-full items-center truncate">
-                    {c.header}
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+                    <span className="min-w-0 whitespace-normal break-words leading-tight">
+                      {c.header}
+                    </span>
                     {isSortable && <SortIcon active={isActive} dir={sortDir} />}
                   </span>
                 </th>
@@ -200,7 +219,7 @@ export function Table({
                         'min-w-0 text-sm text-ink',
                         c.noTruncate ? 'overflow-visible' : 'overflow-hidden',
                         c.numeric && 'font-mono tabular text-ink',
-                        c.hideOnMobile && 'hidden sm:table-cell',
+                        visibilityClass(c),
                       )}
                     >
                       <div className={cn(

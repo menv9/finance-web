@@ -373,7 +373,7 @@ function PortfolioHoldingList({
     {
       key: 'symbol',
       header: 'Symbol',
-      width: 190,
+      width: 150,
       noTruncate: true,
       render: (row) => (
         <div className={cn('flex min-w-0 items-center gap-2', row.rowType === 'lot' && 'pl-8')}>
@@ -409,65 +409,68 @@ function PortfolioHoldingList({
       key: 'quantity',
       header: 'Shares',
       numeric: true,
-      width: 95,
-      render: (row) => formatNumber(row.quantity, locale, quantityDigits(row)),
+      width: 76,
+      render: (row) => formatNumber(row.quantity, locale, Math.min(quantityDigits(row), 5)),
     },
     {
       key: 'lastPriceCents',
       header: 'Last Price',
       numeric: true,
-      width: 110,
+      width: 94,
+      hideBelow: 'lg',
       render: (row) => formatCurrency(row.lastPriceCents, row.priceCurrency, locale),
     },
     {
       key: 'totalCostCents',
       header: 'Total Cost (' + currencySymbol + ')',
       numeric: true,
-      width: 120,
+      width: 104,
+      hideBelow: 'xl',
       render: (row) => formatCurrency(row.totalCostCents, currency, locale),
     },
     {
       key: 'marketValueCents',
       header: 'Market Value (' + currencySymbol + ')',
       numeric: true,
-      width: 130,
+      width: 112,
       render: (row) => formatCurrency(row.marketValueCents, currency, locale),
     },
     {
       key: 'dayGainPct',
       header: 'Day Gain UNRL (%)',
       numeric: true,
-      width: 130,
-      hideOnMobile: true,
+      width: 106,
+      hideBelow: 'xl',
       render: (row) => <span className={gainClass(row.dayGainPct)}>{signedPercent(row.dayGainPct)}</span>,
     },
     {
       key: 'dayGainCents',
       header: 'Day Gain UNRL (' + currencySymbol + ')',
       numeric: true,
-      width: 135,
-      hideOnMobile: true,
+      width: 112,
+      hideBelow: '2xl',
       render: (row) => <span className={gainClass(row.dayGainCents)}>{signedCurrency(row.dayGainCents)}</span>,
     },
     {
       key: 'totalGainPct',
       header: 'Tot Gain UNRL (%)',
       numeric: true,
-      width: 130,
+      width: 108,
       render: (row) => <span className={gainClass(row.totalGainPct)}>{signedPercent(row.totalGainPct)}</span>,
     },
     {
       key: 'totalGainCents',
       header: 'Tot Gain UNRL (' + currencySymbol + ')',
       numeric: true,
-      width: 135,
+      width: 112,
+      hideBelow: 'md',
       render: (row) => <span className={gainClass(row.totalGainCents)}>{signedCurrency(row.totalGainCents)}</span>,
     },
     {
       key: 'actions',
       header: '',
       align: 'right',
-      width: 132,
+      width: 104,
       noTruncate: true,
       render: (row) => (
         row.rowType === 'group' ? (
@@ -541,6 +544,7 @@ function PortfolioHoldingList({
       rows={rows}
       density="compact"
       className="rounded-lg"
+      allowHorizontalScroll={false}
       caption={t('portfolio.holdingsCard.title')}
     />
   );
