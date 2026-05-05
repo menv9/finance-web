@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   display_name text,
   bio text,
   avatar_url text,
+  social_enabled boolean not null default true,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint username_format check (username ~ '^[a-z0-9_]{3,20}$')

@@ -932,6 +932,65 @@ export default function SavingsPage() {
         )}
       </Card>
 
+      {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
+
+      {/* Entries log */}
+      <Card
+        eyebrow={t('savings.logCard.eyebrow')}
+        title={t('savings.logCard.title')}
+        description={t('savings.logCard.description')}
+        className={rise(3)}
+        action={
+          <div className="flex flex-wrap justify-end gap-2">
+            {!batchSelect.selecting && (
+              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
+                {t('savings.select')}
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={() => openNew()}>
+              <PlusIcon /> {t('savings.addSaving')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <FormField label={t('savings.logCard.monthLabel')} htmlFor="savings-month">
+            <Input
+              id="savings-month"
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </FormField>
+          <FormField label={t('savings.logCard.typeLabel')} htmlFor="savings-type">
+            <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">{t('savings.logCard.typeAll')}</option>
+              <option value="deposit">{t('savings.logCard.typeDeposit')}</option>
+              <option value="withdrawal">{t('savings.logCard.typeWithdrawal')}</option>
+            </Select>
+          </FormField>
+        </div>
+        <BatchDeleteBar
+          selecting={batchSelect.selecting}
+          selectedCount={batchSelect.selectedIds.size}
+          onDelete={handleBatchDeleteEntries}
+          onCancel={batchSelect.cancel}
+        />
+        {savingsEntries.length ? (
+          <SavingsEntryList rows={sortedEntries} />
+        ) : (
+          <EmptyState
+            title={t('savings.logCard.emptyTitle')}
+            description={t('savings.logCard.emptyDescription')}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => openNew()}>
+                <PlusIcon /> {t('savings.addSaving')}
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
       {/* Entries chart */}
       <Card
         eyebrow={t('savings.historyChart.eyebrow')}
@@ -1010,65 +1069,6 @@ export default function SavingsPage() {
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-ink-faint">{t('savings.historyChart.noEntries')}</p>
           </div>
-        )}
-      </Card>
-
-      {/* ── SECTION 1: Savings history ─────────────────────────────────────── */}
-
-      {/* Entries log */}
-      <Card
-        eyebrow={t('savings.logCard.eyebrow')}
-        title={t('savings.logCard.title')}
-        description={t('savings.logCard.description')}
-        className={rise(3)}
-        action={
-          <div className="flex flex-wrap justify-end gap-2">
-            {!batchSelect.selecting && (
-              <Button variant="secondary" size="sm" onClick={batchSelect.start}>
-                {t('savings.select')}
-              </Button>
-            )}
-            <Button variant="primary" size="sm" onClick={() => openNew()}>
-              <PlusIcon /> {t('savings.addSaving')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label={t('savings.logCard.monthLabel')} htmlFor="savings-month">
-            <Input
-              id="savings-month"
-              type="month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-            />
-          </FormField>
-          <FormField label={t('savings.logCard.typeLabel')} htmlFor="savings-type">
-            <Select id="savings-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">{t('savings.logCard.typeAll')}</option>
-              <option value="deposit">{t('savings.logCard.typeDeposit')}</option>
-              <option value="withdrawal">{t('savings.logCard.typeWithdrawal')}</option>
-            </Select>
-          </FormField>
-        </div>
-        <BatchDeleteBar
-          selecting={batchSelect.selecting}
-          selectedCount={batchSelect.selectedIds.size}
-          onDelete={handleBatchDeleteEntries}
-          onCancel={batchSelect.cancel}
-        />
-        {savingsEntries.length ? (
-          <SavingsEntryList rows={sortedEntries} />
-        ) : (
-          <EmptyState
-            title={t('savings.logCard.emptyTitle')}
-            description={t('savings.logCard.emptyDescription')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => openNew()}>
-                <PlusIcon /> {t('savings.addSaving')}
-              </Button>
-            }
-          />
         )}
       </Card>
 
