@@ -678,7 +678,7 @@ export default function FriendsMoneyPage() {
         </div>
       )}
 
-      <div className="flex gap-1 mb-4 border-b border-rule overflow-x-auto">
+      <div className="flex gap-1 mb-4 border-b border-rule overflow-x-auto overflow-y-hidden">
         {TABS.map((key) => (
           <button
             key={key}
