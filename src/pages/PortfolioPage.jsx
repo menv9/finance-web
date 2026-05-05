@@ -448,6 +448,9 @@ function PortfolioHoldingList({
       header: 'Symbol',
       width: 150,
       noTruncate: true,
+      cellText: (row) => row.rowType === 'group'
+        ? [row.ticker, row.name].filter(Boolean).join(' - ')
+        : [row.symbol, row.platform].filter(Boolean).join(' - '),
       render: (row) => (
         <div className={cn('flex min-w-0 items-center gap-2', row.rowType === 'lot' && 'pl-8')}>
           {row.rowType === 'group' ? (
@@ -483,14 +486,20 @@ function PortfolioHoldingList({
       header: 'Shares',
       numeric: true,
       width: 76,
-      render: (row) => formatNumber(row.quantity, locale, Math.min(quantityDigits(row), 5)),
+      cellText: (row) => formatNumber(row.quantity, locale, quantityDigits(row)),
+      render: (row) => (
+        <>
+          <span className="sm:hidden">{formatNumber(row.quantity, locale, Math.min(quantityDigits(row), 2))}</span>
+          <span className="hidden sm:inline">{formatNumber(row.quantity, locale, Math.min(quantityDigits(row), 5))}</span>
+        </>
+      ),
     },
     {
       key: 'lastPriceCents',
       header: 'Last Price',
       numeric: true,
       width: 94,
-      hideBelow: 'lg',
+      cellText: (row) => formatCurrency(row.lastPriceCents, row.priceCurrency, locale),
       render: (row) => formatCurrency(row.lastPriceCents, row.priceCurrency, locale),
     },
     {
@@ -498,7 +507,7 @@ function PortfolioHoldingList({
       header: 'Total Cost (' + currencySymbol + ')',
       numeric: true,
       width: 104,
-      hideBelow: 'xl',
+      cellText: (row) => formatCurrency(row.totalCostCents, currency, locale),
       render: (row) => formatCurrency(row.totalCostCents, currency, locale),
     },
     {
@@ -506,6 +515,7 @@ function PortfolioHoldingList({
       header: 'Market Value (' + currencySymbol + ')',
       numeric: true,
       width: 112,
+      cellText: (row) => formatCurrency(row.marketValueCents, currency, locale),
       render: (row) => formatCurrency(row.marketValueCents, currency, locale),
     },
     {
@@ -513,7 +523,7 @@ function PortfolioHoldingList({
       header: 'Day Gain UNRL (%)',
       numeric: true,
       width: 106,
-      hideBelow: 'xl',
+      cellText: (row) => signedPercent(row.dayGainPct),
       render: (row) => <span className={gainClass(row.dayGainPct)}>{signedPercent(row.dayGainPct)}</span>,
     },
     {
@@ -521,7 +531,7 @@ function PortfolioHoldingList({
       header: 'Day Gain UNRL (' + currencySymbol + ')',
       numeric: true,
       width: 112,
-      hideBelow: '2xl',
+      cellText: (row) => signedCurrency(row.dayGainCents),
       render: (row) => <span className={gainClass(row.dayGainCents)}>{signedCurrency(row.dayGainCents)}</span>,
     },
     {
@@ -529,6 +539,7 @@ function PortfolioHoldingList({
       header: 'Tot Gain UNRL (%)',
       numeric: true,
       width: 108,
+      cellText: (row) => signedPercent(row.totalGainPct),
       render: (row) => <span className={gainClass(row.totalGainPct)}>{signedPercent(row.totalGainPct)}</span>,
     },
     {
@@ -536,7 +547,7 @@ function PortfolioHoldingList({
       header: 'Tot Gain UNRL (' + currencySymbol + ')',
       numeric: true,
       width: 112,
-      hideBelow: 'md',
+      cellText: (row) => signedCurrency(row.totalGainCents),
       render: (row) => <span className={gainClass(row.totalGainCents)}>{signedCurrency(row.totalGainCents)}</span>,
     },
     {
@@ -617,7 +628,8 @@ function PortfolioHoldingList({
       rows={rows}
       density="compact"
       className="rounded-lg"
-      allowHorizontalScroll={false}
+      allowHorizontalScroll
+      stickyFirstColumn
       caption={t('portfolio.holdingsCard.title')}
     />
   );
@@ -1929,20 +1941,77 @@ export default function PortfolioPage() {
       {isAllPortfoliosView ? (
       <Card
         eyebrow="Portfolios"
-        title="All portfolio holdings"
+        title="Portfolio holdings"
         description="Summary of every portfolio inside Investing."
         density="compact"
         action={<Button variant="primary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
         className={rise(3)}
       >
         {portfolioSummaryRows.length ? (
-          <Table
-            columns={portfolioSummaryColumns}
-            rows={portfolioSummaryRows}
-            density="compact"
-            allowHorizontalScroll={false}
-            caption="All portfolios"
-          />
+          <>
+            <div className="grid gap-2 sm:hidden">
+              {portfolioSummaryRows.map((row) => (
+                <div key={row.id} className="rounded-md border border-rule bg-surface px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      onClick={() => { setActivePortfolioId(row.id); setActiveView('holdings'); }}
+                    >
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: row.color || 'var(--accent)' }} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{row.name}</span>
+                        {row.description ? <span className="block truncate text-xs text-ink-faint">{row.description}</span> : null}
+                      </span>
+                    </button>
+                    <div className="inline-flex shrink-0 gap-1">
+                      <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken" title="Edit portfolio" onClick={() => openEditPortfolio(row.id)}>
+                        <EditIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+                        title="Delete portfolio"
+                        onClick={async () => {
+                          try {
+                            if (await confirm({ title: 'Delete portfolio?', description: 'Only empty portfolios can be deleted.', danger: true }))
+                              await removeEntity('investmentPortfolios', row.id);
+                          } catch (error) {
+                            await alert({ title: 'Cannot delete portfolio', description: error.message });
+                          }
+                        }}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-rule pt-3">
+                    <div className="min-w-0">
+                      <p className="eyebrow text-ink-faint">Symbols</p>
+                      <p className="mt-1 font-mono text-sm text-ink">{row.symbols}</p>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <p className="eyebrow text-ink-faint">Cost basis</p>
+                      <p className="mt-1 truncate font-mono text-sm text-ink">{formatCurrency(row.investedCents, currency, locale)}</p>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <p className="eyebrow text-ink-faint">Market value</p>
+                      <p className="mt-1 truncate font-mono text-sm text-ink">{formatCurrency(row.marketValueCents, currency, locale)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden sm:block">
+              <Table
+                columns={portfolioSummaryColumns}
+                rows={portfolioSummaryRows}
+                density="compact"
+                allowHorizontalScroll={false}
+                caption="All portfolios"
+              />
+            </div>
+          </>
         ) : (
           <EmptyState
             title="No portfolios yet"

@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { cn } from './cn';
 
 /**
@@ -76,7 +77,10 @@ export function Table({
   onToggleAll,
   isRowSelectable,
   allowHorizontalScroll = true,
+  stickyFirstColumn = false,
 }) {
+  const longPressTimer = useRef(null);
+  const [touchPreview, setTouchPreview] = useState(null);
   const pad = density === 'compact' ? 'px-3 py-2' : 'px-4 py-3';
   const visibilityClass = (column) => cn(
     column.hideOnMobile && 'hidden sm:table-cell',
@@ -113,6 +117,28 @@ export function Table({
   const allChecked =
     selectable && selectableRows.length > 0 && selectableRows.every((r) => selectedIds?.has(r.id));
   const someChecked = selectable && !allChecked && selectableRows.some((r) => selectedIds?.has(r.id));
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const startLongPress = (event, text) => {
+    clearLongPress();
+    if (!text) return;
+    const touch = event.touches?.[0];
+    longPressTimer.current = window.setTimeout(() => {
+      setTouchPreview({
+        text,
+        x: Math.min(Math.max(touch?.clientX || window.innerWidth / 2, 24), window.innerWidth - 24),
+        y: Math.min(Math.max(touch?.clientY || window.innerHeight / 2, 56), window.innerHeight - 56),
+      });
+    }, 450);
+  };
+  const stopLongPress = () => {
+    clearLongPress();
+    window.setTimeout(() => setTouchPreview(null), 1200);
+  };
 
   return (
     <div
@@ -145,18 +171,24 @@ export function Table({
                 />
               </th>
             )}
-            {columns.map((c) => {
+            {columns.map((c, columnIndex) => {
               const isSortable = c.sortable && onSort;
               const isActive = sortKey === c.key;
+              const isStickyColumn = stickyFirstColumn && columnIndex === 0;
               return (
                 <th
                   key={c.key}
                   scope="col"
-                  style={{ width: c.width, textAlign: c.align || (c.numeric ? 'right' : 'left') }}
+                  style={{
+                    width: c.width,
+                    textAlign: c.align || (c.numeric ? 'right' : 'left'),
+                    left: isStickyColumn ? 0 : undefined,
+                  }}
                   onClick={isSortable ? () => onSort(c.key) : undefined}
                   title={isSortable ? `Sort by ${c.header}` : undefined}
                   className={cn(
                     'sticky top-0 z-10 bg-surface',
+                    isStickyColumn && 'z-20 border-r border-rule shadow-[6px_0_12px_-12px_rgba(0,0,0,0.45)]',
                     'border-b border-rule',
                     'eyebrow font-medium',
                     pad,
@@ -208,15 +240,26 @@ export function Table({
                     )}
                   </td>
                 )}
-                {columns.map((c) => {
+                {columns.map((c, columnIndex) => {
                   const content = c.render ? c.render(row) : row[c.key];
+                  const isStickyColumn = stickyFirstColumn && columnIndex === 0;
+                  const cellText = c.cellText
+                    ? c.cellText(row)
+                    : typeof content === 'string' || typeof content === 'number'
+                      ? String(content)
+                      : '';
                   return (
                     <td
                       key={c.key}
-                      style={{ textAlign: c.align || (c.numeric ? 'right' : 'left') }}
+                      title={cellText}
+                      style={{
+                        textAlign: c.align || (c.numeric ? 'right' : 'left'),
+                        left: isStickyColumn ? 0 : undefined,
+                      }}
                       className={cn(
                         pad,
                         'min-w-0 text-sm text-ink',
+                        isStickyColumn && 'sticky z-10 border-r border-rule bg-inherit shadow-[6px_0_12px_-12px_rgba(0,0,0,0.45)]',
                         c.noTruncate ? 'overflow-visible' : 'overflow-hidden',
                         c.numeric && 'font-mono tabular text-ink',
                         visibilityClass(c),
@@ -225,7 +268,12 @@ export function Table({
                       <div className={cn(
                         'min-w-0 max-w-full',
                         c.noTruncate ? 'overflow-visible whitespace-normal' : c.numeric ? 'truncate text-right' : 'truncate',
-                      )}>
+                      )}
+                        onTouchStart={(event) => startLongPress(event, cellText)}
+                        onTouchEnd={stopLongPress}
+                        onTouchCancel={stopLongPress}
+                        onTouchMove={clearLongPress}
+                      >
                         {content}
                       </div>
                     </td>
@@ -236,6 +284,15 @@ export function Table({
           })}
         </tbody>
       </table>
+      {touchPreview ? (
+        <div
+          role="status"
+          className="pointer-events-none fixed z-50 max-w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-full rounded-md border border-rule bg-surface-raised px-3 py-2 text-sm text-ink shadow-lg"
+          style={{ left: touchPreview.x, top: touchPreview.y - 12 }}
+        >
+          {touchPreview.text}
+        </div>
+      ) : null}
     </div>
   );
 }
