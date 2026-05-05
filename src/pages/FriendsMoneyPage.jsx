@@ -470,7 +470,7 @@ function IncomingPaymentRow({ entry, onAcceptClick }) {
         {entry.note && <p className="text-xs text-ink-muted truncate italic">"{entry.note}"</p>}
         <p className="text-xs text-ink-muted">{date}</p>
       </div>
-      <Button size="xs" onClick={() => onAcceptClick(entry)}>
+      <Button size="sm" onClick={() => onAcceptClick(entry)}>
         {t('friendsMoney.payment.review')}
       </Button>
     </li>
