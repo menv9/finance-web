@@ -27,6 +27,7 @@ export const translations = {
       confirm: 'Confirm',
       loading: 'Loading…',
       none: 'none',
+      all: 'All',
     },
     nav: {
       overview: 'Overview',
@@ -1436,6 +1437,8 @@ export const translations = {
         emptyDescription: 'Add a holding and refresh prices to start the hourly chart.',
         tooltipValue: 'Market value',
         tooltipCost: 'Cost basis',
+        value: 'Value',
+        invested: 'Invested',
       },
       holdingsCard: {
         eyebrow: 'Register',
@@ -1628,6 +1631,7 @@ export const translations = {
       confirm: 'Confirmar',
       loading: 'Cargando…',
       none: 'ninguno',
+      all: 'Todo',
     },
     nav: {
       overview: 'Resumen',
@@ -3043,6 +3047,8 @@ export const translations = {
         emptyDescription: 'Añade una posición y actualiza los precios para iniciar el gráfico horario.',
         tooltipValue: 'Valor de mercado',
         tooltipCost: 'Coste base',
+        value: 'Valor',
+        invested: 'Invertido',
       },
       holdingsCard: {
         eyebrow: 'Registro',

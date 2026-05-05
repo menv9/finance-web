@@ -115,10 +115,17 @@ function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period 
     .filter((snapshot) => snapshot?.capturedAt)
     .slice()
     .sort((a, b) => (a.capturedAt || '').localeCompare(b.capturedAt || ''));
-  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
   const recent = period === 'all'
     ? sorted
-    : sorted.filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= oneYearAgo);
+    : (() => {
+        const [windowStart] = getPortfolioPeriodWindow(period);
+        const inWindow = sorted.filter((s) => new Date(s.capturedAt).getTime() >= windowStart);
+        if (inWindow.length && inWindow[0] !== sorted[0]) {
+          const priorIdx = sorted.indexOf(inWindow[0]) - 1;
+          if (priorIdx >= 0) return [sorted[priorIdx], ...inWindow];
+        }
+        return inWindow;
+      })();
   const series = recent.map((snapshot) => {
     const historicalCost = snapshot.costCents > 0 ? snapshot.costCents : costAtDate(snapshot.capturedAt);
     return {
@@ -183,28 +190,19 @@ function filterPortfolioValueSeries(series, period, locale) {
   if (first.capturedAtMs > start) {
     const prior = mapped.filter((p) => p.capturedAtMs < start);
     const priorPoint = prior.length > 0 ? prior[prior.length - 1] : null;
-    boundedPoints.unshift({
-      ...first,
-      id: first.id + '-period-start',
-      capturedAt: new Date(start).toISOString(),
-      capturedAtMs: start,
-      valueCents: priorPoint ? priorPoint.valueCents : 0,
-      costCents: priorPoint ? priorPoint.costCents : null,
-      label: formatPortfolioPeriodLabel(start, period, locale),
-    });
-    // No prior data → insert a second 0-point just before the first real snapshot
-    // so the line stays flat at 0 instead of sloping diagonally up
-    if (!priorPoint) {
-      boundedPoints.splice(1, 0, {
+    if (priorPoint) {
+      // Interpolate from the last known value before this period
+      boundedPoints.unshift({
         ...first,
-        id: first.id + '-floor',
-        capturedAt: new Date(first.capturedAtMs - 1000).toISOString(),
-        capturedAtMs: first.capturedAtMs - 1000,
-        valueCents: 0,
-        costCents: null,
-        label: formatPortfolioPeriodLabel(first.capturedAtMs - 1000, period, locale),
+        id: first.id + '-period-start',
+        capturedAt: new Date(start).toISOString(),
+        capturedAtMs: start,
+        valueCents: priorPoint.valueCents,
+        costCents: priorPoint.costCents,
+        label: formatPortfolioPeriodLabel(start, period, locale),
       });
     }
+    // No prior data → don't add a phantom 0-point; domain clamping hides the empty gap
   }
   if (last.capturedAtMs < end) {
     boundedPoints.push({
@@ -1216,6 +1214,46 @@ function PortfolioNews({ tickers, apiKey }) {
   );
 }
 
+function PortfolioTooltip({ active, payload, currency, locale }) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
+  if (!point) return null;
+  const valueCents = point.valueCents ?? null;
+  const costCents  = point.costCents  ?? null;
+  const pnlCents   = valueCents != null && costCents != null ? valueCents - costCents : null;
+  const isUp       = pnlCents != null && pnlCents >= 0;
+  const dateLabel  = point.capturedAt
+    ? new Intl.DateTimeFormat(locale || 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(point.capturedAt))
+    : '';
+  return (
+    <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--rule-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 12, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.18)' }}>
+      <p style={{ color: 'var(--ink-muted)', marginBottom: 8, fontWeight: 500 }}>{dateLabel}</p>
+      {valueCents != null && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+          <span style={{ color: 'var(--ink-muted)' }}>Market value</span>
+          <span style={{ color: 'var(--accent)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(valueCents, currency, locale)}</span>
+        </div>
+      )}
+      {costCents != null && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
+          <span style={{ color: 'var(--ink-muted)' }}>Cost basis</span>
+          <span style={{ color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(costCents, currency, locale)}</span>
+        </div>
+      )}
+      {pnlCents != null && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--rule)' }}>
+          <span style={{ color: 'var(--ink-muted)' }}>P&L</span>
+          <span style={{ color: isUp ? 'var(--positive)' : 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+            {isUp ? '+' : ''}{formatCurrency(pnlCents, currency, locale)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PORTFOLIO_PERIOD_OPTIONS = ['1d', '1w', '1m', '6m', '1y', 'all'];
+
 export default function PortfolioPage() {
   const { t, locale } = useTranslation();
   const investmentPortfolios = useFinanceStore((state) => state.investmentPortfolios || []);
@@ -1256,6 +1294,7 @@ export default function PortfolioPage() {
   const [refreshError, setRefreshError] = useState('');
   const [activePortfolioId, setActivePortfolioId] = useState('all');
   const [activeView, setActiveView] = useState('holdings');
+  const [portfolioValuePeriod, setPortfolioValuePeriod] = useState('1m');
   const activePortfolio = investmentPortfolios.find((item) => item.id === activePortfolioId) || null;
   const editingPortfolio = investmentPortfolios.find((item) => item.id === portfolioModal.id) || null;
   const isAllPortfoliosView = activePortfolioId === 'all';
@@ -1295,18 +1334,23 @@ export default function PortfolioPage() {
   const visibleSnapshots = isAllPortfoliosView
     ? portfolioSnapshots.filter((snapshot) => !snapshot.portfolioId)
     : portfolioSnapshots.filter((snapshot) => snapshot.portfolioId === activePortfolioId);
-  const portfolioValueSeries = buildPortfolioValueSeries(visibleSnapshots, visiblePortfolioMetrics.currentValueCents, locale, 'all', visiblePortfolioMetrics.investedCents, visiblePortfolioCashflows, visiblePortfolioSales);
+  const portfolioValueSeries = buildPortfolioValueSeries(visibleSnapshots, visiblePortfolioMetrics.currentValueCents, locale, portfolioValuePeriod, visiblePortfolioMetrics.investedCents, visiblePortfolioCashflows, visiblePortfolioSales);
   const portfolioValueDomain = useMemo(() => {
     const realTimes = portfolioValueSeries
       .filter((p) => p.valueCents > 0)
       .map((p) => new Date(p.capturedAt).getTime())
       .filter(Boolean);
+    if (portfolioValuePeriod !== 'all') {
+      const [windowStart] = getPortfolioPeriodWindow(portfolioValuePeriod);
+      const firstRealTime = realTimes.length ? Math.min(...realTimes) : windowStart;
+      return [Math.max(windowStart, firstRealTime), Date.now()];
+    }
     if (!realTimes.length) return [Date.now() - 30 * 24 * 60 * 60 * 1000, Date.now()];
     return [Math.min(...realTimes), Date.now()];
-  }, [portfolioValueSeries]);
+  }, [portfolioValueSeries, portfolioValuePeriod]);
   const visiblePortfolioValueSeries = useMemo(
-    () => filterPortfolioValueSeries(portfolioValueSeries, 'all', locale),
-    [portfolioValueSeries, locale],
+    () => filterPortfolioValueSeries(portfolioValueSeries, portfolioValuePeriod, locale),
+    [portfolioValueSeries, portfolioValuePeriod, locale],
   );
   const portfolioYDomain = useMemo(() => {
     const values = visiblePortfolioValueSeries
@@ -1318,6 +1362,17 @@ export default function PortfolioPage() {
     const range = max - min || max;
     return [Math.max(0, Math.floor(min - range * 0.25)), Math.ceil(max + range * 0.05)];
   }, [visiblePortfolioValueSeries]);
+  const portfolioTickFormatter = useMemo(() => {
+    const [domainStart, domainEnd] = portfolioValueDomain;
+    const spanMs = domainEnd - domainStart;
+    const DAY = 24 * 60 * 60 * 1000;
+    let fmt;
+    if (spanMs < 2 * DAY)       fmt = { hour: '2-digit', minute: '2-digit' };
+    else if (spanMs < 14 * DAY) fmt = { month: 'short', day: 'numeric', hour: '2-digit' };
+    else                        fmt = { month: 'short', day: 'numeric' };
+    const intl = new Intl.DateTimeFormat(locale || 'en-GB', fmt);
+    return (value) => intl.format(new Date(value));
+  }, [portfolioValueDomain, locale]);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
@@ -1865,13 +1920,67 @@ export default function PortfolioPage() {
         variant="chart"
         className={rise(2)}
       >
+        {/* Period selector */}
+        <div className="flex items-center gap-0.5 px-1 pb-3">
+          {PORTFOLIO_PERIOD_OPTIONS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPortfolioValuePeriod(p)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                portfolioValuePeriod === p
+                  ? 'bg-accent text-accent-ink'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-raised'
+              }`}
+            >
+              {p === 'all' ? t('common.all') : p.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* P&L summary row */}
+        {visiblePortfolioMetrics.investedCents > 0 && (() => {
+          const pnlCents = visiblePortfolioMetrics.currentValueCents - visiblePortfolioMetrics.investedCents;
+          const pnlPct   = (pnlCents / visiblePortfolioMetrics.investedCents) * 100;
+          const isUp     = pnlCents >= 0;
+          return (
+            <div className="flex items-center gap-6 px-1 pb-4">
+              <div className="flex flex-col gap-0.5">
+                <p className="eyebrow text-[0.6rem] text-ink-muted">{t('portfolio.valueChart.value')}</p>
+                <p className="text-base font-semibold tabular-nums text-ink">
+                  {formatCurrency(visiblePortfolioMetrics.currentValueCents, currency, locale)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <p className="eyebrow text-[0.6rem] text-ink-muted">{t('portfolio.valueChart.invested')}</p>
+                <p className="text-base font-semibold tabular-nums text-ink">
+                  {formatCurrency(visiblePortfolioMetrics.investedCents, currency, locale)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <p className="eyebrow text-[0.6rem] text-ink-muted">P&amp;L</p>
+                <p className={`text-base font-semibold tabular-nums ${isUp ? 'text-positive' : 'text-danger'}`}>
+                  {isUp ? '+' : ''}{formatCurrency(pnlCents, currency, locale)}
+                  <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded-full ${isUp ? 'bg-[var(--positive-soft)] text-positive' : 'bg-[var(--danger-soft)] text-danger'}`}>
+                    {isUp ? '+' : ''}{pnlPct.toFixed(2)}%
+                  </span>
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
         {visiblePortfolioValueSeries.length ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={visiblePortfolioValueSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="portfolioValueArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.32} />
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
                   <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="portfolioCostArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.06} />
+                  <stop offset="100%" stopColor="var(--danger)" stopOpacity={0.06} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
@@ -1880,7 +1989,7 @@ export default function PortfolioPage() {
                 type="number"
                 scale="time"
                 domain={portfolioValueDomain}
-                tickFormatter={(value) => formatPortfolioPeriodLabel(value, 'all', locale)}
+                tickFormatter={portfolioTickFormatter}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
@@ -1894,22 +2003,8 @@ export default function PortfolioPage() {
                 domain={portfolioYDomain}
               />
               <Tooltip
-                formatter={(value, name) => {
-                  if (value == null) return [null, null];
-                  return [
-                    formatCurrency(value, currency, locale),
-                    name === 'valueCents' ? t('portfolio.valueChart.tooltipValue') : t('portfolio.valueChart.tooltipCost'),
-                  ];
-                }}
-                labelFormatter={(_, payload) => {
-                  const point = payload?.[0]?.payload;
-                  return point?.capturedAt
-                    ? new Intl.DateTimeFormat(locale || 'en-GB', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      }).format(new Date(point.capturedAt))
-                    : '';
-                }}
+                content={(props) => <PortfolioTooltip {...props} currency={currency} locale={locale} />}
+                cursor={{ stroke: 'var(--ink-faint)', strokeWidth: 1, strokeDasharray: '2 4' }}
               />
               <Area
                 type="monotone"
@@ -1917,7 +2012,8 @@ export default function PortfolioPage() {
                 stroke="var(--danger)"
                 strokeDasharray="4 3"
                 strokeWidth={1.5}
-                fill="none"
+                fill="url(#portfolioCostArea)"
+                fillOpacity={1}
                 dot={false}
                 connectNulls={false}
                 activeDot={false}

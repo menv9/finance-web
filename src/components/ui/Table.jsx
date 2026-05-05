@@ -81,6 +81,7 @@ export function Table({
 }) {
   const touchPreviewTimer = useRef(null);
   const pointerStart = useRef(null);
+  const recentTap = useRef(null);
   const [touchPreview, setTouchPreview] = useState(null);
   const pad = density === 'compact' ? 'px-3 py-2' : 'px-4 py-3';
   const visibilityClass = (column) => cn(
@@ -124,13 +125,19 @@ export function Table({
       touchPreviewTimer.current = null;
     }
   };
-  const showTouchPreview = (x, y, text) => {
+  const isAndroid = () => (
+    typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+  );
+  const showTouchPreview = (x, y, text, anchorElement) => {
     if (!text) return;
     clearTouchPreviewTimer();
+    const rect = anchorElement?.getBoundingClientRect?.();
+    const anchorX = rect ? rect.left + rect.width / 2 : x;
+    const anchorY = rect ? rect.top : y;
     setTouchPreview({
       text,
-      x: Math.min(Math.max(x || window.innerWidth / 2, 24), window.innerWidth - 24),
-      y: Math.min(Math.max(y || window.innerHeight / 2, 56), window.innerHeight - 56),
+      x: Math.min(Math.max(anchorX || window.innerWidth / 2, 24), window.innerWidth - 24),
+      y: Math.min(Math.max(anchorY || window.innerHeight / 2, 56), window.innerHeight - 56),
     });
     touchPreviewTimer.current = window.setTimeout(() => setTouchPreview(null), 1400);
   };
@@ -146,7 +153,25 @@ export function Table({
     const dx = Math.abs(event.clientX - start.x);
     const dy = Math.abs(event.clientY - start.y);
     if (dx > 10 || dy > 10) return;
+    if (isAndroid()) {
+      recentTap.current = {
+        element: event.currentTarget,
+        text,
+        expiresAt: Date.now() + 500,
+      };
+      return;
+    }
     showTouchPreview(event.clientX, event.clientY, text);
+  };
+  const onCellClick = (event, text) => {
+    if (!isAndroid()) return;
+    const tap = recentTap.current;
+    recentTap.current = null;
+    if (tap && tap.text === text && tap.expiresAt >= Date.now()) {
+      showTouchPreview(null, null, text, tap.element || event.currentTarget);
+      return;
+    }
+    showTouchPreview(null, null, text, event.currentTarget);
   };
 
   return (
@@ -281,6 +306,7 @@ export function Table({
                         onPointerDown={onPointerDown}
                         onPointerUp={(event) => onPointerUp(event, cellText)}
                         onPointerCancel={() => { pointerStart.current = null; }}
+                        onClick={(event) => onCellClick(event, cellText)}
                       >
                         {content}
                       </div>
