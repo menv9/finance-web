@@ -31,10 +31,10 @@ function GoalIconPicker({ value, onChange }) {
           key={key}
           type="button"
           onClick={() => onChange(key)}
-          className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
+          className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border-2 transition-colors ${
             value === key
-              ? 'border-accent bg-accent/10 text-accent'
-              : 'border-rule bg-surface-raised text-ink-muted hover:border-accent/40 hover:text-ink'
+              ? 'border-accent bg-accent text-accent-ink shadow-sm'
+              : 'border-rule bg-surface-raised text-ink-muted hover:border-accent/50 hover:text-ink'
           }`}
         >
           <Icon size={16} />

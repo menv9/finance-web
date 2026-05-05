@@ -363,15 +363,18 @@ export default function ActivityFeedPage() {
       />
 
       {goalInvitations.length > 0 && (
-        <div className="space-y-2">
-          {goalInvitations.map((goal) => (
-            <GoalInvitationCard
-              key={goal.id}
-              goal={goal}
-              onAccept={() => acceptGoalInvitation(goal.id)}
-              onDecline={() => declineGoalInvitation(goal.id)}
-            />
-          ))}
+        <div className="rounded-xl border border-accent/40 bg-surface p-4 shadow-sm space-y-3">
+          <p className="eyebrow text-xs text-accent">{t('sharedGoals.invitationEyebrow')}</p>
+          <div className="space-y-2">
+            {goalInvitations.map((goal) => (
+              <GoalInvitationCard
+                key={goal.id}
+                goal={goal}
+                onAccept={() => acceptGoalInvitation(goal.id)}
+                onDecline={() => declineGoalInvitation(goal.id)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
