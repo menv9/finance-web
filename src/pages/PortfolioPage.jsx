@@ -142,11 +142,12 @@ function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period 
   }
   if (currentValueCents > 0) {
     const capturedAt = new Date().toISOString();
+    const liveCost = costAtDate(capturedAt) || investedCents || null;
     const livePoint = {
       id: 'live',
       capturedAt,
       valueCents: currentValueCents,
-      costCents: investedCents || null,
+      costCents: liveCost,
       label: formatHourlyLabel(capturedAt, locale),
     };
     if (!series.length) return [livePoint];
@@ -156,7 +157,7 @@ function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period 
     const liveCapturedAt = new Date(capturedAt).getTime();
     const lastIsCurrentHour = last.id === `psn-${capturedAt.slice(0, 13)}` || Math.abs(liveCapturedAt - lastCapturedAt) < 60_000;
     if (lastIsCurrentHour) {
-      return [...series.slice(0, -1), { ...last, valueCents: currentValueCents, costCents: investedCents || last.costCents }];
+      return [...series.slice(0, -1), { ...last, valueCents: currentValueCents, costCents: liveCost || last.costCents }];
     }
     return [...series, livePoint];
   }

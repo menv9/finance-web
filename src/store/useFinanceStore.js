@@ -1458,15 +1458,23 @@ export const useFinanceStore = create((set, get) => ({
     try {
     const previous = get()[storeName]?.find((item) => item.id === id);
     if (storeName === 'investmentPortfolios') {
-      const hasLinkedData =
-        get().holdings.some((item) => item.portfolioId === id) ||
-        get().portfolioSales.some((item) => item.portfolioId === id) ||
-        get().portfolioCashflows.some((item) => item.portfolioId === id) ||
-        get().dividends.some((item) => item.portfolioId === id) ||
-        get().portfolioSnapshots.some((item) => item.portfolioId === id);
-      if (hasLinkedData) {
-        throw new Error('This portfolio has holdings or history. Move or remove its data before deleting it.');
+      const activeHoldings = get().holdings.filter(
+        (item) => item.portfolioId === id && !item.archivedAt && (item.quantity || 0) > 0,
+      );
+      if (activeHoldings.length) {
+        throw new Error('This portfolio still has active holdings. Sell or remove them before deleting it.');
       }
+      // Cascade: remove all linked data for this portfolio
+      const linkedHoldings = get().holdings.filter((item) => item.portfolioId === id);
+      for (const h of linkedHoldings) await get().removeEntity('holdings', h.id);
+      const linkedSales = get().portfolioSales.filter((item) => item.portfolioId === id);
+      for (const s of linkedSales) await get().removeEntity('portfolioSales', s.id);
+      const linkedCashflows = get().portfolioCashflows.filter((item) => item.portfolioId === id);
+      for (const c of linkedCashflows) await get().removeEntity('portfolioCashflows', c.id);
+      const linkedDividends = get().dividends.filter((item) => item.portfolioId === id);
+      for (const d of linkedDividends) await get().removeEntity('dividends', d.id);
+      const linkedSnapshots = get().portfolioSnapshots.filter((item) => item.portfolioId === id);
+      for (const s of linkedSnapshots) await get().removeEntity('portfolioSnapshots', s.id);
     }
     // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
     // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
