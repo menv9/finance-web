@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { UserCircle } from 'lucide-react';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { Modal } from './ui';
@@ -40,17 +41,6 @@ const NAV_GROUPS = [
     ],
   },
   { kind: 'link', to: '/portfolio', labelKey: 'nav.investing', module: 'portfolio' },
-  {
-    kind: 'menu',
-    id: 'social',
-    labelKey: 'nav.social',
-    module: 'social',
-    items: [
-      { to: '/activity', labelKey: 'nav.activity', module: 'social' },
-      { to: '/friends', labelKey: 'nav.friends', module: 'social' },
-    ],
-  },
-  { kind: 'link', to: '/profile', labelKey: 'nav.profile', module: 'social' },
 ];
 
 const MORE_LINKS = [
@@ -61,9 +51,6 @@ const MORE_LINKS = [
   { to: '/budgets', labelKey: 'nav.budgets' },
   { to: '/savings', labelKey: 'nav.savings' },
   { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
-  { to: '/activity', labelKey: 'nav.activity', module: 'social' },
-  { to: '/friends', labelKey: 'nav.friends', module: 'social' },
-  { to: '/profile', labelKey: 'nav.profile', module: 'social' },
   { to: '/settings', labelKey: 'nav.settings' },
 ];
 
@@ -297,6 +284,7 @@ export function AppShell({ children }) {
   const [openNavMenu, setOpenNavMenu] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
   const baseCurrency = settings.baseCurrency;
   const moduleVisible = useMemo(
@@ -315,7 +303,6 @@ export function AppShell({ children }) {
           { kind: 'link', to: '/this-month', labelKey: 'nav.month' },
           { kind: 'link', to: '/expenses',   labelKey: 'nav.expenses' },
           { kind: 'link', to: '/income',     labelKey: 'nav.income' },
-          { kind: 'link', to: '/profile',    labelKey: 'nav.profile', module: 'social' },
         ].filter(moduleVisible);
       }
       return NAV_GROUPS
@@ -416,19 +403,21 @@ export function AppShell({ children }) {
     setOpenNavMenu(null);
     setAddMenuOpen(false);
     setThemeMenuOpen(false);
+    setProfileMenuOpen(false);
     setMobileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!openNavMenu && !addMenuOpen && !themeMenuOpen) return undefined;
+    if (!openNavMenu && !addMenuOpen && !themeMenuOpen && !profileMenuOpen) return undefined;
     const closeMenus = () => {
       setOpenNavMenu(null);
       setAddMenuOpen(false);
       setThemeMenuOpen(false);
+      setProfileMenuOpen(false);
     };
     window.addEventListener('click', closeMenus);
     return () => window.removeEventListener('click', closeMenus);
-  }, [openNavMenu, addMenuOpen, themeMenuOpen]);
+  }, [openNavMenu, addMenuOpen, themeMenuOpen, profileMenuOpen]);
 
   useEffect(() => {
     const openEntryModal = (event) => {
@@ -622,26 +611,6 @@ export function AppShell({ children }) {
               )}
             </div>
 
-            {/* User pill + sign-out — only when Supabase auth is active */}
-            {supabaseConfigured && supabaseUser && (
-              <div className="hidden sm:flex items-center gap-2 border-l border-rule pl-3">
-                <span
-                  className="eyebrow text-[0.6rem] text-ink-faint max-w-[140px] truncate"
-                  title={supabaseUser.email}
-                >
-                  {userHandle}
-                </span>
-                <button
-                  type="button"
-                  onClick={signOutSupabase}
-                  aria-label={t('common.signOut')}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-faint transition-colors duration-180 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <SignOutIcon />
-                </button>
-              </div>
-            )}
-
             <div
               role="group"
               aria-label={t('shell.workspace.groupLabel')}
@@ -668,6 +637,130 @@ export function AppShell({ children }) {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Profile dropdown */}
+            <div className="relative" onClick={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((v) => !v)}
+                aria-label={t('nav.profile')}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <UserCircle className="h-4 w-4" />
+              </button>
+              {profileMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-11 z-40 w-52 rounded-lg border border-rule bg-surface p-1 shadow-lift"
+                >
+                  {supabaseUser && (
+                    <div className="px-3 py-2 border-b border-rule mb-1">
+                      <p className="text-sm text-ink truncate">{userHandle}</p>
+                      <p className="eyebrow text-[0.6rem] text-ink-faint truncate">{supabaseUser.email}</p>
+                    </div>
+                  )}
+                  <NavLink
+                    to="/profile"
+                    role="menuitem"
+                    className={({ isActive }) => cn(
+                      'flex items-center rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                      isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                    )}
+                  >
+                    {t('nav.profile')}
+                  </NavLink>
+                  {settings.modules?.social !== false && (
+                    <>
+                      <NavLink
+                        to="/activity"
+                        role="menuitem"
+                        className={({ isActive }) => cn(
+                          'flex items-center rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                          isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                        )}
+                      >
+                        {t('nav.activity')}
+                      </NavLink>
+                      <NavLink
+                        to="/friends"
+                        role="menuitem"
+                        className={({ isActive }) => cn(
+                          'flex items-center rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                          isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                        )}
+                      >
+                        {t('nav.friends')}
+                      </NavLink>
+                    </>
+                  )}
+                  {supabaseConfigured && supabaseUser && (
+                    <div className="border-t border-rule mt-1 pt-1">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setProfileMenuOpen(false); signOutSupabase(); }}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-muted transition-colors duration-150 hover:bg-surface-raised hover:text-danger"
+                      >
+                        <SignOutIcon />
+                        <span>{t('common.signOut')}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative" onClick={(event) => event.stopPropagation()}>
+              {(() => {
+                const ActiveIcon = (THEME_OPTIONS.find((o) => o.value === appliedTheme)?.Icon) || SunIcon;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setThemeMenuOpen((v) => !v)}
+                    aria-label={t('theme.menuLabel')}
+                    aria-haspopup="menu"
+                    aria-expanded={themeMenuOpen}
+                    title={t('theme.title')}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  >
+                    <ActiveIcon />
+                  </button>
+                );
+              })()}
+              {themeMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-11 z-40 w-52 rounded-lg border border-rule bg-surface p-1 shadow-lift"
+                >
+                  {THEME_OPTIONS.map((opt) => {
+                    const active = appliedTheme === opt.value;
+                    const OptIcon = opt.Icon;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        onClick={() => { setTheme(opt.value); setThemeMenuOpen(false); }}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors duration-150',
+                          active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                        )}
+                      >
+                        <span className={active ? 'text-accent' : 'text-ink-faint'}><OptIcon /></span>
+                        <span className="flex flex-col leading-tight min-w-0">
+                          <span className="truncate">{t(opt.labelKey)}</span>
+                          <span className="eyebrow text-[0.55rem] text-ink-faint truncate">{t(opt.hintKey)}</span>
+                        </span>
+                        {active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
             <div
@@ -741,55 +834,6 @@ export function AppShell({ children }) {
                   </div>
                 </div>
               )}
-            </div>
-            <div className="relative" onClick={(event) => event.stopPropagation()}>
-              {(() => {
-                const ActiveIcon = (THEME_OPTIONS.find((o) => o.value === appliedTheme)?.Icon) || SunIcon;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setThemeMenuOpen((v) => !v)}
-                    aria-label={t('theme.menuLabel')}
-                    aria-haspopup="menu"
-                    aria-expanded={themeMenuOpen}
-                    title={t('theme.title')}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong text-ink-muted transition-colors duration-180 hover:text-ink hover:border-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                  >
-                    <ActiveIcon />
-                  </button>
-                );
-              })()}
-              {themeMenuOpen ? (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-11 z-40 w-52 rounded-lg border border-rule bg-surface p-1 shadow-lift"
-                >
-                  {THEME_OPTIONS.map((opt) => {
-                    const active = appliedTheme === opt.value;
-                    const OptIcon = opt.Icon;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={active}
-                        onClick={() => { setTheme(opt.value); setThemeMenuOpen(false); }}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors duration-150',
-                          active ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
-                        )}
-                      >
-                        <span className={active ? 'text-accent' : 'text-ink-faint'}><OptIcon /></span>
-                        <span className="flex flex-col leading-tight min-w-0">
-                          <span className="truncate">{t(opt.labelKey)}</span>
-                          <span className="eyebrow text-[0.55rem] text-ink-faint truncate">{t(opt.hintKey)}</span>
-                        </span>
-                        {active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
             </div>
             <button
               type="button"
