@@ -248,6 +248,14 @@ function inferPortfolioIdFromTicker(ticker, holdings, fallbackPortfolioId = null
   return uniqueIds.length === 1 ? uniqueIds[0] : fallbackPortfolioId;
 }
 
+function resolveHoldingPurchaseDate(holding, cashflows = []) {
+  if (holding?.purchaseDate) return holding.purchaseDate;
+  const linkedBuy = (cashflows || []).find((flow) => flow.kind === 'buy' && flow.holdingId === holding?.id && flow.date);
+  if (linkedBuy?.date) return linkedBuy.date;
+  if (holding?.createdAt) return holding.createdAt.slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+
 async function normalizeInvestmentPortfolioRecords(records, settings) {
   const timestamp = new Date().toISOString();
   const portfolios = [...(records.investmentPortfolios || [])];
@@ -255,9 +263,12 @@ async function normalizeInvestmentPortfolioRecords(records, settings) {
     portfolios.push(defaultInvestmentPortfolio(timestamp));
   }
   const fallbackPortfolioId = portfolios[0]?.id || null;
-  const normalizedHoldings = (records.holdings || []).map((holding) => (
-    holding.portfolioId || !fallbackPortfolioId ? holding : { ...holding, portfolioId: fallbackPortfolioId, updatedAt: timestamp }
-  ));
+  const normalizedHoldings = (records.holdings || []).map((holding) => {
+    const patch = {};
+    if (!holding.portfolioId && fallbackPortfolioId) patch.portfolioId = fallbackPortfolioId;
+    if (!holding.purchaseDate) patch.purchaseDate = resolveHoldingPurchaseDate(holding, records.portfolioCashflows);
+    return Object.keys(patch).length ? { ...holding, ...patch, updatedAt: timestamp } : holding;
+  });
   const holdingsById = new Map(normalizedHoldings.map((holding) => [holding.id, holding]));
   const normalizedSales = (records.portfolioSales || []).map((sale) => {
     const portfolioId = sale.portfolioId || holdingsById.get(sale.holdingId)?.portfolioId || fallbackPortfolioId;
@@ -1381,6 +1392,9 @@ export const useFinanceStore = create((set, get) => ({
       const fallbackPortfolioId = get().investmentPortfolios?.[0]?.id;
       if (!fallbackPortfolioId) throw new Error('Create a portfolio before adding holdings.');
       value = { ...value, portfolioId: fallbackPortfolioId };
+    }
+    if (storeName === 'holdings' && !value.purchaseDate) {
+      value = { ...value, purchaseDate: resolveHoldingPurchaseDate(value, get().portfolioCashflows) };
     }
     if ((storeName === 'portfolioSales' || storeName === 'portfolioCashflows') && !value.portfolioId) {
       const portfolioId = get().holdings.find((holding) => holding.id === value.holdingId)?.portfolioId

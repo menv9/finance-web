@@ -40,7 +40,16 @@ const NAV_GROUPS = [
       { to: '/savings', labelKey: 'nav.savings' },
     ],
   },
-  { kind: 'link', to: '/portfolio', labelKey: 'nav.investing', module: 'portfolio' },
+  {
+    kind: 'menu',
+    id: 'investing',
+    labelKey: 'nav.investing',
+    module: 'portfolio',
+    items: [
+      { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
+      { to: '/portfolio/platforms', labelKey: 'nav.platforms', module: 'portfolio' },
+    ],
+  },
 ];
 
 const MORE_LINKS = [
@@ -51,6 +60,7 @@ const MORE_LINKS = [
   { to: '/budgets', labelKey: 'nav.budgets' },
   { to: '/savings', labelKey: 'nav.savings' },
   { to: '/portfolio', labelKey: 'nav.portfolio', module: 'portfolio' },
+  { to: '/portfolio/platforms', labelKey: 'nav.platforms', module: 'portfolio' },
   { to: '/settings', labelKey: 'nav.settings' },
 ];
 

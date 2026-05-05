@@ -15,6 +15,7 @@ const defaultValue = {
   ticker: '',
   name: '',
   platform: 'Trade Republic',
+  purchaseDate: '',
   fundingSource: 'cashflow',
   purchaseAmountCents: '',
   quantity: '',
@@ -382,7 +383,16 @@ function SelectedAssetSummary({ ticker, name }) {
   );
 }
 
-export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = '', bankAccounts = [] }) {
+export function HoldingForm({
+  initialValue,
+  onSubmit,
+  onCancel,
+  finnhubApiKey = '',
+  bankAccounts = [],
+  allowPurchaseDate = false,
+  historicalMode = false,
+  lockedPlatform = '',
+}) {
   const isEditing = Boolean(initialValue?.id);
   const usesAssetSearch = !isEditing && !initialValue?.ticker;
   const settings = useFinanceStore((state) => state.settings);
@@ -396,7 +406,8 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
-    platform: initialValue?.platform || settings.holdingPlatforms?.[0] || 'Trade Republic',
+    platform: lockedPlatform || initialValue?.platform || settings.holdingPlatforms?.[0] || 'Trade Republic',
+    purchaseDate: initialValue?.purchaseDate || new Date().toISOString().slice(0, 10),
     bankAccountId: defaultBankAccountId,
     quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
@@ -490,6 +501,8 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
           quantity: resolvedQuantity,
           quantityDecimals: resolvedQuantityDecimals,
           purchaseAmountCents,
+          purchaseDate: form.purchaseDate || new Date().toISOString().slice(0, 10),
+          platform: lockedPlatform || form.platform,
           averageBuyPriceCents,
           currentPriceCents: Math.round(Number(form.currentPriceCents || 0) * 100),
           feeCents: Math.round(Number(form.feeCents || 0) * 100),
@@ -535,7 +548,14 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
         ) : null}
 
         <FormField label="Platform" htmlFor="holding-platform" className="md:col-span-2">
-          {() => (
+          {() => lockedPlatform ? (
+            <Input
+              id="holding-platform"
+              value={lockedPlatform}
+              readOnly
+              className="bg-surface-sunken"
+            />
+          ) : (
             <PlatformSelect
               id="holding-platform"
               value={form.platform}
@@ -546,7 +566,21 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
       </FormSection>
 
       <FormSection step="2" title="Purchase">
-        {!isEditing ? (
+        {allowPurchaseDate ? (
+          <FormField label="Purchase date" htmlFor="holding-purchase-date" required>
+            {(props) => (
+              <Input
+                {...props}
+                type="date"
+                value={form.purchaseDate}
+                onChange={set('purchaseDate')}
+                required
+              />
+            )}
+          </FormField>
+        ) : null}
+
+        {!isEditing && !historicalMode ? (
           <FormField label="Money source" htmlFor="holding-funding-source" required>
             {(props) => (
               <Select {...props} value={form.fundingSource} onChange={set('fundingSource')} required>
@@ -557,7 +591,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
           </FormField>
         ) : null}
 
-        {!isEditing && form.fundingSource === 'cashflow' && bankAccounts.length ? (
+        {!isEditing && !historicalMode && form.fundingSource === 'cashflow' && bankAccounts.length ? (
           <FormField label="Source bank" htmlFor="holding-bank-account" required>
             {(props) => (
               <Select
@@ -576,7 +610,7 @@ export function HoldingForm({ initialValue, onSubmit, onCancel, finnhubApiKey = 
           </FormField>
         ) : null}
 
-        {!isEditing ? (
+        {!isEditing && !historicalMode ? (
           <FormField
             label={`Amount invested (${priceCurrency})`}
             htmlFor="holding-purchase-amount"

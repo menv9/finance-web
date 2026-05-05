@@ -695,7 +695,37 @@ describe('investment portfolios', () => {
     });
 
     expect(holding.portfolioId).toBe('ipr-main');
+    expect(holding.purchaseDate).toBe('2026-05-01');
     expect(useFinanceStore.getState().holdings[0].portfolioId).toBe('ipr-main');
+  });
+
+  it('saves historical broker holdings without creating portfolio cashflows or bank movements', async () => {
+    await useFinanceStore.getState().saveEntity('investmentPortfolios', {
+      id: 'ipr-main',
+      name: 'Main Portfolio',
+    });
+    useFinanceStore.setState((state) => ({
+      ...state,
+      bankAccounts: [{ id: 'bank-a', name: 'Main', balanceCents: 50000, currency: 'EUR' }],
+    }));
+
+    const holding = await useFinanceStore.getState().saveEntity('holdings', {
+      portfolioId: 'ipr-main',
+      ticker: 'AAPL',
+      name: 'Apple Inc.',
+      platform: 'IBKR',
+      purchaseDate: '2024-01-15',
+      quantity: 2,
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 12000,
+      currency: 'EUR',
+    });
+
+    const state = useFinanceStore.getState();
+    expect(holding.purchaseDate).toBe('2024-01-15');
+    expect(state.portfolioCashflows).toEqual([]);
+    expect(state.savingsEntries.filter((entry) => entry.kind === 'portfolio_buy')).toEqual([]);
+    expect(state.bankAccounts[0].balanceCents).toBe(50000);
   });
 
   it('blocks deleting a portfolio with linked data and allows deleting an empty one', async () => {
@@ -783,6 +813,7 @@ describe('investment portfolios', () => {
     const state = useFinanceStore.getState();
     expect(state.investmentPortfolios).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'ipr-main', name: 'Main Portfolio' })]));
     expect(state.holdings[0].portfolioId).toBe('ipr-main');
+    expect(state.holdings[0].purchaseDate).toBe('2026-05-01');
     expect(state.dividends[0].portfolioId).toBe('ipr-main');
     expect(state.portfolioCashflows[0].portfolioId).toBe('ipr-main');
     expect(state.portfolioSales[0].portfolioId).toBe('ipr-main');

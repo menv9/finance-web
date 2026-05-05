@@ -89,11 +89,25 @@ function getPortfolioPeriodWindow(period, now = Date.now()) {
   return [startDate.getTime(), end];
 }
 
-function buildCostAtDateFn(cashflows, portfolioSales) {
+function buildCostAtDateFn(cashflows, portfolioSales, holdings = [], fxRates = {}, baseCurrency = 'EUR') {
+  const buyHoldingIds = new Set((cashflows || [])
+    .filter((cf) => cf.kind === 'buy' && cf.holdingId)
+    .map((cf) => cf.holdingId));
   const events = [
     ...(cashflows || [])
       .filter((cf) => cf.kind === 'buy' && cf.date)
       .map((cf) => ({ date: cf.date, delta: Math.abs(cf.amountCents || 0) })),
+    ...(holdings || [])
+      .filter((holding) => !buyHoldingIds.has(holding.id))
+      .map((holding) => {
+        const date = holding.purchaseDate || holding.createdAt?.slice(0, 10);
+        if (!date) return null;
+        const nativeCost = Math.round(Number(holding.quantity || 0) * (holding.averageBuyPriceCents || 0));
+        const baseCost = applyFx(nativeCost, holding.currency, fxRates, baseCurrency);
+        const fee = applyFx(holding.feeCents || 0, holding.feeCurrency || holding.currency, fxRates, baseCurrency);
+        return { date, delta: baseCost + fee };
+      })
+      .filter(Boolean),
     ...(portfolioSales || [])
       .filter((sale) => sale.date && sale.costBasisCents)
       .map((sale) => ({ date: sale.date, delta: -(sale.costBasisCents || 0) })),
@@ -109,8 +123,8 @@ function buildCostAtDateFn(cashflows, portfolioSales) {
   };
 }
 
-function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period = '1m', investedCents = 0, cashflows = [], portfolioSales = []) {
-  const costAtDate = buildCostAtDateFn(cashflows, portfolioSales);
+function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period = '1m', investedCents = 0, cashflows = [], portfolioSales = [], holdings = [], fxRates = {}, baseCurrency = 'EUR') {
+  const costAtDate = buildCostAtDateFn(cashflows, portfolioSales, holdings, fxRates, baseCurrency);
   const sorted = (snapshots || [])
     .filter((snapshot) => snapshot?.capturedAt)
     .slice()
@@ -1334,7 +1348,18 @@ export default function PortfolioPage() {
   const visibleSnapshots = isAllPortfoliosView
     ? portfolioSnapshots.filter((snapshot) => !snapshot.portfolioId)
     : portfolioSnapshots.filter((snapshot) => snapshot.portfolioId === activePortfolioId);
-  const portfolioValueSeries = buildPortfolioValueSeries(visibleSnapshots, visiblePortfolioMetrics.currentValueCents, locale, portfolioValuePeriod, visiblePortfolioMetrics.investedCents, visiblePortfolioCashflows, visiblePortfolioSales);
+  const portfolioValueSeries = buildPortfolioValueSeries(
+    visibleSnapshots,
+    visiblePortfolioMetrics.currentValueCents,
+    locale,
+    portfolioValuePeriod,
+    visiblePortfolioMetrics.investedCents,
+    visiblePortfolioCashflows,
+    visiblePortfolioSales,
+    visibleHoldings,
+    fxRates,
+    currency,
+  );
   const portfolioValueDomain = useMemo(() => {
     const realTimes = portfolioValueSeries
       .filter((p) => p.valueCents > 0)
@@ -2433,9 +2458,10 @@ export default function PortfolioPage() {
               }
               const saved = await saveEntity('holdings', holdingValue);
               if (isNew) {
+                const purchaseDate = normalizeDateInput(new Date());
                 if (cost > 0) {
                   await addPortfolioBuy({
-                    date: normalizeDateInput(new Date()),
+                    date: purchaseDate,
                     amountCents: cost,
                     fundingSource: fundingSource === 'savings' ? 'savings' : 'cashflow',
                     holdingId: saved.id,

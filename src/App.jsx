@@ -28,6 +28,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const IncomePage = lazy(() => import('./pages/IncomePage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const PlatformsPage = lazy(() => import('./pages/PlatformsPage'));
 const SavingsPage = lazy(() => import('./pages/SavingsPage'));
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -112,6 +113,16 @@ export default function App() {
                         element={
                           portfolioEnabled || tourActive ? (
                             <PortfolioPage />
+                          ) : (
+                            <Navigate to="/dashboard" replace />
+                          )
+                        }
+                      />
+                      <Route
+                        path="/portfolio/platforms"
+                        element={
+                          portfolioEnabled || tourActive ? (
+                            <PlatformsPage />
                           ) : (
                             <Navigate to="/dashboard" replace />
                           )
