@@ -380,7 +380,7 @@ function GoalCard({ goal, currentUserId, friends, currency, onEdit, onDelete, on
           <ProgressBar valueCents={totalCents} targetCents={goal.target_cents} />
           <div className="flex justify-between text-xs text-ink-muted">
             <span className="numeric">{formatCurrency(totalCents / 100, goal.currency || currency)}</span>
-            <span className="numeric">{pct}% · {formatCurrency(goal.target_cents / 100, goal.currency || currency)}</span>
+            <span className="numeric">{pct}% · {formatCurrency(goal.target_cents, goal.currency || currency)}</span>
           </div>
         </div>
 
