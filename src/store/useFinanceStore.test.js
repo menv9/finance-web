@@ -213,27 +213,116 @@ describe('account-backed transaction saves', () => {
     expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(10000);
   });
 
-  it('keeps savings withdrawal to bank as a real transfer', async () => {
+  it('withdrawSavings: moves money to bank without creating income or transfer rows', async () => {
     useFinanceStore.setState((state) => ({
       ...state,
       savingsEntries: [{ id: 'sav-a', date: '2026-05-01', amountCents: 5000 }],
     }));
 
-    await useFinanceStore.getState().executeTransfer({
+    await useFinanceStore.getState().withdrawSavings({
       date: '2026-05-02',
       amountCents: 2000,
-      fromModule: 'savings',
-      toModule: 'cashflow',
       bankAccountId: 'bank-a',
       description: 'Withdrawal',
     });
 
-    const totalSavings = useFinanceStore.getState().savingsEntries
+    const state = useFinanceStore.getState();
+    const totalSavings = state.savingsEntries
       .filter((entry) => entry.source !== 'allocation')
       .reduce((sum, entry) => sum + entry.amountCents, 0);
+    const newEntry = state.savingsEntries.find((e) => e.id !== 'sav-a');
 
     expect(totalSavings).toBe(3000);
-    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(12000);
+    expect(state.bankAccounts[0].balanceCents).toBe(12000);
+    expect(newEntry.kind).toBe('withdrawal');
+    expect(newEntry.amountCents).toBe(-2000);
+    expect(state.transfers).toHaveLength(0);
+    expect(state.incomes.filter((i) => i.incomeKind === 'transfer')).toHaveLength(0);
+  });
+
+  it('addPortfolioBuy (cashflow): deducts bank, no savings entry, no transfer', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      bankAccounts: [{ id: 'bank-a', name: 'Main', balanceCents: 50000, currency: 'EUR' }],
+    }));
+
+    await useFinanceStore.getState().addPortfolioBuy({
+      date: '2026-05-02',
+      holdingId: 'hld-1',
+      ticker: 'VWCE',
+      amountCents: 10000,
+      fundingSource: 'cashflow',
+      bankAccountId: 'bank-a',
+    });
+
+    const state = useFinanceStore.getState();
+    const cashflow = state.portfolioCashflows[0];
+
+    expect(cashflow.kind).toBe('buy');
+    expect(cashflow.source).toBe('cashflow');
+    expect(cashflow.amountCents).toBe(-10000);
+    expect(state.bankAccounts[0].balanceCents).toBe(40000);
+    expect(state.savingsEntries).toHaveLength(0);
+    expect(state.transfers).toHaveLength(0);
+  });
+
+  it('addPortfolioBuy (savings): reduces savings, leaves bank, links savings entry to cashflow', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [{ id: 'sav-seed', date: '2026-05-01', amountCents: 50000 }],
+    }));
+
+    await useFinanceStore.getState().addPortfolioBuy({
+      date: '2026-05-02',
+      holdingId: 'hld-1',
+      ticker: 'VWCE',
+      amountCents: 10000,
+      fundingSource: 'savings',
+    });
+
+    const state = useFinanceStore.getState();
+    const cashflow = state.portfolioCashflows[0];
+    const newEntry = state.savingsEntries.find((e) => e.id !== 'sav-seed');
+
+    expect(cashflow.kind).toBe('buy');
+    expect(cashflow.source).toBe('savings');
+    expect(cashflow.bankAccountId).toBe(null);
+    expect(state.bankAccounts[0].balanceCents).toBe(10000);
+    expect(newEntry.kind).toBe('portfolio_buy');
+    expect(newEntry.cashflowId).toBe(cashflow.id);
+    expect(newEntry.amountCents).toBe(-10000);
+    expect(state.transfers).toHaveLength(0);
+  });
+
+  it('spendFromSavings: creates expense + savings entry; deletion cascades expense', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [{ id: 'sav-seed', date: '2026-05-01', amountCents: 50000 }],
+    }));
+
+    await useFinanceStore.getState().spendFromSavings({
+      date: '2026-05-02',
+      amountCents: 1500,
+      description: 'Vacation gear',
+      category: 'Travel',
+    });
+
+    let state = useFinanceStore.getState();
+    const expense = state.expenses[0];
+    const linkedEntry = state.savingsEntries.find((e) => e.id !== 'sav-seed');
+
+    expect(expense.amountCents).toBe(1500);
+    expect(expense.bankAccountId).toBeFalsy();
+    expect(linkedEntry.kind).toBe('expense');
+    expect(linkedEntry.expenseId).toBe(expense.id);
+    expect(linkedEntry.amountCents).toBe(-1500);
+    expect(state.bankAccounts[0].balanceCents).toBe(10000);
+    expect(state.transfers).toHaveLength(0);
+
+    await useFinanceStore.getState().removeEntity('savingsEntries', linkedEntry.id);
+    state = useFinanceStore.getState();
+    expect(state.expenses.find((e) => e.id === expense.id)).toBeUndefined();
+    expect(state.savingsEntries.find((e) => e.id === linkedEntry.id)).toBeUndefined();
   });
 
   it('does not adjust bank balance when creating a fixed income schedule', async () => {

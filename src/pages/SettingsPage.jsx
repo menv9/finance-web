@@ -1143,7 +1143,6 @@ export default function SettingsPage() {
                 { labelKey: 'settings.backup.modules.accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
                 { labelKey: 'settings.backup.modules.portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
                 { labelKey: 'settings.backup.modules.savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
-                { labelKey: 'settings.backup.modules.transfers', stores: ['transfers'],                                                             file: 'transfers-backup.json' },
               ];
               return (
                 <div className="flex flex-col gap-5">

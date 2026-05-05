@@ -111,6 +111,7 @@ export default function ThisMonthPage() {
   const expenses = useFinanceStore((s) => s.expenses);
   const transfers = useFinanceStore((s) => s.transfers);
   const savingsEntries = useFinanceStore((s) => s.savingsEntries);
+  const portfolioCashflows = useFinanceStore((s) => s.portfolioCashflows);
   const dividends = useFinanceStore((s) => s.dividends);
   const settings = useFinanceStore((s) => s.settings);
 
@@ -118,15 +119,23 @@ export default function ThisMonthPage() {
 
   // Compute monthly KPIs from raw data for the selected month
   const metrics = useMemo(() => {
-    const savingsPaidExpenseIds = new Set(
-      transfers
+    // Expenses paid from savings shouldn't count toward the monthly expense
+    // total — the money already left "savings" balance, not the bank. Hybrid:
+    // legacy transfer-linked expense IDs + new-style savings entries with
+    // kind === 'expense'.
+    const savingsPaidExpenseIds = new Set([
+      ...transfers
         .filter((t) => t.fromModule === 'savings' && t.toModule === 'expenses')
         .map((t) => t.linkedExpenseId)
         .filter(Boolean),
-    );
+      ...(savingsEntries || [])
+        .filter((e) => e.kind === 'expense' && e.expenseId)
+        .map((e) => e.expenseId),
+    ]);
 
-    // Exclude transfer incomes (savings withdrawals) — they affect balance but
-    // should not inflate the monthly cashflow/income metrics.
+    // Exclude transfer incomes (legacy savings withdrawals) — they affect balance
+    // but should not inflate monthly cashflow/income metrics. New-style
+    // withdrawals create no income row, so this only matters for legacy data.
     const dividendIncomeRows = buildDividendIncomeRows(dividends);
     const monthIncomes = [...incomes, ...dividendIncomeRows].filter(
       (e) =>
@@ -143,13 +152,28 @@ export default function ThisMonthPage() {
     const cashflowIncomeCents = monthCashflowIncomes.reduce((s, e) => s + (e.amountCents || 0), 0);
     const expenseCents = monthExpenses.reduce((s, e) => s + (e.amountCents || 0), 0);
 
+    // Cashflow → portfolio. Hybrid: legacy transfer rows + new-style cashflows.
     const isCashflowSource = (t) => t.fromModule === 'income' || t.fromModule === 'cashflow';
-    const distributedToPortfolioCents = monthTransfers
+    const legacyDistToPortfolio = monthTransfers
       .filter((t) => isCashflowSource(t) && t.toModule === 'portfolio')
       .reduce((s, t) => s + (t.amountCents || 0), 0);
+    const newDistToPortfolio = (portfolioCashflows || [])
+      .filter((cf) =>
+        cf.date?.startsWith(selectedMonth)
+        && cf.kind === 'buy' && cf.source === 'cashflow',
+      )
+      .reduce((s, cf) => s - (cf.amountCents || 0), 0);
+    const distributedToPortfolioCents = legacyDistToPortfolio + newDistToPortfolio;
 
+    // Net savings flow: only true deposits/withdrawals from cashflow side.
+    // Exclude allocation releases and new-style typed entries (those represent
+    // money moving between modules, not "saved this month").
     const netSavedThisMonthCents = (savingsEntries || [])
-      .filter((e) => e.date?.startsWith(selectedMonth) && e.source !== 'allocation')
+      .filter((e) =>
+        e.date?.startsWith(selectedMonth)
+        && e.source !== 'allocation'
+        && !e.kind,
+      )
       .reduce((s, e) => s + (e.amountCents || 0), 0);
 
     const cashflowCents =
@@ -164,7 +188,7 @@ export default function ThisMonthPage() {
       savedCents: netSavedThisMonthCents,
       investedCents: distributedToPortfolioCents,
     };
-  }, [incomes, dividends, expenses, transfers, savingsEntries, selectedMonth]);
+  }, [incomes, dividends, expenses, transfers, savingsEntries, portfolioCashflows, selectedMonth]);
 
   // Combined activity log for the selected month
   const activityLog = useMemo(() => {
@@ -200,6 +224,7 @@ export default function ThisMonthPage() {
         }),
       );
 
+    // Legacy transfers (kept for historical data continuity)
     transfers
       .filter((t) => t.date?.startsWith(selectedMonth) && t.date <= today)
       .forEach((t) =>
@@ -213,8 +238,25 @@ export default function ThisMonthPage() {
         }),
       );
 
+    // New-style typed savings entries surface the underlying movement
+    (savingsEntries || [])
+      .filter((e) =>
+        e.date?.startsWith(selectedMonth) && e.date <= today
+        && e.kind && !e.transferId,
+      )
+      .forEach((e) =>
+        rows.push({
+          id: e.id,
+          type: 'savings_movement',
+          date: e.date,
+          label: e.note || e.kind,
+          amountCents: Math.abs(e.amountCents || 0),
+          direction: e.kind === 'withdrawal' ? 'in' : 'out',
+        }),
+      );
+
     return rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [incomes, dividends, expenses, transfers, selectedMonth]);
+  }, [incomes, dividends, expenses, transfers, savingsEntries, selectedMonth]);
 
   // 12-month bar chart data + selected month highlight label
   const chartData = dashboard.cashflowSeries || [];

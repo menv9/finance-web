@@ -1275,17 +1275,20 @@ export const useFinanceStore = create((set, get) => ({
       const holding = get().holdings.find((h) => h.id === id);
       const cashflows = get().portfolioCashflows.filter((c) => c.holdingId === id);
       for (const cf of cashflows) {
-        if (cf.transferId) {
-          await get().removeTransfer(cf.transferId);
-        } else {
-          await get().removeEntity('portfolioCashflows', cf.id);
-        }
+        await get().removeEntity('portfolioCashflows', cf.id);
       }
       if (holding?.ticker) {
         const dividends = get().dividends.filter((d) => d.ticker === holding.ticker);
         for (const div of dividends) {
           await get().removeDividend(div.id);
         }
+      }
+    }
+    if (storeName === 'savingsEntries' && previous) {
+      if (previous.kind === 'expense' && previous.expenseId) {
+        await get().removeEntity('expenses', previous.expenseId);
+      } else if (previous.kind === 'portfolio_buy' && previous.cashflowId) {
+        await get().removeEntity('portfolioCashflows', previous.cashflowId);
       }
     }
 
@@ -1962,121 +1965,46 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
-  executeTransfer: async (spec) => {
-    const { date, amountCents, fromModule, fromId, toModule, description, category, ticker, holdingId, goalId, bankAccountId } = spec;
-    assertSourceHasFunds(get(), fromModule, amountCents);
+  addPortfolioBuy: async (spec) => {
+    const { date, holdingId, ticker, amountCents, fundingSource, bankAccountId } = spec;
+    const amount = Math.abs(amountCents || 0);
+    if (!amount) return null;
+    const source = fundingSource === 'savings' ? 'savings' : 'cashflow';
+    assertSourceHasFunds(get(), source === 'savings' ? 'savings' : 'cashflow', amount);
     const timestamp = new Date().toISOString();
-    const currency = get().settings.baseCurrency;
-    const trfId = `trf-${crypto.randomUUID()}`;
-    const toPut = []; // { storeName, record }
 
-    let linkedSavingsEntryId = null;
-    let linkedExpenseId = null;
-    let linkedCashflowId = null;
-    let linkedIncomeId = null;
-
-    // Source side — what leaves
-    if (fromModule === 'savings') {
-      const entry = ensureEntitySyncFields({
-        id: `sav-${crypto.randomUUID()}`,
-        date,
-        amountCents: -Math.abs(amountCents),
-        note: description || 'Transfer out',
-        transferId: trfId,
-        goalId: goalId || null,
-      }, timestamp);
-      toPut.push({ storeName: 'savingsEntries', record: entry });
-      linkedSavingsEntryId = entry.id;
-    }
-
-    // Destination side — what arrives
-    if (toModule === 'expenses') {
-      const expense = ensureEntitySyncFields({
-        id: `exp-${crypto.randomUUID()}`,
-        date,
-        amountCents: Math.abs(amountCents),
-        currency,
-        category: category || 'Other',
-        description: description || 'Transfer expense',
-        isRecurring: false,
-        transferId: trfId,
-        bankAccountId: bankAccountId || null,
-      }, timestamp);
-      toPut.push({ storeName: 'expenses', record: expense });
-      linkedExpenseId = expense.id;
-    } else if (toModule === 'portfolio') {
-      const cashflow = ensureEntitySyncFields({
-        id: `pcf-${crypto.randomUUID()}`,
-        date,
-        amountCents: -Math.abs(amountCents), // negative = capital deposit
-        ticker: ticker || null,
-        holdingId: holdingId || null,
-        kind: 'transfer_in',
-        transferId: trfId,
-      }, timestamp);
-      toPut.push({ storeName: 'portfolioCashflows', record: cashflow });
-      linkedCashflowId = cashflow.id;
-    } else if (toModule === 'savings') {
-      const entry = ensureEntitySyncFields({
-        id: `sav-${crypto.randomUUID()}`,
-        date,
-        amountCents: Math.abs(amountCents),
-        note: description || 'Transfer in',
-        transferId: trfId,
-      }, timestamp);
-      toPut.push({ storeName: 'savingsEntries', record: entry });
-      linkedSavingsEntryId = entry.id;
-    } else if (toModule === 'cashflow') {
-      const income = ensureEntitySyncFields({
-        id: `inc-${crypto.randomUUID()}`,
-        date,
-        accountingMonth: date?.slice(0, 7),
-        amountCents: Math.abs(amountCents),
-        currency,
-        incomeKind: 'transfer',
-        source: description || 'Transfer from savings',
-        transferId: trfId,
-        bankAccountId: bankAccountId || null,
-      }, timestamp);
-      toPut.push({ storeName: 'incomes', record: income });
-      linkedIncomeId = income.id;
-    }
-    const bankAccountAdjustments = toPut.reduce((adjustments, { storeName, record }) => {
-      const adjustment = buildBankAccountAdjustments(storeName, null, record, false);
-      adjustment.forEach((deltaCents, accountId) => {
-        adjustments.set(accountId, (adjustments.get(accountId) || 0) + deltaCents);
-      });
-      return adjustments;
-    }, new Map());
-    if (
-      bankAccountId &&
-      (fromModule === 'cashflow' || fromModule === 'income') &&
-      (toModule === 'portfolio' || toModule === 'savings')
-    ) {
-      bankAccountAdjustments.set(
-        bankAccountId,
-        (bankAccountAdjustments.get(bankAccountId) || 0) - Math.abs(amountCents || 0),
-      );
-    }
-    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
-
-    const trf = ensureEntitySyncFields({
-      id: trfId,
+    const cashflow = ensureEntitySyncFields({
+      id: makeId('pcf'),
       date,
-      amountCents: Math.abs(amountCents),
-      fromModule,
-      fromId: fromId || null,
-      toModule,
-      description: description || '',
-      category: category || null,
+      amountCents: -amount, // negative = capital deposit
       ticker: ticker || null,
-      linkedSavingsEntryId,
-      linkedExpenseId,
-      linkedCashflowId,
-      linkedIncomeId,
-      bankAccountId: bankAccountId || null,
+      holdingId: holdingId || null,
+      kind: 'buy',
+      source,
+      bankAccountId: source === 'cashflow' ? (bankAccountId || null) : null,
     }, timestamp);
-    toPut.push({ storeName: 'transfers', record: trf });
+
+    const toPut = [{ storeName: 'portfolioCashflows', record: cashflow }];
+    const bankAccountAdjustments = new Map();
+
+    if (source === 'cashflow' && bankAccountId) {
+      bankAccountAdjustments.set(bankAccountId, -amount);
+    }
+
+    let savingsEntry = null;
+    if (source === 'savings') {
+      savingsEntry = ensureEntitySyncFields({
+        id: makeId('sav'),
+        date,
+        amountCents: -amount,
+        note: ticker ? `Portfolio buy: ${ticker}` : 'Portfolio buy',
+        kind: 'portfolio_buy',
+        cashflowId: cashflow.id,
+      }, timestamp);
+      toPut.push({ storeName: 'savingsEntries', record: savingsEntry });
+    }
+
+    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
 
     await Promise.all([
       ...toPut.map(({ storeName, record }) => putRecord(storeName, record)),
@@ -2099,7 +2027,72 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName, action: 'create', before: null, after: record }),
     ));
     get().triggerAutoPush();
-    return trf;
+    return cashflow;
+  },
+
+  withdrawSavings: async (spec) => {
+    const { date, amountCents, description, bankAccountId, goalId } = spec;
+    const amount = Math.abs(amountCents || 0);
+    if (!amount) return null;
+    assertSourceHasFunds(get(), 'savings', amount);
+    return get().saveSavingsEntry({
+      date,
+      amountCents: -amount,
+      note: description || 'Withdrawal',
+      kind: 'withdrawal',
+      bankAccountId: bankAccountId || null,
+      goalId: goalId || null,
+    });
+  },
+
+  spendFromSavings: async (spec) => {
+    const { date, amountCents, description, category, goalId } = spec;
+    const amount = Math.abs(amountCents || 0);
+    if (!amount) return null;
+    assertSourceHasFunds(get(), 'savings', amount);
+    const timestamp = new Date().toISOString();
+    const currency = get().settings.baseCurrency;
+
+    const expense = ensureEntitySyncFields({
+      id: makeId('exp'),
+      date,
+      amountCents: amount,
+      currency,
+      category: category || 'Other',
+      description: description || 'Bucket spend',
+      isRecurring: false,
+    }, timestamp);
+
+    const savingsEntry = ensureEntitySyncFields({
+      id: makeId('sav'),
+      date,
+      amountCents: -amount,
+      note: description || 'Bucket spend',
+      kind: 'expense',
+      expenseId: expense.id,
+      goalId: goalId || null,
+    }, timestamp);
+
+    const toPut = [
+      { storeName: 'expenses', record: expense },
+      { storeName: 'savingsEntries', record: savingsEntry },
+    ];
+
+    await Promise.all(toPut.map(({ storeName, record }) => putRecord(storeName, record)));
+
+    set((state) => {
+      let nextState = { ...state };
+      for (const { storeName, record } of toPut) {
+        nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], record) };
+      }
+      return { ...nextState, derived: buildDerived(nextState) };
+    });
+
+    await persistActivityLogs(set, toPut.map(({ storeName, record }) =>
+      buildActivityLog({ storeName, action: 'create', before: null, after: record }),
+    ));
+    get().triggerAutoPush();
+    return { expense, savingsEntry };
   },
 
   markFixedIncomeReceived: async (fixedIncomeId, accountingMonth) => {
@@ -2128,79 +2121,6 @@ export const useFinanceStore = create((set, get) => ({
       frequency: schedule.frequency || 'monthly',
       payDay: schedule.payDay || 1,
     });
-  },
-
-  removeTransfer: async (id) => {
-    const trf = get().transfers.find((t) => t.id === id);
-    if (!trf) return;
-    const timestamp = new Date().toISOString();
-
-    const toDelete = [];
-    if (trf.linkedSavingsEntryId) toDelete.push({ storeName: 'savingsEntries', id: trf.linkedSavingsEntryId });
-    if (trf.linkedExpenseId) toDelete.push({ storeName: 'expenses', id: trf.linkedExpenseId });
-    if (trf.linkedCashflowId) toDelete.push({ storeName: 'portfolioCashflows', id: trf.linkedCashflowId });
-    if (trf.linkedIncomeId) toDelete.push({ storeName: 'incomes', id: trf.linkedIncomeId });
-    toDelete.push({ storeName: 'transfers', id });
-    const deletedRecords = toDelete.map(({ storeName, id: recId }) => ({
-      storeName,
-      record: (get()[storeName] || []).find((item) => item.id === recId) || { id: recId },
-    }));
-    const bankAccountAdjustments = deletedRecords.reduce((adjustments, { storeName, record }) => {
-      const adjustment = buildBankAccountAdjustments(storeName, record, null, false);
-      adjustment.forEach((deltaCents, accountId) => {
-        adjustments.set(accountId, (adjustments.get(accountId) || 0) + deltaCents);
-      });
-      return adjustments;
-    }, new Map());
-    if (
-      trf.bankAccountId &&
-      (trf.fromModule === 'cashflow' || trf.fromModule === 'income') &&
-      (trf.toModule === 'portfolio' || trf.toModule === 'savings')
-    ) {
-      bankAccountAdjustments.set(
-        trf.bankAccountId,
-        (bankAccountAdjustments.get(trf.bankAccountId) || 0) + Math.abs(trf.amountCents || 0),
-      );
-    }
-    const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
-
-    await Promise.all([
-      ...toDelete.map(({ storeName, id: recId }) => deleteRecord(storeName, recId)),
-      ...adjustedBankAccounts
-        .filter((account) => bankAccountAdjustments.has(account.id))
-        .map((account) => putRecord('bankAccounts', account)),
-    ]);
-
-    set((state) => {
-      let nextState = { ...state };
-      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
-      for (const { storeName, id: recId } of toDelete) {
-        nextState = {
-          ...nextState,
-          [storeName]: storeName === 'savings'
-            ? nextState[storeName]
-            : (nextState[storeName] || []).filter((item) => item.id !== recId),
-        };
-        nextDeletedRecords[storeName] = [
-          ...(nextDeletedRecords[storeName] || []).filter((item) => item.id !== recId),
-          { id: recId, updatedAt: timestamp, deletedAt: timestamp },
-        ];
-      }
-      const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      nextState = { ...nextState, bankAccounts: nextBankAccounts };
-      if (bankAccountAdjustments.size) {
-        nextDeletedRecords.bankAccounts = (nextDeletedRecords.bankAccounts || [])
-          .filter((item) => !bankAccountAdjustments.has(item.id));
-      }
-      const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
-      saveSyncMeta(nextSyncMeta);
-      return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
-    });
-
-    await persistActivityLogs(set, deletedRecords.map(({ storeName, record }) =>
-      buildActivityLog({ storeName, action: 'delete', before: record, after: null }),
-    ));
-    get().triggerAutoPush();
   },
 
   refreshPrices: async () => {

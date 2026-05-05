@@ -381,7 +381,8 @@ export default function SavingsPage() {
   const removeSavingsEntry = useFinanceStore((state) => state.removeSavingsEntry);
   const saveSavingsGoal    = useFinanceStore((state) => state.saveSavingsGoal);
   const removeSavingsGoal  = useFinanceStore((state) => state.removeSavingsGoal);
-  const executeTransfer    = useFinanceStore((state) => state.executeTransfer);
+  const withdrawSavings    = useFinanceStore((state) => state.withdrawSavings);
+  const spendFromSavings   = useFinanceStore((state) => state.spendFromSavings);
   const settings           = useFinanceStore((state) => state.settings);
   const bankAccounts       = useFinanceStore((state) => state.bankAccounts || []);
 
@@ -589,8 +590,19 @@ export default function SavingsPage() {
     [filteredEntries, savSortKey, savSortDir],
   );
 
-  // Transfer-linked entries can only be removed via the Transfers page
+  // Legacy transfer-linked entries are read-only (the transfer system was removed).
+  // Typed entries (kind set) are deletable but not editable — deletion cascades
+  // through the store to the linked expense/cashflow.
   const isEntrySelectable = (e) => !e.transferId;
+  const isEntryEditable = (e) => !e.transferId && !e.kind;
+  const entryKindLabel = (e) => {
+    if (e.kind === 'withdrawal') return t('savings.logCard.kindWithdrawal');
+    if (e.kind === 'portfolio_buy') return t('savings.logCard.kindPortfolioBuy');
+    if (e.kind === 'expense') return t('savings.logCard.kindExpense');
+    if (e.kind === 'allocation_release') return t('savings.logCard.kindAllocationRelease');
+    if (e.transferId) return t('savings.logCard.viaTransfer');
+    return null;
+  };
   const batchSelect = useBatchSelect(sortedEntries, isEntrySelectable);
 
   useEffect(() => { batchSelect.cancel(); }, [filterMonth, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -677,18 +689,23 @@ export default function SavingsPage() {
                     {meta} / {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(r.date))}
                   </p>
                   {r.transferId ? (
-                    <span className="shrink-0 text-xs text-ink-faint">{t('savings.logCard.viaTransfer')}</span>
+                    <span className="shrink-0 text-xs text-ink-faint">{entryKindLabel(r)}</span>
                   ) : (
                     <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                        aria-label={t('savings.logCard.rowAriaEdit')}
-                        title={t('common.edit')}
-                        onClick={() => openEdit(r.id)}
-                      >
-                        <EditIcon />
-                      </button>
+                      {entryKindLabel(r) ? (
+                        <span className="shrink-0 text-xs text-ink-faint">{entryKindLabel(r)}</span>
+                      ) : null}
+                      {isEntryEditable(r) ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+                          aria-label={t('savings.logCard.rowAriaEdit')}
+                          title={t('common.edit')}
+                          onClick={() => openEdit(r.id)}
+                        >
+                          <EditIcon />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
@@ -1305,12 +1322,9 @@ export default function SavingsPage() {
                 });
                 return;
               }
-              await executeTransfer({
+              await spendFromSavings({
                 date: value.date,
                 amountCents: value.amountCents,
-                fromModule: 'savings',
-                fromId: spendingGoal.id,
-                toModule: 'expenses',
                 description: value.description || `${spendingGoal.name} expense from bucket`,
                 category: value.category,
                 goalId: spendingGoal.id,
@@ -1332,15 +1346,10 @@ export default function SavingsPage() {
           locale={locale}
           bankAccounts={bankAccounts}
           onSubmit={async ({ amountCents, date, description, bankAccountId }) => {
-            await executeTransfer({
+            await withdrawSavings({
               date,
               amountCents,
-              fromModule: 'savings',
-              fromId: null,
-              toModule: 'cashflow',
               description,
-              category: null,
-              ticker: null,
               bankAccountId,
             });
             setTransferOpen(false);

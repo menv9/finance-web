@@ -952,7 +952,7 @@ export default function PortfolioPage() {
   const sellHolding = useFinanceStore((state) => state.sellHolding);
   const updatePortfolioSale = useFinanceStore((state) => state.updatePortfolioSale);
   const removePortfolioSale = useFinanceStore((state) => state.removePortfolioSale);
-  const executeTransfer = useFinanceStore((state) => state.executeTransfer);
+  const addPortfolioBuy = useFinanceStore((state) => state.addPortfolioBuy);
   const saveDividend = useFinanceStore((state) => state.saveDividend);
   const removeDividend = useFinanceStore((state) => state.removeDividend);
   const refreshPrices = useFinanceStore((state) => state.refreshPrices);
@@ -1715,13 +1715,10 @@ export default function PortfolioPage() {
               const saved = await saveEntity('holdings', holdingValue);
               if (isNew) {
                 if (cost > 0) {
-                  await executeTransfer({
+                  await addPortfolioBuy({
                     date: normalizeDateInput(new Date()),
                     amountCents: cost,
-                    fromModule: fundingSource === 'savings' ? 'savings' : 'cashflow',
-                    fromId: null,
-                    toModule: 'portfolio',
-                    description: `${saved.ticker} purchase`,
+                    fundingSource: fundingSource === 'savings' ? 'savings' : 'cashflow',
                     holdingId: saved.id,
                     ticker: saved.ticker,
                     bankAccountId: fundingSource === 'cashflow' ? bankAccountId : null,

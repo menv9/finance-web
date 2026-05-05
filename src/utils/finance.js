@@ -148,8 +148,8 @@ export function computeXIRR(cashflows, endingValueCents) {
   if (!cashflows.length || !endingValueCents) return 0;
 
   // Convention: deposits (money in) are negative; ending value (money back) is positive.
-  // Stored portfolioCashflows already follow this convention (executeTransfer
-  // writes deposits as negative). Preserve the original sign so that any future
+  // Stored portfolioCashflows already follow this convention (buy cashflows
+  // are written as negative). Preserve the original sign so that any future
   // withdrawal entries (positive stored amount) don't get flipped back to a
   // deposit by a blanket -Math.abs(...).
   const datedFlows = [
@@ -227,21 +227,41 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
 
   // Distributions this month (income → savings / portfolio) are money you've
   // deliberately set aside — they're no longer "usable" discretionary cash.
+  // Hybrid derivation: legacy transfer rows + new-style direct records.
   const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth));
   const isCashflowSource = (t) => t.fromModule === 'income' || t.fromModule === 'cashflow';
-  const distributedToSavingsCents = thisMonthTransfers
+  const legacyDistToSavings = thisMonthTransfers
     .filter((t) => isCashflowSource(t) && t.toModule === 'savings')
-    .reduce((s, t) => s + t.amountCents, 0);
-  const distributedToPortfolioCents = thisMonthTransfers
+    .reduce((s, t) => s + (t.amountCents || 0), 0);
+  const legacyDistToPortfolio = thisMonthTransfers
     .filter((t) => isCashflowSource(t) && t.toModule === 'portfolio')
-    .reduce((s, t) => s + t.amountCents, 0);
+    .reduce((s, t) => s + (t.amountCents || 0), 0);
 
-  // Directly-logged savings entries this month are money set aside from cashflow,
-  // just like transfers to savings — deduct them so cashflow reflects what's
-  // actually left to spend. Exclude transfer-linked entries (transferId is set)
-  // since those are already captured by distributedToSavingsCents above.
+  // New-style: cashflow-funded portfolio buys recorded directly on the cashflow.
+  const newDistToPortfolio = (portfolioCashflows || [])
+    .filter((cf) =>
+      cf.date?.startsWith(currentMonth) && cf.date <= today
+      && cf.kind === 'buy' && cf.source === 'cashflow',
+    )
+    .reduce((s, cf) => s - (cf.amountCents || 0), 0); // amountCents is negative for buys
+
+  const distributedToSavingsCents = legacyDistToSavings;
+  const distributedToPortfolioCents = legacyDistToPortfolio + newDistToPortfolio;
+
+  // Net savings flow this month from direct entries. Excludes:
+  //   - allocation releases (internal reshuffles)
+  //   - legacy transfer-linked entries (already counted in legacyDistToSavings)
+  //   - new-style typed entries that represent money LEAVING savings
+  //     (withdrawal → bank, expense → expense, portfolio_buy → portfolio).
+  // Their negative amounts shouldn't reduce "saved this month" — they're not
+  // savings flow at all, they're separate movements tracked elsewhere.
   const savedThisMonthCents = (savingsEntries || [])
-    .filter((e) => e.date?.startsWith(currentMonth) && e.date <= today && !e.transferId && e.source !== 'allocation')
+    .filter((e) =>
+      e.date?.startsWith(currentMonth) && e.date <= today
+      && !e.transferId
+      && e.source !== 'allocation'
+      && !e.kind,
+    )
     .reduce((s, e) => s + (e.amountCents || 0), 0);
 
   // Cashflow = money actually left to spend (income − expenses − saved − invested).
