@@ -593,6 +593,7 @@ export const translations = {
         accept: 'Accept',
         decline: 'Decline',
         errorAccount: 'Please select an account to receive into.',
+        pendingBadge: 'Payment Request Pending',
       },
       status: {
         settled: 'Settled',
@@ -2189,6 +2190,7 @@ export const translations = {
         accept: 'Aceptar',
         decline: 'Rechazar',
         errorAccount: 'Selecciona una cuenta donde recibir el ingreso.',
+        pendingBadge: 'Pago pendiente de aprobación',
       },
       status: {
         settled: 'Saldado',

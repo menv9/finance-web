@@ -397,7 +397,12 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
         <span className={`text-sm font-semibold tabular-nums ${iAmCreditor ? 'text-success' : 'text-danger'}`}>
           {iAmCreditor ? '+' : '-'}{formatCurrency(entry.amount_cents, entry.currency)}
         </span>
-        {isPending && (
+        {isPending && entry.kind === 'payment' && !iAmCreditor && (
+          <span className="text-[11px] font-medium text-ink-muted bg-surface-raised border border-rule rounded-full px-2 py-0.5 whitespace-nowrap">
+            {t('friendsMoney.payment.pendingBadge')}
+          </span>
+        )}
+        {isPending && entry.kind !== 'payment' && (
           <div className="flex gap-1.5">
             {!iAmCreditor && (
               <Button size="xs" variant="ghost" onClick={() => onSendPayment(entry)} disabled={busy} title={t('friendsMoney.payment.sendTitle')}>
@@ -475,7 +480,7 @@ export default function FriendsMoneyPage() {
   const currency = settings.currency || 'EUR';
 
   const oweYouEntries  = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind !== 'payment');
-  const youOweEntries  = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending' && e.kind !== 'payment');
+  const youOweEntries  = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending');
   const incomingEntries = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind === 'payment');
   const historyEntries = friendLedger.filter((e) => e.status !== 'pending');
 
