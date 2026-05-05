@@ -80,6 +80,7 @@ export function Table({
   stickyFirstColumn = false,
 }) {
   const touchPreviewTimer = useRef(null);
+  const pointerStart = useRef(null);
   const [touchPreview, setTouchPreview] = useState(null);
   const pad = density === 'compact' ? 'px-3 py-2' : 'px-4 py-3';
   const visibilityClass = (column) => cn(
@@ -123,16 +124,29 @@ export function Table({
       touchPreviewTimer.current = null;
     }
   };
-  const showTouchPreview = (event, text) => {
+  const showTouchPreview = (x, y, text) => {
     if (!text) return;
-    const touch = event.changedTouches?.[0] || event.touches?.[0];
     clearTouchPreviewTimer();
     setTouchPreview({
       text,
-      x: Math.min(Math.max(touch?.clientX || window.innerWidth / 2, 24), window.innerWidth - 24),
-      y: Math.min(Math.max(touch?.clientY || window.innerHeight / 2, 56), window.innerHeight - 56),
+      x: Math.min(Math.max(x || window.innerWidth / 2, 24), window.innerWidth - 24),
+      y: Math.min(Math.max(y || window.innerHeight / 2, 56), window.innerHeight - 56),
     });
     touchPreviewTimer.current = window.setTimeout(() => setTouchPreview(null), 1400);
+  };
+  const onPointerDown = (event) => {
+    if (event.pointerType !== 'touch') return;
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+  };
+  const onPointerUp = (event, text) => {
+    if (event.pointerType !== 'touch') return;
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start) return;
+    const dx = Math.abs(event.clientX - start.x);
+    const dy = Math.abs(event.clientY - start.y);
+    if (dx > 10 || dy > 10) return;
+    showTouchPreview(event.clientX, event.clientY, text);
   };
 
   return (
@@ -264,8 +278,9 @@ export function Table({
                         'min-w-0 max-w-full',
                         c.noTruncate ? 'overflow-visible whitespace-normal' : c.numeric ? 'truncate text-right' : 'truncate',
                       )}
-                        onTouchEnd={(event) => showTouchPreview(event, cellText)}
-                        onTouchCancel={clearTouchPreviewTimer}
+                        onPointerDown={onPointerDown}
+                        onPointerUp={(event) => onPointerUp(event, cellText)}
+                        onPointerCancel={() => { pointerStart.current = null; }}
                       >
                         {content}
                       </div>
