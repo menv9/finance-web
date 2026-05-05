@@ -443,10 +443,10 @@ export function GoalInvitationCard({ goal, onAccept, onDecline }) {
     <div className="flex items-start gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
       <div className="flex-1 min-w-0">
         <p className="eyebrow text-accent mb-0.5">{t('sharedGoals.invitationEyebrow')}</p>
-        <p className="text-sm font-medium text-ink truncate">
-          {goal.emoji && <span className="mr-1.5"><GoalIcon iconKey={goal.emoji} size={14} /></span>}
-          {goal.name}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {goal.emoji && <span className="shrink-0 text-ink-muted"><GoalIcon iconKey={goal.emoji} size={14} /></span>}
+          <p className="text-sm font-medium text-ink truncate">{goal.name}</p>
+        </div>
         <p className="text-xs text-ink-muted mt-0.5">
           {t('sharedGoals.invitationDesc').replace('{name}', creatorName)}
         </p>
