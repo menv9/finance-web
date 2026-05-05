@@ -3433,9 +3433,22 @@ export const useFinanceStore = create((set, get) => ({
     return entry;
   },
 
-  settleLedgerEntry: async (entryId) => {
+  settleLedgerEntry: async (entryId, { bankAccountId } = {}) => {
     const user = get().supabaseUser;
     if (!user) return;
+    const entry = get().friendLedger.find((e) => e.id === entryId);
+    if (bankAccountId && entry && entry.debtor_id === user.id) {
+      const today = new Date().toISOString().slice(0, 10);
+      await get().saveEntity('expenses', {
+        date: today,
+        amountCents: entry.amount_cents,
+        currency: entry.currency,
+        category: 'Other',
+        description: entry.note || 'IOU settlement',
+        isRecurring: false,
+        bankAccountId,
+      });
+    }
     const updated = await apiSettleLedgerEntry(entryId, user.id);
     set((state) => ({
       friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),

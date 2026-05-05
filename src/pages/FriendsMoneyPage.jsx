@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, HandCoins, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
-import { Button, Card, EmptyState, FormField, Input, Modal, SectionDivider, Skeleton } from '../components/ui';
-import { useConfirm } from '../components/ConfirmContext';
+import { Button, Card, EmptyState, FormField, Input, Modal, Skeleton } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency } from '../utils/formatters';
 import { useTranslation } from '../i18n/useTranslation';
@@ -36,7 +35,101 @@ function displayName(profile) {
   return profile?.display_name || profile?.username || '?';
 }
 
-function LedgerRow({ entry, currentUserId, onSettle, onCancel }) {
+function SettleModal({ entry, currentUserId, open, onClose }) {
+  const { t } = useTranslation();
+  const bankAccounts = useFinanceStore((s) => s.bankAccounts);
+  const settleLedgerEntry = useFinanceStore((s) => s.settleLedgerEntry);
+
+  const isDebtor = entry?.debtor_id === currentUserId;
+  const counterpart = entry ? (isDebtor ? entry.creditor : entry.debtor) : null;
+
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  function reset() {
+    setBankAccountId('');
+    setError('');
+    setBusy(false);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  async function handleConfirm() {
+    if (isDebtor && !bankAccountId) {
+      setError(t('friendsMoney.settle.errorAccount'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await settleLedgerEntry(entry.id, isDebtor ? { bankAccountId } : {});
+      handleClose();
+    } catch (err) {
+      setError(err.message || 'Something went wrong.');
+      setBusy(false);
+    }
+  }
+
+  if (!entry) return null;
+
+  return (
+    <Modal open={open} onClose={handleClose} title={t('friendsMoney.settle.title')} size="sm">
+      <div className="grid gap-4 pt-1">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-raised">
+          <Avatar profile={counterpart} size={36} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-ink font-medium">{displayName(counterpart)}</p>
+            <p className="text-xs text-ink-muted">
+              {isDebtor ? t('friendsMoney.settle.youOwe') : t('friendsMoney.settle.theyOwe')}
+            </p>
+          </div>
+          <span className="text-base font-semibold tabular-nums">
+            {formatCurrency(entry.amount_cents, entry.currency)}
+          </span>
+        </div>
+
+        {isDebtor && (
+          <FormField label={t('friendsMoney.settle.payFrom')}>
+            <select
+              className="w-full rounded-md border border-rule bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+              value={bankAccountId}
+              onChange={(e) => setBankAccountId(e.target.value)}
+            >
+              <option value="">{t('friendsMoney.settle.selectAccount')}</option>
+              {bankAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        )}
+
+        {isDebtor && (
+          <p className="text-xs text-ink-muted">
+            {t('friendsMoney.settle.expenseNote')}
+          </p>
+        )}
+
+        {error && <p className="text-sm text-danger">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleConfirm} disabled={busy}>
+            {busy ? t('common.loading') : t('friendsMoney.settle.confirm')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function LedgerRow({ entry, currentUserId, onSettleClick, onCancel }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const iAmCreditor = entry.creditor_id === currentUserId;
@@ -45,11 +138,6 @@ function LedgerRow({ entry, currentUserId, onSettle, onCancel }) {
   const isCreator = entry.created_by === currentUserId;
 
   const date = new Date(entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-  async function handleSettle() {
-    setBusy(true);
-    try { await onSettle(entry.id); } finally { setBusy(false); }
-  }
 
   async function handleCancel() {
     setBusy(true);
@@ -70,7 +158,7 @@ function LedgerRow({ entry, currentUserId, onSettle, onCancel }) {
         </span>
         {isPending && (
           <div className="flex gap-1.5">
-            <Button size="xs" variant="ghost" onClick={handleSettle} disabled={busy} title={t('friendsMoney.settle')}>
+            <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} disabled={busy} title={t('friendsMoney.settle.title')}>
               <Check size={13} />
             </Button>
             {isCreator && (
@@ -212,11 +300,12 @@ export default function FriendsMoneyPage() {
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
   const friendLedger = useFinanceStore((s) => s.friendLedger);
   const loadFriendLedger = useFinanceStore((s) => s.loadFriendLedger);
-  const settleLedgerEntry = useFinanceStore((s) => s.settleLedgerEntry);
   const cancelLedgerEntry = useFinanceStore((s) => s.cancelLedgerEntry);
+  const settings = useFinanceStore((s) => s.settings);
 
   const [tab, setTab] = useState('oweYou');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [settleEntry, setSettleEntry] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -224,6 +313,7 @@ export default function FriendsMoneyPage() {
   }, [loadFriendLedger]);
 
   const uid = supabaseUser?.id;
+  const currency = settings.currency || 'EUR';
 
   const oweYouEntries = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending');
   const youOweEntries = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending');
@@ -234,7 +324,6 @@ export default function FriendsMoneyPage() {
 
   const oweYouTotal = oweYouEntries.reduce((s, e) => s + e.amount_cents, 0);
   const youOweTotal = youOweEntries.reduce((s, e) => s + e.amount_cents, 0);
-  const currency = friendLedger[0]?.currency || useFinanceStore.getState().settings.currency || 'EUR';
 
   return (
     <div>
@@ -244,7 +333,7 @@ export default function FriendsMoneyPage() {
         description={t('friendsMoney.description')}
         actions={
           supabaseUser && (
-            <Button onClick={() => setModalOpen(true)}>
+            <Button onClick={() => setCreateOpen(true)}>
               <HandCoins size={15} className="mr-1.5" />
               {t('friendsMoney.createIOU')}
             </Button>
@@ -303,7 +392,7 @@ export default function FriendsMoneyPage() {
                 key={entry.id}
                 entry={entry}
                 currentUserId={uid}
-                onSettle={settleLedgerEntry}
+                onSettleClick={setSettleEntry}
                 onCancel={cancelLedgerEntry}
               />
             ))}
@@ -311,7 +400,13 @@ export default function FriendsMoneyPage() {
         </Card>
       )}
 
-      <CreateIOUModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <CreateIOUModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <SettleModal
+        entry={settleEntry}
+        currentUserId={uid}
+        open={!!settleEntry}
+        onClose={() => setSettleEntry(null)}
+      />
     </div>
   );
 }
