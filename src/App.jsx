@@ -41,6 +41,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
 const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
+const FriendsMoneyPage = lazy(() => import('./pages/FriendsMoneyPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
@@ -120,6 +121,7 @@ export default function App() {
                       <Route path="/activity" element={socialEnabled ? <ActivityFeedPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/shared-goals" element={socialEnabled ? <SharedGoalsPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/friends" element={socialEnabled ? <FriendsPage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/friends/money" element={socialEnabled ? <FriendsMoneyPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

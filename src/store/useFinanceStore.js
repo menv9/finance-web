@@ -69,6 +69,12 @@ import {
   updateSharedGoal as apiUpdateSharedGoal,
   upsertActivityPrivacy,
 } from '../utils/socialApi';
+import {
+  cancelLedgerEntry as apiCancelLedgerEntry,
+  createLedgerEntry as apiCreateLedgerEntry,
+  fetchFriendLedger,
+  settleLedgerEntry as apiSettleLedgerEntry,
+} from '../utils/friendsMoneyApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
@@ -696,6 +702,7 @@ export const useFinanceStore = create((set, get) => ({
   activityPrivacy: null,
   sharedGoals: [],
   goalInvitations: [],
+  friendLedger: [],
   socialStatus: 'idle',
   socialError: '',
   syncMeta: {
@@ -2775,6 +2782,7 @@ export const useFinanceStore = create((set, get) => ({
       activityPrivacy: null,
       sharedGoals: [],
       goalInvitations: [],
+      friendLedger: [],
       socialStatus: 'idle',
       socialError: '',
     });
@@ -3392,6 +3400,53 @@ export const useFinanceStore = create((set, get) => ({
   deleteContribution: async (goalId, contributionId) => {
     await apiDeleteContribution(contributionId);
     await get().loadSharedGoals();
+  },
+
+  // ── Social: friend ledger ─────────────────────────────────────────────────
+
+  loadFriendLedger: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    try {
+      const entries = await fetchFriendLedger(user.id);
+      set({ friendLedger: entries });
+    } catch (err) {
+      console.error('loadFriendLedger:', err);
+    }
+  },
+
+  createManualIOU: async ({ friendId, amountCents, currency = 'EUR', note = '', iOweTheme = false }) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const creditorId = iOweTheme ? friendId : user.id;
+    const debtorId  = iOweTheme ? user.id   : friendId;
+    const entry = await apiCreateLedgerEntry({
+      creditorId,
+      debtorId,
+      amountCents,
+      currency,
+      kind: 'manual',
+      note,
+      createdBy: user.id,
+    });
+    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
+    return entry;
+  },
+
+  settleLedgerEntry: async (entryId) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const updated = await apiSettleLedgerEntry(entryId, user.id);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
+  },
+
+  cancelLedgerEntry: async (entryId) => {
+    const updated = await apiCancelLedgerEntry(entryId);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
   },
 
 }));

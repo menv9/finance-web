@@ -694,6 +694,16 @@ export function AppShell({ children }) {
                       >
                         {t('nav.friends')}
                       </NavLink>
+                      <NavLink
+                        to="/friends/money"
+                        role="menuitem"
+                        className={({ isActive }) => cn(
+                          'flex items-center rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                          isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                        )}
+                      >
+                        {t('nav.friendsMoney')}
+                      </NavLink>
                     </>
                   )}
                   {supabaseConfigured && supabaseUser && (
