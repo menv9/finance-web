@@ -270,6 +270,12 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
           />
         </FormField>
 
+        {prefillParentIouId && (
+          <p className="text-xs text-ink-muted bg-surface-raised border border-rule rounded-md px-3 py-2">
+            {t('friendsMoney.payment.iouDeductNote')}
+          </p>
+        )}
+
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>

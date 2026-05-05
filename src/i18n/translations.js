@@ -594,6 +594,7 @@ export const translations = {
         decline: 'Decline',
         errorAccount: 'Please select an account to receive into.',
         pendingBadge: 'Payment Request Pending',
+        iouDeductNote: 'This amount will be deducted from the IOU once they accept the payment.',
       },
       status: {
         settled: 'Settled',
@@ -2191,6 +2192,7 @@ export const translations = {
         decline: 'Rechazar',
         errorAccount: 'Selecciona una cuenta donde recibir el ingreso.',
         pendingBadge: 'Pago pendiente de aprobación',
+        iouDeductNote: 'Este importe se descontará de la deuda una vez que acepten el pago.',
       },
       status: {
         settled: 'Saldado',
