@@ -51,7 +51,7 @@ export async function createOwnProfile(userId, email) {
     const candidate = attempt === 0 ? base : `${base.slice(0, 16)}_${Math.floor(1000 + Math.random() * 9000)}`;
     const { data, error } = await client()
       .from('profiles')
-      .insert({ user_id: userId, username: candidate })
+      .insert({ user_id: userId, username: candidate, social_enabled: true })
       .select('*')
       .single();
     if (!error) return data;
