@@ -62,10 +62,29 @@ function incomeReportMonth(row) {
   return row.accountingMonth || row.date?.slice(0, 7);
 }
 
+function addMonthsToMonth(month, offset) {
+  const [year, monthNumber] = (month || '').split('-').map(Number);
+  if (!year || !monthNumber) return month;
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthOffset(fromMonth, toMonth) {
+  const [fromYear, fromMonthNumber] = (fromMonth || '').split('-').map(Number);
+  const [toYear, toMonthNumber] = (toMonth || '').split('-').map(Number);
+  if (!fromYear || !fromMonthNumber || !toYear || !toMonthNumber) return 0;
+  return (toYear - fromYear) * 12 + (toMonthNumber - fromMonthNumber);
+}
+
 function fixedIncomeDueDate(schedule, month) {
-  const day = Math.min(Math.max(Number(schedule.payDay || 1), 1), 31);
-  const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-  return `${month}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+  const configuredReceivedMonth = schedule.date?.slice(0, 7);
+  const configuredReportMonth = schedule.accountingMonth || configuredReceivedMonth;
+  const receivedMonthOffset = monthOffset(configuredReportMonth, configuredReceivedMonth);
+  const receivedMonth = addMonthsToMonth(month, receivedMonthOffset);
+  const fallbackDay = Number(schedule.date?.slice(8, 10)) || 1;
+  const day = Math.min(Math.max(Number(schedule.payDay || fallbackDay), 1), 31);
+  const lastDay = new Date(Number(receivedMonth.slice(0, 4)), Number(receivedMonth.slice(5, 7)), 0).getDate();
+  return `${receivedMonth}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
 }
 
 function PlusIcon() {
@@ -167,7 +186,7 @@ function IncomeLedgerList({
                       <button
                         type="button"
                         className="rounded-md border border-accent/40 bg-accent-soft px-2.5 py-1.5 text-xs font-medium text-accent hover:border-accent"
-                        onClick={() => onMarkReceived?.(row.fixedIncomeId)}
+                        onClick={() => onMarkReceived?.(row)}
                       >
                         {t('income.markReceived')}
                       </button>
@@ -328,8 +347,6 @@ export default function IncomePage() {
 
   const pendingFixedRows = useMemo(() => {
     const today = normalizeDateInput(new Date());
-    const currentMonth = today.slice(0, 7);
-    if (selectedMonth !== currentMonth) return [];
     return fixedSchedules
       .filter((schedule) => fixedIncomeDueDate(schedule, selectedMonth) <= today)
       .filter((schedule) => !incomeLedgerRows.some((row) =>
@@ -596,7 +613,7 @@ export default function IncomePage() {
               selectedIds={batchSelect.selectedIds}
               onToggleRow={batchSelect.toggle}
               openEdit={openEdit}
-              onMarkReceived={(fixedIncomeId) => markFixedIncomeReceived(fixedIncomeId, selectedMonth)}
+              onMarkReceived={(row) => markFixedIncomeReceived(row.fixedIncomeId, row.accountingMonth, row.date)}
               onDeleteIncome={async (id) => {
                 if (await confirm({ title: t('income.confirmDeleteOne.title'), description: t('income.confirmDeleteOne.description') }))
                   removeEntity('incomes', id);
@@ -646,7 +663,7 @@ export default function IncomePage() {
             selectable={false}
             selectedIds={new Set()}
             openEdit={openEdit}
-            onMarkReceived={(fixedIncomeId) => markFixedIncomeReceived(fixedIncomeId, selectedMonth)}
+            onMarkReceived={(row) => markFixedIncomeReceived(row.fixedIncomeId, row.accountingMonth, row.date)}
             onDeleteIncome={async (id) => {
               if (await confirm({ title: t('income.confirmDeleteFixed.title'), description: t('income.confirmDeleteFixed.description') }))
                 removeEntity('incomes', id);

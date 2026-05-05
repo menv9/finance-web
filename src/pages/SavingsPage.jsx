@@ -194,6 +194,10 @@ function monthKeyOffset(monthsBack) {
   return monthKey(date);
 }
 
+function entryReportMonth(entry) {
+  return entry.accountingMonth || entry.date?.slice(0, 7);
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
@@ -484,7 +488,7 @@ export default function SavingsPage() {
   const thisMonthKey = monthKey(new Date());
   const savedThisMonthCents = useMemo(
     () => savingsEntries
-      .filter((e) => monthKey(e.date) === thisMonthKey && e.source !== 'allocation')
+      .filter((e) => entryReportMonth(e) === thisMonthKey && e.source !== 'allocation')
       .reduce((sum, e) => sum + e.amountCents, 0),
     [savingsEntries, thisMonthKey],
   );
@@ -495,7 +499,7 @@ export default function SavingsPage() {
     const map = {};
     savingsEntries.forEach((e) => {
       if (e.source === 'allocation') return;
-      const key = monthKey(e.date);
+      const key = entryReportMonth(e);
       map[key] = (map[key] || 0) + e.amountCents;
     });
     return Object.entries(map)
@@ -533,7 +537,7 @@ export default function SavingsPage() {
     const map = {};
     savingsEntries.forEach((e) => {
       if (e.source === 'allocation') return;
-      const key = monthKey(e.date);
+      const key = entryReportMonth(e);
       map[key] = (map[key] || 0) + e.amountCents;
     });
 
@@ -576,7 +580,7 @@ export default function SavingsPage() {
     () =>
       savingsEntries.filter(
         (e) =>
-          (!filterMonth || e.date.startsWith(filterMonth)) &&
+          (!filterMonth || entryReportMonth(e) === filterMonth) &&
           (filterType === 'all' ||
             (filterType === 'deposit' && e.amountCents >= 0) ||
             (filterType === 'withdrawal' && e.amountCents < 0)),
@@ -591,10 +595,9 @@ export default function SavingsPage() {
   );
 
   // Legacy transfer-linked entries are read-only (the transfer system was removed).
-  // Typed entries (kind set) are deletable but not editable — deletion cascades
-  // through the store to the linked expense/cashflow.
+  // Typed entries can edit metadata only; structural fields stay locked in the form/store.
   const isEntrySelectable = (e) => !e.transferId;
-  const isEntryEditable = (e) => !e.transferId && !e.kind;
+  const isEntryEditable = (e) => !e.transferId;
   const entryKindLabel = (e) => {
     if (e.kind === 'withdrawal') return t('savings.logCard.kindWithdrawal');
     if (e.kind === 'portfolio_buy') return t('savings.logCard.kindPortfolioBuy');
@@ -1237,6 +1240,7 @@ export default function SavingsPage() {
           showBucketSource={Boolean(modal.goalId && !modal.withdraw && !editingEntry)}
           unallocatedSavingsCents={unallocatedSavingsCents}
           bankAccounts={modal.withdraw ? [] : bankAccounts}
+          metadataOnly={Boolean(editingEntry?.kind && !editingEntry?.transferId)}
           submitLabel={modal.withdraw ? t('savings.entryModal.release') : undefined}
           onSubmit={async (value) => {
             try {

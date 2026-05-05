@@ -118,6 +118,32 @@ const STORE_MODULES = {
 };
 let authSubscription = null;
 let autoPushTimer = null;
+
+function addMonthsToMonth(month, offset) {
+  const [year, monthNumber] = (month || '').split('-').map(Number);
+  if (!year || !monthNumber) return month;
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthOffset(fromMonth, toMonth) {
+  const [fromYear, fromMonthNumber] = (fromMonth || '').split('-').map(Number);
+  const [toYear, toMonthNumber] = (toMonth || '').split('-').map(Number);
+  if (!fromYear || !fromMonthNumber || !toYear || !toMonthNumber) return 0;
+  return (toYear - fromYear) * 12 + (toMonthNumber - fromMonthNumber);
+}
+
+function fixedIncomePaymentDate(schedule, accountingMonth, explicitDate) {
+  if (explicitDate) return explicitDate;
+  const configuredReceivedMonth = schedule.date?.slice(0, 7);
+  const configuredReportMonth = schedule.accountingMonth || configuredReceivedMonth;
+  const receivedMonthOffset = monthOffset(configuredReportMonth, configuredReceivedMonth);
+  const receivedMonth = addMonthsToMonth(accountingMonth, receivedMonthOffset);
+  const fallbackDay = Number(schedule.date?.slice(8, 10)) || 1;
+  const day = Math.min(Math.max(Number(schedule.payDay || fallbackDay), 1), 31);
+  const lastDay = new Date(Number(receivedMonth.slice(0, 4)), Number(receivedMonth.slice(5, 7)), 0).getDate();
+  return `${receivedMonth}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
 let focusHandler = null;
 let autoPullInterval = null;
 
@@ -898,19 +924,61 @@ export const useFinanceStore = create((set, get) => ({
 
   saveSavingsEntry: async (entry) => {
     const previous = entry.id ? get().savingsEntries.find((item) => item.id === entry.id) : null;
-    if (!entry.transferId && entry.source !== 'allocation') {
+    const timestamp = new Date().toISOString();
+    const metadataOnlyTypedEntry = previous?.kind && !previous.transferId;
+    let entryToSave = entry;
+    if (metadataOnlyTypedEntry) {
+      entryToSave = {
+        ...previous,
+        date: entry.date || previous.date,
+        accountingMonth: entry.accountingMonth || entry.date?.slice(0, 7) || previous.accountingMonth || previous.date?.slice(0, 7),
+        note: entry.note ?? previous.note,
+        updatedAt: timestamp,
+      };
+    } else if (!entryToSave.accountingMonth) {
+      entryToSave = { ...entryToSave, accountingMonth: entryToSave.date?.slice(0, 7) };
+    }
+    if (!entryToSave.transferId && entryToSave.source !== 'allocation') {
       const previousPositive = previous && !previous.transferId && previous.source !== 'allocation' ? Math.max(previous.amountCents || 0, 0) : 0;
-      const nextPositive = Math.max(entry.amountCents || 0, 0);
+      const nextPositive = Math.max(entryToSave.amountCents || 0, 0);
       assertSourceHasFunds(get(), 'cashflow', nextPositive - previousPositive);
     }
-    const timestamp = new Date().toISOString();
     const record = ensureEntitySyncFields(
-      { ...entry, id: entry.id || `sav-${crypto.randomUUID()}` },
+      { ...entryToSave, id: entryToSave.id || `sav-${crypto.randomUUID()}` },
       timestamp,
     );
+    const linkedUpdates = [];
+    if (metadataOnlyTypedEntry && previous.kind === 'expense' && previous.expenseId) {
+      const linkedExpense = get().expenses.find((item) => item.id === previous.expenseId);
+      if (linkedExpense) {
+        linkedUpdates.push({
+          storeName: 'expenses',
+          before: linkedExpense,
+          record: ensureEntitySyncFields({
+            ...linkedExpense,
+            date: record.date,
+            description: record.note ?? linkedExpense.description,
+            updatedAt: timestamp,
+          }, timestamp),
+        });
+      }
+    } else if (metadataOnlyTypedEntry && previous.kind === 'portfolio_buy' && previous.cashflowId) {
+      const linkedCashflow = get().portfolioCashflows.find((item) => item.id === previous.cashflowId);
+      if (linkedCashflow) {
+        linkedUpdates.push({
+          storeName: 'portfolioCashflows',
+          before: linkedCashflow,
+          record: ensureEntitySyncFields({
+            ...linkedCashflow,
+            date: record.date,
+            updatedAt: timestamp,
+          }, timestamp),
+        });
+      }
+    }
     // Deduct from linked bank account (reverse previous, apply new)
     const bankAdjustments = new Map();
-    if (!record.transferId && record.source !== 'allocation') {
+    if (!metadataOnlyTypedEntry && !record.transferId && record.source !== 'allocation') {
       if (previous?.bankAccountId && previous.amountCents) {
         bankAdjustments.set(previous.bankAccountId, (bankAdjustments.get(previous.bankAccountId) || 0) + previous.amountCents);
       }
@@ -919,7 +987,10 @@ export const useFinanceStore = create((set, get) => ({
       }
     }
     const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAdjustments, timestamp);
-    await putRecord('savingsEntries', record);
+    await Promise.all([
+      putRecord('savingsEntries', record),
+      ...linkedUpdates.map(({ storeName, record: linkedRecord }) => putRecord(storeName, linkedRecord)),
+    ]);
     if (bankAdjustments.size) {
       await Promise.all(
         adjustedBankAccounts
@@ -929,15 +1000,23 @@ export const useFinanceStore = create((set, get) => ({
     }
     set((state) => {
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAdjustments, timestamp);
-      const nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record), bankAccounts: nextBankAccounts };
+      let nextState = { ...state, savingsEntries: upsertItem(state.savingsEntries, record), bankAccounts: nextBankAccounts };
+      for (const { storeName, record: linkedRecord } of linkedUpdates) {
+        nextState = { ...nextState, [storeName]: upsertItem(nextState[storeName] || [], linkedRecord) };
+      }
       return { ...nextState, derived: buildDerived(nextState) };
     });
-    await persistActivityLogs(set, [buildActivityLog({
-      storeName: 'savingsEntries',
-      action: previous ? 'update' : 'create',
-      before: previous,
-      after: record,
-    })]);
+    await persistActivityLogs(set, [
+      buildActivityLog({
+        storeName: 'savingsEntries',
+        action: previous ? 'update' : 'create',
+        before: previous,
+        after: record,
+      }),
+      ...linkedUpdates.map(({ storeName, before, record: linkedRecord }) =>
+        buildActivityLog({ storeName, action: 'update', before, after: linkedRecord }),
+      ),
+    ]);
     get().triggerAutoPush();
     return record;
   },
@@ -1825,9 +1904,12 @@ export const useFinanceStore = create((set, get) => ({
       throw new Error('Select a destination bank account for this dividend.');
     }
     const timestamp = new Date().toISOString();
+    const normalizedEntity = entity.accountingMonth
+      ? entity
+      : { ...entity, accountingMonth: entity.date?.slice(0, 7) };
     const record = ensureEntitySyncFields({
-      ...entity,
-      id: entity.id || makeId(prefix),
+      ...normalizedEntity,
+      id: normalizedEntity.id || makeId(prefix),
       linkedIncomeId: null,
     }, timestamp);
     const bankAccountAdjustments = new Map();
@@ -2130,7 +2212,7 @@ export const useFinanceStore = create((set, get) => ({
     return { expense, savingsEntry };
   },
 
-  markFixedIncomeReceived: async (fixedIncomeId, accountingMonth) => {
+  markFixedIncomeReceived: async (fixedIncomeId, accountingMonth, receivedDate) => {
     const schedule = get().incomes.find((income) => income.id === fixedIncomeId && isFixedIncomeSchedule(income));
     if (!schedule) throw new Error('Fixed income schedule not found.');
     const month = accountingMonth || new Date().toISOString().slice(0, 7);
@@ -2141,9 +2223,7 @@ export const useFinanceStore = create((set, get) => ({
     );
     if (existing) return existing;
 
-    const day = Math.min(Math.max(Number(schedule.payDay || 1), 1), 31);
-    const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-    const date = `${month}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+    const date = fixedIncomePaymentDate(schedule, month, receivedDate);
     return get().saveEntity('incomes', {
       date,
       accountingMonth: month,

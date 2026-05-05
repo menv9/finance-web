@@ -170,15 +170,18 @@ export default function ThisMonthPage() {
     // money moving between modules, not "saved this month").
     const netSavedThisMonthCents = (savingsEntries || [])
       .filter((e) =>
-        e.date?.startsWith(selectedMonth)
+        (e.accountingMonth || e.date?.slice(0, 7)) === selectedMonth
         && e.source !== 'allocation'
         && !e.kind,
       )
       .reduce((s, e) => s + (e.amountCents || 0), 0);
 
+    // Cashflow = money left to spend after expenses, savings, and investments.
+    // Expenses are stored as positive amounts, so they reduce cashflow.
     const cashflowCents =
-      cashflowIncomeCents +
+      cashflowIncomeCents -
       expenseCents -
+      netSavedThisMonthCents -
       distributedToPortfolioCents;
 
     return {
@@ -241,7 +244,7 @@ export default function ThisMonthPage() {
     // New-style typed savings entries surface the underlying movement
     (savingsEntries || [])
       .filter((e) =>
-        e.date?.startsWith(selectedMonth) && e.date <= today
+        (e.accountingMonth || e.date?.slice(0, 7)) === selectedMonth && e.date <= today
         && e.kind && !e.transferId,
       )
       .forEach((e) =>

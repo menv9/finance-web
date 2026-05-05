@@ -325,6 +325,46 @@ describe('account-backed transaction saves', () => {
     expect(state.savingsEntries.find((e) => e.id === linkedEntry.id)).toBeUndefined();
   });
 
+  it('allows metadata-only edits on typed savings entries without changing amount or links', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [{ id: 'sav-seed', date: '2026-05-01', amountCents: 50000 }],
+    }));
+
+    await useFinanceStore.getState().spendFromSavings({
+      date: '2026-05-02',
+      amountCents: 1500,
+      description: 'Vacation gear',
+      category: 'Travel',
+    });
+
+    const stateBefore = useFinanceStore.getState();
+    const linkedEntry = stateBefore.savingsEntries.find((e) => e.id !== 'sav-seed');
+    const linkedExpense = stateBefore.expenses[0];
+
+    await useFinanceStore.getState().saveSavingsEntry({
+      ...linkedEntry,
+      date: '2026-05-03',
+      note: 'Beach gear',
+      amountCents: -999999,
+      expenseId: 'tampered',
+      kind: 'withdrawal',
+    });
+
+    const state = useFinanceStore.getState();
+    const editedEntry = state.savingsEntries.find((e) => e.id === linkedEntry.id);
+    const editedExpense = state.expenses.find((e) => e.id === linkedExpense.id);
+
+    expect(editedEntry.date).toBe('2026-05-03');
+    expect(editedEntry.note).toBe('Beach gear');
+    expect(editedEntry.amountCents).toBe(-1500);
+    expect(editedEntry.expenseId).toBe(linkedExpense.id);
+    expect(editedEntry.kind).toBe('expense');
+    expect(editedExpense.date).toBe('2026-05-03');
+    expect(editedExpense.description).toBe('Beach gear');
+    expect(state.bankAccounts[0].balanceCents).toBe(10000);
+  });
+
   it('reverse cascade: deleting the expense also removes the linked savings entry', async () => {
     useFinanceStore.setState((state) => ({
       ...state,
@@ -441,6 +481,26 @@ describe('account-backed transaction saves', () => {
     expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(310000);
   });
 
+  it('preserves fixed income accrual month offsets when marking received', async () => {
+    const schedule = await useFinanceStore.getState().saveEntity('incomes', {
+      date: '2026-01-01',
+      accountingMonth: '2025-12',
+      amountCents: 300000,
+      currency: 'EUR',
+      incomeKind: 'fixed',
+      isRecurringSchedule: true,
+      source: 'Salary',
+      bankAccountId: 'bank-a',
+      payDay: 1,
+    });
+
+    const payment = await useFinanceStore.getState().markFixedIncomeReceived(schedule.id, '2026-05');
+
+    expect(payment.date).toBe('2026-06-01');
+    expect(payment.accountingMonth).toBe('2026-05');
+    expect(payment.incomeKind).toBe('fixed_payment');
+  });
+
   it('keeps legacy fixed income counted as a received entry', async () => {
     await useFinanceStore.getState().saveEntity('incomes', {
       date: '2026-05-01',
@@ -542,15 +602,18 @@ describe('account-backed transaction saves', () => {
     });
 
     expect(useFinanceStore.getState().dividends).toHaveLength(1);
+    expect(useFinanceStore.getState().dividends[0].accountingMonth).toBe('2026-05');
     expect(useFinanceStore.getState().incomes).toEqual([]);
     expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(11000);
 
     await useFinanceStore.getState().saveDividend({
       ...dividend,
+      accountingMonth: '2026-06',
       amountCents: 1500,
       bankAccountId: 'bank-a',
     });
 
+    expect(useFinanceStore.getState().dividends[0].accountingMonth).toBe('2026-06');
     expect(useFinanceStore.getState().incomes).toEqual([]);
     expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(11500);
 

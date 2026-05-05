@@ -5,6 +5,10 @@ function sumAmount(items) {
   return items.reduce((total, item) => total + (item.amountCents || 0), 0);
 }
 
+function reportMonth(item) {
+  return item.accountingMonth || item.date?.slice(0, 7);
+}
+
 export function isFixedIncomeSchedule(income) {
   return income?.incomeKind === 'fixed' && income.isRecurringSchedule === true;
 }
@@ -257,7 +261,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   // savings flow at all, they're separate movements tracked elsewhere.
   const savedThisMonthCents = (savingsEntries || [])
     .filter((e) =>
-      e.date?.startsWith(currentMonth) && e.date <= today
+      reportMonth(e) === currentMonth && e.date <= today
       && !e.transferId
       && e.source !== 'allocation'
       && !e.kind,

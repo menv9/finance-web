@@ -274,6 +274,58 @@ describe('finance metrics', () => {
     }
   });
 
+  it('reports dividends by accounting month while preserving received date gating', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [{ id: 'div-a', amountCents: 1200, date: '2025-12-31', accountingMonth: '2026-01', ticker: 'DIV' }],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+        bankAccounts: [],
+      });
+
+      expect(result.totalIncomeCents).toBe(1200);
+      expect(result.cashflowCents).toBe(1200);
+      expect(result.incomeSeries.at(-1).amountCents).toBe(1200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports direct savings entries by accounting month', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [{ id: 'inc-a', amountCents: 2000, date: '2026-01-02' }],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [{ id: 'sav-a', amountCents: 500, date: '2025-12-31', accountingMonth: '2026-01' }],
+        transfers: [],
+        bankAccounts: [],
+      });
+
+      expect(result.cashflowCents).toBe(1500);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('builds read-only income rows from dividends for the income UI', () => {
     const rows = buildDividendIncomeRows([
       { id: 'div-a', amountCents: 1200, date: '2026-05-02', ticker: 'DIV', currency: 'EUR', bankAccountId: 'bank-a' },

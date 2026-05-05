@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
-import { FormField, Input, Select, Button } from '../ui';
+import { FormField, Input, Select, Button, InfoPopover } from '../ui';
 
 const defaultValue = {
   date: normalizeDateInput(new Date()),
+  accountingMonth: normalizeDateInput(new Date()).slice(0, 7),
   amountCents: '',
   ticker: '',
   currency: 'EUR',
@@ -15,6 +16,7 @@ export function DividendForm({ holdings, bankAccounts = [], initialValue, onSubm
   const [form, setForm] = useState({
     ...defaultValue,
     ...initialValue,
+    accountingMonth: initialValue?.accountingMonth || initialValue?.date?.slice(0, 7) || defaultValue.accountingMonth,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
     bankAccountId: initialValue?.bankAccountId || defaultBankAccountId,
   });
@@ -23,6 +25,23 @@ export function DividendForm({ holdings, bankAccounts = [], initialValue, onSubm
 
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  const onDateChange = (event) => {
+    const nextDate = event.target.value;
+    setForm((prev) => {
+      const wasInSync = prev.date?.slice(0, 7) === prev.accountingMonth;
+      return {
+        ...prev,
+        date: nextDate,
+        accountingMonth: wasInSync ? nextDate.slice(0, 7) : prev.accountingMonth,
+      };
+    });
+  };
+  const monthsDiffer = form.date && form.accountingMonth && form.date.slice(0, 7) !== form.accountingMonth;
+  const formatMonth = (ym) => {
+    if (!ym) return '';
+    const [year, month] = ym.split('-');
+    return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  };
 
   return (
     <form
@@ -37,8 +56,27 @@ export function DividendForm({ holdings, bankAccounts = [], initialValue, onSubm
       }}
     >
       <FormField label="Date" htmlFor="dividend-date">
-        {(props) => <Input {...props} type="date" value={form.date} onChange={set('date')} />}
+        {(props) => <Input {...props} type="date" value={form.date} onChange={onDateChange} />}
       </FormField>
+
+      <div className="grid gap-1.5">
+        <div className="eyebrow flex items-center gap-1.5 text-ink-muted">
+          <label htmlFor="dividend-accounting-month">Reporting month</label>
+          <InfoPopover info="Which month this dividend counts toward in reports. Defaults to the received date; change it only for accrual accounting." />
+        </div>
+        <Input
+          id="dividend-accounting-month"
+          type="month"
+          value={form.accountingMonth}
+          onChange={set('accountingMonth')}
+        />
+      </div>
+
+      {monthsDiffer ? (
+        <div className="md:col-span-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          Reporting a {formatMonth(form.date.slice(0, 7))} dividend as {formatMonth(form.accountingMonth)} income (accrual).
+        </div>
+      ) : null}
 
       <FormField label="Amount" htmlFor="dividend-amount" required>
         {(props) => (

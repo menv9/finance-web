@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
-import { FormField, Input, Button, Select } from '../ui';
+import { FormField, Input, Button, Select, InfoPopover } from '../ui';
 
 const defaultValue = {
   date: normalizeDateInput(new Date()),
+  accountingMonth: normalizeDateInput(new Date()).slice(0, 7),
   amountCents: '',
   note: '',
   goalId: '',
@@ -19,6 +20,7 @@ export function SavingsEntryForm({
   showBucketSource = false,
   unallocatedSavingsCents = 0,
   bankAccounts = [],
+  metadataOnly = false,
   submitLabel,
   onSubmit,
   onCancel,
@@ -30,10 +32,28 @@ export function SavingsEntryForm({
     bucketSource: 'balance',
     bankAccountId: defaultBankAccountId,
     ...initialValue,
+    accountingMonth: initialValue?.accountingMonth || initialValue?.date?.slice(0, 7) || defaultValue.accountingMonth,
     amountCents: initialValue?.amountCents ? `${initialValue.amountCents / 100}` : '',
   });
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const onDateChange = (e) => {
+    const nextDate = e.target.value;
+    setForm((prev) => {
+      const wasInSync = prev.date?.slice(0, 7) === prev.accountingMonth;
+      return {
+        ...prev,
+        date: nextDate,
+        accountingMonth: wasInSync ? nextDate.slice(0, 7) : prev.accountingMonth,
+      };
+    });
+  };
+  const monthsDiffer = form.date && form.accountingMonth && form.date.slice(0, 7) !== form.accountingMonth;
+  const formatMonth = (ym) => {
+    if (!ym) return '';
+    const [year, month] = ym.split('-');
+    return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  };
 
   return (
     <form
@@ -58,7 +78,7 @@ export function SavingsEntryForm({
           className="md:col-span-2"
         >
           {(props) => (
-            <Select {...props} value={form.bucketSource} onChange={set('bucketSource')}>
+            <Select {...props} value={form.bucketSource} onChange={set('bucketSource')} disabled={metadataOnly}>
               <option value="balance">Total balance (adds to total savings)</option>
               <option value="savings">Allocate from total savings</option>
             </Select>
@@ -68,9 +88,28 @@ export function SavingsEntryForm({
 
       <FormField label="Date" htmlFor="saving-date">
         {(props) => (
-          <Input {...props} type="date" value={form.date} onChange={set('date')} required />
+          <Input {...props} type="date" value={form.date} onChange={onDateChange} required />
         )}
       </FormField>
+
+      <div className="grid gap-1.5">
+        <div className="eyebrow flex items-center gap-1.5 text-ink-muted">
+          <label htmlFor="saving-accounting-month">Reporting month</label>
+          <InfoPopover info="Which month this savings movement counts toward in reports. Defaults to the movement date; change it only for accrual accounting." />
+        </div>
+        <Input
+          id="saving-accounting-month"
+          type="month"
+          value={form.accountingMonth}
+          onChange={set('accountingMonth')}
+        />
+      </div>
+
+      {monthsDiffer ? (
+        <div className="md:col-span-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          Reporting a {formatMonth(form.date.slice(0, 7))} movement as {formatMonth(form.accountingMonth)} savings (accrual).
+        </div>
+      ) : null}
 
       <FormField label={`Amount (${currency})`} htmlFor="saving-amount" required>
         {(props) => (
@@ -83,6 +122,7 @@ export function SavingsEntryForm({
             placeholder="0.00"
             value={form.amountCents}
             onChange={set('amountCents')}
+            disabled={metadataOnly}
             required
           />
         )}
@@ -99,7 +139,7 @@ export function SavingsEntryForm({
         )}
       </FormField>
 
-      {bankAccounts.length && form.bucketSource !== 'savings' ? (
+      {bankAccounts.length && form.bucketSource !== 'savings' && !metadataOnly ? (
         <FormField label="Deduct from account" htmlFor="saving-bank" className="md:col-span-2" required>
           {(props) => (
             <Select {...props} value={form.bankAccountId || ''} onChange={set('bankAccountId')} required>
@@ -121,7 +161,7 @@ export function SavingsEntryForm({
               {...props}
               value={form.goalId || ''}
               onChange={set('goalId')}
-              disabled={goalLocked}
+              disabled={goalLocked || metadataOnly}
             >
               <option value="">No goal</option>
               {goals.map((goal) => (
