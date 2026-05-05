@@ -90,6 +90,28 @@ export function IncomeForm({ bankAccounts = [], initialValue, onSubmit, onCancel
   const set = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
+  // When the received date changes, auto-advance the reporting month if it was
+  // previously in sync. Keeps the common case effortless while still allowing
+  // an explicit override (which then surfaces the accrual warning below).
+  const onDateChange = (event) => {
+    const nextDate = event.target.value;
+    setForm((prev) => {
+      const wasInSync = prev.date?.slice(0, 7) === prev.accountingMonth;
+      return {
+        ...prev,
+        date: nextDate,
+        accountingMonth: wasInSync ? nextDate.slice(0, 7) : prev.accountingMonth,
+      };
+    });
+  };
+
+  const monthsDiffer = form.date && form.accountingMonth && form.date.slice(0, 7) !== form.accountingMonth;
+  const formatMonth = (ym) => {
+    if (!ym) return '';
+    const [y, m] = ym.split('-');
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  };
+
   useEffect(() => {
     if (!bankAccounts.length || form.bankAccountId) return;
     setForm((prev) => ({ ...prev, bankAccountId: defaultBankAccountId }));
@@ -113,16 +135,16 @@ export function IncomeForm({ bankAccounts = [], initialValue, onSubmit, onCancel
       }}
     >
       <FormSection step="1" title="PAYMENT">
-        <FormField label="Date" htmlFor="income-date">
+        <FormField label="Received date" htmlFor="income-date" hint="When the money actually arrived.">
           {(props) => (
-            <Input {...props} type="date" value={form.date} onChange={set('date')} />
+            <Input {...props} type="date" value={form.date} onChange={onDateChange} />
           )}
         </FormField>
 
         <div className="grid gap-1.5">
           <div className="eyebrow flex items-center gap-1.5 text-ink-muted">
-            <label htmlFor="income-accounting-month">Accounting month</label>
-            <InfoPopover info="Month where this income appears in reports." />
+            <label htmlFor="income-accounting-month">Reporting month</label>
+            <InfoPopover info="Which month this income counts toward in reports. Defaults to the received date — change it only for accrual accounting (e.g. December salary paid in January, but reported as December)." />
           </div>
           <Input
             id="income-accounting-month"
@@ -131,6 +153,12 @@ export function IncomeForm({ bankAccounts = [], initialValue, onSubmit, onCancel
             onChange={set('accountingMonth')}
           />
         </div>
+
+        {monthsDiffer ? (
+          <div className="md:col-span-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+            Reporting a {formatMonth(form.date.slice(0, 7))} payment as {formatMonth(form.accountingMonth)} income (accrual).
+          </div>
+        ) : null}
       </FormSection>
 
       <FormSection step="2" title="AMOUNT">

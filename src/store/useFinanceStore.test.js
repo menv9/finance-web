@@ -325,6 +325,85 @@ describe('account-backed transaction saves', () => {
     expect(state.savingsEntries.find((e) => e.id === linkedEntry.id)).toBeUndefined();
   });
 
+  it('reverse cascade: deleting the expense also removes the linked savings entry', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [{ id: 'sav-seed', date: '2026-05-01', amountCents: 50000 }],
+    }));
+
+    await useFinanceStore.getState().spendFromSavings({
+      date: '2026-05-02',
+      amountCents: 1500,
+      description: 'Vacation gear',
+      category: 'Travel',
+    });
+
+    let state = useFinanceStore.getState();
+    const expense = state.expenses[0];
+    const linkedEntry = state.savingsEntries.find((e) => e.id !== 'sav-seed');
+
+    await useFinanceStore.getState().removeEntity('expenses', expense.id);
+    state = useFinanceStore.getState();
+    expect(state.expenses.find((e) => e.id === expense.id)).toBeUndefined();
+    expect(state.savingsEntries.find((e) => e.id === linkedEntry.id)).toBeUndefined();
+  });
+
+  it('deleting a savings-funded holding refunds savings and reverts the cashflow', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      holdings: [{ id: 'hld-1', ticker: 'VWCE', name: 'VWCE', quantity: 10, averageBuyPriceCents: 100000, currency: 'EUR' }],
+      savingsEntries: [{ id: 'sav-seed', date: '2026-05-01', amountCents: 50000 }],
+    }));
+
+    await useFinanceStore.getState().addPortfolioBuy({
+      date: '2026-05-02',
+      holdingId: 'hld-1',
+      ticker: 'VWCE',
+      amountCents: 10000,
+      fundingSource: 'savings',
+    });
+
+    expect(useFinanceStore.getState().portfolioCashflows).toHaveLength(1);
+    expect(useFinanceStore.getState().savingsEntries.filter((e) => e.kind === 'portfolio_buy')).toHaveLength(1);
+
+    await useFinanceStore.getState().removeEntity('holdings', 'hld-1');
+
+    const state = useFinanceStore.getState();
+    expect(state.holdings).toHaveLength(0);
+    expect(state.portfolioCashflows).toHaveLength(0);
+    expect(state.savingsEntries.filter((e) => e.kind === 'portfolio_buy')).toHaveLength(0);
+    // Savings balance restored: only the seed remains.
+    const totalSavings = state.savingsEntries
+      .filter((e) => e.source !== 'allocation')
+      .reduce((s, e) => s + e.amountCents, 0);
+    expect(totalSavings).toBe(50000);
+  });
+
+  it('deleting a cashflow-funded holding refunds the bank account', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      bankAccounts: [{ id: 'bank-a', name: 'Main', balanceCents: 50000, currency: 'EUR' }],
+      holdings: [{ id: 'hld-1', ticker: 'VWCE', name: 'VWCE', quantity: 10, averageBuyPriceCents: 100000, currency: 'EUR' }],
+    }));
+
+    await useFinanceStore.getState().addPortfolioBuy({
+      date: '2026-05-02',
+      holdingId: 'hld-1',
+      ticker: 'VWCE',
+      amountCents: 10000,
+      fundingSource: 'cashflow',
+      bankAccountId: 'bank-a',
+    });
+
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(40000);
+
+    await useFinanceStore.getState().removeEntity('holdings', 'hld-1');
+
+    const state = useFinanceStore.getState();
+    expect(state.bankAccounts[0].balanceCents).toBe(50000);
+    expect(state.portfolioCashflows).toHaveLength(0);
+  });
+
   it('does not adjust bank balance when creating a fixed income schedule', async () => {
     await useFinanceStore.getState().saveEntity('incomes', {
       date: '2026-05-01',

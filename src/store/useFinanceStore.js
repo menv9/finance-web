@@ -574,6 +574,10 @@ async function persistActivityLogs(set, logs) {
   return logs;
 }
 
+// Tracks in-flight deletions so paired records (savings entry ↔ expense /
+// portfolio cashflow) can cascade in either direction without infinite recursion.
+const _cascadingDeletes = new Set();
+
 export const useFinanceStore = create((set, get) => ({
   hydrated: false,
   tourActive: false,
@@ -1268,6 +1272,10 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   removeEntity: async (storeName, id) => {
+    const cascadeKey = `${storeName}:${id}`;
+    if (_cascadingDeletes.has(cascadeKey)) return;
+    _cascadingDeletes.add(cascadeKey);
+    try {
     const previous = get()[storeName]?.find((item) => item.id === id);
     // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
     // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
@@ -1291,9 +1299,33 @@ export const useFinanceStore = create((set, get) => ({
         await get().removeEntity('portfolioCashflows', previous.cashflowId);
       }
     }
+    // Reverse cascade: deleting one half of a typed pair removes the other,
+    // otherwise the orphan record silently corrupts the savings balance.
+    if (storeName === 'expenses' && previous) {
+      const linked = get().savingsEntries.find((e) => e.expenseId === id);
+      if (linked) await get().removeEntity('savingsEntries', linked.id);
+    }
+    if (storeName === 'portfolioCashflows' && previous) {
+      const linked = get().savingsEntries.find((e) => e.cashflowId === id);
+      if (linked) await get().removeEntity('savingsEntries', linked.id);
+    }
 
     const timestamp = new Date().toISOString();
     const bankAccountAdjustments = buildBankAccountAdjustments(storeName, previous, null, false);
+    // Cashflow-funded portfolio buys deduct from the bank when created
+    // (executed manually in addPortfolioBuy, outside buildBankAccountAdjustments).
+    // Reverse that deduction on delete.
+    if (
+      storeName === 'portfolioCashflows'
+      && previous?.source === 'cashflow'
+      && previous.bankAccountId
+      && previous.amountCents
+    ) {
+      bankAccountAdjustments.set(
+        previous.bankAccountId,
+        (bankAccountAdjustments.get(previous.bankAccountId) || 0) + Math.abs(previous.amountCents),
+      );
+    }
     const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
     const debtAdjustments = buildDebtAdjustments(storeName, previous, null);
     const adjustedDebts = applyDebtAdjustments(get().debts || [], debtAdjustments, timestamp);
@@ -1361,6 +1393,9 @@ export const useFinanceStore = create((set, get) => ({
       })]);
     }
     get().triggerAutoPush();
+    } finally {
+      _cascadingDeletes.delete(cascadeKey);
+    }
   },
 
   sellHolding: async ({ holdingId, percent, salePriceCents, feeCents, date, bankAccountId }) => {
