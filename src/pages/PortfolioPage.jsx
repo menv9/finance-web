@@ -21,6 +21,7 @@ import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
+import { computePortfolioMetrics } from '../utils/finance';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
@@ -88,50 +89,121 @@ function getPortfolioPeriodWindow(period, now = Date.now()) {
   return [startDate.getTime(), end];
 }
 
-function buildPortfolioValueSeries(snapshots, currentValueCents, locale) {
+function buildCostAtDateFn(cashflows, portfolioSales) {
+  const events = [
+    ...(cashflows || [])
+      .filter((cf) => cf.kind === 'buy' && cf.date)
+      .map((cf) => ({ date: cf.date, delta: Math.abs(cf.amountCents || 0) })),
+    ...(portfolioSales || [])
+      .filter((sale) => sale.date && sale.costBasisCents)
+      .map((sale) => ({ date: sale.date, delta: -(sale.costBasisCents || 0) })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+  return (isoTimestamp) => {
+    const day = isoTimestamp.slice(0, 10);
+    let cost = 0;
+    for (const event of events) {
+      if (event.date <= day) cost += event.delta;
+      else break;
+    }
+    return Math.max(0, cost);
+  };
+}
+
+function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period = '1m', investedCents = 0, cashflows = [], portfolioSales = []) {
+  const costAtDate = buildCostAtDateFn(cashflows, portfolioSales);
   const sorted = (snapshots || [])
     .filter((snapshot) => snapshot?.capturedAt)
     .slice()
     .sort((a, b) => (a.capturedAt || '').localeCompare(b.capturedAt || ''));
   const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-  const recent = sorted.filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= oneYearAgo);
-  const series = recent.map((snapshot) => ({
-    ...snapshot,
-    label: formatHourlyLabel(snapshot.capturedAt, locale),
-  }));
-  if (!series.length && currentValueCents > 0) {
+  const recent = period === 'all'
+    ? sorted
+    : sorted.filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= oneYearAgo);
+  const series = recent.map((snapshot) => {
+    const historicalCost = snapshot.costCents > 0 ? snapshot.costCents : costAtDate(snapshot.capturedAt);
+    return {
+      ...snapshot,
+      costCents: snapshot.valueCents > 0 ? (historicalCost || null) : null,
+      label: formatHourlyLabel(snapshot.capturedAt, locale),
+    };
+  });
+  // Prepend a purchase-start point at cost basis level so the green line starts
+  // at the same height as the red cost line on the first purchase date
+  if (series.length > 0 && investedCents > 0) {
+    const firstTs = new Date(series[0].capturedAt).getTime() - 1000;
+    const startCost = series[0].costCents || investedCents;
+    series.unshift({
+      id: 'purchase-start',
+      capturedAt: new Date(firstTs).toISOString(),
+      valueCents: startCost,
+      costCents: startCost,
+      label: formatHourlyLabel(new Date(firstTs).toISOString(), locale),
+    });
+  }
+  if (currentValueCents > 0) {
     const capturedAt = new Date().toISOString();
-    return [{
+    const livePoint = {
       id: 'live',
       capturedAt,
       valueCents: currentValueCents,
+      costCents: investedCents || null,
       label: formatHourlyLabel(capturedAt, locale),
-    }];
+    };
+    if (!series.length) return [livePoint];
+
+    const last = series[series.length - 1];
+    const lastCapturedAt = new Date(last.capturedAt).getTime();
+    const liveCapturedAt = new Date(capturedAt).getTime();
+    const lastIsCurrentHour = last.id === `psn-${capturedAt.slice(0, 13)}` || Math.abs(liveCapturedAt - lastCapturedAt) < 60_000;
+    if (lastIsCurrentHour) {
+      return [...series.slice(0, -1), { ...last, valueCents: currentValueCents, costCents: investedCents || last.costCents }];
+    }
+    return [...series, livePoint];
   }
   return series;
 }
 
 function filterPortfolioValueSeries(series, period, locale) {
-  const [start, end] = getPortfolioPeriodWindow(period);
-  const points = (series || []).map((point) => ({
+  const mapped = (series || []).map((point) => ({
     ...point,
     capturedAtMs: new Date(point.capturedAt).getTime(),
     label: formatPortfolioPeriodLabel(point.capturedAt, period, locale),
-  })).filter((point) => point.capturedAtMs >= start && point.capturedAtMs <= end);
+  }));
+
+  if (period === 'all') return mapped;
+
+  const [start, end] = getPortfolioPeriodWindow(period);
+  const points = mapped.filter((point) => point.capturedAtMs >= start && point.capturedAtMs <= end);
   if (!points.length) return points;
 
   const first = points[0];
   const last = points[points.length - 1];
   const boundedPoints = [...points];
   if (first.capturedAtMs > start) {
+    const prior = mapped.filter((p) => p.capturedAtMs < start);
+    const priorPoint = prior.length > 0 ? prior[prior.length - 1] : null;
     boundedPoints.unshift({
       ...first,
       id: first.id + '-period-start',
       capturedAt: new Date(start).toISOString(),
       capturedAtMs: start,
-      valueCents: 0,
+      valueCents: priorPoint ? priorPoint.valueCents : 0,
+      costCents: priorPoint ? priorPoint.costCents : null,
       label: formatPortfolioPeriodLabel(start, period, locale),
     });
+    // No prior data → insert a second 0-point just before the first real snapshot
+    // so the line stays flat at 0 instead of sloping diagonally up
+    if (!priorPoint) {
+      boundedPoints.splice(1, 0, {
+        ...first,
+        id: first.id + '-floor',
+        capturedAt: new Date(first.capturedAtMs - 1000).toISOString(),
+        capturedAtMs: first.capturedAtMs - 1000,
+        valueCents: 0,
+        costCents: null,
+        label: formatPortfolioPeriodLabel(first.capturedAtMs - 1000, period, locale),
+      });
+    }
   }
   if (last.capturedAtMs < end) {
     boundedPoints.push({
@@ -547,6 +619,38 @@ function PortfolioHoldingList({
       allowHorizontalScroll={false}
       caption={t('portfolio.holdingsCard.title')}
     />
+  );
+}
+
+function PortfolioForm({ initialValue, onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    name: initialValue?.name || '',
+    description: initialValue?.description || '',
+    color: initialValue?.color || '#0f5132',
+  });
+  const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  return (
+    <form
+      className="grid gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({ ...initialValue, ...form, name: form.name.trim() || 'Portfolio' });
+      }}
+    >
+      <FormField label="Portfolio name" htmlFor="portfolio-name" required>
+        {(props) => <Input {...props} value={form.name} onChange={set('name')} placeholder="Main Portfolio" required />}
+      </FormField>
+      <FormField label="Description" htmlFor="portfolio-description">
+        {(props) => <Input {...props} value={form.description} onChange={set('description')} placeholder="Long-term holdings, broker, strategy..." />}
+      </FormField>
+      <FormField label="Color" htmlFor="portfolio-color">
+        {(props) => <Input {...props} type="color" value={form.color} onChange={set('color')} />}
+      </FormField>
+      <div className="flex justify-end gap-2 border-t border-rule pt-4">
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" variant="primary">{initialValue?.id ? 'Save changes' : 'Create portfolio'}</Button>
+      </div>
+    </form>
   );
 }
 
@@ -1101,8 +1205,10 @@ function PortfolioNews({ tickers, apiKey }) {
 
 export default function PortfolioPage() {
   const { t, locale } = useTranslation();
+  const investmentPortfolios = useFinanceStore((state) => state.investmentPortfolios || []);
   const holdings = useFinanceStore((state) => state.holdings);
   const dividends = useFinanceStore((state) => state.dividends);
+  const portfolioCashflows = useFinanceStore((state) => state.portfolioCashflows);
   const portfolioSales = useFinanceStore((state) => state.portfolioSales);
   const portfolioSnapshots = useFinanceStore((state) => state.portfolioSnapshots);
   const portfolio = useFinanceStore((state) => state.derived.portfolio);
@@ -1132,10 +1238,14 @@ export default function PortfolioPage() {
   const [dividendModal, setDividendModal] = useState({ open: false, id: null });
   const [sellModal, setSellModal] = useState({ open: false, holdingId: null, saleId: null });
   const [sellAllModal, setSellAllModal] = useState({ open: false, ticker: null });
+  const [portfolioModal, setPortfolioModal] = useState({ open: false, id: null });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
+  const [activePortfolioId, setActivePortfolioId] = useState('all');
   const [activeView, setActiveView] = useState('holdings');
-  const [portfolioValuePeriod, setPortfolioValuePeriod] = useState('1m');
+  const activePortfolio = investmentPortfolios.find((item) => item.id === activePortfolioId) || null;
+  const editingPortfolio = investmentPortfolios.find((item) => item.id === portfolioModal.id) || null;
+  const isAllPortfoliosView = activePortfolioId === 'all';
   const editingHolding = holdings.find((item) => item.id === holdingModal.id);
   const editingDividend = dividends.find((item) => item.id === dividendModal.id);
   const editingSale = portfolioSales.find((item) => item.id === sellModal.saleId);
@@ -1149,33 +1259,76 @@ export default function PortfolioPage() {
     : modalHolding;
   const fxRates = useFinanceStore((state) => state.fxRates);
   const currency = settings.baseCurrency;
-  const activeHoldings = holdings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
+  const visibleHoldings = isAllPortfoliosView ? holdings : holdings.filter((item) => item.portfolioId === activePortfolioId);
+  const visibleDividends = isAllPortfoliosView ? dividends : dividends.filter((item) => item.portfolioId === activePortfolioId);
+  const visiblePortfolioSales = isAllPortfoliosView ? portfolioSales : portfolioSales.filter((item) => item.portfolioId === activePortfolioId);
+  const visiblePortfolioCashflows = isAllPortfoliosView ? portfolioCashflows : portfolioCashflows.filter((item) => item.portfolioId === activePortfolioId);
+  const visiblePortfolioMetrics = isAllPortfoliosView
+    ? portfolio
+    : computePortfolioMetrics(
+        visibleHoldings,
+        visibleDividends,
+        visiblePortfolioCashflows,
+        settings.allocationTargets,
+        fxRates,
+        currency,
+      );
+  const activeHoldings = visibleHoldings.filter((item) => !item.archivedAt && (item.quantity || 0) > 0);
   const holdingGroups = groupHoldingsByTicker(activeHoldings, fxRates, currency);
   const newsTickers = useMemo(
     () => Array.from(new Set(activeHoldings.map((h) => h.ticker).filter(Boolean))),
     [activeHoldings],
   );
-  const portfolioValueSeries = buildPortfolioValueSeries(portfolioSnapshots, portfolio.currentValueCents, locale);
-  const portfolioValueDomain = useMemo(
-    () => getPortfolioPeriodWindow(portfolioValuePeriod),
-    [portfolioValuePeriod, portfolioValueSeries.length],
-  );
+  const visibleSnapshots = isAllPortfoliosView
+    ? portfolioSnapshots.filter((snapshot) => !snapshot.portfolioId)
+    : portfolioSnapshots.filter((snapshot) => snapshot.portfolioId === activePortfolioId);
+  const portfolioValueSeries = buildPortfolioValueSeries(visibleSnapshots, visiblePortfolioMetrics.currentValueCents, locale, 'all', visiblePortfolioMetrics.investedCents, visiblePortfolioCashflows, visiblePortfolioSales);
+  const portfolioValueDomain = useMemo(() => {
+    const realTimes = portfolioValueSeries
+      .filter((p) => p.valueCents > 0)
+      .map((p) => new Date(p.capturedAt).getTime())
+      .filter(Boolean);
+    if (!realTimes.length) return [Date.now() - 30 * 24 * 60 * 60 * 1000, Date.now()];
+    return [Math.min(...realTimes), Date.now()];
+  }, [portfolioValueSeries]);
   const visiblePortfolioValueSeries = useMemo(
-    () => filterPortfolioValueSeries(portfolioValueSeries, portfolioValuePeriod, locale),
-    [portfolioValuePeriod, portfolioValueSeries, locale],
+    () => filterPortfolioValueSeries(portfolioValueSeries, 'all', locale),
+    [portfolioValueSeries, locale],
   );
+  const portfolioYDomain = useMemo(() => {
+    const values = visiblePortfolioValueSeries
+      .flatMap((p) => [p.valueCents, p.costCents])
+      .filter((v) => v != null && v > 0);
+    if (!values.length) return [0, 1000];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || max;
+    return [Math.max(0, Math.floor(min - range * 0.25)), Math.ceil(max + range * 0.05)];
+  }, [visiblePortfolioValueSeries]);
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
   useEffect(() => {
-    if (activeHoldings.length && portfolio.currentValueCents > 0) {
+    if (holdings.some((holding) => !holding.archivedAt && (holding.quantity || 0) > 0) && portfolio.currentValueCents > 0) {
       recordPortfolioSnapshot();
     }
-  }, [activeHoldings.length, portfolio.currentValueCents, recordPortfolioSnapshot]);
+  }, [holdings, portfolio.currentValueCents, recordPortfolioSnapshot]);
+
+  useEffect(() => {
+    if (activePortfolioId !== 'all' && !investmentPortfolios.some((portfolio) => portfolio.id === activePortfolioId)) {
+      setActivePortfolioId('all');
+      setActiveView('holdings');
+    }
+  }, [activePortfolioId, investmentPortfolios]);
 
   const openNewHolding = (initialValue = null) => {
+    if (!activePortfolio) return;
     const nextInitialValue = initialValue && !initialValue.nativeEvent ? initialValue : null;
-    setHoldingModal({ open: true, id: null, initialValue: nextInitialValue });
+    setHoldingModal({
+      open: true,
+      id: null,
+      initialValue: { ...(nextInitialValue || {}), portfolioId: activePortfolio.id },
+    });
   };
   const openAddHoldingOperation = (group) => openNewHolding({
     ticker: group.ticker,
@@ -1191,8 +1344,14 @@ export default function PortfolioPage() {
   const openSellHolding = (id) => setSellModal({ open: true, holdingId: id, saleId: null });
   const openEditSale = (saleId) => setSellModal({ open: true, holdingId: null, saleId });
   const closeSellHolding = () => setSellModal({ open: false, holdingId: null, saleId: null });
+  const openNewPortfolio = () => setPortfolioModal({ open: true, id: null });
+  const openEditPortfolio = (id) => setPortfolioModal({ open: true, id });
+  const closePortfolio = () => setPortfolioModal({ open: false, id: null });
 
-  const openNewDividend = () => setDividendModal({ open: true, id: null });
+  const openNewDividend = () => {
+    if (!activePortfolio) return;
+    setDividendModal({ open: true, id: null });
+  };
   const openEditDividend = (id) => setDividendModal({ open: true, id });
   const closeDividend = () => setDividendModal({ open: false, id: null });
 
@@ -1366,7 +1525,7 @@ export default function PortfolioPage() {
     },
   ];
 
-  const historicalSaleRows = (portfolioSales || [])
+  const historicalSaleRows = (visiblePortfolioSales || [])
     .slice()
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     .map((sale) => ({
@@ -1411,6 +1570,101 @@ export default function PortfolioPage() {
     { id: 'holdings', label: t('portfolio.views.holdings') },
     { id: 'activity', label: t('portfolio.views.activity') },
     { id: 'performance', label: t('portfolio.views.performance') },
+  ];
+  const portfolioSummaryRows = investmentPortfolios.map((portfolioItem) => {
+    const scopedHoldings = holdings.filter((holding) => holding.portfolioId === portfolioItem.id);
+    const scopedActiveHoldings = scopedHoldings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
+    const metrics = computePortfolioMetrics(
+      scopedHoldings,
+      dividends.filter((dividend) => dividend.portfolioId === portfolioItem.id),
+      portfolioCashflows.filter((flow) => flow.portfolioId === portfolioItem.id),
+      settings.allocationTargets,
+      fxRates,
+      currency,
+    );
+    return {
+      ...portfolioItem,
+      symbols: new Set(scopedActiveHoldings.map((holding) => holding.ticker).filter(Boolean)).size,
+      holdingsCount: scopedActiveHoldings.length,
+      investedCents: metrics.investedCents,
+      marketValueCents: metrics.currentValueCents,
+      dayChangeCents: 0,
+      dayChangePct: 0,
+      unrealizedCents: metrics.pnlCents,
+      unrealizedPct: metrics.pnlPercent,
+    };
+  });
+  const portfolioSummaryColumns = [
+    {
+      key: 'name',
+      header: 'Portfolio Name',
+      noTruncate: true,
+      render: (row) => (
+        <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => { setActivePortfolioId(row.id); setActiveView('holdings'); }}>
+          <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: row.color || 'var(--accent)' }} />
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-ink">{row.name}</span>
+            {row.description ? <span className="block truncate text-xs text-ink-faint">{row.description}</span> : null}
+          </span>
+        </button>
+      ),
+    },
+    { key: 'symbols', header: 'Symbols', numeric: true, width: 84 },
+    { key: 'investedCents', header: 'Cost Basis', numeric: true, width: 120, render: (row) => formatCurrency(row.investedCents, currency, locale) },
+    { key: 'marketValueCents', header: 'Market Value', numeric: true, width: 130, render: (row) => formatCurrency(row.marketValueCents, currency, locale) },
+    {
+      key: 'dayChangeCents',
+      header: 'Day Change',
+      numeric: true,
+      width: 112,
+      hideBelow: 'lg',
+      render: (row) => (
+        <span className="text-ink-muted">
+          {formatCurrency(row.dayChangeCents, currency, locale)} ({formatNumber(row.dayChangePct, locale, 2)}%)
+        </span>
+      ),
+    },
+    {
+      key: 'unrealizedCents',
+      header: 'Unrealized Gain/Loss',
+      numeric: true,
+      width: 150,
+      render: (row) => (
+        <span className={row.unrealizedCents >= 0 ? 'text-positive' : 'text-danger'}>
+          {formatCurrency(row.unrealizedCents, currency, locale)}
+          <span className="ml-1 text-xs text-ink-muted">({formatNumber(row.unrealizedPct, locale, 2)}%)</span>
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      width: 108,
+      noTruncate: true,
+      render: (row) => (
+        <div className="inline-flex justify-end gap-1">
+          <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken" title="Edit portfolio" onClick={() => openEditPortfolio(row.id)}>
+            <EditIcon />
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+            title="Delete portfolio"
+            onClick={async () => {
+              try {
+                if (await confirm({ title: 'Delete portfolio?', description: 'Only empty portfolios can be deleted.', danger: true }))
+                  await removeEntity('investmentPortfolios', row.id);
+              } catch (error) {
+                await alert({ title: 'Cannot delete portfolio', description: error.message });
+              }
+            }}
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   const historicalColumns = [
@@ -1499,9 +1753,14 @@ export default function PortfolioPage() {
             <Button variant="secondary" size="sm" loading={refreshing} onClick={onRefresh}>
               {refreshing ? t('portfolio.refreshing', { count: activeHoldings.length, mins: Math.ceil(activeHoldings.length * 13 / 60) }) : t('portfolio.refreshPrices')}
             </Button>
+            <Button variant="secondary" size="sm" onClick={openNewPortfolio}>
+              <PlusIcon /> Create portfolio
+            </Button>
+            {activePortfolio ? (
             <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
               <PlusIcon /> {t('portfolio.newHolding')}
             </Button>
+            ) : null}
           </>
         }
       />
@@ -1509,10 +1768,10 @@ export default function PortfolioPage() {
       {/* KPIs */}
       <section data-tour="portfolio-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: t('portfolio.kpiMarketValue.label'), value: portfolio.currentValueCents, mode: 'currency', hint: t('portfolio.kpiMarketValue.hintHoldings', { count: activeHoldings.length }), info: t('portfolio.kpiMarketValue.info') },
-          { label: t('portfolio.kpiTwrr.label'), value: portfolio.twrr, mode: 'percent', hint: t('portfolio.kpiTwrr.hint'), info: t('portfolio.kpiTwrr.info') },
-          { label: t('portfolio.kpiXirr.label'), value: portfolio.xirr, mode: 'percent', hint: t('portfolio.kpiXirr.hint'), info: t('portfolio.kpiXirr.info') },
-          { label: t('portfolio.kpiDividendYield.label'), value: portfolio.dividendYield, mode: 'percent', hint: t('portfolio.kpiDividendYield.hint'), info: t('portfolio.kpiDividendYield.info') },
+          { label: t('portfolio.kpiMarketValue.label'), value: visiblePortfolioMetrics.currentValueCents, mode: 'currency', hint: t('portfolio.kpiMarketValue.hintHoldings', { count: activeHoldings.length }), info: t('portfolio.kpiMarketValue.info') },
+          { label: t('portfolio.kpiTwrr.label'), value: visiblePortfolioMetrics.twrr, mode: 'percent', hint: t('portfolio.kpiTwrr.hint'), info: t('portfolio.kpiTwrr.info') },
+          { label: t('portfolio.kpiXirr.label'), value: visiblePortfolioMetrics.xirr, mode: 'percent', hint: t('portfolio.kpiXirr.hint'), info: t('portfolio.kpiXirr.info') },
+          { label: t('portfolio.kpiDividendYield.label'), value: visiblePortfolioMetrics.dividendYield, mode: 'percent', hint: t('portfolio.kpiDividendYield.hint'), info: t('portfolio.kpiDividendYield.info') },
         ].map((k, i) => (
           <div key={k.label} className={'min-w-0 bg-surface p-6 ' + rise(i + 1)}>
             <Stat label={k.label} value={k.value} mode={k.mode} currency={currency} locale={locale} hint={k.hint} info={k.info} />
@@ -1520,6 +1779,50 @@ export default function PortfolioPage() {
         ))}
       </section>
 
+      <Card
+        eyebrow="Investing portfolios"
+        title={isAllPortfoliosView ? 'All portfolios' : activePortfolio?.name || 'Portfolio'}
+        description={isAllPortfoliosView ? 'Combined view across every investment portfolio.' : activePortfolio?.description || 'Portfolio-specific holdings and performance.'}
+        density="compact"
+        action={<Button variant="secondary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
+      >
+        {investmentPortfolios.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={cn(
+                'rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+                isAllPortfoliosView ? 'border-accent bg-accent text-accent-contrast' : 'border-rule bg-surface-raised text-ink-muted hover:text-ink',
+              )}
+              onClick={() => { setActivePortfolioId('all'); setActiveView('holdings'); }}
+            >
+              All portfolios
+            </button>
+            {investmentPortfolios.map((portfolioItem) => (
+              <button
+                key={portfolioItem.id}
+                type="button"
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+                  activePortfolioId === portfolioItem.id ? 'border-accent bg-accent text-accent-contrast' : 'border-rule bg-surface-raised text-ink-muted hover:text-ink',
+                )}
+                onClick={() => { setActivePortfolioId(portfolioItem.id); setActiveView('holdings'); }}
+              >
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: portfolioItem.color || 'currentColor' }} />
+                {portfolioItem.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No portfolios yet"
+            description="Create a portfolio before adding holdings."
+            action={<Button variant="primary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
+          />
+        )}
+      </Card>
+
+      {activePortfolio ? (
       <div className="flex flex-wrap items-center gap-2 border-b border-rule">
         {portfolioViews.map((view) => (
           <button
@@ -1537,6 +1840,7 @@ export default function PortfolioPage() {
           </button>
         ))}
       </div>
+      ) : null}
 
       {activeView === 'holdings' ? (
       <>
@@ -1546,31 +1850,6 @@ export default function PortfolioPage() {
         title={t('portfolio.valueChart.title')}
         description={t('portfolio.valueChart.description')}
         variant="chart"
-        action={
-          <div className="inline-flex overflow-hidden rounded-md border border-rule bg-surface-raised p-0.5">
-            {[
-              { id: '1d', label: '1D' },
-              { id: '1w', label: '1W' },
-              { id: '1m', label: '1M' },
-              { id: '6m', label: '6M' },
-              { id: '1y', label: '1Y' },
-            ].map((period) => (
-              <button
-                key={period.id}
-                type="button"
-                className={cn(
-                  'h-7 rounded px-2.5 text-xs font-medium transition-colors',
-                  portfolioValuePeriod === period.id
-                    ? 'bg-accent text-accent-contrast'
-                    : 'text-ink-muted hover:bg-surface-sunken hover:text-ink',
-                )}
-                onClick={() => setPortfolioValuePeriod(period.id)}
-              >
-                {period.label}
-              </button>
-            ))}
-          </div>
-        }
         className={rise(2)}
       >
         {visiblePortfolioValueSeries.length ? (
@@ -1588,7 +1867,7 @@ export default function PortfolioPage() {
                 type="number"
                 scale="time"
                 domain={portfolioValueDomain}
-                tickFormatter={(value) => formatPortfolioPeriodLabel(value, portfolioValuePeriod, locale)}
+                tickFormatter={(value) => formatPortfolioPeriodLabel(value, 'all', locale)}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
@@ -1599,9 +1878,16 @@ export default function PortfolioPage() {
                 tickLine={false}
                 axisLine={false}
                 width={60}
+                domain={portfolioYDomain}
               />
               <Tooltip
-                formatter={(value) => formatCurrency(value, currency, locale)}
+                formatter={(value, name) => {
+                  if (value == null) return [null, null];
+                  return [
+                    formatCurrency(value, currency, locale),
+                    name === 'valueCents' ? t('portfolio.valueChart.tooltipValue') : t('portfolio.valueChart.tooltipCost'),
+                  ];
+                }}
                 labelFormatter={(_, payload) => {
                   const point = payload?.[0]?.payload;
                   return point?.capturedAt
@@ -1611,6 +1897,17 @@ export default function PortfolioPage() {
                       }).format(new Date(point.capturedAt))
                     : '';
                 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="costCents"
+                stroke="var(--danger)"
+                strokeDasharray="4 3"
+                strokeWidth={1.5}
+                fill="none"
+                dot={false}
+                connectNulls={false}
+                activeDot={false}
               />
               <Area
                 type="monotone"
@@ -1628,6 +1925,33 @@ export default function PortfolioPage() {
         )}
       </Card>
 
+      {isAllPortfoliosView ? (
+      <Card
+        eyebrow="Portfolios"
+        title="All portfolio holdings"
+        description="Summary of every portfolio inside Investing."
+        density="compact"
+        action={<Button variant="primary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
+        className={rise(3)}
+      >
+        {portfolioSummaryRows.length ? (
+          <Table
+            columns={portfolioSummaryColumns}
+            rows={portfolioSummaryRows}
+            density="compact"
+            allowHorizontalScroll={false}
+            caption="All portfolios"
+          />
+        ) : (
+          <EmptyState
+            title="No portfolios yet"
+            description="Create a portfolio first, then add holdings inside it."
+            action={<Button variant="primary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
+          />
+        )}
+      </Card>
+      ) : (
+      <>
       {/* holdings */}
       <Card
         data-tour="portfolio-holdings"
@@ -1674,13 +1998,13 @@ export default function PortfolioPage() {
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card data-tour="portfolio-allocation" eyebrow={t('portfolio.allocationCard.eyebrow')} title={t('portfolio.allocationCard.title')} className={'order-2 lg:col-span-5 ' + rise(2)}>
-          {portfolio.allocationActual?.length ? (
+          {visiblePortfolioMetrics.allocationActual?.length ? (
             <div className="flex flex-col gap-5">
               <div className="relative mx-auto h-[190px] w-full max-w-[190px] sm:h-[220px] sm:max-w-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={portfolio.allocationActual}
+                      data={visiblePortfolioMetrics.allocationActual}
                       dataKey="valueCents"
                       nameKey="ticker"
                       innerRadius="58%"
@@ -1688,7 +2012,7 @@ export default function PortfolioPage() {
                       paddingAngle={2}
                       strokeWidth={0}
                     >
-                      {portfolio.allocationActual.map((item, index) => (
+                      {visiblePortfolioMetrics.allocationActual.map((item, index) => (
                         <Cell key={item.ticker} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -1702,11 +2026,11 @@ export default function PortfolioPage() {
                 </ResponsiveContainer>
               </div>
               <ul className="flex flex-col gap-2">
-                {portfolio.allocationActual
+                {visiblePortfolioMetrics.allocationActual
                   .slice()
                   .sort((a, b) => b.valueCents - a.valueCents)
                   .map((item) => {
-                    const originalIndex = portfolio.allocationActual.findIndex((s) => s.ticker === item.ticker);
+                    const originalIndex = visiblePortfolioMetrics.allocationActual.findIndex((s) => s.ticker === item.ticker);
                     const color = COLORS[originalIndex % COLORS.length];
                     return (
                       <li key={item.ticker} className="flex items-center gap-2 min-w-0">
@@ -1729,9 +2053,9 @@ export default function PortfolioPage() {
         </Card>
 
         <Card eyebrow={t('portfolio.rebalanceCard.eyebrow')} title={t('portfolio.rebalanceCard.title')} variant="chart" className={'order-1 lg:col-span-7 ' + rise(3)}>
-          {portfolio.allocationActual?.length ? (
+          {visiblePortfolioMetrics.allocationActual?.length ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={portfolio.allocationActual} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+              <BarChart data={visiblePortfolioMetrics.allocationActual} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="2 4" vertical={false} />
                 <XAxis dataKey="ticker" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} width={44} />
@@ -1745,6 +2069,8 @@ export default function PortfolioPage() {
           )}
         </Card>
       </section>
+      </>
+      )}
       </>
       ) : null}
 
@@ -1865,8 +2191,8 @@ export default function PortfolioPage() {
         }
         className={rise(7)}
       >
-        {dividends.length ? (
-          <Table columns={dividendColumns} rows={dividends} density="compact" />
+        {visibleDividends.length ? (
+          <Table columns={dividendColumns} rows={visibleDividends} density="compact" />
         ) : (
           <EmptyState
             title={t('portfolio.dividendsCard.emptyTitle')}
@@ -1883,6 +2209,26 @@ export default function PortfolioPage() {
 
       {/* news */}
       <PortfolioNews tickers={newsTickers} apiKey={settings.finnhubApiKey || ''} />
+
+      <Modal
+        open={portfolioModal.open}
+        onClose={closePortfolio}
+        eyebrow="Portfolio"
+        title={editingPortfolio ? 'Edit portfolio' : 'Create portfolio'}
+        description="Group holdings, dividends, activity and performance under one investment portfolio."
+        size="md"
+      >
+        <PortfolioForm
+          initialValue={editingPortfolio}
+          onSubmit={async (value) => {
+            const saved = await saveEntity('investmentPortfolios', value);
+            setActivePortfolioId(saved.id);
+            setActiveView('holdings');
+            closePortfolio();
+          }}
+          onCancel={closePortfolio}
+        />
+      </Modal>
 
       <Modal
         open={holdingModal.open}
@@ -1927,6 +2273,7 @@ export default function PortfolioPage() {
                     amountCents: cost,
                     fundingSource: fundingSource === 'savings' ? 'savings' : 'cashflow',
                     holdingId: saved.id,
+                    portfolioId: saved.portfolioId,
                     ticker: saved.ticker,
                     bankAccountId: fundingSource === 'cashflow' ? bankAccountId : null,
                   });
@@ -2034,11 +2381,11 @@ export default function PortfolioPage() {
         size="md"
       >
         <DividendForm
-          holdings={holdings}
+          holdings={activePortfolio ? holdings.filter((holding) => holding.portfolioId === activePortfolio.id) : holdings}
           bankAccounts={bankAccounts}
-          initialValue={editingDividend}
+          initialValue={editingDividend || (activePortfolio ? { portfolioId: activePortfolio.id } : null)}
           onSubmit={async (value) => {
-            await saveDividend(value);
+            await saveDividend({ ...value, portfolioId: value.portfolioId || activePortfolio?.id });
             closeDividend();
           }}
           onCancel={closeDividend}

@@ -70,7 +70,7 @@ import {
   upsertActivityPrivacy,
 } from '../utils/socialApi';
 
-const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
+const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
   savings: 'savingsConfig',
 };
@@ -78,6 +78,7 @@ const STORE_LABELS = {
   expenses: 'Expense',
   fixedExpenses: 'Recurring bill',
   incomes: 'Income',
+  investmentPortfolios: 'Investment portfolio',
   holdings: 'Holding',
   dividends: 'Dividend',
   portfolioCashflows: 'Portfolio cashflow',
@@ -99,6 +100,7 @@ const STORE_MODULES = {
   expenses: 'Expenses',
   fixedExpenses: 'Expenses',
   incomes: 'Income',
+  investmentPortfolios: 'Portfolio',
   holdings: 'Portfolio',
   dividends: 'Portfolio',
   portfolioCashflows: 'Portfolio',
@@ -215,6 +217,72 @@ function makeId(prefix) {
 
 function portfolioSnapshotId(timestamp = new Date().toISOString()) {
   return `psn-${timestamp.slice(0, 13)}`;
+}
+
+function portfolioScopedSnapshotId(portfolioId, timestamp = new Date().toISOString()) {
+  return `psn-${portfolioId}-${timestamp.slice(0, 13)}`;
+}
+
+function defaultInvestmentPortfolio(timestamp = new Date().toISOString()) {
+  return ensureEntitySyncFields({
+    id: 'ipr-main',
+    name: 'Main Portfolio',
+    description: '',
+    color: '#0f5132',
+    updatedAt: timestamp,
+  }, timestamp);
+}
+
+function inferPortfolioIdFromTicker(ticker, holdings, fallbackPortfolioId = null) {
+  if (!ticker) return fallbackPortfolioId;
+  const matches = (holdings || []).filter((holding) => holding.ticker === ticker && holding.portfolioId);
+  const uniqueIds = [...new Set(matches.map((holding) => holding.portfolioId))];
+  return uniqueIds.length === 1 ? uniqueIds[0] : fallbackPortfolioId;
+}
+
+async function normalizeInvestmentPortfolioRecords(records, settings) {
+  const timestamp = new Date().toISOString();
+  const portfolios = [...(records.investmentPortfolios || [])];
+  if (!portfolios.length && (records.holdings || []).length) {
+    portfolios.push(defaultInvestmentPortfolio(timestamp));
+  }
+  const fallbackPortfolioId = portfolios[0]?.id || null;
+  const normalizedHoldings = (records.holdings || []).map((holding) => (
+    holding.portfolioId || !fallbackPortfolioId ? holding : { ...holding, portfolioId: fallbackPortfolioId, updatedAt: timestamp }
+  ));
+  const holdingsById = new Map(normalizedHoldings.map((holding) => [holding.id, holding]));
+  const normalizedSales = (records.portfolioSales || []).map((sale) => {
+    const portfolioId = sale.portfolioId || holdingsById.get(sale.holdingId)?.portfolioId || fallbackPortfolioId;
+    return portfolioId && !sale.portfolioId ? { ...sale, portfolioId, updatedAt: timestamp } : sale;
+  });
+  const normalizedCashflows = (records.portfolioCashflows || []).map((cashflow) => {
+    const portfolioId = cashflow.portfolioId || holdingsById.get(cashflow.holdingId)?.portfolioId || fallbackPortfolioId;
+    return portfolioId && !cashflow.portfolioId ? { ...cashflow, portfolioId, updatedAt: timestamp } : cashflow;
+  });
+  const normalizedDividends = (records.dividends || []).map((dividend) => {
+    const portfolioId = dividend.portfolioId || inferPortfolioIdFromTicker(dividend.ticker, normalizedHoldings, fallbackPortfolioId);
+    return portfolioId && !dividend.portfolioId ? { ...dividend, portfolioId, updatedAt: timestamp } : dividend;
+  });
+
+  await Promise.all([
+    ...portfolios
+      .filter((portfolio) => !(records.investmentPortfolios || []).some((item) => item.id === portfolio.id))
+      .map((portfolio) => putRecord('investmentPortfolios', ensureEntitySyncFields(portfolio, timestamp))),
+    ...normalizedHoldings.filter((item, index) => item !== records.holdings[index]).map((item) => putRecord('holdings', item)),
+    ...normalizedSales.filter((item, index) => item !== records.portfolioSales[index]).map((item) => putRecord('portfolioSales', item)),
+    ...normalizedCashflows.filter((item, index) => item !== records.portfolioCashflows[index]).map((item) => putRecord('portfolioCashflows', item)),
+    ...normalizedDividends.filter((item, index) => item !== records.dividends[index]).map((item) => putRecord('dividends', item)),
+  ]);
+
+  void settings;
+  return {
+    ...records,
+    investmentPortfolios: portfolios,
+    holdings: normalizedHoldings,
+    portfolioSales: normalizedSales,
+    portfolioCashflows: normalizedCashflows,
+    dividends: normalizedDividends,
+  };
 }
 
 function portfolioSaleCashflowCents(sale) {
@@ -361,9 +429,10 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, dat
   }, timestamp);
   const nextSale = ensureEntitySyncFields({
     id: saleId,
-    date: saleDate,
-    holdingId: holding.id,
-    ticker: holding.ticker,
+      date: saleDate,
+      holdingId: holding.id,
+      portfolioId: holding.portfolioId || sale?.portfolioId || null,
+      ticker: holding.ticker,
     name: holding.name,
     platform: holding.platform,
     percent: salePercent,
@@ -385,9 +454,10 @@ function buildSaleUpdate({ holding, sale, percent, salePriceCents, feeCents, dat
   const nextCashflow = ensureEntitySyncFields({
     id: cashflowId || makeId('pcf'),
     date: saleDate,
-    amountCents: proceedsCents,
-    holdingId: holding.id,
-    ticker: holding.ticker,
+      amountCents: proceedsCents,
+      holdingId: holding.id,
+      portfolioId: holding.portfolioId || sale?.portfolioId || null,
+      ticker: holding.ticker,
     kind: 'sell',
     linkedSaleId: nextSale.id,
     bankAccountId: bankAccountId ?? sale?.bankAccountId ?? null,
@@ -636,6 +706,7 @@ export const useFinanceStore = create((set, get) => ({
   expenses: [],
   fixedExpenses: [],
   incomes: [],
+  investmentPortfolios: [],
   holdings: [],
   dividends: [],
   portfolioCashflows: [],
@@ -684,7 +755,14 @@ export const useFinanceStore = create((set, get) => ({
     const syncMeta = loadSyncMeta();
     const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
     const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
-    normalizedRecords[13] = await migrateInitialCashToBankAccounts(normalizedRecords[13], settings);
+    normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
+    const portfolioRecords = await normalizeInvestmentPortfolioRecords({
+      investmentPortfolios: normalizedRecords[3],
+      holdings: normalizedRecords[4],
+      dividends: normalizedRecords[5],
+      portfolioCashflows: normalizedRecords[6],
+      portfolioSales: normalizedRecords[7],
+    }, settings);
     set((state) => {
       const nextState = {
         ...state,
@@ -693,21 +771,22 @@ export const useFinanceStore = create((set, get) => ({
         expenses: normalizedRecords[0],
         fixedExpenses: normalizedRecords[1],
         incomes: normalizedRecords[2],
-        holdings: normalizedRecords[3],
-        dividends: normalizedRecords[4],
-        portfolioCashflows: normalizedRecords[5],
-        portfolioSales: normalizedRecords[6],
-        savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
-        savingsEntries: normalizedRecords[8],
-        savingsGoals: normalizedRecords[9],
-        budgets: normalizedRecords[10],
-        rollovers: normalizedRecords[11],
-        transfers: normalizedRecords[12],
-        bankAccounts: normalizedRecords[13],
-        debts: normalizedRecords[14],
-        attachments: normalizedRecords[15],
-        activityLog: normalizedRecords[16],
-        portfolioSnapshots: normalizedRecords[17],
+        investmentPortfolios: portfolioRecords.investmentPortfolios,
+        holdings: portfolioRecords.holdings,
+        dividends: portfolioRecords.dividends,
+        portfolioCashflows: portfolioRecords.portfolioCashflows,
+        portfolioSales: portfolioRecords.portfolioSales,
+        savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
+        savingsEntries: normalizedRecords[9],
+        savingsGoals: normalizedRecords[10],
+        budgets: normalizedRecords[11],
+        rollovers: normalizedRecords[12],
+        transfers: normalizedRecords[13],
+        bankAccounts: normalizedRecords[14],
+        debts: normalizedRecords[15],
+        attachments: normalizedRecords[16],
+        activityLog: normalizedRecords[17],
+        portfolioSnapshots: normalizedRecords[18],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -720,7 +799,14 @@ export const useFinanceStore = create((set, get) => ({
     const syncMeta = loadSyncMeta();
     const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
     const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
-    normalizedRecords[13] = await migrateInitialCashToBankAccounts(normalizedRecords[13], settings);
+    normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
+    const portfolioRecords = await normalizeInvestmentPortfolioRecords({
+      investmentPortfolios: normalizedRecords[3],
+      holdings: normalizedRecords[4],
+      dividends: normalizedRecords[5],
+      portfolioCashflows: normalizedRecords[6],
+      portfolioSales: normalizedRecords[7],
+    }, settings);
     await Promise.all(
       STORE_KEYS.map(async (storeName, index) => {
         const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
@@ -732,21 +818,22 @@ export const useFinanceStore = create((set, get) => ({
       expenses: normalizedRecords[0],
       fixedExpenses: normalizedRecords[1],
       incomes: normalizedRecords[2],
-      holdings: normalizedRecords[3],
-      dividends: normalizedRecords[4],
-      portfolioCashflows: normalizedRecords[5],
-      portfolioSales: normalizedRecords[6],
-      savingsConfig: normalizedRecords[7][0] || SAVINGS_DEFAULT,
-      savingsEntries: normalizedRecords[8],
-      savingsGoals: normalizedRecords[9],
-      budgets: normalizedRecords[10],
-      rollovers: normalizedRecords[11],
-      transfers: normalizedRecords[12],
-      bankAccounts: normalizedRecords[13],
-      debts: normalizedRecords[14],
-      attachments: normalizedRecords[15],
-      activityLog: normalizedRecords[16],
-      portfolioSnapshots: normalizedRecords[17],
+      investmentPortfolios: portfolioRecords.investmentPortfolios,
+      holdings: portfolioRecords.holdings,
+      dividends: portfolioRecords.dividends,
+      portfolioCashflows: portfolioRecords.portfolioCashflows,
+      portfolioSales: portfolioRecords.portfolioSales,
+      savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
+      savingsEntries: normalizedRecords[9],
+      savingsGoals: normalizedRecords[10],
+      budgets: normalizedRecords[11],
+      rollovers: normalizedRecords[12],
+      transfers: normalizedRecords[13],
+      bankAccounts: normalizedRecords[14],
+      debts: normalizedRecords[15],
+      attachments: normalizedRecords[16],
+      activityLog: normalizedRecords[17],
+      portfolioSnapshots: normalizedRecords[18],
       hydrated: false,
       supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
       syncMeta,
@@ -1274,6 +1361,20 @@ export const useFinanceStore = create((set, get) => ({
     if (storeName === 'incomes' && !value.accountingMonth) {
       value = { ...value, accountingMonth: value.date?.slice(0, 7) };
     }
+    if (storeName === 'holdings' && !value.portfolioId) {
+      const fallbackPortfolioId = get().investmentPortfolios?.[0]?.id;
+      if (!fallbackPortfolioId) throw new Error('Create a portfolio before adding holdings.');
+      value = { ...value, portfolioId: fallbackPortfolioId };
+    }
+    if ((storeName === 'portfolioSales' || storeName === 'portfolioCashflows') && !value.portfolioId) {
+      const portfolioId = get().holdings.find((holding) => holding.id === value.holdingId)?.portfolioId
+        || get().investmentPortfolios?.[0]?.id;
+      if (portfolioId) value = { ...value, portfolioId };
+    }
+    if (storeName === 'dividends' && !value.portfolioId) {
+      const portfolioId = inferPortfolioIdFromTicker(value.ticker, get().holdings, get().investmentPortfolios?.[0]?.id);
+      if (portfolioId) value = { ...value, portfolioId };
+    }
 
     const prefix = storeName.slice(0, 3);
     // Always stamp a fresh updatedAt — existing records carry their old timestamp which
@@ -1356,6 +1457,17 @@ export const useFinanceStore = create((set, get) => ({
     _cascadingDeletes.add(cascadeKey);
     try {
     const previous = get()[storeName]?.find((item) => item.id === id);
+    if (storeName === 'investmentPortfolios') {
+      const hasLinkedData =
+        get().holdings.some((item) => item.portfolioId === id) ||
+        get().portfolioSales.some((item) => item.portfolioId === id) ||
+        get().portfolioCashflows.some((item) => item.portfolioId === id) ||
+        get().dividends.some((item) => item.portfolioId === id) ||
+        get().portfolioSnapshots.some((item) => item.portfolioId === id);
+      if (hasLinkedData) {
+        throw new Error('This portfolio has holdings or history. Move or remove its data before deleting it.');
+      }
+    }
     // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
     // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
     if (storeName === 'holdings') {
@@ -1365,7 +1477,10 @@ export const useFinanceStore = create((set, get) => ({
         await get().removeEntity('portfolioCashflows', cf.id);
       }
       if (holding?.ticker) {
-        const dividends = get().dividends.filter((d) => d.ticker === holding.ticker);
+        const dividends = get().dividends.filter((d) => (
+          d.ticker === holding.ticker &&
+          (!holding.portfolioId || !d.portfolioId || d.portfolioId === holding.portfolioId)
+        ));
         for (const div of dividends) {
           await get().removeDividend(div.id);
         }
@@ -1907,8 +2022,11 @@ export const useFinanceStore = create((set, get) => ({
     const normalizedEntity = entity.accountingMonth
       ? entity
       : { ...entity, accountingMonth: entity.date?.slice(0, 7) };
+    const portfolioId = normalizedEntity.portfolioId ||
+      inferPortfolioIdFromTicker(normalizedEntity.ticker, get().holdings, get().investmentPortfolios?.[0]?.id);
     const record = ensureEntitySyncFields({
       ...normalizedEntity,
+      portfolioId,
       id: normalizedEntity.id || makeId(prefix),
       linkedIncomeId: null,
     }, timestamp);
@@ -1980,39 +2098,73 @@ export const useFinanceStore = create((set, get) => ({
     return record;
   },
 
-  recordPortfolioSnapshot: async ({ force = false, source = 'hourly' } = {}) => {
+  recordPortfolioSnapshot: async ({ force = false, source = 'hourly', portfolioId = null } = {}) => {
     const state = get();
-    const valueCents = state.derived?.portfolio?.currentValueCents || 0;
-    const activeHoldingsCount = (state.holdings || [])
+    const baseCurrency = state.settings?.baseCurrency || 'EUR';
+    const activeHoldings = (state.holdings || [])
       .filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0).length;
-    if (!activeHoldingsCount) return null;
+    const targetPortfolios = portfolioId
+      ? (state.investmentPortfolios || []).filter((portfolio) => portfolio.id === portfolioId)
+      : (state.investmentPortfolios || []);
+    const snapshotRecords = [];
+    if (!activeHoldings) return null;
 
     const timestamp = new Date().toISOString();
-    const record = ensureEntitySyncFields({
+    const globalRecord = ensureEntitySyncFields({
       id: force ? `psn-${timestamp}` : portfolioSnapshotId(timestamp),
       capturedAt: timestamp,
-      valueCents,
-      currency: state.settings?.baseCurrency || 'EUR',
-      holdingsCount: activeHoldingsCount,
+      valueCents: state.derived?.portfolio?.currentValueCents || 0,
+      costCents: state.derived?.portfolio?.investedCents || 0,
+      currency: baseCurrency,
+      holdingsCount: activeHoldings,
       source,
     }, timestamp);
+    if (!portfolioId) snapshotRecords.push(globalRecord);
 
-    await putRecord('portfolioSnapshots', record);
+    for (const portfolio of targetPortfolios) {
+      const scopedHoldings = (state.holdings || []).filter((holding) => holding.portfolioId === portfolio.id);
+      const scopedActiveCount = scopedHoldings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0).length;
+      if (!scopedActiveCount) continue;
+      const metrics = computePortfolioMetrics(
+        scopedHoldings,
+        (state.dividends || []).filter((dividend) => dividend.portfolioId === portfolio.id),
+        (state.portfolioCashflows || []).filter((flow) => flow.portfolioId === portfolio.id),
+        state.settings.allocationTargets,
+        state.fxRates || {},
+        baseCurrency,
+      );
+      snapshotRecords.push(ensureEntitySyncFields({
+        id: force ? `psn-${portfolio.id}-${timestamp}` : portfolioScopedSnapshotId(portfolio.id, timestamp),
+        portfolioId: portfolio.id,
+        capturedAt: timestamp,
+        valueCents: metrics.currentValueCents,
+        costCents: metrics.investedCents,
+        currency: baseCurrency,
+        holdingsCount: scopedActiveCount,
+        source,
+      }, timestamp));
+    }
+    if (!snapshotRecords.length) return null;
+
+    await Promise.all(snapshotRecords.map((record) => putRecord('portfolioSnapshots', record)));
     set((current) => {
       const nextDeletedRecords = {
         ...current.syncMeta.deletedRecords,
         portfolioSnapshots: (current.syncMeta.deletedRecords.portfolioSnapshots || [])
-          .filter((item) => item.id !== record.id),
+          .filter((item) => !snapshotRecords.some((record) => record.id === item.id)),
       };
       const nextSyncMeta = { ...current.syncMeta, deletedRecords: nextDeletedRecords };
       saveSyncMeta(nextSyncMeta);
       return {
-        portfolioSnapshots: upsertItem(current.portfolioSnapshots || [], record),
+        portfolioSnapshots: snapshotRecords.reduce(
+          (items, record) => upsertItem(items, record),
+          current.portfolioSnapshots || [],
+        ),
         syncMeta: nextSyncMeta,
       };
     });
     get().triggerAutoPush();
-    return record;
+    return portfolioId ? snapshotRecords.find((record) => record.portfolioId === portfolioId) || null : globalRecord;
   },
 
   removeDividend: async (id) => {
@@ -2089,6 +2241,7 @@ export const useFinanceStore = create((set, get) => ({
     const source = fundingSource === 'savings' ? 'savings' : 'cashflow';
     assertSourceHasFunds(get(), source === 'savings' ? 'savings' : 'cashflow', amount);
     const timestamp = new Date().toISOString();
+    const portfolioId = spec.portfolioId || get().holdings.find((holding) => holding.id === holdingId)?.portfolioId || null;
 
     const cashflow = ensureEntitySyncFields({
       id: makeId('pcf'),
@@ -2096,6 +2249,7 @@ export const useFinanceStore = create((set, get) => ({
       amountCents: -amount, // negative = capital deposit
       ticker: ticker || null,
       holdingId: holdingId || null,
+      portfolioId,
       kind: 'buy',
       source,
       bankAccountId: source === 'cashflow' ? (bankAccountId || null) : null,

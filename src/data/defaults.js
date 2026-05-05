@@ -47,6 +47,7 @@ export const DEFAULT_DATA = {
   expenses: [],
   fixedExpenses: [],
   incomes: [],
+  investmentPortfolios: [],
   holdings: [],
   dividends: [],
   portfolioCashflows: [],

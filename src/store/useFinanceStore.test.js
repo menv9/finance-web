@@ -39,6 +39,7 @@ vi.mock('../utils/yahoo', () => ({
 }));
 
 const { fetchTickerPrice } = await import('../utils/yahoo');
+const { getAllRecords, putRecord } = await import('../utils/storage');
 const { useFinanceStore } = await import('./useFinanceStore');
 
 function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 10000, currency: 'EUR' }]) {
@@ -55,6 +56,7 @@ function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 1000
     expenses: [],
     fixedExpenses: [],
     incomes: [],
+    investmentPortfolios: [],
     holdings: [],
     dividends: [],
     portfolioCashflows: [],
@@ -80,6 +82,8 @@ describe('account-backed transaction saves', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+    vi.mocked(getAllRecords).mockResolvedValue([]);
+    vi.mocked(putRecord).mockClear();
   });
 
   it('decreases the selected account when creating an expense', async () => {
@@ -647,6 +651,143 @@ describe('account-backed transaction saves', () => {
       cashflowCents: 4000,
       realizedPnlCents: -1000,
     });
+  });
+});
+
+describe('investment portfolios', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T12:00:00Z'));
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.mocked(getAllRecords).mockResolvedValue([]);
+    vi.mocked(putRecord).mockClear();
+  });
+
+  it('requires a portfolio before adding holdings', async () => {
+    await expect(useFinanceStore.getState().saveEntity('holdings', {
+      ticker: 'VWCE',
+      name: 'VWCE',
+      quantity: 1,
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 11000,
+      currency: 'EUR',
+    })).rejects.toThrow('Create a portfolio before adding holdings.');
+  });
+
+  it('assigns new holdings to the existing portfolio when no portfolioId is provided', async () => {
+    await useFinanceStore.getState().saveEntity('investmentPortfolios', {
+      id: 'ipr-main',
+      name: 'Main Portfolio',
+    });
+
+    const holding = await useFinanceStore.getState().saveEntity('holdings', {
+      ticker: 'VWCE',
+      name: 'VWCE',
+      quantity: 1,
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 11000,
+      currency: 'EUR',
+    });
+
+    expect(holding.portfolioId).toBe('ipr-main');
+    expect(useFinanceStore.getState().holdings[0].portfolioId).toBe('ipr-main');
+  });
+
+  it('blocks deleting a portfolio with linked data and allows deleting an empty one', async () => {
+    await useFinanceStore.getState().saveEntity('investmentPortfolios', { id: 'ipr-main', name: 'Main Portfolio' });
+    await useFinanceStore.getState().saveEntity('investmentPortfolios', { id: 'ipr-empty', name: 'Empty' });
+    await useFinanceStore.getState().saveEntity('holdings', {
+      id: 'hld-1',
+      portfolioId: 'ipr-main',
+      ticker: 'VWCE',
+      name: 'VWCE',
+      quantity: 1,
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 11000,
+      currency: 'EUR',
+    });
+
+    await expect(useFinanceStore.getState().removeEntity('investmentPortfolios', 'ipr-main'))
+      .rejects.toThrow('This portfolio has holdings or history.');
+    await useFinanceStore.getState().removeEntity('investmentPortfolios', 'ipr-empty');
+
+    expect(useFinanceStore.getState().investmentPortfolios.map((item) => item.id)).toEqual(['ipr-main']);
+  });
+
+  it('records a global snapshot and scoped snapshots for portfolios with holdings', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      investmentPortfolios: [
+        { id: 'ipr-a', name: 'A' },
+        { id: 'ipr-b', name: 'B' },
+      ],
+      holdings: [
+        { id: 'hld-a', portfolioId: 'ipr-a', ticker: 'AAA', quantity: 2, averageBuyPriceCents: 10000, currentPriceCents: 12000, currency: 'EUR' },
+        { id: 'hld-b', portfolioId: 'ipr-b', ticker: 'BBB', quantity: 1, averageBuyPriceCents: 5000, currentPriceCents: 6000, currency: 'EUR' },
+      ],
+      derived: {
+        ...state.derived,
+        portfolio: {
+          ...state.derived.portfolio,
+          currentValueCents: 30000,
+        },
+      },
+    }));
+
+    await useFinanceStore.getState().recordPortfolioSnapshot();
+
+    const snapshots = useFinanceStore.getState().portfolioSnapshots;
+    expect(snapshots).toHaveLength(3);
+    expect(snapshots.find((snapshot) => !snapshot.portfolioId)).toMatchObject({ valueCents: 30000, holdingsCount: 2 });
+    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-a')).toMatchObject({ valueCents: 24000, holdingsCount: 1 });
+    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-b')).toMatchObject({ valueCents: 6000, holdingsCount: 1 });
+  });
+
+  it('backfills legacy holdings into a default portfolio during bootstrap', async () => {
+    const storeData = {
+      expenses: [],
+      fixedExpenses: [],
+      incomes: [],
+      investmentPortfolios: [],
+      holdings: [{ id: 'hld-legacy', ticker: 'VWCE', name: 'VWCE', quantity: 1, averageBuyPriceCents: 10000, currentPriceCents: 11000, currency: 'EUR' }],
+      dividends: [{ id: 'div-legacy', ticker: 'VWCE', date: '2026-05-01', amountCents: 100 }],
+      portfolioCashflows: [{ id: 'pcf-legacy', holdingId: 'hld-legacy', date: '2026-05-01', amountCents: -10000 }],
+      portfolioSales: [{ id: 'psl-legacy', holdingId: 'hld-legacy', ticker: 'VWCE', date: '2026-05-02', proceedsCents: 12000 }],
+      savings: [],
+      savingsEntries: [],
+      savingsGoals: [],
+      budgets: [],
+      rollovers: [],
+      transfers: [],
+      bankAccounts: [],
+      debts: [],
+      attachments: [],
+      activityLog: [],
+      portfolioSnapshots: [],
+    };
+    const order = [
+      'expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings',
+      'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries',
+      'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts',
+      'attachments', 'activityLog', 'portfolioSnapshots',
+    ];
+    vi.mocked(getAllRecords).mockImplementation(async (storeName) => storeData[storeName] || []);
+
+    await useFinanceStore.getState().bootstrap();
+
+    const state = useFinanceStore.getState();
+    expect(state.investmentPortfolios).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'ipr-main', name: 'Main Portfolio' })]));
+    expect(state.holdings[0].portfolioId).toBe('ipr-main');
+    expect(state.dividends[0].portfolioId).toBe('ipr-main');
+    expect(state.portfolioCashflows[0].portfolioId).toBe('ipr-main');
+    expect(state.portfolioSales[0].portfolioId).toBe('ipr-main');
+    expect(vi.mocked(putRecord)).toHaveBeenCalledWith('investmentPortfolios', expect.objectContaining({ id: 'ipr-main' }));
+    expect(order).toContain('investmentPortfolios');
   });
 });
 

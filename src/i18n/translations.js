@@ -1360,6 +1360,8 @@ export const translations = {
         description: 'Open-position market value captured once per hour.',
         emptyTitle: 'No portfolio value yet',
         emptyDescription: 'Add a holding and refresh prices to start the hourly chart.',
+        tooltipValue: 'Market value',
+        tooltipCost: 'Cost basis',
       },
       holdingsCard: {
         eyebrow: 'Register',
@@ -2891,6 +2893,8 @@ export const translations = {
         description: 'Valor de mercado en posiciones abiertas capturado cada hora.',
         emptyTitle: 'Sin valor de cartera aún',
         emptyDescription: 'Añade una posición y actualiza los precios para iniciar el gráfico horario.',
+        tooltipValue: 'Valor de mercado',
+        tooltipCost: 'Coste base',
       },
       holdingsCard: {
         eyebrow: 'Registro',

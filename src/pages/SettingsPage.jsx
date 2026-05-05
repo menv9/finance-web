@@ -1141,7 +1141,7 @@ export default function SettingsPage() {
                 { labelKey: 'settings.backup.modules.expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
                 { labelKey: 'settings.backup.modules.income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
                 { labelKey: 'settings.backup.modules.accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
-                { labelKey: 'settings.backup.modules.portfolio', stores: ['holdings', 'dividends', 'portfolioCashflows', 'portfolioSales'],         file: 'portfolio-backup.json' },
+                { labelKey: 'settings.backup.modules.portfolio', stores: ['investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'portfolioSnapshots'], file: 'portfolio-backup.json' },
                 { labelKey: 'settings.backup.modules.savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
               ];
               return (
