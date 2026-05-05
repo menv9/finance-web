@@ -84,6 +84,18 @@ import {
   settleLedgerEntry as apiSettleLedgerEntry,
   updateLedgerEntry as apiUpdateLedgerEntry,
 } from '../utils/friendsMoneyApi';
+import {
+  buyCoin as apiBuyCoin,
+  claimDaily as apiClaimDaily,
+  ensureWallet,
+  fetchCoinByOwner,
+  fetchEconomy,
+  fetchHoldings as apiFetchHoldings,
+  fetchTransactions as apiFetchTransactions,
+  fetchTrending,
+  fetchWeeklyLeaderboard,
+  sellCoin as apiSellCoin,
+} from '../utils/coingameApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
 const STORE_STATE_KEY = {
@@ -735,6 +747,16 @@ export const useFinanceStore = create((set, get) => ({
   friendLedger: [],
   socialStatus: 'idle',
   socialError: '',
+  coingameWallet: null,
+  coingameOwnCoin: null,
+  coingameHoldings: [],
+  coingameTransactions: [],
+  coingameTrending: [],
+  coingameLeaderboard: [],
+  coingameLeaderboardMetric: 'gains_fc',
+  coingameEconomy: null,
+  coingameStatus: 'idle',
+  coingameError: '',
   syncMeta: {
     lastPulledAt: {},
     deletedRecords: {},
@@ -3612,6 +3634,126 @@ export const useFinanceStore = create((set, get) => ({
     set((state) => ({
       friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
     }));
+  },
+
+  // ── Coingame ──────────────────────────────────────────────────────────────
+
+  loadCoingame: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    set({ coingameStatus: 'loading', coingameError: '' });
+    try {
+      const init = await ensureWallet();
+      const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
+        init ? { user_id: init.user_id, fc_balance: init.fc_balance } : null,
+        fetchCoinByOwner(user.id),
+        apiFetchHoldings(user.id),
+        apiFetchTransactions(user.id),
+        fetchTrending(),
+        fetchWeeklyLeaderboard(get().coingameLeaderboardMetric),
+        fetchEconomy(),
+      ]);
+      set({
+        coingameWallet: wallet,
+        coingameOwnCoin: ownCoin,
+        coingameHoldings: holdings,
+        coingameTransactions: transactions,
+        coingameTrending: trending,
+        coingameLeaderboard: leaderboard,
+        coingameEconomy: economy,
+        coingameStatus: 'idle',
+      });
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message || 'Failed to load Coingame' });
+    }
+  },
+
+  coingameBuy: async (coinId, tokens) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    set({ coingameStatus: 'loading', coingameError: '' });
+    try {
+      const result = await apiBuyCoin(coinId, tokens);
+      // Refresh wallet balance + holdings + trending after trade
+      const [holdings, trending] = await Promise.all([
+        apiFetchHoldings(user.id),
+        fetchTrending(),
+      ]);
+      set((state) => ({
+        coingameWallet: state.coingameWallet
+          ? { ...state.coingameWallet, fc_balance: result.new_balance }
+          : state.coingameWallet,
+        coingameHoldings: holdings,
+        coingameTrending: trending,
+        coingameStatus: 'idle',
+      }));
+      return result;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message });
+      throw err;
+    }
+  },
+
+  coingameSell: async (coinId, tokens) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    set({ coingameStatus: 'loading', coingameError: '' });
+    try {
+      const result = await apiSellCoin(coinId, tokens);
+      const [holdings, trending] = await Promise.all([
+        apiFetchHoldings(user.id),
+        fetchTrending(),
+      ]);
+      set((state) => ({
+        coingameWallet: state.coingameWallet
+          ? { ...state.coingameWallet, fc_balance: (state.coingameWallet.fc_balance ?? 0) + result.net_proceeds }
+          : state.coingameWallet,
+        coingameHoldings: holdings,
+        coingameTrending: trending,
+        coingameStatus: 'idle',
+      }));
+      return result;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message });
+      throw err;
+    }
+  },
+
+  coingameClaimDaily: async () => {
+    set({ coingameStatus: 'loading', coingameError: '' });
+    try {
+      const result = await apiClaimDaily();
+      set((state) => ({
+        coingameWallet: state.coingameWallet
+          ? { ...state.coingameWallet, fc_balance: result.new_balance, login_streak: result.streak }
+          : state.coingameWallet,
+        coingameStatus: 'idle',
+      }));
+      return result;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message });
+      throw err;
+    }
+  },
+
+  loadCoingameLeaderboard: async (metric = 'gains_fc') => {
+    try {
+      const leaderboard = await fetchWeeklyLeaderboard(metric);
+      set({ coingameLeaderboard: leaderboard, coingameLeaderboardMetric: metric });
+    } catch (err) {
+      set({ coingameError: err.message });
+    }
+  },
+
+  loadCoingameTransactions: async () => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    try {
+      const transactions = await apiFetchTransactions(user.id);
+      set({ coingameTransactions: transactions });
+    } catch (err) {
+      set({ coingameError: err.message });
+    }
   },
 
 }));

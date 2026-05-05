@@ -717,6 +717,18 @@ export function AppShell({ children }) {
                       </NavLink>
                     </>
                   )}
+                  {settings.modules?.coingame === true && (
+                    <NavLink
+                      to="/coingame"
+                      role="menuitem"
+                      className={({ isActive }) => cn(
+                        'flex items-center rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                        isActive ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:bg-surface-raised hover:text-ink',
+                      )}
+                    >
+                      {t('nav.coingame')}
+                    </NavLink>
+                  )}
                   {supabaseConfigured && supabaseUser && (
                     <div className="border-t border-rule mt-1 pt-1">
                       <button

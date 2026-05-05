@@ -592,6 +592,20 @@ export default function SettingsPage() {
                 label={t('settings.modules.social')}
                 description={t('settings.modules.socialHint')}
               />
+              <Toggle
+                id="module-coingame"
+                checked={settings.modules?.coingame === true}
+                onChange={(checked) =>
+                  updateSettings({
+                    modules: {
+                      ...(settings.modules || {}),
+                      coingame: checked,
+                    },
+                  })
+                }
+                label={t('settings.modules.coingame')}
+                description={t('settings.modules.coingameHint')}
+              />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rule bg-surface-raised p-4">
                 <div>
                   <p className="text-sm font-medium text-ink">{t('settings.modules.onboarding')}</p>

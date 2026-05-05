@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   modules: {
     portfolio: false,
     social: true,
+    coingame: false,
   },
   setupIntent: {
     buckets: false,

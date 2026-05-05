@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import CoingameShell from './components/coingame/CoingameShell';
 import { ConfirmProvider } from './components/ConfirmContext';
 import { LoadingScreen } from './components/LoadingScreen';
 import { RouteLoader } from './components/RouteLoader';
@@ -43,6 +44,10 @@ const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
 const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const FriendsMoneyPage = lazy(() => import('./pages/FriendsMoneyPage'));
+const CoingamePage = lazy(() => import('./pages/CoingamePage'));
+const CoingameMarketPage = lazy(() => import('./pages/CoingameMarketPage'));
+const CoingameTransactionsPage = lazy(() => import('./pages/CoingameTransactionsPage'));
+const CoingameLeaderboardPage = lazy(() => import('./pages/CoingameLeaderboardPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
@@ -52,6 +57,7 @@ export default function App() {
   const hydrated = useFinanceStore((state) => state.hydrated);
   const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
   const socialEnabled = useFinanceStore((state) => state.settings.modules?.social !== false);
+  const coingameEnabled = useFinanceStore((state) => state.settings.modules?.coingame === true);
   const tourActive = useFinanceStore((state) => state.tourActive);
 
   useEffect(() => {
@@ -81,6 +87,30 @@ export default function App() {
         <Routes>
           {/* Root redirect */}
           <Route path="/" element={<RootRedirect />} />
+
+          {/* Coingame — standalone shell (no AppShell nav) */}
+          <Route
+            path="/coingame/*"
+            element={
+              <ProtectedRoute>
+                {coingameEnabled ? (
+                  <CoingameShell>
+                    <Suspense fallback={<div style={{ color: '#1cff00', fontFamily: 'monospace', padding: '2rem' }}>Loading...</div>}>
+                      <Routes>
+                        <Route path="/" element={<CoingamePage />} />
+                        <Route path="/market" element={<CoingameMarketPage />} />
+                        <Route path="/history" element={<CoingameTransactionsPage />} />
+                        <Route path="/leaderboard" element={<CoingameLeaderboardPage />} />
+                        <Route path="*" element={<CoingamePage />} />
+                      </Routes>
+                    </Suspense>
+                  </CoingameShell>
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )}
+              </ProtectedRoute>
+            }
+          />
 
           {/* Public — standalone pages (no AppShell) */}
           <Route path="/landing" element={<LandingPage />} />
