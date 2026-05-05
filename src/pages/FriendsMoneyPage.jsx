@@ -199,12 +199,14 @@ function AcceptPaymentModal({ entry, open, onClose }) {
 function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCents = 0, prefillParentIouId = null }) {
   const { t } = useTranslation();
   const friends = useFinanceStore((s) => s.friends);
+  const bankAccounts = useFinanceStore((s) => s.bankAccounts);
   const sendPayment = useFinanceStore((s) => s.sendPayment);
   const settings = useFinanceStore((s) => s.settings);
   const currency = settings.currency || 'EUR';
 
   const [friendId, setFriendId] = useState(prefillFriendId);
   const [amount, setAmount] = useState(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
+  const [bankAccountId, setBankAccountId] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -213,13 +215,14 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
     if (open) {
       setFriendId(prefillFriendId);
       setAmount(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
+      setBankAccountId('');
       setNote('');
       setError('');
       setBusy(false);
     }
   }, [open, prefillFriendId, prefillAmountCents]);
 
-  function reset() { setFriendId(''); setAmount(''); setNote(''); setError(''); setBusy(false); }
+  function reset() { setFriendId(''); setAmount(''); setBankAccountId(''); setNote(''); setError(''); setBusy(false); }
   function handleClose() { reset(); onClose(); }
 
   async function handleSubmit(e) {
@@ -228,9 +231,10 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
     const cents = Math.round(parseFloat(amount) * 100);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
+    if (!bankAccountId) { setError(t('friendsMoney.settle.errorAccount')); return; }
     setBusy(true);
     try {
-      await sendPayment({ friendId, amountCents: cents, currency, note: note.trim(), parentIouId: prefillParentIouId });
+      await sendPayment({ friendId, amountCents: cents, currency, note: note.trim(), parentIouId: prefillParentIouId, bankAccountId });
       handleClose();
     } catch (err) {
       setError(err.message || 'Something went wrong.');
@@ -261,6 +265,19 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
             type="number" min="0.01" step="0.01" placeholder="0.00"
             value={amount} onChange={(e) => setAmount(e.target.value)}
           />
+        </FormField>
+
+        <FormField label={t('friendsMoney.settle.payFrom')}>
+          <select
+            className="w-full rounded-md border border-rule bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+            value={bankAccountId}
+            onChange={(e) => setBankAccountId(e.target.value)}
+          >
+            <option value="">{t('friendsMoney.settle.selectAccount')}</option>
+            {bankAccounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
         </FormField>
 
         <FormField label={t('friendsMoney.form.note')}>

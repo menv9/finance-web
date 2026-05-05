@@ -3464,9 +3464,21 @@ export const useFinanceStore = create((set, get) => ({
     }));
   },
 
-  sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '', parentIouId = null }) => {
+  sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '', parentIouId = null, bankAccountId = null }) => {
     const user = get().supabaseUser;
     if (!user) return;
+    if (bankAccountId) {
+      const today = new Date().toISOString().slice(0, 10);
+      await get().saveEntity('expenses', {
+        date: today,
+        amountCents,
+        currency,
+        category: 'Other',
+        description: note || 'Payment to friend',
+        isRecurring: false,
+        bankAccountId,
+      });
+    }
     const entry = await apiCreateLedgerEntry({
       creditorId: friendId,
       debtorId: user.id,
