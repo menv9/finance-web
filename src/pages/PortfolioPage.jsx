@@ -8,8 +8,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  ComposedChart,
-  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -26,6 +24,7 @@ import { normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
+import { ChevronDown } from 'lucide-react';
 
 const COLORS = [
   'var(--accent)',
@@ -61,12 +60,41 @@ function formatHourlyLabel(timestamp, locale) {
   }).format(new Date(timestamp));
 }
 
+function formatPortfolioPeriodLabel(timestamp, period, locale) {
+  const date = new Date(timestamp);
+  if (period === '1d') {
+    return new Intl.DateTimeFormat(locale || 'en-GB', { hour: '2-digit', minute: '2-digit' }).format(date);
+  }
+  if (period === '1w') {
+    return new Intl.DateTimeFormat(locale || 'en-GB', { weekday: 'short', day: 'numeric' }).format(date);
+  }
+  return new Intl.DateTimeFormat(locale || 'en-GB', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function getPortfolioPeriodWindow(period, now = Date.now()) {
+  const end = now;
+  const startDate = new Date(now);
+  if (period === '1d') {
+    startDate.setDate(startDate.getDate() - 1);
+  } else if (period === '1w') {
+    startDate.setDate(startDate.getDate() - 7);
+  } else if (period === '6m') {
+    startDate.setMonth(startDate.getMonth() - 6);
+  } else if (period === '1y') {
+    startDate.setFullYear(startDate.getFullYear() - 1);
+  } else {
+    startDate.setMonth(startDate.getMonth() - 1);
+  }
+  return [startDate.getTime(), end];
+}
+
 function buildPortfolioValueSeries(snapshots, currentValueCents, locale) {
   const sorted = (snapshots || [])
     .filter((snapshot) => snapshot?.capturedAt)
     .slice()
     .sort((a, b) => (a.capturedAt || '').localeCompare(b.capturedAt || ''));
-  const recent = sorted.slice(-168);
+  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const recent = sorted.filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= oneYearAgo);
   const series = recent.map((snapshot) => ({
     ...snapshot,
     label: formatHourlyLabel(snapshot.capturedAt, locale),
@@ -81,6 +109,40 @@ function buildPortfolioValueSeries(snapshots, currentValueCents, locale) {
     }];
   }
   return series;
+}
+
+function filterPortfolioValueSeries(series, period, locale) {
+  const [start, end] = getPortfolioPeriodWindow(period);
+  const points = (series || []).map((point) => ({
+    ...point,
+    capturedAtMs: new Date(point.capturedAt).getTime(),
+    label: formatPortfolioPeriodLabel(point.capturedAt, period, locale),
+  })).filter((point) => point.capturedAtMs >= start && point.capturedAtMs <= end);
+  if (!points.length) return points;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const boundedPoints = [...points];
+  if (first.capturedAtMs > start) {
+    boundedPoints.unshift({
+      ...first,
+      id: first.id + '-period-start',
+      capturedAt: new Date(start).toISOString(),
+      capturedAtMs: start,
+      valueCents: 0,
+      label: formatPortfolioPeriodLabel(start, period, locale),
+    });
+  }
+  if (last.capturedAtMs < end) {
+    boundedPoints.push({
+      ...last,
+      id: last.id + '-period-end',
+      capturedAt: new Date(end).toISOString(),
+      capturedAtMs: end,
+      label: formatPortfolioPeriodLabel(end, period, locale),
+    });
+  }
+  return boundedPoints;
 }
 
 function groupHoldingsByTicker(holdings, fxRates = {}, baseCurrency = 'EUR') {
@@ -238,147 +300,249 @@ function PortfolioHoldingList({
   onDeleteHolding,
 }) {
   const { t } = useTranslation();
-  return (
-    <ul className="space-y-4">
-      {groups.map((group) => (
-        <li key={group.ticker} className="overflow-hidden rounded-lg border border-rule bg-surface">
-          <div className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface-sunken px-4 py-5 sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
-            <span aria-hidden className="hidden min-w-0 sm:block" />
-            <div className="min-w-0 pr-3 sm:col-span-1 sm:pr-0">
-              <div className="min-w-0 text-left">
-                <p className="truncate text-sm font-medium text-ink">
-                  <span className="font-mono">{group.ticker}</span>
-                  <span className="ml-2 hidden text-ink-muted sm:inline">{group.name}</span>
-                  <span className="ml-2 font-mono text-xs tabular text-ink-faint">
-                    {t('portfolio.holdingsCard.totalUnits', { qty: formatNumber(group.quantity, locale, quantityDigits(group)) })}
-                  </span>
-                </p>
-                <p className="mt-3 font-mono text-sm tabular text-ink">
-                  {formatCurrency(group.valueCents, currency, locale)}
-                  <span className={group.pnlCents >= 0 ? 'ml-3 text-positive' : 'ml-3 text-danger'}>
-                    {formatCurrency(group.pnlCents, currency, locale)} ({formatNumber(group.pnlPct, locale, 2)}%)
-                  </span>
-                </p>
-                <p className="mt-3 min-w-0 text-xs text-ink-muted">
-                  <span className="block truncate sm:inline">
-                    {t('portfolio.holdingsCard.avg', { price: formatCurrency(group.averageBuyPriceCents, group.currency || currency, locale) })}
-                    {group.currency && group.currency !== currency && (
-                      <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
-                    )}
-                    {' · '}
-                    {t('portfolio.holdingsCard.price', { price: formatCurrency(group.currentPriceCents, group.currency || currency, locale) })}
-                    {group.currency && group.currency !== currency && (
-                      <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{group.currency}</span>
-                    )}
-                  </span>
-                  <span className="mt-1 block truncate sm:mt-0 sm:inline">
-                    <span className="hidden sm:inline"> · </span>{t('portfolio.holdingsCard.fees', { amount: formatCurrency(group.feeCents || 0, currency, locale) })}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div className="min-w-0 justify-self-end">
-              <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
-                  aria-label={t('portfolio.holdingsCard.ariaAddOperation', { ticker: group.ticker })}
-                  title={t('portfolio.addHolding')}
-                  onClick={() => openAddHoldingOperation(group)}
-                >
-                  <PlusIcon />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-ink"
-                  aria-label={t('portfolio.holdingsCard.ariaEdit', { ticker: group.ticker })}
-                  title={t('common.edit')}
-                  onClick={() => openEditHoldingGroup(group.ticker)}
-                >
-                  <EditIcon />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface hover:text-accent"
-                  aria-label={t('portfolio.holdingsCard.ariaSellAll', { ticker: group.ticker })}
-                  title={t('portfolio.sellAll')}
-                  onClick={() => sellAllHoldingGroup(group)}
-                >
-                  <SellIcon />
-                </button>
-              </div>
-            </div>
+  const [openGroups, setOpenGroups] = useState(() => new Set());
+  const toggleGroup = (ticker) => {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(ticker)) next.delete(ticker);
+      else next.add(ticker);
+      return next;
+    });
+  };
+
+  const gainClass = (value) =>
+    value > 0 ? 'text-positive' : value < 0 ? 'text-danger' : 'text-ink-muted';
+  const signedCurrency = (valueCents) => {
+    const sign = valueCents > 0 ? '+' : valueCents < 0 ? '-' : '';
+    return sign + formatCurrency(Math.abs(valueCents || 0), currency, locale).replace(/^-/, '');
+  };
+  const signedPercent = (value) => {
+    const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+    return sign + formatNumber(Math.abs(value || 0), locale, 2) + '%';
+  };
+  const currencySymbol =
+    new Intl.NumberFormat(locale || 'en-GB', { style: 'currency', currency })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value || currency;
+
+  const rows = groups.flatMap((group) => {
+    const isOpen = openGroups.has(group.ticker);
+    const groupRow = {
+      ...group,
+      id: group.id,
+      rowType: 'group',
+      symbol: group.ticker,
+      lastPriceCents: group.currentPriceCents,
+      priceCurrency: group.currency || currency,
+      totalCostCents: group.costCents,
+      marketValueCents: group.valueCents,
+      dayGainPct: 0,
+      dayGainCents: 0,
+      totalGainPct: group.pnlPct,
+      totalGainCents: group.pnlCents,
+      isOpen,
+      rowClassName: 'bg-surface-raised',
+    };
+    if (!isOpen) return [groupRow];
+    return [
+      groupRow,
+      ...group.lots.map((holding, index) => {
+        const { valueCents, costCents, pnlCents, pnlPct } = buildLotMetrics(holding, fxRates, currency);
+        return {
+          ...holding,
+          id: holding.id,
+          rowType: 'lot',
+          parentTicker: group.ticker,
+          operationNumber: index + 1,
+          symbol: t('portfolio.tableHeaders.operation', { num: index + 1 }),
+          lastPriceCents: holding.currentPriceCents || 0,
+          priceCurrency: holding.currency || currency,
+          totalCostCents: costCents,
+          marketValueCents: valueCents,
+          dayGainPct: 0,
+          dayGainCents: 0,
+          totalGainPct: pnlPct,
+          totalGainCents: pnlCents,
+          rowClassName: 'bg-surface',
+        };
+      }),
+    ];
+  });
+
+  const columns = [
+    {
+      key: 'symbol',
+      header: 'Symbol',
+      width: 190,
+      noTruncate: true,
+      render: (row) => (
+        <div className={cn('flex min-w-0 items-center gap-2', row.rowType === 'lot' && 'pl-8')}>
+          {row.rowType === 'group' ? (
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+              aria-label={(row.isOpen ? 'Hide' : 'Show') + ' ' + row.ticker + ' trades'}
+              title={(row.isOpen ? 'Hide' : 'Show') + ' trades'}
+              aria-expanded={row.isOpen}
+              onClick={() => toggleGroup(row.ticker)}
+            >
+              <ChevronDown
+                className={cn('h-4 w-4 transition-transform duration-150', row.isOpen && 'rotate-180')}
+                aria-hidden="true"
+              />
+            </button>
+          ) : (
+            <span className="h-7 w-7 shrink-0" />
+          )}
+          <div className="min-w-0 text-left">
+            <p className={cn('truncate font-mono text-sm font-semibold', row.rowType === 'group' ? 'text-accent' : 'text-ink-muted')}>
+              {row.rowType === 'group' ? row.ticker : row.symbol}
+            </p>
+            <p className="truncate text-xs text-ink-faint">
+              {row.rowType === 'group' ? row.name : row.platform || t('common.none')}
+            </p>
           </div>
-          <ul className="divide-y divide-rule">
-            {group.lots.map((holding, index) => {
-              const { valueCents, costCents, pnlCents, pnlPct } = buildLotMetrics(holding, fxRates, currency);
-              const holdingCurrency = holding.currency || currency;
-              return (
-                <li key={holding.id} className="grid grid-cols-[minmax(0,80%)_minmax(0,20%)] items-center gap-0 bg-surface px-4 py-3 transition-colors duration-120 hover:bg-accent-soft sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:gap-8 sm:px-6 sm:py-5">
-                  <div className="min-w-0 pr-3 sm:contents">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">
-                        {holding.ticker}
-                        <span className="ml-2 font-mono text-xs tabular text-ink-faint">
-                          {t('portfolio.holdingsCard.units', { qty: formatNumber(holding.quantity, locale, quantityDigits(holding)) })}
-                        </span>
-                      </p>
-                      <p className="mt-2 truncate text-sm text-ink-muted sm:text-xs">{holding.platform || t('common.none')}</p>
-                      <p className="mt-2 min-w-0 truncate text-xs text-ink-muted">
-                        {t('portfolio.holdingsCard.price', { price: formatCurrency(holding.currentPriceCents, holdingCurrency, locale) })}
-                        {holdingCurrency !== currency && (
-                          <span className="ml-0.5 font-mono text-[10px] text-ink-faint">{holdingCurrency}</span>
-                        )}
-                        {' · '}{t('portfolio.holdingsCard.fees', { amount: formatCurrency(holding.feeCents || 0, holding.feeCurrency || holdingCurrency, locale) })}
-                      </p>
-                    </div>
-                    <div className="mt-2 min-w-0 sm:mt-0 sm:shrink-0 sm:text-right">
-                      <p className="font-mono text-sm font-semibold tabular">
-                        <span className="text-ink sm:block">{formatCurrency(valueCents, currency, locale)}</span>
-                        <span className={pnlCents >= 0 ? 'ml-2 text-positive sm:ml-0 sm:mt-2 sm:block' : 'ml-2 text-danger sm:ml-0 sm:mt-2 sm:block'}>
-                          {formatCurrency(pnlCents, currency, locale)} ({formatNumber(pnlPct, locale, 2)}%)
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex min-w-0 justify-end sm:shrink-0">
-                    <div className="inline-flex min-w-0 shrink-0 flex-col items-center justify-center gap-1 text-xs text-ink-muted sm:flex-row sm:gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
-                        aria-label={t('portfolio.holdingsCard.ariaEditOperation', { ticker: holding.ticker, num: index + 1 })}
-                        title={t('common.edit')}
-                        onClick={() => openEditHolding(holding.id)}
-                      >
-                        <EditIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
-                        aria-label={t('portfolio.holdingsCard.ariaSellOperation', { ticker: holding.ticker, num: index + 1 })}
-                        title={t('portfolio.sellAll')}
-                        onClick={() => openSellHolding(holding.id)}
-                      >
-                        <SellIcon />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
-                        aria-label={t('portfolio.holdingsCard.ariaDeleteOperation', { ticker: holding.ticker, num: index + 1 })}
-                        title={t('common.delete')}
-                        onClick={() => onDeleteHolding(holding)}
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </li>
-      ))}
-    </ul>
+        </div>
+      ),
+    },
+    {
+      key: 'quantity',
+      header: 'Shares',
+      numeric: true,
+      width: 95,
+      render: (row) => formatNumber(row.quantity, locale, quantityDigits(row)),
+    },
+    {
+      key: 'lastPriceCents',
+      header: 'Last Price',
+      numeric: true,
+      width: 110,
+      render: (row) => formatCurrency(row.lastPriceCents, row.priceCurrency, locale),
+    },
+    {
+      key: 'totalCostCents',
+      header: 'Total Cost (' + currencySymbol + ')',
+      numeric: true,
+      width: 120,
+      render: (row) => formatCurrency(row.totalCostCents, currency, locale),
+    },
+    {
+      key: 'marketValueCents',
+      header: 'Market Value (' + currencySymbol + ')',
+      numeric: true,
+      width: 130,
+      render: (row) => formatCurrency(row.marketValueCents, currency, locale),
+    },
+    {
+      key: 'dayGainPct',
+      header: 'Day Gain UNRL (%)',
+      numeric: true,
+      width: 130,
+      hideOnMobile: true,
+      render: (row) => <span className={gainClass(row.dayGainPct)}>{signedPercent(row.dayGainPct)}</span>,
+    },
+    {
+      key: 'dayGainCents',
+      header: 'Day Gain UNRL (' + currencySymbol + ')',
+      numeric: true,
+      width: 135,
+      hideOnMobile: true,
+      render: (row) => <span className={gainClass(row.dayGainCents)}>{signedCurrency(row.dayGainCents)}</span>,
+    },
+    {
+      key: 'totalGainPct',
+      header: 'Tot Gain UNRL (%)',
+      numeric: true,
+      width: 130,
+      render: (row) => <span className={gainClass(row.totalGainPct)}>{signedPercent(row.totalGainPct)}</span>,
+    },
+    {
+      key: 'totalGainCents',
+      header: 'Tot Gain UNRL (' + currencySymbol + ')',
+      numeric: true,
+      width: 135,
+      render: (row) => <span className={gainClass(row.totalGainCents)}>{signedCurrency(row.totalGainCents)}</span>,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      width: 132,
+      noTruncate: true,
+      render: (row) => (
+        row.rowType === 'group' ? (
+          <div className="inline-flex shrink-0 items-center justify-end gap-1">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
+              aria-label={t('portfolio.holdingsCard.ariaAddOperation', { ticker: row.ticker })}
+              title={t('portfolio.addHolding')}
+              onClick={() => openAddHoldingOperation(row)}
+            >
+              <PlusIcon />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+              aria-label={t('portfolio.holdingsCard.ariaEdit', { ticker: row.ticker })}
+              title={t('common.edit')}
+              onClick={() => openEditHoldingGroup(row.ticker)}
+            >
+              <EditIcon />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
+              aria-label={t('portfolio.holdingsCard.ariaSellAll', { ticker: row.ticker })}
+              title={t('portfolio.sellAll')}
+              onClick={() => sellAllHoldingGroup(row)}
+            >
+              <SellIcon />
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex shrink-0 items-center justify-end gap-1">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-ink"
+              aria-label={t('portfolio.holdingsCard.ariaEditOperation', { ticker: row.ticker, num: row.operationNumber })}
+              title={t('common.edit')}
+              onClick={() => openEditHolding(row.id)}
+            >
+              <EditIcon />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-surface-sunken hover:text-accent"
+              aria-label={t('portfolio.holdingsCard.ariaSellOperation', { ticker: row.ticker, num: row.operationNumber })}
+              title={t('portfolio.sellAll')}
+              onClick={() => openSellHolding(row.id)}
+            >
+              <SellIcon />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-danger-soft hover:text-danger"
+              aria-label={t('portfolio.holdingsCard.ariaDeleteOperation', { ticker: row.ticker, num: row.operationNumber })}
+              title={t('common.delete')}
+              onClick={() => onDeleteHolding(row)}
+            >
+              <TrashIcon />
+            </button>
+          </div>
+        )
+      ),
+    },
+  ];
+
+  return (
+    <Table
+      columns={columns}
+      rows={rows}
+      density="compact"
+      className="rounded-lg"
+      caption={t('portfolio.holdingsCard.title')}
+    />
   );
 }
 
@@ -967,6 +1131,7 @@ export default function PortfolioPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [activeView, setActiveView] = useState('holdings');
+  const [portfolioValuePeriod, setPortfolioValuePeriod] = useState('1m');
   const editingHolding = holdings.find((item) => item.id === holdingModal.id);
   const editingDividend = dividends.find((item) => item.id === dividendModal.id);
   const editingSale = portfolioSales.find((item) => item.id === sellModal.saleId);
@@ -987,6 +1152,14 @@ export default function PortfolioPage() {
     [activeHoldings],
   );
   const portfolioValueSeries = buildPortfolioValueSeries(portfolioSnapshots, portfolio.currentValueCents, locale);
+  const portfolioValueDomain = useMemo(
+    () => getPortfolioPeriodWindow(portfolioValuePeriod),
+    [portfolioValuePeriod, portfolioValueSeries.length],
+  );
+  const visiblePortfolioValueSeries = useMemo(
+    () => filterPortfolioValueSeries(portfolioValueSeries, portfolioValuePeriod, locale),
+    [portfolioValuePeriod, portfolioValueSeries, locale],
+  );
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
@@ -1369,11 +1542,36 @@ export default function PortfolioPage() {
         title={t('portfolio.valueChart.title')}
         description={t('portfolio.valueChart.description')}
         variant="chart"
+        action={
+          <div className="inline-flex overflow-hidden rounded-md border border-rule bg-surface-raised p-0.5">
+            {[
+              { id: '1d', label: '1D' },
+              { id: '1w', label: '1W' },
+              { id: '1m', label: '1M' },
+              { id: '6m', label: '6M' },
+              { id: '1y', label: '1Y' },
+            ].map((period) => (
+              <button
+                key={period.id}
+                type="button"
+                className={cn(
+                  'h-7 rounded px-2.5 text-xs font-medium transition-colors',
+                  portfolioValuePeriod === period.id
+                    ? 'bg-accent text-accent-contrast'
+                    : 'text-ink-muted hover:bg-surface-sunken hover:text-ink',
+                )}
+                onClick={() => setPortfolioValuePeriod(period.id)}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+        }
         className={rise(2)}
       >
-        {portfolioValueSeries.length ? (
+        {visiblePortfolioValueSeries.length ? (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={portfolioValueSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart data={visiblePortfolioValueSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="portfolioValueArea" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.32} />
@@ -1381,7 +1579,17 @@ export default function PortfolioPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="capturedAtMs"
+                type="number"
+                scale="time"
+                domain={portfolioValueDomain}
+                tickFormatter={(value) => formatPortfolioPeriodLabel(value, portfolioValuePeriod, locale)}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={24}
+              />
               <YAxis
                 tickFormatter={(value) => formatCurrencyCompact(value, currency, locale)}
                 tickLine={false}
@@ -1401,21 +1609,15 @@ export default function PortfolioPage() {
                 }}
               />
               <Area
-                type="stepAfter"
-                dataKey="valueCents"
-                stroke="transparent"
-                fill="url(#portfolioValueArea)"
-                dot={false}
-              />
-              <Line
-                type="stepAfter"
+                type="monotone"
                 dataKey="valueCents"
                 stroke="var(--accent)"
-                strokeWidth={1.9}
-                dot={{ r: 2.5, strokeWidth: 1.5, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
+                strokeWidth={1.75}
+                fill="url(#portfolioValueArea)"
+                dot={false}
                 activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
               />
-            </ComposedChart>
+            </AreaChart>
           </ResponsiveContainer>
         ) : (
           <EmptyState title={t('portfolio.valueChart.emptyTitle')} description={t('portfolio.valueChart.emptyDescription')} />
@@ -1428,6 +1630,7 @@ export default function PortfolioPage() {
         eyebrow={t('portfolio.holdingsCard.eyebrow')}
         title={t('portfolio.holdingsCard.title')}
         description={t('portfolio.holdingsCard.description')}
+        density="compact"
         action={
           <Button variant="primary" size="sm" onClick={() => openNewHolding()}>
             <PlusIcon /> {t('portfolio.addHolding')}
