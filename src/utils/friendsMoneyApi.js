@@ -23,10 +23,26 @@ export async function fetchFriendLedger(userId) {
   return data ?? [];
 }
 
-export async function createLedgerEntry({ creditorId, debtorId, amountCents, currency = 'EUR', kind = 'manual', note = '', createdBy }) {
+export async function createLedgerEntry({ creditorId, debtorId, amountCents, currency = 'EUR', kind = 'manual', note = '', createdBy, parentIouId = null }) {
   const { data, error } = await client()
     .from('friend_ledger')
-    .insert({ creditor_id: creditorId, debtor_id: debtorId, amount_cents: amountCents, currency, kind, note, created_by: createdBy })
+    .insert({ creditor_id: creditorId, debtor_id: debtorId, amount_cents: amountCents, currency, kind, note, created_by: createdBy, parent_expense_id: parentIouId })
+    .select(LEDGER_SELECT)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateLedgerEntry(entryId, patch = {}) {
+  const allowed = {};
+  if (patch.amountCents !== undefined) allowed.amount_cents = patch.amountCents;
+  if (patch.status !== undefined) allowed.status = patch.status;
+  if (patch.settledAt !== undefined) allowed.settled_at = patch.settledAt;
+  if (patch.settledBy !== undefined) allowed.settled_by = patch.settledBy;
+  const { data, error } = await client()
+    .from('friend_ledger')
+    .update(allowed)
+    .eq('id', entryId)
     .select(LEDGER_SELECT)
     .single();
   if (error) throw error;

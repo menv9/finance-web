@@ -75,6 +75,7 @@ import {
   fetchFriendLedger,
   rejectLedgerEntry as apiRejectLedgerEntry,
   settleLedgerEntry as apiSettleLedgerEntry,
+  updateLedgerEntry as apiUpdateLedgerEntry,
 } from '../utils/friendsMoneyApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
@@ -3463,7 +3464,7 @@ export const useFinanceStore = create((set, get) => ({
     }));
   },
 
-  sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '' }) => {
+  sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '', parentIouId = null }) => {
     const user = get().supabaseUser;
     if (!user) return;
     const entry = await apiCreateLedgerEntry({
@@ -3474,6 +3475,7 @@ export const useFinanceStore = create((set, get) => ({
       kind: 'payment',
       note,
       createdBy: user.id,
+      parentIouId,
     });
     set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
     return entry;
@@ -3483,6 +3485,7 @@ export const useFinanceStore = create((set, get) => ({
     const user = get().supabaseUser;
     if (!user) return;
     const entry = get().friendLedger.find((e) => e.id === entryId);
+
     if (entry && bankAccountId) {
       const today = new Date().toISOString().slice(0, 10);
       await get().saveEntity('incomes', {
@@ -3493,9 +3496,29 @@ export const useFinanceStore = create((set, get) => ({
         source: senderName ? `Payment from ${senderName}` : 'Friend payment',
       });
     }
-    const updated = await apiSettleLedgerEntry(entryId, user.id);
+
+    const updatedPayment = await apiSettleLedgerEntry(entryId, user.id);
+
+    // If this payment was linked to an IOU, reduce or settle it
+    const linkedIouId = entry?.parent_expense_id;
+    const linkedIou = linkedIouId ? get().friendLedger.find((e) => e.id === linkedIouId && e.status === 'pending') : null;
+
+    let updatedIou = null;
+    if (linkedIou) {
+      const remaining = linkedIou.amount_cents - entry.amount_cents;
+      if (remaining <= 0) {
+        updatedIou = await apiSettleLedgerEntry(linkedIou.id, user.id);
+      } else {
+        updatedIou = await apiUpdateLedgerEntry(linkedIou.id, { amountCents: remaining });
+      }
+    }
+
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => {
+        if (e.id === entryId) return updatedPayment;
+        if (updatedIou && e.id === linkedIou.id) return updatedIou;
+        return e;
+      }),
     }));
   },
 

@@ -196,7 +196,7 @@ function AcceptPaymentModal({ entry, open, onClose }) {
 
 // ── Send payment modal ────────────────────────────────────────────────────────
 
-function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCents = 0 }) {
+function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCents = 0, prefillParentIouId = null }) {
   const { t } = useTranslation();
   const friends = useFinanceStore((s) => s.friends);
   const sendPayment = useFinanceStore((s) => s.sendPayment);
@@ -213,6 +213,7 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
     if (open) {
       setFriendId(prefillFriendId);
       setAmount(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
+      setNote('');
       setError('');
       setBusy(false);
     }
@@ -229,7 +230,7 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
     setBusy(true);
     try {
-      await sendPayment({ friendId, amountCents: cents, currency, note: note.trim() });
+      await sendPayment({ friendId, amountCents: cents, currency, note: note.trim(), parentIouId: prefillParentIouId });
       handleClose();
     } catch (err) {
       setError(err.message || 'Something went wrong.');
@@ -576,6 +577,7 @@ export default function FriendsMoneyPage() {
         onClose={() => setSendEntry(null)}
         prefillFriendId={sendEntry?.creditor_id ?? ''}
         prefillAmountCents={sendEntry?.amount_cents ?? 0}
+        prefillParentIouId={sendEntry?.id ?? null}
       />
       <SettleModal entry={settleEntry} currentUserId={uid} open={!!settleEntry} onClose={() => setSettleEntry(null)} />
       <AcceptPaymentModal entry={acceptEntry} open={!!acceptEntry} onClose={() => setAcceptEntry(null)} />
