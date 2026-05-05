@@ -55,6 +55,17 @@ export async function cancelLedgerEntry(entryId) {
   return data;
 }
 
+export async function rejectLedgerEntry(entryId) {
+  const { data, error } = await client()
+    .from('friend_ledger')
+    .update({ status: 'rejected' })
+    .eq('id', entryId)
+    .select(LEDGER_SELECT)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteLedgerEntry(entryId) {
   const { error } = await client()
     .from('friend_ledger')

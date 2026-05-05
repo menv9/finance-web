@@ -73,6 +73,7 @@ import {
   cancelLedgerEntry as apiCancelLedgerEntry,
   createLedgerEntry as apiCreateLedgerEntry,
   fetchFriendLedger,
+  rejectLedgerEntry as apiRejectLedgerEntry,
   settleLedgerEntry as apiSettleLedgerEntry,
 } from '../utils/friendsMoneyApi';
 
@@ -3457,6 +3458,49 @@ export const useFinanceStore = create((set, get) => ({
 
   cancelLedgerEntry: async (entryId) => {
     const updated = await apiCancelLedgerEntry(entryId);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
+  },
+
+  sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '' }) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const entry = await apiCreateLedgerEntry({
+      creditorId: friendId,
+      debtorId: user.id,
+      amountCents,
+      currency,
+      kind: 'payment',
+      note,
+      createdBy: user.id,
+    });
+    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
+    return entry;
+  },
+
+  acceptPayment: async (entryId, { bankAccountId, senderName = '' } = {}) => {
+    const user = get().supabaseUser;
+    if (!user) return;
+    const entry = get().friendLedger.find((e) => e.id === entryId);
+    if (entry && bankAccountId) {
+      const today = new Date().toISOString().slice(0, 10);
+      await get().saveEntity('incomes', {
+        date: today,
+        amountCents: entry.amount_cents,
+        currency: entry.currency,
+        bankAccountId,
+        source: senderName ? `Payment from ${senderName}` : 'Friend payment',
+      });
+    }
+    const updated = await apiSettleLedgerEntry(entryId, user.id);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
+  },
+
+  declinePayment: async (entryId) => {
+    const updated = await apiRejectLedgerEntry(entryId);
     set((state) => ({
       friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
     }));

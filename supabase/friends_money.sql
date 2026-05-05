@@ -7,7 +7,7 @@ create table if not exists public.friend_ledger (
   debtor_id         uuid not null,
   amount_cents      bigint not null check (amount_cents > 0),
   currency          text not null default 'EUR',
-  kind              text not null check (kind in ('split', 'request', 'manual')),
+  kind              text not null check (kind in ('split', 'request', 'manual', 'payment')),
   status            text not null default 'pending'
                     check (status in ('pending', 'settled', 'cancelled', 'rejected')),
   note              text,
