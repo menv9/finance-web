@@ -1671,9 +1671,6 @@ export default function PortfolioPage() {
         )}
       </Card>
 
-      {/* news */}
-      <PortfolioNews tickers={newsTickers} apiKey={settings.finnhubApiKey || ''} />
-
       {/* allocation */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card data-tour="portfolio-allocation" eyebrow={t('portfolio.allocationCard.eyebrow')} title={t('portfolio.allocationCard.title')} className={'order-2 lg:col-span-5 ' + rise(2)}>
@@ -1883,6 +1880,9 @@ export default function PortfolioPage() {
         )}
       </Card>
       ) : null}
+
+      {/* news */}
+      <PortfolioNews tickers={newsTickers} apiKey={settings.finnhubApiKey || ''} />
 
       <Modal
         open={holdingModal.open}
