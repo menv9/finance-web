@@ -258,6 +258,10 @@ function accountDeltaForRecord(storeName, record) {
     return { accountId: record.bankAccountId, deltaCents: -Math.abs(record.amountCents || 0) };
   }
   if (storeName === 'incomes') {
+    if (record.incomeKind === 'fixed') {
+      const today = new Date().toISOString().slice(0, 10);
+      if (record.date > today) return null;
+    }
     return { accountId: record.bankAccountId, deltaCents: record.amountCents || 0 };
   }
   return null;
