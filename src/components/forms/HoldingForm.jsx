@@ -389,7 +389,9 @@ export function HoldingForm({
   onCancel,
   finnhubApiKey = '',
   bankAccounts = [],
+  portfolios = [],
   allowPurchaseDate = false,
+  allowPortfolioSelect = false,
   historicalMode = false,
   lockedPlatform = '',
 }) {
@@ -408,6 +410,7 @@ export function HoldingForm({
     ...initialValue,
     platform: lockedPlatform || initialValue?.platform || settings.holdingPlatforms?.[0] || 'Trade Republic',
     purchaseDate: initialValue?.purchaseDate || new Date().toISOString().slice(0, 10),
+    portfolioId: initialValue?.portfolioId || portfolios[0]?.id || '',
     bankAccountId: defaultBankAccountId,
     quantity: formatQuantityForInput(initialValue),
     averageBuyPriceCents: initialValue?.averageBuyPriceCents
@@ -576,6 +579,23 @@ export function HoldingForm({
                 onChange={set('purchaseDate')}
                 required
               />
+            )}
+          </FormField>
+        ) : null}
+
+        {allowPortfolioSelect && portfolios.length ? (
+          <FormField label="Portfolio" htmlFor="holding-portfolio" required>
+            {(props) => (
+              <Select
+                {...props}
+                value={form.portfolioId || portfolios[0]?.id || ''}
+                onChange={set('portfolioId')}
+                required
+              >
+                {portfolios.map((portfolio) => (
+                  <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>
+                ))}
+              </Select>
             )}
           </FormField>
         ) : null}

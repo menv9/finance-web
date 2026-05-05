@@ -68,6 +68,25 @@ function applyFx(cents, currency, fxRates, baseCurrency) {
   return rate != null ? Math.round(cents * rate) : cents;
 }
 
+export function validPortfolioIds(investmentPortfolios = []) {
+  return new Set((investmentPortfolios || []).map((portfolio) => portfolio.id).filter(Boolean));
+}
+
+export function isAssignedPortfolioHolding(holding, investmentPortfolios = []) {
+  const ids = validPortfolioIds(investmentPortfolios);
+  return Boolean(holding?.portfolioId && ids.has(holding.portfolioId));
+}
+
+export function assignedPortfolioHoldings(holdings = [], investmentPortfolios = []) {
+  const ids = validPortfolioIds(investmentPortfolios);
+  return (holdings || []).filter((holding) => holding?.portfolioId && ids.has(holding.portfolioId));
+}
+
+export function assignedPortfolioRecords(records = [], investmentPortfolios = []) {
+  const ids = validPortfolioIds(investmentPortfolios);
+  return (records || []).filter((record) => record?.portfolioId && ids.has(record.portfolioId));
+}
+
 export function computePortfolioMetrics(holdings, dividends, cashflows, targets = [], fxRates = {}, baseCurrency = 'EUR') {
   const activeHoldings = holdings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0);
 
@@ -206,7 +225,7 @@ export function computeXIRR(cashflows, endingValueCents) {
   return null;
 }
 
-export function computeDashboardData({ expenses, incomes, fixedExpenses, holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], debts = [], settings = {}, fxRates = {} }) {
+export function computeDashboardData({ expenses, incomes, fixedExpenses, investmentPortfolios = [], holdings, dividends, portfolioCashflows, portfolioSales = [], savingsConfig, savingsEntries, transfers = [], bankAccounts = [], debts = [], settings = {}, fxRates = {} }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const today = format(new Date(), 'yyyy-MM-dd');
   const bankBalanceCents = (bankAccounts || [])
@@ -273,7 +292,10 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   const cashflowCents      = cashflowIncomeCents - totalExpensesCents - distributedTotalCents - savedThisMonthCents;
   const savingsRate        = totalIncomeCents ? (cashflowCents / totalIncomeCents) * 100 : 0;
   const baseCurrency = settings.baseCurrency || 'EUR';
-  const portfolio          = computePortfolioMetrics(holdings, dividends, portfolioCashflows, [], fxRates, baseCurrency);
+  const assignedHoldings = assignedPortfolioHoldings(holdings, investmentPortfolios);
+  const assignedDividends = assignedPortfolioRecords(dividends, investmentPortfolios);
+  const assignedCashflows = assignedPortfolioRecords(portfolioCashflows, investmentPortfolios);
+  const portfolio          = computePortfolioMetrics(assignedHoldings, assignedDividends, assignedCashflows, [], fxRates, baseCurrency);
 
   // Fix: real net worth = savings balance (starting balance + logged entries) + portfolio.
   // The old formula (12-month cumulative cashflow + portfolio) ignored pre-existing

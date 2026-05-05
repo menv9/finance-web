@@ -5,13 +5,15 @@ import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { computePortfolioMetrics } from '../utils/finance';
-import { Button, Card, EmptyState, FormField, Modal, Select, Table, cn } from '../components/ui';
+import { Button, Card, EmptyState, FormField, Input, Modal, Select, Table, cn } from '../components/ui';
 import { useTranslation } from '../i18n/useTranslation';
 import { rise } from '../utils/motion';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const UNASSIGNED_PORTFOLIO_ID = '__unassigned__';
 
 function PlusIcon() {
   return (
@@ -46,6 +48,134 @@ function holdingPurchaseDate(holding, cashflows) {
   return holding.createdAt?.slice(0, 10) || '';
 }
 
+function parseCents(value) {
+  if (value == null || value === '') return 0;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric * 100);
+}
+
+function normalizeImportedHolding(row, platform, portfolioId, baseCurrency, sourceCashflows = []) {
+  const ticker = String(row.ticker || row.symbol || '').trim().toUpperCase();
+  if (!ticker) return null;
+  const quantity = Number(row.quantity ?? row.shares ?? 0);
+  if (!Number.isFinite(quantity) || quantity <= 0) return null;
+  const averageBuyPriceCents = Number.isFinite(Number(row.averageBuyPriceCents))
+    ? Math.round(Number(row.averageBuyPriceCents))
+    : parseCents(row.averageBuyPrice ?? row.avgBuyPrice ?? row.buyPrice);
+  const currentPriceCents = Number.isFinite(Number(row.currentPriceCents))
+    ? Math.round(Number(row.currentPriceCents))
+    : parseCents(row.currentPrice ?? row.lastPrice ?? row.price);
+  const feeCents = Number.isFinite(Number(row.feeCents))
+    ? Math.round(Number(row.feeCents))
+    : parseCents(row.fee ?? row.commission);
+  const [, decimals = ''] = `${quantity}`.split('.');
+  const linkedCashflow = sourceCashflows.find((flow) => flow.holdingId === row.id && flow.date);
+
+  return {
+    ticker,
+    name: row.name || row.companyName || ticker,
+    platform,
+    portfolioId,
+    purchaseDate: row.purchaseDate || row.date || linkedCashflow?.date || today(),
+    quantity,
+    quantityDecimals: Number.isInteger(row.quantityDecimals)
+      ? row.quantityDecimals
+      : Math.min(decimals.length, 20),
+    averageBuyPriceCents,
+    currentPriceCents,
+    feeCents,
+    currency: row.currency || baseCurrency,
+    feeCurrency: row.feeCurrency || row.currency || baseCurrency,
+  };
+}
+
+function ManagePlatformsModal({ open, onClose }) {
+  const confirm = useConfirm();
+  const settings = useFinanceStore((state) => state.settings);
+  const holdings = useFinanceStore((state) => state.holdings || []);
+  const updateSettings = useFinanceStore((state) => state.updateSettings);
+  const [draft, setDraft] = useState('');
+  const platforms = settings.holdingPlatforms?.length ? settings.holdingPlatforms : ['Trade Republic', 'IBKR', 'DEGIRO'];
+
+  const add = () => {
+    const name = draft.trim();
+    if (!name || platforms.includes(name)) return;
+    updateSettings({ holdingPlatforms: [...platforms, name] });
+    setDraft('');
+  };
+
+  const remove = (platform) => {
+    const next = platforms.filter((item) => item !== platform);
+    updateSettings({ holdingPlatforms: next.length ? next : ['Trade Republic', 'IBKR', 'DEGIRO'] });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      eyebrow="Investing"
+      title="Manage platforms"
+      description="Platforms are used as brokers for portfolio holdings."
+      size="sm"
+    >
+      <div className="grid gap-6">
+        <ul className="divide-y divide-rule">
+          {platforms.map((platform) => (
+            <li key={platform} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <span className="block truncate text-sm text-ink">{platform}</span>
+                {holdings.some((holding) => holding.platform === platform) ? (
+                  <span className="text-xs text-ink-faint">Contains holdings</span>
+                ) : null}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={holdings.some((holding) => holding.platform === platform)}
+                onClick={async () => {
+                  if (holdings.some((holding) => holding.platform === platform)) return;
+                  if (await confirm({
+                    title: 'Remove platform',
+                    description: `Remove "${platform}" from the broker list?`,
+                  })) {
+                    remove(platform);
+                  }
+                }}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+
+        <FormField label="Add platform" htmlFor="new-platform-input">
+          <div className="flex gap-2">
+            <Input
+              id="new-platform-input"
+              type="text"
+              placeholder="e.g. Trade Republic"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  add();
+                }
+              }}
+            />
+            <Button variant="primary" onClick={add}>Add</Button>
+          </div>
+        </FormField>
+
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function PlatformsPage() {
   const alert = useAlert();
   const confirm = useConfirm();
@@ -58,6 +188,7 @@ export default function PlatformsPage() {
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const recordPortfolioSnapshot = useFinanceStore((state) => state.recordPortfolioSnapshot);
+  const [managePlatformsOpen, setManagePlatformsOpen] = useState(false);
 
   const currency = settings.baseCurrency || 'EUR';
   const platformNames = useMemo(() => {
@@ -69,13 +200,29 @@ export default function PlatformsPage() {
   const [activePlatform, setActivePlatform] = useState(platformNames[0] || '');
   const [activePortfolioId, setActivePortfolioId] = useState(investmentPortfolios[0]?.id || '');
   const [holdingModal, setHoldingModal] = useState({ open: false, id: null });
+  const [importingJson, setImportingJson] = useState(false);
 
   const selectedPlatform = activePlatform || platformNames[0] || '';
   const selectedPortfolioId = activePortfolioId || investmentPortfolios[0]?.id || '';
   const editingHolding = holdings.find((holding) => holding.id === holdingModal.id);
+  const portfolioFilterOptions = [
+    ...investmentPortfolios,
+    { id: UNASSIGNED_PORTFOLIO_ID, name: 'Unassigned' },
+  ];
+  const knownPortfolioIds = new Set(investmentPortfolios.map((portfolio) => portfolio.id));
+  const isUnassignedHolding = (holding) => !holding.portfolioId || !knownPortfolioIds.has(holding.portfolioId);
+  const platformPortfolioId = (holding) => (
+    isUnassignedHolding(holding) ? UNASSIGNED_PORTFOLIO_ID : holding.portfolioId
+  );
 
   const brokerSummaries = platformNames.map((platform) => {
-    const platformHoldings = holdings.filter((holding) => holding.platform === platform && !holding.archivedAt && (holding.quantity || 0) > 0);
+    const platformHoldings = holdings.filter((holding) => (
+      holding.platform === platform &&
+      holding.portfolioId &&
+      knownPortfolioIds.has(holding.portfolioId) &&
+      !holding.archivedAt &&
+      (holding.quantity || 0) > 0
+    ));
     const metrics = computePortfolioMetrics(platformHoldings, [], [], [], fxRates, currency);
     return {
       id: platform,
@@ -90,7 +237,14 @@ export default function PlatformsPage() {
   });
 
   const visibleHoldings = holdings
-    .filter((holding) => holding.platform === selectedPlatform)
+    .filter((holding) => (
+      holding.platform === selectedPlatform &&
+      (
+        selectedPortfolioId === UNASSIGNED_PORTFOLIO_ID
+          ? isUnassignedHolding(holding)
+          : holding.portfolioId === selectedPortfolioId
+      )
+    ))
     .slice()
     .sort((a, b) => (holdingPurchaseDate(b, portfolioCashflows) || '').localeCompare(holdingPurchaseDate(a, portfolioCashflows) || ''));
 
@@ -153,7 +307,9 @@ export default function PlatformsPage() {
           <button
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-sunken hover:text-ink"
-            onClick={() => setHoldingModal({ open: true, id: row.id })}
+            onClick={() => {
+              setHoldingModal({ open: true, id: row.id });
+            }}
             aria-label={`Edit ${row.ticker}`}
             title="Edit"
           >
@@ -192,7 +348,80 @@ export default function PlatformsPage() {
     setHoldingModal({ open: true, id: null });
   };
 
-  const closeHolding = () => setHoldingModal({ open: false, id: null });
+  const closeHolding = () => {
+    setHoldingModal({ open: false, id: null });
+  };
+
+  const importJson = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!selectedPortfolioId) {
+      await alert({
+        title: 'Select a portfolio first',
+        description: 'Choose a portfolio or Unassigned before importing holdings.',
+      });
+      return;
+    }
+    if (!selectedPlatform) {
+      await alert({ title: 'Select a platform first', description: 'Choose the broker before importing holdings.' });
+      return;
+    }
+    setImportingJson(true);
+    try {
+      const parsed = JSON.parse(await file.text());
+      const rows = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed.holdings)
+          ? parsed.holdings
+          : Array.isArray(parsed.data?.holdings)
+            ? parsed.data.holdings
+            : Array.isArray(parsed.data)
+              ? parsed.data
+            : [];
+      const sourceCashflows = Array.isArray(parsed.data?.portfolioCashflows)
+        ? parsed.data.portfolioCashflows
+        : Array.isArray(parsed.portfolioCashflows)
+          ? parsed.portfolioCashflows
+          : [];
+      const importPortfolioId = selectedPortfolioId === UNASSIGNED_PORTFOLIO_ID ? '' : selectedPortfolioId;
+      const normalized = rows
+        .map((row) => normalizeImportedHolding(row, selectedPlatform, importPortfolioId, currency, sourceCashflows))
+        .filter(Boolean);
+      if (!normalized.length) {
+        throw new Error('No valid holdings found. Use an array or an object with a holdings array.');
+      }
+      for (const holding of normalized) {
+        await saveEntity('holdings', holding, { allowUnassignedPortfolio: importPortfolioId === '' });
+      }
+      if (importPortfolioId) {
+        await recordPortfolioSnapshot({
+          force: true,
+          source: 'broker_json_import',
+          portfolioId: importPortfolioId,
+          includeGlobal: true,
+        });
+      } else {
+        await recordPortfolioSnapshot({
+          force: true,
+          source: 'broker_json_import',
+          includeGlobal: true,
+          includeScoped: false,
+        });
+      }
+      await alert({
+        title: 'Import complete',
+        description: `${normalized.length} holding${normalized.length === 1 ? '' : 's'} imported into ${selectedPlatform}.`,
+      });
+    } catch (error) {
+      await alert({
+        title: 'Unable to import JSON',
+        description: error.message || 'Check the file format and try again.',
+      });
+    } finally {
+      setImportingJson(false);
+    }
+  };
 
   return (
     <div className="grid gap-6">
@@ -200,11 +429,6 @@ export default function PlatformsPage() {
         eyebrow="Investing"
         title="Platforms"
         description="Manage broker holdings and set the real purchase date for historical positions."
-        actions={(
-          <Button onClick={openNewHolding}>
-            <PlusIcon /> Add broker holding
-          </Button>
-        )}
       />
 
       <Card
@@ -213,6 +437,15 @@ export default function PlatformsPage() {
         description="Platform is treated as broker across Investing."
         className={rise(1)}
       >
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setManagePlatformsOpen(true)}
+            className="text-xs text-accent hover:underline"
+          >
+            Manage platforms
+          </button>
+        </div>
         {brokerSummaries.length ? (
           <Table columns={summaryColumns} rows={brokerSummaries} density="compact" />
         ) : (
@@ -226,11 +459,11 @@ export default function PlatformsPage() {
 
       <Card
         eyebrow={selectedPlatform || 'Broker'}
-        title="Holdings"
+        title={selectedPortfolioId === UNASSIGNED_PORTFOLIO_ID ? 'Unassigned holdings' : 'Holdings'}
         description="Historical broker setup does not create cashflows or bank movements."
         action={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {investmentPortfolios.length ? (
+            {portfolioFilterOptions.length ? (
               <div className="w-48">
                 <FormField label="Portfolio" htmlFor="platform-portfolio">
                   {(props) => (
@@ -239,7 +472,7 @@ export default function PlatformsPage() {
                       value={selectedPortfolioId}
                       onChange={(event) => setActivePortfolioId(event.target.value)}
                     >
-                      {investmentPortfolios.map((portfolio) => (
+                      {portfolioFilterOptions.map((portfolio) => (
                         <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>
                       ))}
                     </Select>
@@ -247,6 +480,12 @@ export default function PlatformsPage() {
                 </FormField>
               </div>
             ) : null}
+            <label className="inline-flex">
+              <Button as="span" variant="secondary" size="sm" loading={importingJson}>
+                Import JSON
+              </Button>
+              <input type="file" accept="application/json" className="hidden" onChange={importJson} />
+            </label>
             <Button variant="primary" size="sm" onClick={openNewHolding}>
               <PlusIcon /> Add holding
             </Button>
@@ -265,6 +504,8 @@ export default function PlatformsPage() {
         )}
       </Card>
 
+      <ManagePlatformsModal open={managePlatformsOpen} onClose={() => setManagePlatformsOpen(false)} />
+
       <Modal
         open={holdingModal.open}
         onClose={closeHolding}
@@ -274,23 +515,50 @@ export default function PlatformsPage() {
         size="lg"
       >
         <HoldingForm
-          initialValue={editingHolding || {
-            platform: selectedPlatform,
-            portfolioId: selectedPortfolioId,
-            purchaseDate: today(),
+          key={holdingModal.id || 'new'}
+          initialValue={{
+            ...(editingHolding || {
+              platform: selectedPlatform,
+              purchaseDate: today(),
+            }),
+            portfolioId: editingHolding ? platformPortfolioId(editingHolding) : selectedPortfolioId,
           }}
           finnhubApiKey={settings.finnhubApiKey || ''}
+          portfolios={portfolioFilterOptions}
           allowPurchaseDate
+          allowPortfolioSelect
           historicalMode
           lockedPlatform={editingHolding?.platform || selectedPlatform}
           onSubmit={async (value) => {
+            const nextPortfolioId = value.portfolioId || selectedPortfolioId;
+            const normalizedPortfolioId = nextPortfolioId === UNASSIGNED_PORTFOLIO_ID ? '' : nextPortfolioId;
+            const previousPortfolioId = editingHolding?.portfolioId || '';
             const saved = await saveEntity('holdings', {
               ...value,
               platform: editingHolding?.platform || selectedPlatform,
-              portfolioId: value.portfolioId || selectedPortfolioId,
+              portfolioId: normalizedPortfolioId,
               purchaseDate: value.purchaseDate || today(),
-            });
-            await recordPortfolioSnapshot({ force: true, source: editingHolding ? 'broker_holding_edited' : 'broker_holding_added', portfolioId: saved.portfolioId });
+            }, { allowUnassignedPortfolio: normalizedPortfolioId === '' });
+            setActivePortfolioId(normalizedPortfolioId || UNASSIGNED_PORTFOLIO_ID);
+            const snapshotSource = editingHolding ? 'broker_holding_edited' : 'broker_holding_added';
+            const affectedPortfolioIds = [...new Set([previousPortfolioId, saved.portfolioId].filter(Boolean))];
+            if (affectedPortfolioIds.length) {
+              for (const [index, affectedPortfolioId] of affectedPortfolioIds.entries()) {
+                await recordPortfolioSnapshot({
+                  force: true,
+                  source: snapshotSource,
+                  portfolioId: affectedPortfolioId,
+                  includeGlobal: index === 0,
+                });
+              }
+            } else {
+              await recordPortfolioSnapshot({
+                force: true,
+                source: snapshotSource,
+                includeGlobal: true,
+                includeScoped: false,
+              });
+            }
             closeHolding();
           }}
           onCancel={closeHolding}

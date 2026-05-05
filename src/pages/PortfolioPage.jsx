@@ -21,7 +21,7 @@ import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
-import { computePortfolioMetrics } from '../utils/finance';
+import { assignedPortfolioHoldings, assignedPortfolioRecords, computePortfolioMetrics } from '../utils/finance';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
@@ -1267,6 +1267,12 @@ function PortfolioTooltip({ active, payload, currency, locale }) {
 }
 
 const PORTFOLIO_PERIOD_OPTIONS = ['1d', '1w', '1m', '6m', '1y', 'all'];
+const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
+
+function chooseCanonicalSnapshots(snapshots) {
+  const canonical = (snapshots || []).filter((snapshot) => snapshot.scopeVersion === PORTFOLIO_SNAPSHOT_SCOPE_VERSION);
+  return canonical.length ? canonical : (snapshots || []).filter((snapshot) => !snapshot.scopeVersion);
+}
 
 export default function PortfolioPage() {
   const { t, locale } = useTranslation();
@@ -1325,10 +1331,26 @@ export default function PortfolioPage() {
     : modalHolding;
   const fxRates = useFinanceStore((state) => state.fxRates);
   const currency = settings.baseCurrency;
-  const visibleHoldings = isAllPortfoliosView ? holdings : holdings.filter((item) => item.portfolioId === activePortfolioId);
-  const visibleDividends = isAllPortfoliosView ? dividends : dividends.filter((item) => item.portfolioId === activePortfolioId);
-  const visiblePortfolioSales = isAllPortfoliosView ? portfolioSales : portfolioSales.filter((item) => item.portfolioId === activePortfolioId);
-  const visiblePortfolioCashflows = isAllPortfoliosView ? portfolioCashflows : portfolioCashflows.filter((item) => item.portfolioId === activePortfolioId);
+  const assignedHoldings = useMemo(
+    () => assignedPortfolioHoldings(holdings, investmentPortfolios),
+    [holdings, investmentPortfolios],
+  );
+  const assignedDividends = useMemo(
+    () => assignedPortfolioRecords(dividends, investmentPortfolios),
+    [dividends, investmentPortfolios],
+  );
+  const assignedPortfolioSales = useMemo(
+    () => assignedPortfolioRecords(portfolioSales, investmentPortfolios),
+    [portfolioSales, investmentPortfolios],
+  );
+  const assignedPortfolioCashflows = useMemo(
+    () => assignedPortfolioRecords(portfolioCashflows, investmentPortfolios),
+    [portfolioCashflows, investmentPortfolios],
+  );
+  const visibleHoldings = isAllPortfoliosView ? assignedHoldings : assignedHoldings.filter((item) => item.portfolioId === activePortfolioId);
+  const visibleDividends = isAllPortfoliosView ? assignedDividends : assignedDividends.filter((item) => item.portfolioId === activePortfolioId);
+  const visiblePortfolioSales = isAllPortfoliosView ? assignedPortfolioSales : assignedPortfolioSales.filter((item) => item.portfolioId === activePortfolioId);
+  const visiblePortfolioCashflows = isAllPortfoliosView ? assignedPortfolioCashflows : assignedPortfolioCashflows.filter((item) => item.portfolioId === activePortfolioId);
   const visiblePortfolioMetrics = isAllPortfoliosView
     ? portfolio
     : computePortfolioMetrics(
@@ -1345,9 +1367,10 @@ export default function PortfolioPage() {
     () => Array.from(new Set(activeHoldings.map((h) => h.ticker).filter(Boolean))),
     [activeHoldings],
   );
-  const visibleSnapshots = isAllPortfoliosView
+  const scopedSnapshots = isAllPortfoliosView
     ? portfolioSnapshots.filter((snapshot) => !snapshot.portfolioId)
     : portfolioSnapshots.filter((snapshot) => snapshot.portfolioId === activePortfolioId);
+  const visibleSnapshots = chooseCanonicalSnapshots(scopedSnapshots);
   const portfolioValueSeries = buildPortfolioValueSeries(
     visibleSnapshots,
     visiblePortfolioMetrics.currentValueCents,
@@ -1402,10 +1425,10 @@ export default function PortfolioPage() {
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
   useEffect(() => {
-    if (holdings.some((holding) => !holding.archivedAt && (holding.quantity || 0) > 0) && portfolio.currentValueCents > 0) {
+    if (assignedHoldings.some((holding) => !holding.archivedAt && (holding.quantity || 0) > 0) && portfolio.currentValueCents > 0) {
       recordPortfolioSnapshot();
     }
-  }, [holdings, portfolio.currentValueCents, recordPortfolioSnapshot]);
+  }, [assignedHoldings, portfolio.currentValueCents, recordPortfolioSnapshot]);
 
   useEffect(() => {
     if (activePortfolioId !== 'all' && !investmentPortfolios.some((portfolio) => portfolio.id === activePortfolioId)) {

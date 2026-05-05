@@ -256,9 +256,6 @@ export default function SettingsPage() {
   const [editingPlatform, setEditingPlatform] = useState('');
   const [targetInput, setTargetInput] = useState({ ticker: '', targetWeight: '' });
   const [showApiKey, setShowApiKey] = useState(false);
-  const holdingPlatforms = settings.holdingPlatforms?.length
-    ? settings.holdingPlatforms
-    : ['Trade Republic', 'IBKR', 'DEGIRO'];
 
   const targetColumns = [
     { key: 'ticker', header: t('settings.targets.ticker'), render: (r) => <span className="font-mono">{r.ticker}</span> },
@@ -703,77 +700,84 @@ export default function SettingsPage() {
             eyebrow={t('settings.platforms.eyebrow')}
             title={t('settings.platforms.title')}
             description={t('settings.platforms.description')}
-            className={rise(3)}
+            className={rise(4)}
           >
-            <div className="flex flex-wrap gap-2">
-              {holdingPlatforms.map((platform) => (
-                <span
-                  key={platform}
-                  className="inline-flex items-center gap-2 rounded-full border border-rule bg-surface-raised px-3 py-1 text-xs text-ink"
-                >
-                  <span>{platform}</span>
-                  <button
-                    type="button"
-                    className="text-ink-faint hover:text-ink transition-colors"
-                    onClick={() => {
-                      setEditingPlatform(platform);
-                      setPlatformInput(platform);
-                    }}
-                  >
-                    edit
-                  </button>
-                  {holdingPlatforms.length > 1 ? (
-                    <button
-                      type="button"
-                      className="text-ink-faint hover:text-danger transition-colors"
-                      onClick={() =>
-                        updateSettings({
-                          holdingPlatforms: holdingPlatforms.filter((item) => item !== platform),
-                        })
-                      }
+            {(() => {
+              const platforms = settings.holdingPlatforms?.length
+                ? settings.holdingPlatforms
+                : ['Trade Republic', 'IBKR', 'DEGIRO'];
+              return (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {platforms.map((platform) => (
+                      <span
+                        key={platform}
+                        className="inline-flex items-center gap-2 rounded-full border border-rule bg-surface-raised px-3 py-1 text-xs text-ink"
+                      >
+                        <span>{platform}</span>
+                        <button
+                          type="button"
+                          className="text-ink-faint hover:text-ink transition-colors"
+                          onClick={() => { setEditingPlatform(platform); setPlatformInput(platform); }}
+                        >
+                          edit
+                        </button>
+                        {platforms.length > 1 ? (
+                          <button
+                            type="button"
+                            className="text-ink-faint hover:text-danger transition-colors"
+                            onClick={() =>
+                              updateSettings({
+                                holdingPlatforms: platforms.filter((p) => p !== platform),
+                              })
+                            }
+                          >
+                            x
+                          </button>
+                        ) : null}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-5 flex flex-wrap items-end gap-3">
+                    <FormField
+                      label={editingPlatform ? t('settings.platforms.editLabel') : t('settings.platforms.addLabel')}
+                      className="flex-1 min-w-[220px]"
                     >
-                      x
-                    </button>
-                  ) : null}
-                </span>
-              ))}
-            </div>
-            <div className="mt-5 flex flex-wrap items-end gap-3">
-              <FormField label={editingPlatform ? t('settings.platforms.editLabel') : t('settings.platforms.addLabel')} className="flex-1 min-w-[220px]">
-                <Input
-                  value={platformInput}
-                  placeholder={t('settings.platforms.placeholder')}
-                  onChange={(e) => setPlatformInput(e.target.value)}
-                />
-              </FormField>
-              <Button
-                onClick={() => {
-                  if (!platformInput.trim()) return;
-                  const next = platformInput.trim();
-                  if (editingPlatform) {
-                    const renamed = holdingPlatforms.map((item) => (item === editingPlatform ? next : item));
-                    updateSettings({ holdingPlatforms: [...new Set(renamed)] });
-                    setEditingPlatform('');
-                  } else if (!holdingPlatforms.includes(next)) {
-                    updateSettings({ holdingPlatforms: [...holdingPlatforms, next] });
-                  }
-                  setPlatformInput('');
-                }}
-              >
-                {editingPlatform ? t('common.save') : t('common.add')}
-              </Button>
-              {editingPlatform ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setEditingPlatform('');
-                    setPlatformInput('');
-                  }}
-                >
-                  {t('common.cancel')}
-                </Button>
-              ) : null}
-            </div>
+                      <Input
+                        value={platformInput}
+                        placeholder={t('settings.platforms.placeholder')}
+                        onChange={(e) => setPlatformInput(e.target.value)}
+                      />
+                    </FormField>
+                    <Button
+                      onClick={() => {
+                        if (!platformInput.trim()) return;
+                        const next = platformInput.trim();
+                        if (editingPlatform) {
+                          updateSettings({
+                            holdingPlatforms: platforms.map((p) => (p === editingPlatform ? next : p)),
+                          });
+                          setEditingPlatform('');
+                        } else if (!platforms.includes(next)) {
+                          updateSettings({ holdingPlatforms: [...platforms, next] });
+                        }
+                        setPlatformInput('');
+                      }}
+                    >
+                      {editingPlatform ? t('common.save') : t('common.add')}
+                    </Button>
+                    {editingPlatform ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => { setEditingPlatform(''); setPlatformInput(''); }}
+                      >
+                        {t('common.cancel')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </>
+              );
+            })()}
           </Card>
 
           <Card
@@ -781,7 +785,7 @@ export default function SettingsPage() {
             eyebrow={t('settings.targets.eyebrow')}
             title={t('settings.targets.title')}
             description={t('settings.targets.description')}
-            className={rise(4)}
+            className={rise(5)}
           >
             {settings.allocationTargets?.length ? (
               <Table columns={targetColumns} rows={settings.allocationTargets.map((tgt) => ({ ...tgt, id: tgt.ticker }))} density="compact" />
@@ -829,7 +833,7 @@ export default function SettingsPage() {
             eyebrow={t('settings.import.eyebrow')}
             title={t('settings.import.title')}
             description={t('settings.import.description')}
-            className={rise(5)}
+            className={rise(6)}
           >
             <SmartBankImport
               categories={settings.categories}
@@ -1138,11 +1142,12 @@ export default function SettingsPage() {
                 await importBackup(JSON.parse(await file.text()));
               };
               const modules = [
-                { labelKey: 'settings.backup.modules.expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                    file: 'expenses-backup.json' },
-                { labelKey: 'settings.backup.modules.income',    stores: ['incomes'],                                                               file: 'income-backup.json' },
-                { labelKey: 'settings.backup.modules.accounts',  stores: ['bankAccounts'],                                                          file: 'accounts-backup.json' },
+                { labelKey: 'settings.backup.modules.expenses',  stores: ['expenses', 'fixedExpenses', 'budgets', 'rollovers'],                                                            file: 'expenses-backup.json' },
+                { labelKey: 'settings.backup.modules.income',    stores: ['incomes'],                                                                                                      file: 'income-backup.json' },
+                { labelKey: 'settings.backup.modules.accounts',  stores: ['bankAccounts', 'debts'],                                                                                        file: 'accounts-backup.json' },
                 { labelKey: 'settings.backup.modules.portfolio', stores: ['investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'portfolioSnapshots'], file: 'portfolio-backup.json' },
-                { labelKey: 'settings.backup.modules.savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                             file: 'savings-backup.json' },
+                { labelKey: 'settings.backup.modules.savings',   stores: ['savings', 'savingsEntries', 'savingsGoals'],                                                                    file: 'savings-backup.json' },
+                { labelKey: 'settings.backup.modules.transfers', stores: ['transfers'],                                                                                                    file: 'transfers-backup.json' },
               ];
               return (
                 <div className="flex flex-col gap-5">

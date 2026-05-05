@@ -47,6 +47,30 @@ describe('finance metrics', () => {
     expect(metrics.allocationActual[0].valueCents).toBe(Math.round(0.12345678 * 1234567));
   });
 
+  it('excludes unassigned holdings from dashboard portfolio totals', () => {
+    const result = computeDashboardData({
+      expenses: [],
+      incomes: [],
+      fixedExpenses: [],
+      investmentPortfolios: [{ id: 'ipr-main', name: 'Main' }],
+      holdings: [
+        { id: 'hold-main', portfolioId: 'ipr-main', ticker: 'AAA', quantity: 1, averageBuyPriceCents: 10000, currentPriceCents: 12000 },
+        { id: 'hold-unassigned', portfolioId: '', ticker: 'BBB', quantity: 10, averageBuyPriceCents: 10000, currentPriceCents: 12000 },
+      ],
+      dividends: [],
+      portfolioCashflows: [],
+      portfolioSales: [],
+      savingsConfig: [],
+      savingsEntries: [],
+      transfers: [],
+      bankAccounts: [],
+      debts: [],
+    });
+
+    expect(result.netWorthCents).toBe(12000);
+    expect(result.portfolioPnlMonthCents).toBe(2000);
+  });
+
   it('counts only variable income in side income ytd', () => {
     const result = yearlySideIncome([
       { incomeKind: 'variable', amountCents: 20000, date: '2026-01-02' },

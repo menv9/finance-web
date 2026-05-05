@@ -20,7 +20,14 @@ import {
   sanitizeSettingsForSync,
   setActiveUserId,
 } from '../utils/storage';
-import { computeDashboardData, computePortfolioMetrics, isFixedIncomeSchedule } from '../utils/finance';
+import {
+  assignedPortfolioHoldings,
+  assignedPortfolioRecords,
+  computeDashboardData,
+  computePortfolioMetrics,
+  isFixedIncomeSchedule,
+  validPortfolioIds,
+} from '../utils/finance';
 import {
   clearSupabaseBrowserClient,
   createSupabaseBrowserClient,
@@ -126,6 +133,7 @@ const STORE_MODULES = {
   activityLog: 'Settings',
   portfolioSnapshots: 'Investing',
 };
+const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
 let authSubscription = null;
 let autoPushTimer = null;
 
@@ -169,12 +177,15 @@ const SAVINGS_DEFAULT = {
 function buildDerived(state) {
   const fxRates = state.fxRates || {};
   const baseCurrency = state.settings?.baseCurrency || 'EUR';
+  const portfolioHoldings = assignedPortfolioHoldings(state.holdings, state.investmentPortfolios);
+  const portfolioDividends = assignedPortfolioRecords(state.dividends, state.investmentPortfolios);
+  const portfolioCashflows = assignedPortfolioRecords(state.portfolioCashflows, state.investmentPortfolios);
   return {
     dashboard: computeDashboardData({ ...state, fxRates }),
     portfolio: computePortfolioMetrics(
-      state.holdings,
-      state.dividends,
-      state.portfolioCashflows,
+      portfolioHoldings,
+      portfolioDividends,
+      portfolioCashflows,
       state.settings.allocationTargets,
       fxRates,
       baseCurrency,
@@ -265,22 +276,27 @@ async function normalizeInvestmentPortfolioRecords(records, settings) {
   const fallbackPortfolioId = portfolios[0]?.id || null;
   const normalizedHoldings = (records.holdings || []).map((holding) => {
     const patch = {};
-    if (!holding.portfolioId && fallbackPortfolioId) patch.portfolioId = fallbackPortfolioId;
+    if (!Object.prototype.hasOwnProperty.call(holding, 'portfolioId') && fallbackPortfolioId) {
+      patch.portfolioId = fallbackPortfolioId;
+    }
     if (!holding.purchaseDate) patch.purchaseDate = resolveHoldingPurchaseDate(holding, records.portfolioCashflows);
     return Object.keys(patch).length ? { ...holding, ...patch, updatedAt: timestamp } : holding;
   });
   const holdingsById = new Map(normalizedHoldings.map((holding) => [holding.id, holding]));
   const normalizedSales = (records.portfolioSales || []).map((sale) => {
+    const hasPortfolioId = Object.prototype.hasOwnProperty.call(sale, 'portfolioId');
     const portfolioId = sale.portfolioId || holdingsById.get(sale.holdingId)?.portfolioId || fallbackPortfolioId;
-    return portfolioId && !sale.portfolioId ? { ...sale, portfolioId, updatedAt: timestamp } : sale;
+    return portfolioId && !hasPortfolioId ? { ...sale, portfolioId, updatedAt: timestamp } : sale;
   });
   const normalizedCashflows = (records.portfolioCashflows || []).map((cashflow) => {
+    const hasPortfolioId = Object.prototype.hasOwnProperty.call(cashflow, 'portfolioId');
     const portfolioId = cashflow.portfolioId || holdingsById.get(cashflow.holdingId)?.portfolioId || fallbackPortfolioId;
-    return portfolioId && !cashflow.portfolioId ? { ...cashflow, portfolioId, updatedAt: timestamp } : cashflow;
+    return portfolioId && !hasPortfolioId ? { ...cashflow, portfolioId, updatedAt: timestamp } : cashflow;
   });
   const normalizedDividends = (records.dividends || []).map((dividend) => {
+    const hasPortfolioId = Object.prototype.hasOwnProperty.call(dividend, 'portfolioId');
     const portfolioId = dividend.portfolioId || inferPortfolioIdFromTicker(dividend.ticker, normalizedHoldings, fallbackPortfolioId);
-    return portfolioId && !dividend.portfolioId ? { ...dividend, portfolioId, updatedAt: timestamp } : dividend;
+    return portfolioId && !hasPortfolioId ? { ...dividend, portfolioId, updatedAt: timestamp } : dividend;
   });
 
   await Promise.all([
@@ -1362,7 +1378,7 @@ export const useFinanceStore = create((set, get) => ({
     }, 1000);
   },
 
-  saveEntity: async (storeName, entity, { skipAutoCreate = false, skipAccountAdjustment = false } = {}) => {
+  saveEntity: async (storeName, entity, { skipAutoCreate = false, skipAccountAdjustment = false, allowUnassignedPortfolio = false } = {}) => {
     let value = entity;
     const previous = entity.id ? get()[storeName]?.find((item) => item.id === entity.id) : null;
 
@@ -1388,7 +1404,7 @@ export const useFinanceStore = create((set, get) => ({
     if (storeName === 'incomes' && !value.accountingMonth) {
       value = { ...value, accountingMonth: value.date?.slice(0, 7) };
     }
-    if (storeName === 'holdings' && !value.portfolioId) {
+    if (storeName === 'holdings' && !value.portfolioId && !allowUnassignedPortfolio) {
       const fallbackPortfolioId = get().investmentPortfolios?.[0]?.id;
       if (!fallbackPortfolioId) throw new Error('Create a portfolio before adding holdings.');
       value = { ...value, portfolioId: fallbackPortfolioId };
@@ -2128,37 +2144,55 @@ export const useFinanceStore = create((set, get) => ({
     return record;
   },
 
-  recordPortfolioSnapshot: async ({ force = false, source = 'hourly', portfolioId = null } = {}) => {
+  recordPortfolioSnapshot: async ({ force = false, source = 'hourly', portfolioId = null, includeGlobal = false, includeScoped = true } = {}) => {
     const state = get();
     const baseCurrency = state.settings?.baseCurrency || 'EUR';
-    const activeHoldings = (state.holdings || [])
+    const portfolioIds = validPortfolioIds(state.investmentPortfolios || []);
+    const assignedHoldings = (state.holdings || []).filter((holding) => (
+      holding.portfolioId &&
+      portfolioIds.has(holding.portfolioId)
+    ));
+    const assignedDividends = assignedPortfolioRecords(state.dividends || [], state.investmentPortfolios || []);
+    const assignedCashflows = assignedPortfolioRecords(state.portfolioCashflows || [], state.investmentPortfolios || []);
+    const activeHoldings = assignedHoldings
       .filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0).length;
-    const targetPortfolios = portfolioId
-      ? (state.investmentPortfolios || []).filter((portfolio) => portfolio.id === portfolioId)
-      : (state.investmentPortfolios || []);
+    const targetPortfolios = !includeScoped
+      ? []
+      : portfolioId
+        ? (state.investmentPortfolios || []).filter((portfolio) => portfolio.id === portfolioId)
+        : (state.investmentPortfolios || []);
     const snapshotRecords = [];
-    if (!activeHoldings) return null;
+    if (!activeHoldings && !force) return null;
 
     const timestamp = new Date().toISOString();
+    const globalMetrics = computePortfolioMetrics(
+      assignedHoldings,
+      assignedDividends,
+      assignedCashflows,
+      state.settings.allocationTargets,
+      state.fxRates || {},
+      baseCurrency,
+    );
     const globalRecord = ensureEntitySyncFields({
       id: force ? `psn-${timestamp}` : portfolioSnapshotId(timestamp),
       capturedAt: timestamp,
-      valueCents: state.derived?.portfolio?.currentValueCents || 0,
-      costCents: state.derived?.portfolio?.investedCents || 0,
+      valueCents: globalMetrics.currentValueCents,
+      costCents: globalMetrics.investedCents,
       currency: baseCurrency,
       holdingsCount: activeHoldings,
       source,
+      scopeVersion: PORTFOLIO_SNAPSHOT_SCOPE_VERSION,
     }, timestamp);
-    if (!portfolioId) snapshotRecords.push(globalRecord);
+    if (!portfolioId || includeGlobal) snapshotRecords.push(globalRecord);
 
     for (const portfolio of targetPortfolios) {
-      const scopedHoldings = (state.holdings || []).filter((holding) => holding.portfolioId === portfolio.id);
+      const scopedHoldings = assignedHoldings.filter((holding) => holding.portfolioId === portfolio.id);
       const scopedActiveCount = scopedHoldings.filter((holding) => !holding.archivedAt && (holding.quantity || 0) > 0).length;
-      if (!scopedActiveCount) continue;
+      if (!scopedActiveCount && !force) continue;
       const metrics = computePortfolioMetrics(
         scopedHoldings,
-        (state.dividends || []).filter((dividend) => dividend.portfolioId === portfolio.id),
-        (state.portfolioCashflows || []).filter((flow) => flow.portfolioId === portfolio.id),
+        assignedDividends.filter((dividend) => dividend.portfolioId === portfolio.id),
+        assignedCashflows.filter((flow) => flow.portfolioId === portfolio.id),
         state.settings.allocationTargets,
         state.fxRates || {},
         baseCurrency,
@@ -2172,6 +2206,7 @@ export const useFinanceStore = create((set, get) => ({
         currency: baseCurrency,
         holdingsCount: scopedActiveCount,
         source,
+        scopeVersion: PORTFOLIO_SNAPSHOT_SCOPE_VERSION,
       }, timestamp));
     }
     if (!snapshotRecords.length) return null;
@@ -2545,6 +2580,7 @@ export const useFinanceStore = create((set, get) => ({
           initialSetupCompleted: false,
           initialSetupCompletedAt: null,
           categories: DEFAULT_SETTINGS.categories,
+          holdingPlatforms: DEFAULT_SETTINGS.holdingPlatforms,
           setupIntent: {
             buckets: false,
             budgets: false,
@@ -2567,6 +2603,7 @@ export const useFinanceStore = create((set, get) => ({
         expenses: [],
         fixedExpenses: [],
         incomes: [],
+        investmentPortfolios: [],
         holdings: [],
         dividends: [],
         portfolioCashflows: [],

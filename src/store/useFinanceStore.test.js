@@ -773,9 +773,43 @@ describe('investment portfolios', () => {
 
     const snapshots = useFinanceStore.getState().portfolioSnapshots;
     expect(snapshots).toHaveLength(3);
-    expect(snapshots.find((snapshot) => !snapshot.portfolioId)).toMatchObject({ valueCents: 30000, holdingsCount: 2 });
-    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-a')).toMatchObject({ valueCents: 24000, holdingsCount: 1 });
-    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-b')).toMatchObject({ valueCents: 6000, holdingsCount: 1 });
+    expect(snapshots.find((snapshot) => !snapshot.portfolioId)).toMatchObject({ valueCents: 30000, holdingsCount: 2, scopeVersion: 'assigned-only-v1' });
+    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-a')).toMatchObject({ valueCents: 24000, holdingsCount: 1, scopeVersion: 'assigned-only-v1' });
+    expect(snapshots.find((snapshot) => snapshot.portfolioId === 'ipr-b')).toMatchObject({ valueCents: 6000, holdingsCount: 1, scopeVersion: 'assigned-only-v1' });
+  });
+
+  it('excludes unassigned holdings from derived portfolio metrics and snapshots', async () => {
+    await useFinanceStore.getState().saveEntity('investmentPortfolios', { id: 'ipr-main', name: 'Main' });
+    await useFinanceStore.getState().saveEntity('holdings', {
+      id: 'hld-main',
+      portfolioId: 'ipr-main',
+      ticker: 'AAA',
+      quantity: 2,
+      averageBuyPriceCents: 10000,
+      currentPriceCents: 12000,
+      currency: 'EUR',
+    });
+    await useFinanceStore.getState().saveEntity('holdings', {
+      id: 'hld-unassigned',
+      portfolioId: '',
+      ticker: 'BBB',
+      quantity: 10,
+      averageBuyPriceCents: 5000,
+      currentPriceCents: 9000,
+      currency: 'EUR',
+    }, { allowUnassignedPortfolio: true });
+
+    await useFinanceStore.getState().recordPortfolioSnapshot();
+
+    const state = useFinanceStore.getState();
+    expect(state.derived.portfolio.currentValueCents).toBe(24000);
+    expect(state.derived.portfolio.investedCents).toBe(20000);
+    expect(state.portfolioSnapshots.find((snapshot) => !snapshot.portfolioId)).toMatchObject({
+      valueCents: 24000,
+      costCents: 20000,
+      holdingsCount: 1,
+      scopeVersion: 'assigned-only-v1',
+    });
   });
 
   it('backfills legacy holdings into a default portfolio during bootstrap', async () => {
@@ -820,6 +854,37 @@ describe('investment portfolios', () => {
     expect(vi.mocked(putRecord)).toHaveBeenCalledWith('investmentPortfolios', expect.objectContaining({ id: 'ipr-main' }));
     expect(order).toContain('investmentPortfolios');
   });
+
+  it('keeps explicitly unassigned holdings unassigned during bootstrap', async () => {
+    const storeData = {
+      expenses: [],
+      fixedExpenses: [],
+      incomes: [],
+      investmentPortfolios: [{ id: 'ipr-main', name: 'Main Portfolio' }],
+      holdings: [{ id: 'hld-unassigned', portfolioId: '', ticker: 'VWCE', name: 'VWCE', quantity: 1, averageBuyPriceCents: 10000, currentPriceCents: 11000, currency: 'EUR' }],
+      dividends: [],
+      portfolioCashflows: [],
+      portfolioSales: [],
+      savings: [],
+      savingsEntries: [],
+      savingsGoals: [],
+      budgets: [],
+      rollovers: [],
+      transfers: [],
+      bankAccounts: [],
+      debts: [],
+      attachments: [],
+      activityLog: [],
+      portfolioSnapshots: [],
+    };
+    vi.mocked(getAllRecords).mockImplementation(async (storeName) => storeData[storeName] || []);
+
+    await useFinanceStore.getState().bootstrap();
+
+    const state = useFinanceStore.getState();
+    expect(state.holdings[0].portfolioId).toBe('');
+    expect(state.derived.portfolio.currentValueCents).toBe(0);
+  });
 });
 
 describe('portfolio price refresh', () => {
@@ -839,8 +904,10 @@ describe('portfolio price refresh', () => {
   it('updates current price without changing average buy price', async () => {
     useFinanceStore.setState((state) => ({
       ...state,
+      investmentPortfolios: [{ id: 'ipr-main', name: 'Main' }],
       holdings: [{
         id: 'holding-a',
+        portfolioId: 'ipr-main',
         ticker: 'VWCE.DE',
         name: 'Vanguard FTSE All-World',
         quantity: 2,
@@ -861,8 +928,10 @@ describe('portfolio price refresh', () => {
   it('records one floating portfolio value snapshot per hour', async () => {
     useFinanceStore.setState((state) => ({
       ...state,
+      investmentPortfolios: [{ id: 'ipr-main', name: 'Main' }],
       holdings: [{
         id: 'holding-a',
+        portfolioId: 'ipr-main',
         ticker: 'VWCE.DE',
         name: 'Vanguard FTSE All-World',
         quantity: 2,
@@ -882,31 +951,31 @@ describe('portfolio price refresh', () => {
     await useFinanceStore.getState().recordPortfolioSnapshot();
     useFinanceStore.setState((state) => ({
       ...state,
-      derived: {
-        ...state.derived,
-        portfolio: {
-          ...state.derived.portfolio,
-          currentValueCents: 26000,
-        },
-      },
+      holdings: state.holdings.map((holding) => (
+        holding.id === 'holding-a' ? { ...holding, currentPriceCents: 13000 } : holding
+      )),
     }));
     await useFinanceStore.getState().recordPortfolioSnapshot();
 
-    expect(useFinanceStore.getState().portfolioSnapshots).toHaveLength(1);
-    expect(useFinanceStore.getState().portfolioSnapshots[0]).toMatchObject({
+    const snapshots = useFinanceStore.getState().portfolioSnapshots;
+    expect(snapshots).toHaveLength(2);
+    expect(snapshots.find((snapshot) => !snapshot.portfolioId)).toMatchObject({
       id: 'psn-2026-05-01T12',
       valueCents: 26000,
       currency: 'EUR',
       holdingsCount: 1,
       source: 'hourly',
+      scopeVersion: 'assigned-only-v1',
     });
   });
 
   it('can force an event snapshot inside an existing hour', async () => {
     useFinanceStore.setState((state) => ({
       ...state,
+      investmentPortfolios: [{ id: 'ipr-main', name: 'Main' }],
       holdings: [{
         id: 'holding-a',
+        portfolioId: 'ipr-main',
         ticker: 'VWCE.DE',
         name: 'Vanguard FTSE All-World',
         quantity: 2,
@@ -926,10 +995,8 @@ describe('portfolio price refresh', () => {
     await useFinanceStore.getState().recordPortfolioSnapshot();
     await useFinanceStore.getState().recordPortfolioSnapshot({ force: true, source: 'holding_added' });
 
-    expect(useFinanceStore.getState().portfolioSnapshots).toHaveLength(2);
-    expect(useFinanceStore.getState().portfolioSnapshots.map((snapshot) => snapshot.source)).toEqual([
-      'holding_added',
-      'hourly',
-    ]);
+    expect(useFinanceStore.getState().portfolioSnapshots).toHaveLength(4);
+    expect(useFinanceStore.getState().portfolioSnapshots.filter((snapshot) => snapshot.source === 'holding_added')).toHaveLength(2);
+    expect(useFinanceStore.getState().portfolioSnapshots.filter((snapshot) => snapshot.source === 'hourly')).toHaveLength(2);
   });
 });
