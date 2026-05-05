@@ -878,7 +878,7 @@ export default function SavingsPage() {
                       onClick={() => openWithdraw(goal.id)}
                       disabled={goal.savedCents <= 0}
                     >
-                      {t('savings.bucketsCard.withdraw')}
+                      {t('savings.bucketsCard.release')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -1220,7 +1220,7 @@ export default function SavingsPage() {
           showBucketSource={Boolean(modal.goalId && !modal.withdraw && !editingEntry)}
           unallocatedSavingsCents={unallocatedSavingsCents}
           bankAccounts={modal.withdraw ? [] : bankAccounts}
-          submitLabel={modal.withdraw ? t('savings.withdrawalModal.withdraw') : undefined}
+          submitLabel={modal.withdraw ? t('savings.entryModal.release') : undefined}
           onSubmit={async (value) => {
             try {
               if (modal.withdraw && Math.abs(value.amountCents) > (goalBalances[modal.goalId] || 0)) {
@@ -1247,7 +1247,7 @@ export default function SavingsPage() {
               await saveSavingsEntry({
                 ...entryValue,
                 amountCents: modal.withdraw ? -Math.abs(value.amountCents) : value.amountCents,
-                source: bucketSource === 'savings' ? 'allocation' : undefined,
+                source: modal.withdraw || bucketSource === 'savings' ? 'allocation' : undefined,
                 note: value.note || (
                   modal.withdraw
                     ? t('savings.entryModal.noteWithdrawal')

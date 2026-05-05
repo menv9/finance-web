@@ -59,7 +59,9 @@ function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 1000
     dividends: [],
     portfolioCashflows: [],
     portfolioSales: [],
+    savingsConfig: { id: 'savings-config', currentBalanceCents: 0, monthlyOverrideCents: 0, annualReturnRate: 0, goalCents: 0, projectionYears: 30 },
     savingsEntries: [],
+    savingsGoals: [],
     transfers: [],
     bankAccounts: accounts,
     attachments: [],
@@ -180,6 +182,110 @@ describe('account-backed transaction saves', () => {
       balanceCents: 12345,
       isMain: true,
     });
+  });
+
+  it('releases goal savings back to unallocated savings without changing total savings or bank balance', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [
+        { id: 'sav-goal', date: '2026-05-01', amountCents: 5000, goalId: 'goal-a', source: undefined },
+      ],
+    }));
+
+    await useFinanceStore.getState().saveSavingsEntry({
+      date: '2026-05-02',
+      amountCents: -2000,
+      goalId: 'goal-a',
+      source: 'allocation',
+      note: 'Released from bucket',
+    });
+
+    const entries = useFinanceStore.getState().savingsEntries;
+    const totalSavings = entries
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, entry) => sum + entry.amountCents, 0);
+    const goalBalance = entries
+      .filter((entry) => entry.goalId === 'goal-a')
+      .reduce((sum, entry) => sum + entry.amountCents, 0);
+
+    expect(totalSavings).toBe(5000);
+    expect(goalBalance).toBe(3000);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(10000);
+  });
+
+  it('keeps savings withdrawal to bank as a real transfer', async () => {
+    useFinanceStore.setState((state) => ({
+      ...state,
+      savingsEntries: [{ id: 'sav-a', date: '2026-05-01', amountCents: 5000 }],
+    }));
+
+    await useFinanceStore.getState().executeTransfer({
+      date: '2026-05-02',
+      amountCents: 2000,
+      fromModule: 'savings',
+      toModule: 'cashflow',
+      bankAccountId: 'bank-a',
+      description: 'Withdrawal',
+    });
+
+    const totalSavings = useFinanceStore.getState().savingsEntries
+      .filter((entry) => entry.source !== 'allocation')
+      .reduce((sum, entry) => sum + entry.amountCents, 0);
+
+    expect(totalSavings).toBe(3000);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(12000);
+  });
+
+  it('does not adjust bank balance when creating a fixed income schedule', async () => {
+    await useFinanceStore.getState().saveEntity('incomes', {
+      date: '2026-05-01',
+      accountingMonth: '2026-05',
+      amountCents: 300000,
+      currency: 'EUR',
+      incomeKind: 'fixed',
+      isRecurringSchedule: true,
+      source: 'Salary',
+      bankAccountId: 'bank-a',
+      payDay: 5,
+    });
+
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(10000);
+  });
+
+  it('marks fixed income received once for the month', async () => {
+    const schedule = await useFinanceStore.getState().saveEntity('incomes', {
+      date: '2026-05-01',
+      accountingMonth: '2026-05',
+      amountCents: 300000,
+      currency: 'EUR',
+      incomeKind: 'fixed',
+      isRecurringSchedule: true,
+      source: 'Salary',
+      bankAccountId: 'bank-a',
+      payDay: 5,
+    });
+
+    const first = await useFinanceStore.getState().markFixedIncomeReceived(schedule.id, '2026-05');
+    const second = await useFinanceStore.getState().markFixedIncomeReceived(schedule.id, '2026-05');
+
+    expect(first.id).toBe(second.id);
+    expect(useFinanceStore.getState().incomes.filter((income) => income.incomeKind === 'fixed_payment')).toHaveLength(1);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(310000);
+  });
+
+  it('keeps legacy fixed income counted as a received entry', async () => {
+    await useFinanceStore.getState().saveEntity('incomes', {
+      date: '2026-05-01',
+      accountingMonth: '2026-05',
+      amountCents: 100000,
+      currency: 'EUR',
+      incomeKind: 'fixed',
+      source: 'Legacy salary',
+      bankAccountId: 'bank-a',
+    });
+
+    expect(useFinanceStore.getState().derived.dashboard.totalIncomeCents).toBe(100000);
+    expect(useFinanceStore.getState().bankAccounts[0].balanceCents).toBe(110000);
   });
 });
 

@@ -194,4 +194,54 @@ describe('finance metrics', () => {
       vi.useRealTimers();
     }
   });
+
+  it('excludes fixed income schedules but counts fixed payments and legacy fixed income', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-05T12:00:00'));
+
+    try {
+      const result = computeDashboardData({
+        expenses: [],
+        incomes: [
+          {
+            id: 'schedule',
+            amountCents: 300000,
+            date: '2026-05-01',
+            accountingMonth: '2026-05',
+            incomeKind: 'fixed',
+            isRecurringSchedule: true,
+          },
+          {
+            id: 'payment',
+            amountCents: 300000,
+            date: '2026-05-05',
+            accountingMonth: '2026-05',
+            incomeKind: 'fixed_payment',
+            fixedIncomeId: 'schedule',
+          },
+          {
+            id: 'legacy-fixed',
+            amountCents: 100000,
+            date: '2026-05-02',
+            accountingMonth: '2026-05',
+            incomeKind: 'fixed',
+          },
+        ],
+        fixedExpenses: [],
+        holdings: [],
+        dividends: [],
+        portfolioCashflows: [],
+        portfolioSales: [],
+        savingsConfig: [],
+        savingsEntries: [],
+        transfers: [],
+        bankAccounts: [{ id: 'bank-main', balanceCents: 400000 }],
+      });
+
+      expect(result.totalIncomeCents).toBe(400000);
+      expect(result.incomeSeries.at(-1).amountCents).toBe(400000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

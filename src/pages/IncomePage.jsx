@@ -20,7 +20,7 @@ import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
 import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { computeIncomeSeries } from '../utils/finance';
+import { computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
@@ -66,6 +66,12 @@ function incomeReportMonth(row) {
   return row.accountingMonth || row.date?.slice(0, 7);
 }
 
+function fixedIncomeDueDate(schedule, month) {
+  const day = Math.min(Math.max(Number(schedule.payDay || 1), 1), 31);
+  const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+  return `${month}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
@@ -101,12 +107,14 @@ function IncomeLedgerList({
   onToggleRow,
   openEdit,
   onDeleteIncome,
+  onMarkReceived,
   t,
 }) {
   return (
     <ul className="overflow-hidden rounded-lg border border-rule bg-surface divide-y divide-rule">
       {rows.map((row) => {
-        const isEditable = row.ledgerType === 'income';
+        const isEditable = row.ledgerType === 'income' || row.ledgerType === 'fixed-schedule';
+        const isPending = row.ledgerType === 'fixed-pending';
         const isPortfolioSaleLoss = row.incomeKind === 'portfolio_sale' && (row.realizedPnlCents || 0) < 0;
         const displayAmountCents = isPortfolioSaleLoss ? row.realizedPnlCents : row.amountCents;
         const amountClass = row.incomeKind === 'portfolio_sale'
@@ -158,7 +166,17 @@ function IncomeLedgerList({
                   <p className="min-w-0 truncate eyebrow">
                     {row.incomeKind || 'income'} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(row.date))}
                   </p>
-                  {isEditable ? (
+                  {isPending ? (
+                    <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                      <button
+                        type="button"
+                        className="rounded-md border border-accent/40 bg-accent-soft px-2.5 py-1.5 text-xs font-medium text-accent hover:border-accent"
+                        onClick={() => onMarkReceived?.(row.fixedIncomeId)}
+                      >
+                        {t('income.markReceived')}
+                      </button>
+                    </div>
+                  ) : isEditable ? (
                     <div className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
                       <button
                         type="button"
@@ -180,7 +198,7 @@ function IncomeLedgerList({
                       </button>
                     </div>
                   ) : (
-                    <span className="shrink-0 text-xs text-ink-faint">{t('income.viaPortfolio')}</span>
+                    <span className="shrink-0 text-xs text-ink-faint">{row.ledgerType === 'portfolio-sale-cashflow' ? t('income.viaPortfolio') : ''}</span>
                   )}
                 </div>
               </div>
@@ -200,6 +218,7 @@ export default function IncomePage() {
   const settings = useFinanceStore((state) => state.settings);
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
+  const markFixedIncomeReceived = useFinanceStore((state) => state.markFixedIncomeReceived);
   const confirm = useConfirm();
   const [modal, setModal] = useState({ open: false, id: null });
   const [incomePage, setIncomePage] = useState(1);
@@ -294,7 +313,7 @@ export default function IncomePage() {
 
   const incomeLedgerRows = useMemo(
     () => [
-      ...incomes.map((income) => ({ ...income, ledgerType: 'income' })),
+      ...incomes.filter(isReceivedIncome).map((income) => ({ ...income, ledgerType: 'income' })),
       ...(portfolioSales || [])
         .map((sale) => ({
           id: `portfolio-sale-cashflow-${sale.id}`,
@@ -311,12 +330,43 @@ export default function IncomePage() {
     [currency, incomes, portfolioSales],
   );
 
+  const fixedSchedules = useMemo(
+    () =>
+      incomes
+        .filter(isFixedIncomeSchedule)
+        .sort((a, b) => Number(a.payDay || 1) - Number(b.payDay || 1))
+        .map((income) => ({ ...income, ledgerType: 'fixed-schedule' })),
+    [incomes],
+  );
+
+  const pendingFixedRows = useMemo(() => {
+    const today = normalizeDateInput(new Date());
+    const currentMonth = today.slice(0, 7);
+    if (selectedMonth !== currentMonth) return [];
+    return fixedSchedules
+      .filter((schedule) => fixedIncomeDueDate(schedule, selectedMonth) <= today)
+      .filter((schedule) => !incomeLedgerRows.some((row) =>
+        row.incomeKind === 'fixed_payment' &&
+        row.fixedIncomeId === schedule.id &&
+        incomeReportMonth(row) === selectedMonth
+      ))
+      .map((schedule) => ({
+        ...schedule,
+        id: `pending-${schedule.id}-${selectedMonth}`,
+        fixedIncomeId: schedule.id,
+        date: fixedIncomeDueDate(schedule, selectedMonth),
+        accountingMonth: selectedMonth,
+        incomeKind: 'fixed_pending',
+        ledgerType: 'fixed-pending',
+      }));
+  }, [fixedSchedules, incomeLedgerRows, selectedMonth]);
+
   const filteredIncomeRows = useMemo(
     () =>
       incomeLedgerRows.filter(
         (row) =>
           incomeReportMonth(row) === selectedMonth &&
-          row.incomeKind !== 'fixed' &&
+          !isFixedIncomeSchedule(row) &&
           (filterKind === 'all' || row.incomeKind === filterKind) &&
           (!sourceSearch || (row.source || '').toLowerCase().includes(sourceSearch.toLowerCase())),
       ),
@@ -367,11 +417,10 @@ export default function IncomePage() {
   const topSource = sourceBreakdown.slice().sort((a, b) => b.value - a.value)[0];
   const fixedIncomeRows = useMemo(
     () =>
-      incomes
-        .filter((income) => income.incomeKind === 'fixed')
+      fixedSchedules
         .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .map((income) => ({ ...income, ledgerType: 'income' })),
-    [incomes],
+        .map((income) => ({ ...income, ledgerType: 'fixed-schedule' })),
+    [fixedSchedules],
   );
 
   return (
@@ -530,6 +579,7 @@ export default function IncomePage() {
             <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
               <option value="all">{t('income.ledgerCard.allKinds')}</option>
               <option value="variable">{t('income.ledgerCard.kindVariable')}</option>
+              <option value="fixed_payment">{t('income.ledgerCard.kindFixedPayment')}</option>
               <option value="dividend">{t('income.ledgerCard.kindDividend')}</option>
               <option value="portfolio_sale">{t('income.ledgerCard.kindPortfolioSale')}</option>
               <option value="portfolio_sale_cashflow">{t('income.ledgerCard.kindPortfolioSaleCashflow')}</option>
@@ -561,6 +611,7 @@ export default function IncomePage() {
               selectedIds={batchSelect.selectedIds}
               onToggleRow={batchSelect.toggle}
               openEdit={openEdit}
+              onMarkReceived={(fixedIncomeId) => markFixedIncomeReceived(fixedIncomeId, selectedMonth)}
               onDeleteIncome={async (id) => {
                 if (await confirm({ title: t('income.confirmDeleteOne.title'), description: t('income.confirmDeleteOne.description') }))
                   removeEntity('incomes', id);
@@ -602,14 +653,15 @@ export default function IncomePage() {
         }
         className={'lg:col-span-4 ' + rise(6)}
       >
-        {fixedIncomeRows.length ? (
+        {fixedIncomeRows.length || pendingFixedRows.length ? (
           <IncomeLedgerList
-            rows={fixedIncomeRows.slice(0, PAGE_SIZE)}
+            rows={[...pendingFixedRows, ...fixedIncomeRows].slice(0, PAGE_SIZE)}
             currency={currency}
             locale={locale}
             selectable={false}
             selectedIds={new Set()}
             openEdit={openEdit}
+            onMarkReceived={(fixedIncomeId) => markFixedIncomeReceived(fixedIncomeId, selectedMonth)}
             onDeleteIncome={async (id) => {
               if (await confirm({ title: t('income.confirmDeleteFixed.title'), description: t('income.confirmDeleteFixed.description') }))
                 removeEntity('incomes', id);

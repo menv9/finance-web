@@ -20,7 +20,7 @@ import {
   sanitizeSettingsForSync,
   setActiveUserId,
 } from '../utils/storage';
-import { computeDashboardData, computePortfolioMetrics } from '../utils/finance';
+import { computeDashboardData, computePortfolioMetrics, isFixedIncomeSchedule } from '../utils/finance';
 import {
   clearSupabaseBrowserClient,
   createSupabaseBrowserClient,
@@ -258,6 +258,7 @@ function accountDeltaForRecord(storeName, record) {
     return { accountId: record.bankAccountId, deltaCents: -Math.abs(record.amountCents || 0) };
   }
   if (storeName === 'incomes') {
+    if (isFixedIncomeSchedule(record)) return null;
     return { accountId: record.bankAccountId, deltaCents: record.amountCents || 0 };
   }
   return null;
@@ -2075,6 +2076,34 @@ export const useFinanceStore = create((set, get) => ({
     ));
     get().triggerAutoPush();
     return trf;
+  },
+
+  markFixedIncomeReceived: async (fixedIncomeId, accountingMonth) => {
+    const schedule = get().incomes.find((income) => income.id === fixedIncomeId && isFixedIncomeSchedule(income));
+    if (!schedule) throw new Error('Fixed income schedule not found.');
+    const month = accountingMonth || new Date().toISOString().slice(0, 7);
+    const existing = get().incomes.find((income) =>
+      income.incomeKind === 'fixed_payment' &&
+      income.fixedIncomeId === fixedIncomeId &&
+      income.accountingMonth === month
+    );
+    if (existing) return existing;
+
+    const day = Math.min(Math.max(Number(schedule.payDay || 1), 1), 31);
+    const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+    const date = `${month}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+    return get().saveEntity('incomes', {
+      date,
+      accountingMonth: month,
+      amountCents: schedule.amountCents,
+      currency: schedule.currency || get().settings.baseCurrency,
+      bankAccountId: schedule.bankAccountId || null,
+      incomeKind: 'fixed_payment',
+      fixedIncomeId,
+      source: schedule.source || 'Fixed income',
+      frequency: schedule.frequency || 'monthly',
+      payDay: schedule.payDay || 1,
+    });
   },
 
   removeTransfer: async (id) => {

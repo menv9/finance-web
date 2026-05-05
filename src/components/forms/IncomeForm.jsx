@@ -106,6 +106,9 @@ export function IncomeForm({ bankAccounts = [], initialValue, onSubmit, onCancel
           bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : '',
           amountCents: Math.round(Number(form.amountCents || 0) * 100),
           payDay: Number(form.payDay),
+          isRecurringSchedule: form.incomeKind === 'fixed'
+            ? (initialValue?.incomeKind === 'fixed' ? initialValue.isRecurringSchedule === true : true)
+            : false,
         });
       }}
     >

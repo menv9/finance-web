@@ -5,6 +5,14 @@ function sumAmount(items) {
   return items.reduce((total, item) => total + (item.amountCents || 0), 0);
 }
 
+export function isFixedIncomeSchedule(income) {
+  return income?.incomeKind === 'fixed' && income.isRecurringSchedule === true;
+}
+
+export function isReceivedIncome(income) {
+  return !isFixedIncomeSchedule(income);
+}
+
 export function computeExpenseSeries(expenses) {
   return lastTwelveMonths().map((month) => ({
     month: month.label,
@@ -15,7 +23,7 @@ export function computeExpenseSeries(expenses) {
 export function computeIncomeSeries(incomes) {
   return lastTwelveMonths().map((month) => ({
     month: month.label,
-    amountCents: sumAmount(incomes.filter((income) => (income.accountingMonth || monthKey(income.date)) === month.key)),
+    amountCents: sumAmount(incomes.filter((income) => isReceivedIncome(income) && (income.accountingMonth || monthKey(income.date)) === month.key)),
   }));
 }
 
@@ -188,7 +196,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, holding
   const availableBalanceCents = bankBalanceCents;
 
   const currentMonthExpenses = expenses.filter((item) => monthKey(item.date) === currentMonth && item.date <= today);
-  const currentMonthIncomes  = incomes.filter((item)  => (item.accountingMonth || monthKey(item.date)) === currentMonth && item.date <= today);
+  const currentMonthIncomes  = incomes.filter((item)  => isReceivedIncome(item) && (item.accountingMonth || monthKey(item.date)) === currentMonth && item.date <= today);
   // Exclude portfolio_sale (already counted via saleCashflowCents) and transfer
   // incomes (savings withdrawals) — those affect balance but not the monthly
   // cashflow metric, which should reflect only real earned income vs spending.
