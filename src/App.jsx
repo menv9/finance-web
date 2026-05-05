@@ -57,7 +57,7 @@ export default function App() {
   const hydrated = useFinanceStore((state) => state.hydrated);
   const portfolioEnabled = useFinanceStore((state) => state.settings.modules?.portfolio !== false);
   const socialEnabled = useFinanceStore((state) => state.settings.modules?.social !== false);
-  const coingameEnabled = useFinanceStore((state) => state.settings.modules?.coingame === true);
+  const coingameEnabled = useFinanceStore((state) => state.settings.modules?.coingame !== false);
   const tourActive = useFinanceStore((state) => state.tourActive);
 
   useEffect(() => {

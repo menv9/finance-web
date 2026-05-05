@@ -717,7 +717,7 @@ export function AppShell({ children }) {
                       </NavLink>
                     </>
                   )}
-                  {settings.modules?.coingame === true && (
+                  {settings.modules?.coingame !== false && (
                     <NavLink
                       to="/coingame"
                       role="menuitem"

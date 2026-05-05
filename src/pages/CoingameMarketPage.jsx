@@ -13,6 +13,7 @@ function FC({ amount, decimals = 4 }) {
 
 function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
   const profile = coin.profiles;
+  const coinName = coin.coin_name || profile?.username || 'Unnamed coin';
   const price = spotPrice(coin.tokens_minted, coin.base_price);
   const marketCap = price * coin.tokens_minted;
   const owned = ownHolding?.tokens_held ?? 0;
@@ -29,9 +30,9 @@ function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
       </div>
 
       <div className="cg-coin-card-body">
-        <div className="cg-coin-card-name">@{profile?.username ?? '…'}</div>
+        <div className="cg-coin-card-name">{coinName}</div>
         <div className="cg-coin-card-handle" style={{ fontFamily: 'var(--cg-font-mono)' }}>
-          {Number(coin.tokens_minted).toLocaleString()} minted
+          @{profile?.username ?? '...'} · {Number(coin.tokens_minted).toLocaleString()} minted
         </div>
         {owned > 0 && (
           <div style={{ fontSize: '0.75rem', color: 'var(--cg-accent)', fontFamily: 'var(--cg-font-mono)' }}>
@@ -101,7 +102,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
       <div className="cg-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cg-modal-header">
           <span className="cg-modal-title">
-            {mode === 'buy' ? 'Buy' : 'Sell'} @{coin.profiles?.username}
+            {mode === 'buy' ? 'Buy' : 'Sell'} {coin.coin_name || `@${coin.profiles?.username}`}
           </span>
           <button className="cg-modal-close" onClick={onClose}>×</button>
         </div>
@@ -220,7 +221,7 @@ export default function CoingameMarketPage() {
             className="cg-search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by username…"
+            placeholder="Search coin or username..."
           />
         </div>
       </div>

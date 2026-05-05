@@ -594,7 +594,7 @@ export default function SettingsPage() {
               />
               <Toggle
                 id="module-coingame"
-                checked={settings.modules?.coingame === true}
+                checked={settings.modules?.coingame !== false}
                 onChange={(checked) =>
                   updateSettings({
                     modules: {

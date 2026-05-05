@@ -12,11 +12,69 @@ async function rpc(fn, args = {}) {
   return data;
 }
 
+function withProfile(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    profiles: {
+      username: row.username,
+      display_name: row.display_name,
+      avatar_url: row.avatar_url,
+    },
+  };
+}
+
+function holdingFromView(row) {
+  return {
+    holder_user_id: row.holder_user_id,
+    coin_id: row.coin_id,
+    tokens_held: row.tokens_held,
+    avg_buy_price: row.avg_buy_price,
+    first_bought_at: row.first_bought_at,
+    last_buy_at: row.last_buy_at,
+    updated_at: row.updated_at,
+    coingame_coins: {
+      coin_id: row.coin_id,
+      owner_user_id: row.owner_user_id,
+      coin_name: row.coin_name,
+      base_price: row.base_price,
+      tokens_minted: row.tokens_minted,
+      status: row.status,
+      created_at: row.coin_created_at,
+      profiles: {
+        username: row.username,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url,
+      },
+    },
+  };
+}
+
+function transactionFromView(row) {
+  return {
+    ...row,
+    coingame_coins: row.coin_id ? {
+      owner_user_id: row.coin_owner_user_id,
+      coin_name: row.coin_name,
+      profiles: {
+        username: row.username,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url,
+      },
+    } : null,
+  };
+}
+
 // ── Initialization ────────────────────────────────────────────────────────────
 
-/** Creates wallet + personal coin if they don't exist. Safe to call on every mount. */
+/** Creates wallet if it doesn't exist. Coin creation is confirmed separately. */
 export async function ensureWallet() {
   const rows = await rpc('cg_ensure_wallet');
+  return rows?.[0] ?? null;
+}
+
+export async function createCoin(coinName) {
+  const rows = await rpc('cg_create_coin', { p_coin_name: coinName });
   return rows?.[0] ?? null;
 }
 
@@ -36,57 +94,59 @@ export async function fetchWallet(userId) {
 
 export async function fetchCoinByOwner(ownerUserId) {
   const { data, error } = await client()
-    .from('coingame_coins')
+    .from('coingame_market_coins')
     .select('*')
     .eq('owner_user_id', ownerUserId)
     .maybeSingle();
   if (error) throw error;
-  return data;
+  return withProfile(data);
 }
 
 export async function fetchCoinById(coinId) {
   const { data, error } = await client()
-    .from('coingame_coins')
-    .select('*, profiles(username, display_name, avatar_url)')
+    .from('coingame_market_coins')
+    .select('*')
     .eq('coin_id', coinId)
     .maybeSingle();
   if (error) throw error;
-  return data;
+  return withProfile(data);
 }
 
 /** Trending: coins with most tokens_minted, joined with owner profile. */
 export async function fetchTrending(limit = 20) {
   const { data, error } = await client()
-    .from('coingame_coins')
-    .select('*, profiles(username, display_name, avatar_url)')
+    .from('coingame_market_coins')
+    .select('*')
     .order('tokens_minted', { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(withProfile);
 }
 
 /** Search coins by owner username. */
 export async function searchCoins(query, limit = 20) {
+  const safeQuery = String(query || '').replace(/[%,()]/g, ' ').trim();
+  if (!safeQuery) return [];
   const { data, error } = await client()
-    .from('coingame_coins')
-    .select('*, profiles!inner(username, display_name, avatar_url)')
-    .ilike('profiles.username', `%${query}%`)
+    .from('coingame_market_coins')
+    .select('*')
+    .or(`username.ilike.%${safeQuery}%,coin_name.ilike.%${safeQuery}%`)
     .limit(limit);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(withProfile);
 }
 
 // ── Holdings ──────────────────────────────────────────────────────────────────
 
 export async function fetchHoldings(userId) {
   const { data, error } = await client()
-    .from('coingame_holdings')
-    .select('*, coingame_coins(*, profiles(username, display_name, avatar_url))')
+    .from('coingame_holdings_view')
+    .select('*')
     .eq('holder_user_id', userId)
     .gt('tokens_held', 0)
     .order('updated_at', { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(holdingFromView);
 }
 
 // ── Trading (via SECURITY DEFINER RPCs) ──────────────────────────────────────
@@ -118,14 +178,14 @@ export async function claimDaily() {
 
 export async function fetchTransactions(userId, { limit = 50, offset = 0 } = {}) {
   const { data, error } = await client()
-    .from('coingame_transactions')
-    .select('*, coingame_coins(owner_user_id, profiles(username, display_name, avatar_url))')
+    .from('coingame_transactions_view')
+    .select('*')
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
     .in('tx_type', ['buy', 'sell', 'reward', 'starter_grant'])
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(transactionFromView);
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -38,6 +38,7 @@ function StatRow({ wallet, ownCoin }) {
         {ownCoin && (
           <div className="cg-stat-sub">
             <span className={`cg-badge cg-badge-${ownCoin.status}`}>{ownCoin.status}</span>
+            <span style={{ marginLeft: '0.4rem' }}>{ownCoin.coin_name || 'Your coin'}</span>
             <span style={{ marginLeft: '0.4rem' }}>{Number(ownCoin.tokens_minted).toLocaleString()} minted</span>
           </div>
         )}
@@ -171,6 +172,7 @@ function HoldingsCard({ holdings }) {
         holdings.slice(0, 6).map((h) => {
           const coin = h.coingame_coins;
           const profile = coin?.profiles;
+          const coinName = coin?.coin_name || profile?.username || 'Unnamed coin';
           const price = spotPrice(coin?.tokens_minted ?? 0, coin?.base_price ?? 1);
           const value = price * h.tokens_held;
           const pnl = value - h.avg_buy_price * h.tokens_held;
@@ -181,10 +183,10 @@ function HoldingsCard({ holdings }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  @{profile?.username ?? '…'}
+                  {coinName}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>
-                  {Number(h.tokens_held).toLocaleString()} tokens
+                  @{profile?.username ?? '...'} · {Number(h.tokens_held).toLocaleString()} tokens
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -225,7 +227,6 @@ function EconomyStrip({ economy }) {
 }
 
 export default function CoingamePage() {
-  const loadCoingame = useFinanceStore((s) => s.loadCoingame);
   const coingameClaimDaily = useFinanceStore((s) => s.coingameClaimDaily);
   const wallet = useFinanceStore((s) => s.coingameWallet);
   const ownCoin = useFinanceStore((s) => s.coingameOwnCoin);
@@ -233,8 +234,6 @@ export default function CoingamePage() {
   const economy = useFinanceStore((s) => s.coingameEconomy);
   const status = useFinanceStore((s) => s.coingameStatus);
   const error = useFinanceStore((s) => s.coingameError);
-
-  useEffect(() => { loadCoingame(); }, [loadCoingame]);
 
   const loading = status === 'loading' && !wallet;
 

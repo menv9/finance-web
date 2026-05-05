@@ -87,6 +87,7 @@ import {
 import {
   buyCoin as apiBuyCoin,
   claimDaily as apiClaimDaily,
+  createCoin as apiCreateCoin,
   ensureWallet,
   fetchCoinByOwner,
   fetchEconomy,
@@ -757,6 +758,7 @@ export const useFinanceStore = create((set, get) => ({
   coingameEconomy: null,
   coingameStatus: 'idle',
   coingameError: '',
+  coingameNeedsCoinSetup: false,
   syncMeta: {
     lastPulledAt: {},
     deletedRecords: {},
@@ -3643,6 +3645,9 @@ export const useFinanceStore = create((set, get) => ({
     if (!user) return;
     set({ coingameStatus: 'loading', coingameError: '' });
     try {
+      if (!get().profile) {
+        await get().loadProfile();
+      }
       const init = await ensureWallet();
       const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
         init ? { user_id: init.user_id, fc_balance: init.fc_balance } : null,
@@ -3662,9 +3667,42 @@ export const useFinanceStore = create((set, get) => ({
         coingameLeaderboard: leaderboard,
         coingameEconomy: economy,
         coingameStatus: 'idle',
+        coingameNeedsCoinSetup: !ownCoin,
       });
     } catch (err) {
       set({ coingameStatus: 'error', coingameError: err.message || 'Failed to load Coingame' });
+    }
+  },
+
+  coingameCreateCoin: async (coinName) => {
+    const user = get().supabaseUser;
+    if (!user) return null;
+    set({ coingameStatus: 'loading', coingameError: '' });
+    try {
+      const ownCoin = await apiCreateCoin(coinName);
+      const [wallet, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
+        ensureWallet(),
+        apiFetchHoldings(user.id),
+        apiFetchTransactions(user.id),
+        fetchTrending(),
+        fetchWeeklyLeaderboard(get().coingameLeaderboardMetric),
+        fetchEconomy(),
+      ]);
+      set({
+        coingameWallet: wallet ? { user_id: wallet.user_id, fc_balance: wallet.fc_balance } : get().coingameWallet,
+        coingameOwnCoin: ownCoin,
+        coingameHoldings: holdings,
+        coingameTransactions: transactions,
+        coingameTrending: trending,
+        coingameLeaderboard: leaderboard,
+        coingameEconomy: economy,
+        coingameStatus: 'idle',
+        coingameNeedsCoinSetup: false,
+      });
+      return ownCoin;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message || 'Failed to create coin' });
+      throw err;
     }
   },
 

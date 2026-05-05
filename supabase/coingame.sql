@@ -73,12 +73,22 @@ create trigger coingame_wallets_set_updated_at
 create table if not exists public.coingame_coins (
   coin_id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null unique references auth.users(id) on delete cascade,
+  coin_name text,
   base_price numeric not null default 1,
   tokens_minted numeric not null default 0 check (tokens_minted >= 0),
   status text not null default 'starter' check (status in ('starter', 'active', 'strong')),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.coingame_coins
+  add column if not exists coin_name text;
+
+alter table public.coingame_coins
+  drop constraint if exists coingame_coin_name_length;
+alter table public.coingame_coins
+  add constraint coingame_coin_name_length
+  check (coin_name is null or length(trim(coin_name)) between 2 and 32);
 
 create index if not exists coingame_coins_owner_idx on public.coingame_coins (owner_user_id);
 create index if not exists coingame_coins_status_idx on public.coingame_coins (status);
@@ -219,7 +229,7 @@ end;
 $$;
 
 -- ── lazy wallet/coin initialization ──────────────────────────────────────────
--- Called by clients on first Coingame access. Creates wallet (10k FC) and coin.
+-- Called by clients on first Coingame access. Creates wallet (10k FC) only.
 -- Idempotent — safe to call repeatedly.
 create or replace function public.cg_ensure_wallet()
 returns table (
@@ -248,10 +258,6 @@ begin
     on conflict (user_id) do nothing;
   if found then granted := true; end if;
 
-  -- Coin (1 per user). gen_random_uuid handled by default.
-  insert into public.coingame_coins (owner_user_id) values (uid)
-    on conflict (owner_user_id) do nothing;
-
   if granted then
     insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
       values ('starter_grant', uid, public.cg_const_starter_fc(),
@@ -261,7 +267,7 @@ begin
   select w.fc_balance, c.coin_id, c.status, c.tokens_minted
     into v_balance, v_coin_id, v_status, v_tokens
     from public.coingame_wallets w
-    join public.coingame_coins c on c.owner_user_id = w.user_id
+    left join public.coingame_coins c on c.owner_user_id = w.user_id
     where w.user_id = uid;
 
   return query select uid, v_balance, v_coin_id, v_status, v_tokens;
@@ -269,6 +275,63 @@ end;
 $$;
 
 grant execute on function public.cg_ensure_wallet() to authenticated;
+
+-- Creates the caller's personal coin after they confirm the setup modal.
+create or replace function public.cg_create_coin(p_coin_name text)
+returns table (
+  coin_id uuid,
+  owner_user_id uuid,
+  coin_name text,
+  base_price numeric,
+  tokens_minted numeric,
+  status text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  clean_name text := nullif(trim(p_coin_name), '');
+  created_coin public.coingame_coins%rowtype;
+  granted boolean := false;
+begin
+  if uid is null then
+    raise exception 'not authenticated';
+  end if;
+  if clean_name is null or length(clean_name) < 2 or length(clean_name) > 32 then
+    raise exception 'coin name must be 2-32 characters';
+  end if;
+
+  insert into public.coingame_wallets (user_id, fc_balance)
+    values (uid, public.cg_const_starter_fc())
+    on conflict (user_id) do nothing;
+  if found then granted := true; end if;
+
+  if granted then
+    insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
+      values ('starter_grant', uid, public.cg_const_starter_fc(),
+              jsonb_build_object('reason', 'initial_signup'));
+  end if;
+
+  insert into public.coingame_coins (owner_user_id, coin_name)
+    values (uid, clean_name)
+    on conflict (owner_user_id) do update
+      set coin_name = excluded.coin_name
+    returning * into created_coin;
+
+  return query
+    select created_coin.coin_id,
+           created_coin.owner_user_id,
+           created_coin.coin_name,
+           created_coin.base_price,
+           created_coin.tokens_minted,
+           created_coin.status,
+           created_coin.created_at,
+           created_coin.updated_at;
+end;
+$$;
+
+grant execute on function public.cg_create_coin(text) to authenticated;
 
 -- ── status promotion ────────────────────────────────────────────────────────
 -- A coin becomes "strong" once its market cap (tokens_minted * spot_price) crosses 75k FC.
@@ -594,8 +657,75 @@ $$;
 
 grant execute on function public.cg_claim_daily() to authenticated;
 
+-- ── MARKET / PORTFOLIO READ VIEWS ────────────────────────────────────────────
+create or replace view public.coingame_market_coins
+with (security_invoker = true) as
+  select c.coin_id,
+         c.owner_user_id,
+         coalesce(nullif(trim(c.coin_name), ''), p.username, 'Unnamed coin') as coin_name,
+         c.base_price,
+         c.tokens_minted,
+         c.status,
+         c.created_at,
+         c.updated_at,
+         p.username,
+         p.display_name,
+         p.avatar_url
+    from public.coingame_coins c
+    left join public.profiles p on p.user_id = c.owner_user_id;
+
+grant select on public.coingame_market_coins to authenticated;
+
+create or replace view public.coingame_holdings_view
+with (security_invoker = true) as
+  select h.holder_user_id,
+         h.coin_id,
+         h.tokens_held,
+         h.avg_buy_price,
+         h.first_bought_at,
+         h.last_buy_at,
+         h.updated_at,
+         c.owner_user_id,
+         coalesce(nullif(trim(c.coin_name), ''), p.username, 'Unnamed coin') as coin_name,
+         c.base_price,
+         c.tokens_minted,
+         c.status,
+         c.created_at as coin_created_at,
+         p.username,
+         p.display_name,
+         p.avatar_url
+    from public.coingame_holdings h
+    join public.coingame_coins c on c.coin_id = h.coin_id
+    left join public.profiles p on p.user_id = c.owner_user_id;
+
+grant select on public.coingame_holdings_view to authenticated;
+
+create or replace view public.coingame_transactions_view
+with (security_invoker = true) as
+  select t.id,
+         t.tx_type,
+         t.from_user_id,
+         t.to_user_id,
+         t.coin_id,
+         t.tokens,
+         t.fc_amount,
+         t.spot_price,
+         t.metadata,
+         t.created_at,
+         c.owner_user_id as coin_owner_user_id,
+         coalesce(nullif(trim(c.coin_name), ''), p.username, 'Unnamed coin') as coin_name,
+         p.username,
+         p.display_name,
+         p.avatar_url
+    from public.coingame_transactions t
+    left join public.coingame_coins c on c.coin_id = t.coin_id
+    left join public.profiles p on p.user_id = c.owner_user_id;
+
+grant select on public.coingame_transactions_view to authenticated;
+
 -- ── LEADERBOARD VIEW ─────────────────────────────────────────────────────────
-create or replace view public.coingame_leaderboard_current_week as
+create or replace view public.coingame_leaderboard_current_week
+with (security_invoker = true) as
   select lw.user_id,
          p.username,
          p.display_name,

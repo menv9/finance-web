@@ -20,7 +20,8 @@ function formatDate(iso) {
 
 function TxRow({ tx }) {
   const meta = TX_META[tx.tx_type] ?? TX_META.reward;
-  const profile = tx.coingame_coins?.profiles;
+  const coin = tx.coingame_coins;
+  const profile = coin?.profiles;
   const amount = Number(tx.fc_amount ?? 0);
 
   return (
@@ -41,9 +42,9 @@ function TxRow({ tx }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>
           {meta.label}
-          {profile && (
+          {coin && (
             <span style={{ color: 'var(--cg-text-3)', fontWeight: 400, marginLeft: '0.4rem' }}>
-              · @{profile.username}
+              · {coin.coin_name || `@${profile?.username}`}
             </span>
           )}
         </div>

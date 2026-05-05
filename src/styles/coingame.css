@@ -729,6 +729,52 @@
   gap: 0.5rem;
 }
 
+.cg-setup-overlay {
+  z-index: 260;
+}
+
+.cg-setup-modal {
+  max-width: 440px;
+  border-color: var(--cg-accent-border);
+  box-shadow: 0 0 60px rgba(23,245,0,0.14);
+}
+
+.cg-setup-coin {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.cg-setup-coin-face {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cg-font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--cg-accent);
+  background: radial-gradient(circle at 35% 28%, rgba(23,245,0,0.42), rgba(5,18,5,0.95) 65%);
+  border: 2px solid var(--cg-accent);
+  box-shadow: 0 0 28px rgba(23,245,0,0.35);
+}
+
+.cg-setup-copy {
+  color: var(--cg-text-2);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.cg-input-hint {
+  margin-top: 0.35rem;
+  text-align: right;
+  font-family: var(--cg-font-mono);
+  font-size: 0.72rem;
+  color: var(--cg-text-3);
+}
+
 /* ── Input ────────────────────────────────────────────────────────────────── */
 .cg-label {
   display: block;
