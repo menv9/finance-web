@@ -300,16 +300,20 @@ export default function DashboardPage() {
           aria-label="Key figures"
           data-tour="dashboard-kpis"
           className={`grid gap-px border border-rule rounded-lg overflow-hidden bg-rule ${
-            kpis.length <= 3
-              ? ['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3'][kpis.length]
+            kpis.length <= 2
+              ? ['', 'grid-cols-1', 'grid-cols-2'][kpis.length]
+              : kpis.length === 3
+              ? 'grid-cols-2 sm:grid-cols-3'
               : kpis.length === 4
               ? 'grid-cols-2 sm:grid-cols-4'
               : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
           }`}
         >
-          {kpis.map((k, i) => (
-            isGorka ? (
-              <GorkaSpotlight key={k.label} className={`min-w-0 bg-surface px-3 py-3 sm:px-4 sm:py-4 ${rise(i + 1)}`}>
+          {kpis.map((k, i) => {
+            const spanLastOnMobile = kpis.length === 3 && i === 2 ? 'col-span-2 sm:col-span-1' : '';
+            const cellClass = `min-w-0 bg-surface px-3 py-3 sm:px-4 sm:py-4 ${spanLastOnMobile} ${rise(i + 1)}`;
+            return isGorka ? (
+              <GorkaSpotlight key={k.label} className={cellClass}>
                 <Stat
                   label={k.label}
                   value={hideKpis ? '****' : k.value}
@@ -324,7 +328,7 @@ export default function DashboardPage() {
                 />
               </GorkaSpotlight>
             ) : (
-              <div key={k.label} className={`min-w-0 bg-surface px-3 py-3 sm:px-4 sm:py-4 ${rise(i + 1)}`}>
+              <div key={k.label} className={cellClass}>
                 <Stat
                   label={k.label}
                   value={hideKpis ? '****' : k.value}
@@ -338,8 +342,8 @@ export default function DashboardPage() {
                   info={k.info}
                 />
               </div>
-            )
-          ))}
+            );
+          })}
         </section>
       </div>
 
