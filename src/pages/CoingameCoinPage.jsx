@@ -1,15 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  Area,
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { AreaSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
 
@@ -36,6 +27,95 @@ function tokensForBudget(coin, budgetFc) {
     else hi = mid;
   }
   return lo;
+}
+
+function LightweightCoinChart({ data }) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const areaSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const chart = createChart(container, {
+      autoSize: true,
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#707070',
+        fontFamily: "'DM Mono', monospace",
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.045)' },
+        horzLines: { color: 'rgba(255,255,255,0.055)' },
+      },
+      rightPriceScale: {
+        borderVisible: false,
+        scaleMargins: { top: 0.08, bottom: 0.28 },
+      },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        vertLine: { color: 'rgba(23,245,0,0.28)', labelBackgroundColor: '#17f500' },
+        horzLine: { color: 'rgba(23,245,0,0.18)', labelBackgroundColor: '#17f500' },
+      },
+      localization: {
+        priceFormatter: (value) => `${Number(value).toFixed(6)} FC`,
+      },
+    });
+
+    const areaSeries = chart.addSeries(AreaSeries, {
+      lineColor: '#17f500',
+      topColor: 'rgba(23,245,0,0.26)',
+      bottomColor: 'rgba(23,245,0,0.02)',
+      lineWidth: 2,
+      priceLineColor: '#17f500',
+      priceLineWidth: 1,
+      lastValueVisible: true,
+    });
+
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: '',
+      color: 'rgba(23,245,0,0.24)',
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+
+    chartRef.current = chart;
+    areaSeriesRef.current = areaSeries;
+    volumeSeriesRef.current = volumeSeries;
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      areaSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!areaSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
+    const priceData = data.map((point) => ({
+      time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
+      value: Number(point.price || 0),
+    }));
+    const volumeData = data.map((point) => ({
+      time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
+      value: Number(point.volume || 0),
+      color: Number(point.volume || 0) > 0 ? 'rgba(23,245,0,0.32)' : 'rgba(255,255,255,0.06)',
+    }));
+    areaSeriesRef.current.setData(priceData);
+    volumeSeriesRef.current.setData(volumeData);
+    chartRef.current.timeScale().fitContent();
+  }, [data]);
+
+  return <div className="cg-lightweight-chart" ref={containerRef} />;
 }
 
 function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
@@ -263,20 +343,7 @@ export default function CoingameCoinPage() {
               <div className="cg-chart-pill">24h real transactions</div>
             </div>
             <div className="cg-big-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.055)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="price" orientation="right" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
-                  <YAxis yAxisId="volume" hide />
-                  <Tooltip
-                    formatter={(value, key) => key === 'price' ? [`${Number(value).toFixed(6)} FC`, 'Price'] : [Number(value).toLocaleString(undefined, { maximumFractionDigits: 4 }), 'Tokens']}
-                    contentStyle={{ background: 'rgba(17,17,17,0.96)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#f0f0f0' }}
-                  />
-                  <Bar yAxisId="volume" dataKey="volume" fill="rgba(23,245,0,0.22)" barSize={5} />
-                  <Area yAxisId="price" type="monotone" dataKey="price" stroke="#17f500" strokeWidth={2} fill="rgba(23,245,0,0.08)" dot={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <LightweightCoinChart data={chartData} />
             </div>
           </section>
 

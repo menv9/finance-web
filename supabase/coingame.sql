@@ -1,7 +1,7 @@
 -- Coingame: virtual social economy (FingesCoin / FC).
 -- Run after profiles.sql. Fully virtual — no link to real money/finance_records.
 -- All economy mutations go through SECURITY DEFINER RPCs so invariants
--- (supply, fees, ownership caps) cannot be bypassed by clients.
+-- (supply and fees) cannot be bypassed by clients.
 
 -- ── constants ────────────────────────────────────────────────────────────────
 -- Encoded as immutable SQL functions so they can be referenced from policies
@@ -18,9 +18,6 @@ returns numeric language sql immutable as $$ select 75000::numeric $$;
 
 create or replace function public.cg_const_min_trade_fc()
 returns numeric language sql immutable as $$ select 10::numeric $$;
-
-create or replace function public.cg_const_max_first_day_ownership()
-returns numeric language sql immutable as $$ select 0.05::numeric $$;
 
 -- ── tables ───────────────────────────────────────────────────────────────────
 
@@ -383,8 +380,8 @@ $$;
 
 -- ── BUY ──────────────────────────────────────────────────────────────────────
 -- Buyer specifies how many tokens to buy. We compute FC cost via curve integral,
--- apply 1% fee (0.5% burn / 0.5% prize pool), enforce 5% ownership cap during
--- the coin's first 24h, mint tokens, update holdings, log the transaction.
+-- apply 1% fee (0.5% burn / 0.5% prize pool), mint tokens, update holdings,
+-- and log the transaction.
 create or replace function public.cg_buy_coin(p_coin_id uuid, p_tokens numeric)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -396,10 +393,6 @@ declare
   pool_amt numeric;
   total_charge numeric;
   current_balance numeric;
-  current_held numeric;
-  new_total numeric;
-  ownership_ratio numeric;
-  coin_age_hours numeric;
   spot numeric;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
@@ -431,21 +424,6 @@ begin
   if not found then raise exception 'wallet not initialized — call cg_ensure_wallet first'; end if;
   if current_balance < total_charge then
     raise exception 'insufficient balance (need %, have %)', total_charge, current_balance;
-  end if;
-
-  -- 5% ownership cap during first 24h since coin creation.
-  coin_age_hours := extract(epoch from (timezone('utc', now()) - c.created_at)) / 3600.0;
-  if coin_age_hours < 24 then
-    select coalesce(tokens_held, 0) into current_held
-      from public.coingame_holdings
-      where holder_user_id = uid and coin_id = p_coin_id;
-    new_total := coalesce(current_held, 0) + p_tokens;
-    if (c.tokens_minted + p_tokens) > 0 then
-      ownership_ratio := new_total / (c.tokens_minted + p_tokens);
-      if ownership_ratio > public.cg_const_max_first_day_ownership() then
-        raise exception 'first-24h ownership cap (5%%) exceeded';
-      end if;
-    end if;
   end if;
 
   -- Mutations.
