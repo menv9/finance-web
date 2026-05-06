@@ -73,7 +73,7 @@ async function withStore(storeName, mode, callback) {
     const store = transaction.objectStore(storeName);
     const result = callback(store);
 
-    transaction.oncomplete = () => resolve(result);
+    transaction.oncomplete = () => resolve(result?.result ?? result);
     transaction.onerror = () => reject(transaction.error);
   });
 }

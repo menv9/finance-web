@@ -24,7 +24,6 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     if (!client) return undefined;
-    if (supabaseUser) setRecoveryReady(true);
     const { data } = client.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setRecoveryReady(true);

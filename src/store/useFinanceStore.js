@@ -1833,9 +1833,18 @@ export const useFinanceStore = create((set, get) => ({
       bankAccountId: destinationBankAccountId,
     });
     const baseCurrencyUpd = get().settings.baseCurrency || 'EUR';
+    // Preserve the FX rate implied by the original sale so bank delta doesn't
+    // drift when today's rate differs from the rate at the time of the sale.
+    let fxRatesForUpdate = get().fxRates || {};
+    if (holding.currency && holding.currency !== baseCurrencyUpd) {
+      const nativeGross = (currentSale.quantity || 0) * (currentSale.salePriceCents || 0);
+      if (nativeGross > 0 && currentSale.grossProceedsCents) {
+        fxRatesForUpdate = { ...fxRatesForUpdate, [holding.currency]: currentSale.grossProceedsCents / nativeGross };
+      }
+    }
     const { sale: rawSale, cashflow: nextCashflow } = applySaleFx(
       nativeRawSale, nativeNextCashflow,
-      holding.currency, get().fxRates || {}, baseCurrencyUpd,
+      holding.currency, fxRatesForUpdate, baseCurrencyUpd,
     );
     const nextSale = ensureEntitySyncFields({ ...rawSale, linkedIncomeId: null, updatedAt: timestamp }, timestamp);
     const bankAccountAdjustments = new Map();
@@ -2637,6 +2646,7 @@ export const useFinanceStore = create((set, get) => ({
       conflicts: [],
     };
     await clearAllStores();
+    _cascadingDeletes.clear();
     saveSyncMeta(nextSyncMeta);
     localStorage.setItem('pft-seeded', 'true');
     // Keep settings (currency, locale, theme, API keys) — reset financial fields only
@@ -2889,6 +2899,7 @@ export const useFinanceStore = create((set, get) => ({
       set({ supabaseSyncStatus: 'error', supabaseError: error.message });
       throw error;
     }
+    _cascadingDeletes.clear();
     set({
       supabaseSession: null,
       supabaseUser: null,
@@ -3043,6 +3054,20 @@ export const useFinanceStore = create((set, get) => ({
   removeFriend: async (otherUserId) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
+    // Cancel active IOUs between the two users so they don't dangle after the friendship ends.
+    const toCancel = get().friendLedger.filter(
+      (e) => ['pending', 'accepted'].includes(e.status) &&
+        ((e.creditor_id === user.id && e.debtor_id === otherUserId) ||
+         (e.creditor_id === otherUserId && e.debtor_id === user.id)),
+    );
+    await Promise.all(toCancel.map((e) => apiCancelLedgerEntry(e.id).catch(() => {})));
+    if (toCancel.length) {
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) =>
+          toCancel.some((c) => c.id === e.id) ? { ...e, status: 'cancelled' } : e,
+        ),
+      }));
+    }
     // Delete whichever direction exists.
     await deleteFriendship(user.id, otherUserId).catch(() => {});
     await deleteFriendship(otherUserId, user.id).catch(() => {});

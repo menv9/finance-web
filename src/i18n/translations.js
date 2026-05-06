@@ -1200,10 +1200,10 @@ export const translations = {
         info: 'The sum of every planned monthly category budget.',
       },
       kpiCashflowAfterBudgets: {
-        label: 'Cashflow - budgets',
-        hintPositive: 'left after budgets',
-        hintNegative: 'over monthly cashflow',
-        info: 'Current monthly cashflow minus total planned monthly budgets.',
+        label: 'Cashflow vs budget plan',
+        hintPositive: 'headroom if all budgets are spent',
+        hintNegative: 'shortfall if all budgets are spent',
+        info: 'Monthly cashflow minus the sum of all budget ceilings — shows headroom assuming every limit is fully used.',
       },
       budgetsCard: {
         eyebrow: 'Plan',
@@ -2839,10 +2839,10 @@ export const translations = {
         info: 'Suma de todos los presupuestos mensuales por categoría planificados.',
       },
       kpiCashflowAfterBudgets: {
-        label: 'Flujo - presupuestos',
-        hintPositive: 'restante tras presupuestos',
-        hintNegative: 'sobre el flujo mensual',
-        info: 'Flujo de caja mensual actual menos el total de presupuestos mensuales planificados.',
+        label: 'Flujo vs plan de presupuestos',
+        hintPositive: 'margen si se gastan todos los presupuestos',
+        hintNegative: 'déficit si se gastan todos los presupuestos',
+        info: 'Flujo mensual menos la suma de todos los límites de presupuesto — muestra el margen asumiendo que cada límite se agota.',
       },
       budgetsCard: {
         eyebrow: 'Plan',
