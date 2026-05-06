@@ -451,6 +451,9 @@ p { margin: 0; }
 .recharts-tooltip-label { color: var(--ink-muted) !important; font-size: 11px !important; letter-spacing: 0.08em; text-transform: uppercase; }
 .recharts-tooltip-item { color: var(--ink) !important; font-variant-numeric: tabular-nums; }
 
+/* lightweight-charts attribution logo */
+.tv-lightweight-charts table tr:last-child { display: none !important; }
+
 /* ——————————————————————————————————————————————
    Motion — first-mount stagger hook
 —————————————————————————————————————————————— */
