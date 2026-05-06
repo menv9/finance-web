@@ -158,7 +158,7 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
         <FormField label={t('sharedGoals.description')}>
           <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder={t('sharedGoals.descriptionPlaceholder')} maxLength={200} />
         </FormField>
-        {!isEdit && friends.length > 0 && (
+        {friends.length > 0 && (
           <>
             <SectionDivider />
             <p className="text-xs eyebrow text-ink-muted">{t('sharedGoals.inviteFriends')}</p>
@@ -510,6 +510,11 @@ export function SharedGoalsSection({
   const handleSave = async (data) => {
     if (editingGoal) {
       await updateSharedGoal(editingGoal.id, data);
+      const existingIds = new Set((editingGoal.shared_goal_participants || []).map((p) => p.user_id));
+      const newInviteIds = (data.inviteIds || []).filter((id) => !existingIds.has(id));
+      for (const id of newInviteIds) {
+        await addGoalParticipant(editingGoal.id, id);
+      }
     } else {
       await createSharedGoal(data);
     }
