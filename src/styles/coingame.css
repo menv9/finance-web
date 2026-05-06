@@ -1595,6 +1595,17 @@ button.cg-back-link {
   margin-bottom: 1rem;
 }
 
+.cg-curve-axis-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
+  margin-top: 0.25rem;
+  color: var(--cg-text-3);
+  font-family: var(--cg-font-mono);
+  font-size: 0.68rem;
+}
+
 .cg-admin-form-grid.compact {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   margin-bottom: 0.65rem;
