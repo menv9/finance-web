@@ -41,9 +41,9 @@ export default function LWAreaChart({
 
     const chart = createChart(container, {
       autoSize: true,
-      attributionLogo: false,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
+        attributionLogo: false,
         textColor: 'rgba(128,128,128,0.65)',
       },
       grid: {

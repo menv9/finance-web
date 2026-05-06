@@ -52,11 +52,11 @@ function LightweightCoinChart({ data, chartType }) {
 
     const chart = createChart(container, {
       autoSize: true,
-      attributionLogo: false,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#707070',
         fontFamily: "'DM Mono', monospace",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: 'rgba(255,255,255,0.045)' },

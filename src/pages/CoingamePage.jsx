@@ -150,11 +150,11 @@ function BondingCurveCard({ coin }) {
 
     const chart = createChart(container, {
       autoSize: true,
-      attributionLogo: false,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: 'rgba(255,255,255,0.25)',
         fontFamily: "'DM Mono', monospace",
+        attributionLogo: false,
       },
       grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
       rightPriceScale: { visible: false },

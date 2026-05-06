@@ -31,8 +31,7 @@ export default function LWSalesChart({ data = [] }) {
     if (!container) return;
     const chart = createChart(container, {
       autoSize: true,
-      attributionLogo: false,
-      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: 'rgba(128,128,128,0.65)' },
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: 'rgba(128,128,128,0.65)', attributionLogo: false },
       grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'rgba(128,128,128,0.08)' } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: false },
