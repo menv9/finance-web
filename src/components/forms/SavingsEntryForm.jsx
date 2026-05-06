@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
 import { FormField, Input, Button, Select, InfoPopover } from '../ui';
 
@@ -26,6 +26,8 @@ export function SavingsEntryForm({
   onCancel,
 }) {
   const defaultBankAccountId = bankAccounts.find((a) => a.isMain)?.id || bankAccounts[0]?.id || '';
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     ...defaultValue,
     goalId: defaultGoalId,
@@ -58,16 +60,24 @@ export function SavingsEntryForm({
   return (
     <form
       className="grid grid-cols-1 gap-5 md:grid-cols-2"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        onSubmit({
-          ...initialValue,
-          ...form,
-          amountCents: Math.round(Number(form.amountCents || 0) * 100),
-          goalId: form.goalId || null,
-          bucketSource: form.bucketSource,
-          bankAccountId: form.bankAccountId || null,
-        });
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+        setSubmitting(true);
+        try {
+          await onSubmit({
+            ...initialValue,
+            ...form,
+            amountCents: Math.round(Number(form.amountCents || 0) * 100),
+            goalId: form.goalId || null,
+            bucketSource: form.bucketSource,
+            bankAccountId: form.bankAccountId || null,
+          });
+        } finally {
+          submittingRef.current = false;
+          setSubmitting(false);
+        }
       }}
     >
       {showBucketSource ? (
@@ -180,7 +190,7 @@ export function SavingsEntryForm({
             Cancel
           </Button>
         )}
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" loading={submitting} disabled={submitting}>
           {submitLabel || (initialValue ? 'Save changes' : 'Add saving')}
         </Button>
       </div>
