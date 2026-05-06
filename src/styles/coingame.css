@@ -590,7 +590,7 @@
   background: var(--cg-surface);
   border: 1px solid var(--cg-border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
 }
 
@@ -668,7 +668,7 @@
   background: var(--cg-surface);
   border: 1px solid var(--cg-border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 1.5rem;
   position: relative;
 }
@@ -697,7 +697,7 @@
   background: var(--cg-surface);
   border: 1px solid var(--cg-border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 1.5rem;
 }
 .cg-economy-cell {
@@ -739,7 +739,7 @@
   background: var(--cg-surface);
   border: 1px solid var(--cg-border-strong);
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cg-modal-header {
@@ -1050,7 +1050,7 @@
 }
 
 .cg-chart-card {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cg-chart-toolbar {
@@ -1207,6 +1207,7 @@
 .cg-big-chart {
   height: 430px;
   padding: 0.75rem 0.75rem 0.35rem;
+  overflow: hidden;
 }
 
 .cg-lightweight-chart {
