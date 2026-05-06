@@ -181,11 +181,32 @@ export async function fetchTransactions(userId, { limit = 50, offset = 0 } = {})
     .from('coingame_transactions_view')
     .select('*')
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
-    .in('tx_type', ['buy', 'sell', 'reward', 'starter_grant'])
+    .in('tx_type', ['buy', 'sell', 'reward', 'starter_grant', 'gamble_bet', 'gamble_win', 'gamble_loss'])
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
   return (data ?? []).map(transactionFromView);
+}
+
+// Casino / gambling
+export async function fetchCasinoState() {
+  return rpc('cg_casino_get_state');
+}
+
+export async function setCasinoHouseBalance(amount) {
+  return rpc('cg_casino_set_house_balance', { p_amount: amount });
+}
+
+export async function fetchGamblingRecent(limit = 25) {
+  return rpc('cg_gambling_recent', { p_limit: limit });
+}
+
+export async function gambleCoinflip(choice, wager) {
+  return rpc('cg_gamble_coinflip', { p_choice: choice, p_wager: wager });
+}
+
+export async function gambleDice(target, wager) {
+  return rpc('cg_gamble_dice', { p_target: target, p_wager: wager });
 }
 
 export async function fetchCoinChart(coinId, rangeMinutes = 1440) {

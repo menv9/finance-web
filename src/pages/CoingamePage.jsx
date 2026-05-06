@@ -308,9 +308,10 @@ export default function CoingamePage() {
           <EconomyStrip economy={economy} />
 
           {/* Quick nav */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.625rem' }}>
             {[
               { to: '/coingame/market',      icon: 'M', label: 'Market' },
+              { to: '/coingame/casino',      icon: '$', label: 'Casino' },
               { to: '/coingame/leaderboard', icon: 'R', label: 'Rankings' },
               { to: '/coingame/history',     icon: 'H', label: 'History' },
             ].map(({ to, icon, label }) => (

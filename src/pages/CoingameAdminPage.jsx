@@ -6,6 +6,7 @@ const TABS = [
   ['bots', 'Liquidity Bots'],
   ['health', 'Market Health'],
   ['reserve', 'Reserve'],
+  ['casino', 'Casino'],
   ['coins', 'Coin Controls'],
   ['admins', 'Admins'],
   ['logs', 'Logs'],
@@ -189,6 +190,33 @@ function ReserveTab({ health, onSave }) {
   );
 }
 
+function CasinoTab({ casino, onSave }) {
+  const [amount, setAmount] = useState('');
+  useEffect(() => setAmount(String(casino?.house_balance_fc ?? '')), [casino]);
+  return (
+    <div className="cg-admin-panel">
+      <div className="cg-admin-reserve">
+        <span>Casino house pool</span>
+        <strong><FC amount={casino?.house_balance_fc} /></strong>
+      </div>
+      <div className="cg-admin-info-panel">
+        <div>
+          <strong>Gambling controls</strong>
+          <span>Coinflip and Dice reject bets when this pool cannot cover the possible payout.</span>
+        </div>
+        <div className="cg-admin-info-grid">
+          <div><strong>House edge</strong><p>{(Number(casino?.house_edge ?? 0.02) * 100).toFixed(2)}%</p></div>
+          <div><strong>Status</strong><p>{casino?.enabled === false ? 'Disabled' : 'Enabled'}</p></div>
+        </div>
+      </div>
+      <div className="cg-admin-inline">
+        <input className="cg-input" value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" />
+        <button className="cg-btn cg-btn-primary" onClick={() => onSave(Number(amount))}>Set House Pool</button>
+      </div>
+    </div>
+  );
+}
+
 function CoinsTab({ coins, onToggle }) {
   return (
     <div className="cg-admin-table-wrap">
@@ -293,11 +321,13 @@ export default function CoingameAdminPage() {
   const health = useFinanceStore((s) => s.coingameMarketHealth);
   const logs = useFinanceStore((s) => s.coingameBotLogs);
   const admins = useFinanceStore((s) => s.coingameAdminUsers);
+  const casino = useFinanceStore((s) => s.coingameCasino);
   const loadAdmin = useFinanceStore((s) => s.loadCoingameAdmin);
   const refreshHealth = useFinanceStore((s) => s.refreshMarketHealth);
   const updateConfig = useFinanceStore((s) => s.updateBotConfig);
   const toggleCoin = useFinanceStore((s) => s.toggleBotCoin);
   const setReserve = useFinanceStore((s) => s.setBotReserve);
+  const setCasinoHouseBalance = useFinanceStore((s) => s.setCasinoHouseBalance);
   const addAdmin = useFinanceStore((s) => s.addCoingameAdmin);
   const removeAdmin = useFinanceStore((s) => s.removeCoingameAdmin);
   const refreshLogs = useFinanceStore((s) => s.refreshBotLogs);
@@ -340,6 +370,7 @@ export default function CoingameAdminPage() {
       {tab === 'bots' && <BotsTab config={config} onSave={updateConfig} />}
       {tab === 'health' && <HealthTab health={health} />}
       {tab === 'reserve' && <ReserveTab health={health} onSave={setReserve} />}
+      {tab === 'casino' && <CasinoTab casino={casino} onSave={setCasinoHouseBalance} />}
       {tab === 'coins' && <CoinsTab coins={coins} onToggle={toggleCoin} />}
       {tab === 'admins' && <AdminsTab admins={admins} currentUserId={user?.id} onAdd={addAdmin} onRemove={removeAdmin} />}
       {tab === 'logs' && <LogsTab logs={logs} coins={coins} onRefresh={refreshLogs} />}

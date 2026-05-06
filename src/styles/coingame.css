@@ -693,6 +693,27 @@ button.cg-back-link {
 .cg-row:last-child { border-bottom: none; }
 .cg-row:hover { background: var(--cg-surface-hover); }
 
+.cg-tx-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--cg-surface-raised);
+  border: 1px solid var(--cg-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  font-family: var(--cg-font-mono);
+}
+
+.cg-tx-amount {
+  font-family: var(--cg-font-mono);
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 /* ── Avatar ───────────────────────────────────────────────────────────────── */
 .cg-avatar {
   border-radius: 50%;
@@ -1792,6 +1813,163 @@ button.cg-back-link {
 .cg-admin-action.sell,
 .cg-admin-action.error { color: var(--cg-danger); }
 
+/* Casino */
+.cg-casino-page {
+  max-width: 1120px;
+}
+
+.cg-casino-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cg-casino-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.cg-casino-card {
+  position: relative;
+  padding: 1rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-modal-bg);
+  box-shadow: var(--cg-shadow);
+}
+
+.cg-casino-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cg-casino-card-head span {
+  color: var(--cg-accent);
+  font-family: var(--cg-font-mono);
+  font-size: 0.68rem;
+}
+
+.cg-casino-card-head h2 {
+  margin-top: 0.15rem;
+  font-family: var(--cg-font-display);
+  font-size: 1.2rem;
+}
+
+.cg-casino-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.cg-casino-choice-grid button {
+  height: 48px;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface);
+  color: var(--cg-text-2);
+  font-family: var(--cg-font-display);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cg-casino-choice-grid button.active {
+  background: var(--cg-accent);
+  color: var(--cg-on-accent);
+  border-color: var(--cg-accent);
+}
+
+.cg-casino-slider {
+  width: 100%;
+  margin: 0.75rem 0 0.95rem;
+  accent-color: var(--cg-accent);
+}
+
+.cg-casino-preview {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.85rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-overlay-softer);
+}
+
+.cg-casino-preview div,
+.cg-casino-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cg-casino-preview span,
+.cg-casino-result span {
+  color: var(--cg-text-3);
+  font-size: 0.75rem;
+}
+
+.cg-casino-preview strong,
+.cg-casino-result strong {
+  color: var(--cg-text);
+  font-family: var(--cg-font-mono);
+}
+
+.cg-casino-play {
+  width: 100%;
+  justify-content: center;
+}
+
+.cg-casino-result {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface);
+}
+
+.cg-casino-result > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.cg-casino-result.win {
+  border-color: var(--cg-positive-border);
+  background: var(--cg-positive-soft);
+}
+
+.cg-casino-result.loss {
+  border-color: var(--cg-danger-border);
+  background: var(--cg-danger-soft);
+}
+
+.cg-casino-result-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--cg-font-mono);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cg-casino-result-dot.win {
+  color: #000;
+  background: var(--cg-positive);
+}
+
+.cg-casino-result-dot.loss {
+  color: #000;
+  background: var(--cg-danger);
+}
+
 .cg-admin-list,
 .cg-admin-search,
 .cg-recent-trade-list {
@@ -1962,6 +2140,8 @@ button.cg-back-link {
   .cg-back-link { justify-content: center; padding: 0.6rem; }
   .cg-sidebar-logo { justify-content: center; padding: 1rem 0.5rem; }
   .cg-stat-row { grid-template-columns: 1fr 1fr; }
+  .cg-casino-stats,
+  .cg-casino-grid { grid-template-columns: 1fr; }
   .cg-grid { grid-template-columns: repeat(2, 1fr); }
   .cg-coin-layout { grid-template-columns: 1fr; }
   .cg-trade-panel { position: static; }

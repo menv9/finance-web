@@ -92,6 +92,7 @@ import {
   claimDaily as apiClaimDaily,
   createCoin as apiCreateCoin,
   ensureWallet,
+  fetchCasinoState as apiFetchCasinoState,
   fetchWallet,
   addAdminUser as apiAddCoingameAdminUser,
   fetchAdminUsers as apiFetchCoingameAdminUsers,
@@ -100,13 +101,17 @@ import {
   fetchCoinByOwner,
   fetchCoingameAdminStatus as apiFetchCoingameAdminStatus,
   fetchEconomy,
+  fetchGamblingRecent as apiFetchGamblingRecent,
   fetchHoldings as apiFetchHoldings,
   fetchMarketHealth as apiFetchMarketHealth,
   fetchTransactions as apiFetchTransactions,
   fetchTrending,
   fetchWeeklyLeaderboard,
+  gambleCoinflip as apiGambleCoinflip,
+  gambleDice as apiGambleDice,
   removeAdminUser as apiRemoveCoingameAdminUser,
   sellCoin as apiSellCoin,
+  setCasinoHouseBalance as apiSetCasinoHouseBalance,
   setBotCoinEnabled as apiSetBotCoinEnabled,
   setBotReserve as apiSetBotReserve,
   triggerBotTick as apiTriggerBotTick,
@@ -771,6 +776,9 @@ export const useFinanceStore = create((set, get) => ({
   coingameLeaderboard: [],
   coingameLeaderboardMetric: 'gains_fc',
   coingameEconomy: null,
+  coingameCasino: null,
+  coingameGamblingBets: [],
+  coingameLastGambleResult: null,
   coingameStatus: 'idle',
   coingameError: '',
   coingameNeedsCoinSetup: false,
@@ -3751,7 +3759,7 @@ export const useFinanceStore = create((set, get) => ({
         await get().loadProfile();
       }
       await ensureWallet();
-      const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
+      const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy, casino, gamblingBets] = await Promise.all([
         fetchWallet(user.id),
         fetchCoinByOwner(user.id),
         apiFetchHoldings(user.id),
@@ -3759,6 +3767,8 @@ export const useFinanceStore = create((set, get) => ({
         fetchTrending(),
         fetchWeeklyLeaderboard(get().coingameLeaderboardMetric),
         fetchEconomy(),
+        apiFetchCasinoState(),
+        apiFetchGamblingRecent(25),
       ]);
       set({
         coingameWallet: wallet,
@@ -3768,6 +3778,8 @@ export const useFinanceStore = create((set, get) => ({
         coingameTrending: trending,
         coingameLeaderboard: leaderboard,
         coingameEconomy: economy,
+        coingameCasino: casino,
+        coingameGamblingBets: gamblingBets,
         coingameStatus: 'idle',
         coingameNeedsCoinSetup: !ownCoin,
       });
@@ -3781,17 +3793,19 @@ export const useFinanceStore = create((set, get) => ({
   loadCoingameAdmin: async () => {
     set({ coingameAdminStatus: 'loading', coingameAdminError: '' });
     try {
-      const [config, health, logs, admins] = await Promise.all([
+      const [config, health, logs, admins, casino] = await Promise.all([
         apiFetchBotConfig(),
         apiFetchMarketHealth(),
         apiFetchBotLogs(50),
         apiFetchCoingameAdminUsers(),
+        apiFetchCasinoState(),
       ]);
       set({
         coingameBotConfig: config,
         coingameMarketHealth: health,
         coingameBotLogs: logs,
         coingameAdminUsers: admins,
+        coingameCasino: casino,
         coingameIsAdmin: true,
         coingameAdminStatus: 'idle',
       });
@@ -3835,6 +3849,13 @@ export const useFinanceStore = create((set, get) => ({
   setBotReserve: async (amount) => {
     await apiSetBotReserve(amount);
     await get().loadCoingameAdmin();
+  },
+
+  setCasinoHouseBalance: async (amount) => {
+    const casino = await apiSetCasinoHouseBalance(amount);
+    set({ coingameCasino: casino });
+    await get().loadCoingameAdmin();
+    return casino;
   },
 
   addCoingameAdmin: async (userId) => {
@@ -3943,6 +3964,72 @@ export const useFinanceStore = create((set, get) => ({
           : state.coingameWallet,
         coingameStatus: 'idle',
       }));
+      return result;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message });
+      throw err;
+    }
+  },
+
+  loadCoingameCasino: async () => {
+    try {
+      const [casino, gamblingBets] = await Promise.all([
+        apiFetchCasinoState(),
+        apiFetchGamblingRecent(25),
+      ]);
+      set({ coingameCasino: casino, coingameGamblingBets: gamblingBets });
+    } catch (err) {
+      set({ coingameError: err.message });
+    }
+  },
+
+  coingameGambleCoinflip: async (choice, wager) => {
+    const user = get().supabaseUser;
+    if (!user) return null;
+    set({ coingameStatus: 'loading', coingameError: '', coingameLastGambleResult: null });
+    try {
+      const result = await apiGambleCoinflip(choice, wager);
+      const [wallet, transactions, casino, gamblingBets] = await Promise.all([
+        fetchWallet(user.id),
+        apiFetchTransactions(user.id),
+        apiFetchCasinoState(),
+        apiFetchGamblingRecent(25),
+      ]);
+      set({
+        coingameWallet: wallet,
+        coingameTransactions: transactions,
+        coingameCasino: casino,
+        coingameGamblingBets: gamblingBets,
+        coingameLastGambleResult: result,
+        coingameStatus: 'idle',
+      });
+      return result;
+    } catch (err) {
+      set({ coingameStatus: 'error', coingameError: err.message });
+      throw err;
+    }
+  },
+
+  coingameGambleDice: async (target, wager) => {
+    const user = get().supabaseUser;
+    if (!user) return null;
+    set({ coingameStatus: 'loading', coingameError: '', coingameLastGambleResult: null });
+    try {
+      const result = await apiGambleDice(target, wager);
+      const [wallet, transactions, casino, gamblingBets] = await Promise.all([
+        fetchWallet(user.id),
+        apiFetchTransactions(user.id),
+        apiFetchCasinoState(),
+        apiFetchGamblingRecent(25),
+      ]);
+      set({
+        coingameWallet: wallet,
+        coingameTransactions: transactions,
+        coingameCasino: casino,
+        coingameGamblingBets: gamblingBets,
+        coingameLastGambleResult: result,
+        coingameStatus: 'idle',
+      });
       return result;
     } catch (err) {
       set({ coingameStatus: 'error', coingameError: err.message });
