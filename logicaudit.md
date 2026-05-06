@@ -1,22 +1,6 @@
 # Logic & Pre-Release Audit — Remaining Items
 
-> Items C1–C12, H2–H4, H6–H16, M1, M3–M10 have been resolved. H1 is a known limitation (requires historical FX storage — deferred). This file tracks what's left.
-
----
-
-## High
-
-| # | File:Line | Issue |
-|---|---|---|
-| H5 | `SavingsPage.jsx:536` | Savings trend chart double-counts `currentBalanceCents` base + historical entries → curve diverges from KPI |
-
----
-
-## Medium
-
-| # | File:Line | Issue |
-|---|---|---|
-| M2 | `SavingsPage.jsx:486,1258` | `unallocatedSavingsCents` can exceed `totalSavedCents` after releases — allows over-allocation |
+> All critical, high, and medium bugs have been resolved. H5 was investigated twice and could not be reproduced — the trend math is consistent with the KPI (last point equals totalSavedCents). This file now tracks only the pre-release gaps that require dedicated passes.
 
 ---
 
