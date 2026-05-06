@@ -134,16 +134,21 @@ function LightweightCoinChart({ data, chartType }) {
       time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
       value: Number(point.price || 0),
     }));
-    const candleData = priceData.map((point, index) => {
-      const previousClose = index > 0 ? priceData[index - 1].value : point.value;
-      return {
-        time: point.time,
-        open: previousClose,
-        high: Math.max(previousClose, point.value),
-        low: Math.min(previousClose, point.value),
-        close: point.value,
-      };
-    });
+    let previousTradeClose = null;
+    const candleData = data
+      .filter((point) => Number(point.trades || 0) > 0)
+      .map((point) => {
+        const close = Number(point.price || 0);
+        const open = previousTradeClose ?? close;
+        previousTradeClose = close;
+        return {
+          time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
+          open,
+          high: Math.max(open, close),
+          low: Math.min(open, close),
+          close,
+        };
+      });
     const volumeData = data.map((point, index) => {
       const previousPrice = Number(data[Math.max(index - 1, 0)]?.price || point.price || 0);
       const currentPrice = Number(point.price || 0);

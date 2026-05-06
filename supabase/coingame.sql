@@ -743,7 +743,7 @@ language sql stable security definer set search_path = public as $$
      group by date_trunc('hour', t.created_at)
   )
   select b.bucket_start,
-         coalesce(last_trade.spot_price, sc.current_price, sc.base_price, 0) as price,
+         coalesce(last_trade.spot_price, sc.base_price, 0) as price,
          coalesce(bt.volume_tokens, 0) as volume_tokens,
          coalesce(bt.volume_fc, 0) as volume_fc,
          coalesce(bt.trades_count, 0) as trades_count
@@ -830,7 +830,7 @@ language sql stable security definer set search_path = public as $$
      group by to_timestamp(floor(extract(epoch from t.created_at) / bounds.bucket_seconds) * bounds.bucket_seconds)
   )
   select b.bucket_start,
-         coalesce(last_trade.spot_price, sc.current_price, sc.base_price, 0) as price,
+         coalesce(last_trade.spot_price, sc.base_price, 0) as price,
          coalesce(bt.volume_tokens, 0) as volume_tokens,
          coalesce(bt.volume_fc, 0) as volume_fc,
          coalesce(bt.trades_count, 0) as trades_count
