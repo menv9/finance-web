@@ -38,6 +38,7 @@ export function computeExpenseSeries(expenses) {
   const today = new Date().toISOString().slice(0, 10);
   return lastTwelveMonths().map((month) => ({
     month: month.label,
+    key: month.key,
     amountCents: sumAmount(expenses.filter((expense) =>
       monthKey(expense.date) === month.key && expense.date <= today
     )),
@@ -49,6 +50,7 @@ export function computeIncomeSeries(incomes, derivedIncomes = []) {
   const rows = [...(incomes || []), ...(derivedIncomes || [])];
   return lastTwelveMonths().map((month) => ({
     month: month.label,
+    key: month.key,
     amountCents: sumAmount(rows.filter((income) =>
       isReceivedIncome(income) &&
       (income.accountingMonth || monthKey(income.date)) === month.key &&
@@ -341,6 +343,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, investm
       monthlyExpenses.slice(index + 1).reduce((sum, item) => sum + item.amountCents, 0);
     return {
       month: month.label,
+      key: month.key,
       netWorthCents: Math.max(0, netWorthCents - subsequentCashflow),
     };
   });
@@ -348,6 +351,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, investm
   const cashflowSeries = monthlyCashflowIncome.map((incomePoint, index) => {
     return {
       month: incomePoint.month,
+      key: incomePoint.key,
       incomeCents: incomePoint.amountCents,
       expenseCents: monthlyExpenses[index]?.amountCents || 0,
     };

@@ -257,14 +257,14 @@ export default function ThisMonthPage() {
   const chartData = dashboard.cashflowSeries || [];
   const selectedMonthChartLabel = chartMonthLabel(`${selectedMonth}-01`);
 
-  const lwCashflowData = useMemo(() => {
-    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-    return chartData.map((entry) => {
-      const [mon, yr] = entry.month.split(' ');
-      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
-      return { time, incomeCents: entry.incomeCents, expenseCents: entry.expenseCents, isSelected: entry.month === selectedMonthChartLabel };
-    });
-  }, [chartData, selectedMonthChartLabel]);
+  const lwCashflowData = useMemo(() =>
+    chartData.map((entry) => ({
+      time: `${entry.key}-01`,
+      incomeCents: entry.incomeCents,
+      expenseCents: entry.expenseCents,
+      isSelected: entry.month === selectedMonthChartLabel,
+    })),
+  [chartData, selectedMonthChartLabel]);
 
   const selectedChartTime = lwCashflowData.find((d) => d.isSelected)?.time ?? null;
 

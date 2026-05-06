@@ -339,14 +339,9 @@ export default function ExpensesPage() {
   const chartData = computeExpenseSeries(expenses);
   const breakdown = categoryBreakdown(filteredExpenses);
 
-  const lwExpenseData = useMemo(() => {
-    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-    return chartData.map((entry) => {
-      const [mon, yr] = entry.month.split(' ');
-      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
-      return { time, value: entry.amountCents };
-    });
-  }, [chartData]);
+  const lwExpenseData = useMemo(() =>
+    chartData.map((entry) => ({ time: `${entry.key}-01`, value: entry.amountCents })),
+  [chartData]);
   const editingExpense = expenses.find((item) => item.id === expenseModal.id);
   const editingFixedExpense = fixedExpenses.find((item) => item.id === fixedModal.id);
 

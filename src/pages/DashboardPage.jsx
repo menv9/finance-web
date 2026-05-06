@@ -166,23 +166,21 @@ export default function DashboardPage() {
     return delta;
   }, [dashboard.netWorthSeries]);
 
-  const lwNetWorthData = useMemo(() => {
-    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-    return (dashboard.netWorthSeries || []).map((entry) => {
-      const [mon, yr] = entry.month.split(' ');
-      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
-      return { time, value: entry.netWorthCents };
-    });
-  }, [dashboard.netWorthSeries]);
+  const lwNetWorthData = useMemo(() =>
+    (dashboard.netWorthSeries || []).map((entry) => ({
+      time: `${entry.key}-01`,
+      value: entry.netWorthCents,
+    })),
+  [dashboard.netWorthSeries]);
 
-  const lwCashflowData = useMemo(() => {
-    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-    return (dashboard.cashflowSeries || []).map((entry) => {
-      const [mon, yr] = entry.month.split(' ');
-      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
-      return { incomeTime: time, expenseTime: time, incomeCents: entry.incomeCents, expenseCents: entry.expenseCents };
-    });
-  }, [dashboard.cashflowSeries]);
+  const lwCashflowData = useMemo(() =>
+    (dashboard.cashflowSeries || []).map((entry) => ({
+      incomeTime: `${entry.key}-01`,
+      expenseTime: `${entry.key}-01`,
+      incomeCents: entry.incomeCents,
+      expenseCents: entry.expenseCents,
+    })),
+  [dashboard.cashflowSeries]);
 
   const recentActivity = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);

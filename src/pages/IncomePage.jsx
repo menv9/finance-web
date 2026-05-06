@@ -420,14 +420,12 @@ export default function IncomePage() {
     .reduce((sum, row) => sum + row.amountCents, 0);
   const topSource = sourceBreakdown.slice().sort((a, b) => b.value - a.value)[0];
 
-  const lwIncomeData = useMemo(() => {
-    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-    return computeIncomeSeries(incomes, dividendIncomeRows).map((entry) => {
-      const [mon, yr] = entry.month.split(' ');
-      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
-      return { time, value: entry.amountCents };
-    });
-  }, [incomes, dividendIncomeRows]);
+  const lwIncomeData = useMemo(() =>
+    computeIncomeSeries(incomes, dividendIncomeRows).map((entry) => ({
+      time: `${entry.key}-01`,
+      value: entry.amountCents,
+    })),
+  [incomes, dividendIncomeRows]);
   const fixedIncomeRows = useMemo(
     () =>
       fixedSchedules
