@@ -15,7 +15,7 @@ import { PageHeader } from '../components/PageHeader';
 import { DividendForm } from '../components/forms/DividendForm';
 import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency, formatNumber } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
 import { assignedPortfolioHoldings, assignedPortfolioRecords, computePortfolioMetrics } from '../utils/finance';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
@@ -1973,6 +1973,7 @@ export default function PortfolioPage() {
               color="var(--accent)"
               topOpacity={0.22}
               secondSeries={{ data: lwPortfolioValueData.cost, color: 'var(--danger)', topOpacity: 0.06, bottomOpacity: 0.06, dashed: true }}
+              priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
             />
           </div>
         ) : (
@@ -2233,7 +2234,7 @@ export default function PortfolioPage() {
         className={rise(6)}
       >
         {lwSalesData.length ? (
-          <LWSalesChart data={lwSalesData} />
+          <LWSalesChart data={lwSalesData} priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)} />
         ) : (
           <EmptyState title={t('portfolio.salesPerformanceCard.emptyTitle')} description={t('portfolio.salesPerformanceCard.emptyDescription')} />
         )}

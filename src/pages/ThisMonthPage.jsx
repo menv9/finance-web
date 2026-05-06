@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows } from '../utils/finance';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, normalizeDateInput } from '../utils/dates';
 import { Card, Stat, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
@@ -377,6 +377,7 @@ export default function ThisMonthPage() {
             seriesA={{ data: lwCashflowData.map((d) => ({ time: d.time, value: d.incomeCents })), color: 'var(--accent)' }}
             seriesB={{ data: lwCashflowData.map((d) => ({ time: d.time, value: d.expenseCents })), color: 'var(--danger)' }}
             selectedTime={selectedChartTime}
+            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
           />
         ) : (
           <EmptyState title={t('thisMonth.chartCard.emptyTitle')} description={t('thisMonth.chartCard.emptyDescription')} />
