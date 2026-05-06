@@ -2636,8 +2636,8 @@ export const useFinanceStore = create((set, get) => ({
       deletedRecords: nextDeletedRecords,
       conflicts: [],
     };
-    saveSyncMeta(nextSyncMeta);
     await clearAllStores();
+    saveSyncMeta(nextSyncMeta);
     localStorage.setItem('pft-seeded', 'true');
     // Keep settings (currency, locale, theme, API keys) — reset financial fields only
     const current = state.settings;
