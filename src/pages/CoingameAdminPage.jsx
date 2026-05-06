@@ -45,12 +45,12 @@ function BotVariablesInfo() {
     ['Min trade pct', 'Lower bound for trade size as a fraction of minted supply. Higher means every bot trade starts larger.'],
     ['Max trade pct', 'Upper bound for trade size as a fraction of minted supply. This is the main aggression dial.'],
     ['Min tokens', 'Absolute minimum trade size. Useful for young coins where percentage-based trades would be tiny.'],
+    ['Tick interval seconds', 'Minimum time between runs for that bot. Lower values make that specific bot wake up more often.'],
+    ['Trades per coin/day', 'Hard limit for each bot on each coin per UTC day. Higher keeps charts moving longer.'],
+    ['Max price impact', 'Maximum allowed price move per bot trade. Higher allows bigger jumps; lower keeps movement subtle.'],
     ['Inactive hours', 'How long a coin must go without real user trades before the bot can step in. Use 0 for always eligible.'],
     ['Daily volume cap', 'Maximum bot volume compared with real market volume after the daily floor is spent. 0.5 means 50%.'],
     ['Daily floor FC', 'Free daily bot volume before the percentage cap applies. This lets empty markets bootstrap.'],
-    ['Trades per coin/day', 'Hard limit for bot trades on each coin per UTC day. Higher keeps charts moving longer.'],
-    ['Max price impact', 'Maximum allowed price move per bot trade. Higher allows bigger jumps; lower keeps movement subtle.'],
-    ['Tick interval minutes', 'Minimum time between bot runs at the server level. Lower values make the whole system wake up more often.'],
   ];
 
   return (
@@ -73,27 +73,40 @@ function BotVariablesInfo() {
 
 function BotsTab({ config, onSave }) {
   const global = config?.global || {};
+  const bots = useMemo(() => config?.bots || [], [config]);
   const [draft, setDraft] = useState(global);
+  const [botDrafts, setBotDrafts] = useState(bots);
 
   useEffect(() => {
     setDraft(global);
-  }, [config]);
+    setBotDrafts(bots);
+  }, [config, bots]);
 
   const set = (key, value) => setDraft((state) => ({ ...state, [key]: value }));
+  const setBot = (botId, key, value) => {
+    setBotDrafts((state) => state.map((bot) => (
+      bot.bot_id === botId ? { ...bot, [key]: value } : bot
+    )));
+  };
 
   async function save() {
     await onSave({
       enabled: Boolean(draft.enabled),
-      min_trade_pct: Number(draft.min_trade_pct),
-      max_trade_pct: Number(draft.max_trade_pct),
-      min_tokens_abs: Number(draft.min_tokens_abs),
       inactivity_threshold_h: Number(draft.inactivity_threshold_h),
       max_bot_daily_volume_pct: Number(draft.max_bot_daily_volume_pct),
       daily_volume_floor_fc: Number(draft.daily_volume_floor_fc),
-      max_trades_per_coin_day: Number(draft.max_trades_per_coin_day),
-      max_price_impact_pct: Number(draft.max_price_impact_pct),
       reserve_low_threshold_fc: Number(draft.reserve_low_threshold_fc),
-      tick_interval_minutes: Number(draft.tick_interval_minutes),
+      bot_profiles: botDrafts.map((bot) => ({
+        bot_id: bot.bot_id,
+        bot_name: bot.bot_name,
+        enabled: Boolean(bot.enabled),
+        min_trade_pct: Number(bot.min_trade_pct),
+        max_trade_pct: Number(bot.max_trade_pct),
+        min_tokens_abs: Number(bot.min_tokens_abs),
+        tick_interval_seconds: Number(bot.tick_interval_seconds),
+        max_trades_per_coin_day: Number(bot.max_trades_per_coin_day),
+        max_price_impact_pct: Number(bot.max_price_impact_pct),
+      })),
     });
   }
 
@@ -108,15 +121,33 @@ function BotsTab({ config, onSave }) {
       </div>
 
       <div className="cg-admin-form-grid">
-        <NumberField label="Min trade pct" value={draft.min_trade_pct} onChange={(v) => set('min_trade_pct', v)} step="0.0001" />
-        <NumberField label="Max trade pct" value={draft.max_trade_pct} onChange={(v) => set('max_trade_pct', v)} step="0.0001" />
-        <NumberField label="Min tokens" value={draft.min_tokens_abs} onChange={(v) => set('min_tokens_abs', v)} step="1" />
         <NumberField label="Inactive hours" value={draft.inactivity_threshold_h} onChange={(v) => set('inactivity_threshold_h', v)} step="1" />
         <NumberField label="Daily volume cap" value={draft.max_bot_daily_volume_pct} onChange={(v) => set('max_bot_daily_volume_pct', v)} step="0.01" />
         <NumberField label="Daily floor FC" value={draft.daily_volume_floor_fc} onChange={(v) => set('daily_volume_floor_fc', v)} step="100" />
-        <NumberField label="Trades per coin/day" value={draft.max_trades_per_coin_day} onChange={(v) => set('max_trades_per_coin_day', v)} step="1" />
-        <NumberField label="Max price impact" value={draft.max_price_impact_pct} onChange={(v) => set('max_price_impact_pct', v)} step="0.01" />
-        <NumberField label="Tick interval minutes" value={draft.tick_interval_minutes} onChange={(v) => set('tick_interval_minutes', v)} step="1" min="1" />
+        <NumberField label="Reserve low threshold" value={draft.reserve_low_threshold_fc} onChange={(v) => set('reserve_low_threshold_fc', v)} step="100" />
+      </div>
+
+      <div className="cg-bot-profile-grid">
+        {botDrafts.map((bot) => (
+          <div className={`cg-bot-profile-card ${bot.bot_id}`} key={bot.bot_id}>
+            <div className="cg-bot-profile-head">
+              <label>
+                <input type="checkbox" checked={Boolean(bot.enabled)} onChange={(event) => setBot(bot.bot_id, 'enabled', event.target.checked)} />
+                <strong>{bot.bot_name}</strong>
+              </label>
+              <span>{bot.bot_id}</span>
+            </div>
+            <div className="cg-admin-form-grid compact">
+              <NumberField label="Min trade pct" value={bot.min_trade_pct} onChange={(v) => setBot(bot.bot_id, 'min_trade_pct', v)} step="0.0001" />
+              <NumberField label="Max trade pct" value={bot.max_trade_pct} onChange={(v) => setBot(bot.bot_id, 'max_trade_pct', v)} step="0.0001" />
+              <NumberField label="Min tokens" value={bot.min_tokens_abs} onChange={(v) => setBot(bot.bot_id, 'min_tokens_abs', v)} step="1" />
+              <NumberField label="Tick interval seconds" value={bot.tick_interval_seconds} onChange={(v) => setBot(bot.bot_id, 'tick_interval_seconds', v)} step="1" min="1" />
+              <NumberField label="Trades per coin/day" value={bot.max_trades_per_coin_day} onChange={(v) => setBot(bot.bot_id, 'max_trades_per_coin_day', v)} step="1" min="1" />
+              <NumberField label="Max price impact" value={bot.max_price_impact_pct} onChange={(v) => setBot(bot.bot_id, 'max_price_impact_pct', v)} step="0.01" />
+            </div>
+            <div className="cg-admin-muted">Last tick: {timeAgo(bot.last_tick_at)}</div>
+          </div>
+        ))}
       </div>
 
       <BotVariablesInfo />
@@ -234,11 +265,12 @@ function LogsTab({ logs, coins, onRefresh }) {
       </div>
       <div className="cg-admin-table-wrap">
         <table className="cg-admin-table">
-          <thead><tr><th>Time</th><th>Coin</th><th>Action</th><th>Reason</th><th>Tokens</th><th>FC</th></tr></thead>
+          <thead><tr><th>Time</th><th>Bot</th><th>Coin</th><th>Action</th><th>Reason</th><th>Tokens</th><th>FC</th></tr></thead>
           <tbody>
             {(logs || []).map((log) => (
               <tr key={log.id}>
                 <td>{timeAgo(log.tick_at)}</td>
+                <td>{log.bot_name || log.bot_id || 'System'}</td>
                 <td>{log.coin_name || 'System'}</td>
                 <td><span className={`cg-admin-action ${log.action}`}>{log.action}</span></td>
                 <td>{log.reason || '-'}</td>

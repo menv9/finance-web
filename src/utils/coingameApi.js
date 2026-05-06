@@ -266,7 +266,8 @@ export async function updateBotGlobalConfig(params = {}) {
     p_max_trades_per_coin_day: params.max_trades_per_coin_day,
     p_max_price_impact_pct: params.max_price_impact_pct,
     p_reserve_low_threshold_fc: params.reserve_low_threshold_fc,
-    p_tick_interval_minutes: params.tick_interval_minutes,
+    p_tick_interval_seconds: params.tick_interval_seconds,
+    p_bot_profiles: params.bot_profiles,
   });
 }
 

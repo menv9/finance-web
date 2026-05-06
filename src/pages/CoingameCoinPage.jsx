@@ -199,7 +199,7 @@ function RecentTradesSection({ coinId, refreshKey }) {
             <div className={`cg-recent-trade ${trade.is_bot ? 'bot' : ''}`} key={trade.id}>
               <span className={`cg-trade-dot ${isBuy ? 'buy' : 'sell'}`}>{isBuy ? '^' : 'v'}</span>
               <div>
-                <strong>{trade.is_bot ? 'System Liquidity' : `@${trade.actor_username || 'user'}`}</strong>
+                <strong>{trade.is_bot ? (trade.actor_username || 'System Liquidity') : `@${trade.actor_username || 'user'}`}</strong>
                 <span>{new Date(trade.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
               {trade.is_bot && <span className="cg-system-badge">SYS</span>}

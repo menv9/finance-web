@@ -1,9 +1,9 @@
--- Coingame: virtual social economy (FingesCoin / FC).
--- Run after profiles.sql. Fully virtual — no link to real money/finance_records.
+﻿-- Coingame: virtual social economy (FingesCoin / FC).
+-- Run after profiles.sql. Fully virtual â€” no link to real money/finance_records.
 -- All economy mutations go through SECURITY DEFINER RPCs so invariants
 -- (supply and fees) cannot be bypassed by clients.
 
--- ── constants ────────────────────────────────────────────────────────────────
+-- â”€â”€ constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Encoded as immutable SQL functions so they can be referenced from policies
 -- and other functions without a config table.
 
@@ -19,7 +19,7 @@ returns numeric language sql immutable as $$ select 75000::numeric $$;
 create or replace function public.cg_const_min_trade_fc()
 returns numeric language sql immutable as $$ select 10::numeric $$;
 
--- ── tables ───────────────────────────────────────────────────────────────────
+-- â”€â”€ tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 -- Singleton row tracking global economy counters.
 create table if not exists public.coingame_economy (
@@ -66,7 +66,7 @@ create trigger coingame_wallets_set_updated_at
   before update on public.coingame_wallets
   for each row execute function public.set_updated_at();
 
--- One personal coin per user (1:1). Public — anyone can browse the market.
+-- One personal coin per user (1:1). Public â€” anyone can browse the market.
 create table if not exists public.coingame_coins (
   coin_id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null unique references auth.users(id) on delete cascade,
@@ -178,12 +178,12 @@ drop policy if exists "leaderboard readable by authenticated" on public.coingame
 create policy "leaderboard readable by authenticated"
   on public.coingame_leaderboard_weekly for select to authenticated using (true);
 
--- ── pricing helpers ──────────────────────────────────────────────────────────
+-- â”€â”€ pricing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Bonding curve: spot_price(T) = base + k(T) * T^2  with segmented k:
 --   [0,        100_000):    k1 = 2e-8
 --   [100_000,  500_000):    k2 = 1e-8
 --   [500_000, 1_000_000):   k3 = 5e-9
---   [1_000_000, +∞):        k3 (clamped — segments only go to 1M in PRD)
+--   [1_000_000, +âˆž):        k3 (clamped â€” segments only go to 1M in PRD)
 -- Cost to buy `delta` tokens starting at `T` is integral of spot_price from T to T+delta.
 -- Each segment contributes:  base*(b - a) + (k/3) * (b^3 - a^3)
 
@@ -225,9 +225,9 @@ begin
 end;
 $$;
 
--- ── lazy wallet/coin initialization ──────────────────────────────────────────
+-- â”€â”€ lazy wallet/coin initialization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Called by clients on first Coingame access. Creates wallet (10k FC) only.
--- Idempotent — safe to call repeatedly.
+-- Idempotent â€” safe to call repeatedly.
 create or replace function public.cg_ensure_wallet()
 returns table (
   user_id uuid,
@@ -330,7 +330,7 @@ $$;
 
 grant execute on function public.cg_create_coin(text) to authenticated;
 
--- ── status promotion ────────────────────────────────────────────────────────
+-- â”€â”€ status promotion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- A coin becomes "strong" once its market cap (tokens_minted * spot_price) crosses 75k FC.
 create or replace function public.cg_recompute_status(p_coin_id uuid)
 returns text language plpgsql security definer set search_path = public as $$
@@ -357,7 +357,7 @@ begin
 end;
 $$;
 
--- ── leaderboard helper ──────────────────────────────────────────────────────
+-- â”€â”€ leaderboard helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create or replace function public.cg_current_week_start()
 returns date language sql stable as $$
   select (date_trunc('week', timezone('utc', now())))::date
@@ -378,7 +378,7 @@ begin
 end;
 $$;
 
--- ── BUY ──────────────────────────────────────────────────────────────────────
+-- â”€â”€ BUY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Buyer specifies how many tokens to buy. We compute FC cost via curve integral,
 -- apply 1% fee (0.5% burn / 0.5% prize pool), mint tokens, update holdings,
 -- and log the transaction.
@@ -421,7 +421,7 @@ begin
   -- Lock buyer wallet.
   select fc_balance into current_balance
     from public.coingame_wallets w where w.user_id = uid for update;
-  if not found then raise exception 'wallet not initialized — call cg_ensure_wallet first'; end if;
+  if not found then raise exception 'wallet not initialized â€” call cg_ensure_wallet first'; end if;
   if current_balance < total_charge then
     raise exception 'insufficient balance (need %, have %)', total_charge, current_balance;
   end if;
@@ -481,7 +481,7 @@ $$;
 
 grant execute on function public.cg_buy_coin(uuid, numeric) to authenticated;
 
--- ── SELL ─────────────────────────────────────────────────────────────────────
+-- â”€â”€ SELL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Sells `p_tokens` from the caller's holdings. Fee: 5% if last buy was <1h ago
 -- (anti-flip), otherwise 1%. Same 0.5/0.5 split into burn/pool.
 create or replace function public.cg_sell_coin(p_coin_id uuid, p_tokens numeric)
@@ -586,7 +586,7 @@ $$;
 
 grant execute on function public.cg_sell_coin(uuid, numeric) to authenticated;
 
--- ── DAILY CLAIM ──────────────────────────────────────────────────────────────
+-- â”€â”€ DAILY CLAIM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Login streak reward. Once per UTC day. Streak resets if a day was missed.
 create or replace function public.cg_claim_daily()
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -635,7 +635,7 @@ $$;
 
 grant execute on function public.cg_claim_daily() to authenticated;
 
--- ── MARKET / PORTFOLIO READ VIEWS ────────────────────────────────────────────
+-- â”€â”€ MARKET / PORTFOLIO READ VIEWS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create or replace view public.coingame_market_coins
 with (security_invoker = true) as
   select c.coin_id,
@@ -701,7 +701,7 @@ with (security_invoker = true) as
 
 grant select on public.coingame_transactions_view to authenticated;
 
--- ── LEADERBOARD VIEW ─────────────────────────────────────────────────────────
+-- â”€â”€ LEADERBOARD VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Real chart data derived from coin buy/sell transactions.
 create or replace function public.cg_coin_chart(p_coin_id uuid, p_hours integer default 24)
 returns table (
@@ -869,7 +869,7 @@ create table if not exists public.coingame_bot_config (
   max_price_impact_pct numeric not null default 0.05,
   reserve_fc numeric not null default 1000000,
   reserve_low_threshold_fc numeric not null default 10000,
-  tick_interval_minutes integer not null default 30,
+  tick_interval_seconds integer not null default 1800,
   last_tick_at timestamptz,
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -877,7 +877,31 @@ create table if not exists public.coingame_bot_config (
 alter table public.coingame_bot_config enable row level security;
 
 alter table public.coingame_bot_config
-  add column if not exists tick_interval_minutes integer not null default 30;
+  add column if not exists tick_interval_seconds integer not null default 1800;
+
+create table if not exists public.coingame_bot_profiles (
+  bot_id text primary key,
+  bot_name text not null,
+  enabled boolean not null default true,
+  min_trade_pct numeric not null,
+  max_trade_pct numeric not null,
+  min_tokens_abs numeric not null,
+  tick_interval_seconds integer not null default 60,
+  max_trades_per_coin_day integer not null default 3,
+  max_price_impact_pct numeric not null default 0.05,
+  last_tick_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.coingame_bot_profiles enable row level security;
+
+insert into public.coingame_bot_profiles
+  (bot_id, bot_name, enabled, min_trade_pct, max_trade_pct, min_tokens_abs, tick_interval_seconds, max_trades_per_coin_day, max_price_impact_pct)
+values
+  ('cautious', 'System Cautious', true, 0.0005, 0.002, 50, 60, 3, 0.05),
+  ('balanced', 'System Balanced', true, 0.002, 0.010, 250, 30, 12, 0.12),
+  ('aggressive', 'System Aggressive', true, 0.005, 0.025, 500, 10, 30, 0.25)
+on conflict (bot_id) do nothing;
 
 insert into public.coingame_bot_config (id)
 values (1)
@@ -894,6 +918,7 @@ alter table public.coingame_bot_coin_config enable row level security;
 create table if not exists public.coingame_bot_log (
   id uuid primary key default gen_random_uuid(),
   tick_at timestamptz not null default timezone('utc', now()),
+  bot_id text references public.coingame_bot_profiles(bot_id) on delete set null,
   coin_id uuid references public.coingame_coins(coin_id) on delete set null,
   action text not null check (action in ('buy', 'sell', 'skip', 'disabled', 'throttle', 'reserve_low', 'error')),
   reason text,
@@ -908,6 +933,9 @@ create index if not exists coingame_bot_log_tick_idx on public.coingame_bot_log 
 create index if not exists coingame_bot_log_coin_tick_idx on public.coingame_bot_log (coin_id, tick_at desc);
 
 alter table public.coingame_bot_log enable row level security;
+
+alter table public.coingame_bot_log
+  add column if not exists bot_id text references public.coingame_bot_profiles(bot_id) on delete set null;
 
 create table if not exists public.coingame_bot_daily_volume (
   trade_date date primary key,
@@ -962,10 +990,14 @@ $$;
 
 grant execute on function public.cg_admin_status() to authenticated;
 
+
+-- Multi-profile version. Kept after the original definition so re-running this
+-- file upgrades existing projects without requiring a manual drop.
 create or replace function public.cg_bot_tick()
 returns void language plpgsql security definer set search_path = public as $$
 declare
   cfg public.coingame_bot_config%rowtype;
+  bot public.coingame_bot_profiles%rowtype;
   c record;
   today date := (timezone('utc', now()))::date;
   daily_bot_volume numeric := 0;
@@ -996,11 +1028,6 @@ begin
     select * into cfg from public.coingame_bot_config where id = 1 for update;
   end if;
 
-  if cfg.last_tick_at is not null
-     and cfg.last_tick_at > timezone('utc', now()) - make_interval(mins => greatest(cfg.tick_interval_minutes, 1)) then
-    return;
-  end if;
-
   if not cfg.enabled then
     update public.coingame_bot_config
       set last_tick_at = timezone('utc', now()), updated_at = timezone('utc', now())
@@ -1028,188 +1055,209 @@ begin
     return;
   end if;
 
-  reserve_low := cfg.reserve_fc < cfg.reserve_low_threshold_fc;
-  if reserve_low then
-    insert into public.coingame_bot_log (action, reason, metadata)
-    values ('reserve_low', 'buy_disabled', jsonb_build_object('reserve_fc', cfg.reserve_fc));
-  end if;
-
-  for c in
-    select coin.coin_id, coin.base_price, coin.tokens_minted, coin.status, coin.created_at
-      from public.coingame_coins coin
-      left join public.coingame_bot_coin_config bcc on bcc.coin_id = coin.coin_id
-      where coalesce(bcc.enabled, true) = true
-        and (coin.status in ('active', 'strong', 'starter') or coin.created_at >= timezone('utc', now()) - interval '24 hours')
-      order by coin.created_at desc
+  for bot in
+    select *
+      from public.coingame_bot_profiles
+      where enabled = true
+        and (
+          last_tick_at is null
+          or last_tick_at <= timezone('utc', now()) - make_interval(secs => greatest(tick_interval_seconds, 1))
+        )
+      order by tick_interval_seconds asc, bot_id asc
+      for update
   loop
-    begin
-      select coin_id, base_price, tokens_minted, status, created_at
-        into c
-        from public.coingame_coins
-        where coin_id = c.coin_id
-        for update;
+    reserve_low := cfg.reserve_fc < cfg.reserve_low_threshold_fc;
+    if reserve_low then
+      insert into public.coingame_bot_log (bot_id, action, reason, metadata)
+      values (bot.bot_id, 'reserve_low', 'buy_disabled', jsonb_build_object('reserve_fc', cfg.reserve_fc));
+    end if;
 
-      is_new_coin := c.created_at >= timezone('utc', now()) - interval '24 hours';
+    for c in
+      select coin.coin_id, coin.base_price, coin.tokens_minted, coin.status, coin.created_at
+        from public.coingame_coins coin
+        left join public.coingame_bot_coin_config bcc on bcc.coin_id = coin.coin_id
+        where coalesce(bcc.enabled, true) = true
+          and (coin.status in ('active', 'strong', 'starter') or coin.created_at >= timezone('utc', now()) - interval '24 hours')
+        order by random()
+    loop
+      begin
+        select coin_id, base_price, tokens_minted, status, created_at
+          into c
+          from public.coingame_coins
+          where coin_id = c.coin_id
+          for update;
 
-      select count(*) into bot_trades_today
-        from public.coingame_bot_log
-        where coin_id = c.coin_id
-          and action in ('buy', 'sell')
-          and (tick_at at time zone 'UTC')::date = today;
-      if bot_trades_today >= cfg.max_trades_per_coin_day then
-        insert into public.coingame_bot_log (coin_id, action, reason)
-        values (c.coin_id, 'skip', 'coin_daily_limit');
-        continue;
-      end if;
+        is_new_coin := c.created_at >= timezone('utc', now()) - interval '24 hours';
 
-      select max(created_at) into last_real_trade
-        from public.coingame_transactions
-        where coin_id = c.coin_id
-          and tx_type in ('buy', 'sell')
-          and from_user_id is not null
-          and (metadata is null or metadata->>'bot' is null);
-      if not is_new_coin and last_real_trade is not null
-         and last_real_trade > timezone('utc', now()) - make_interval(hours => cfg.inactivity_threshold_h) then
-        continue;
-      end if;
+        select count(*) into bot_trades_today
+          from public.coingame_bot_log
+          where coin_id = c.coin_id
+            and bot_id = bot.bot_id
+            and action in ('buy', 'sell')
+            and (tick_at at time zone 'UTC')::date = today;
+        if bot_trades_today >= bot.max_trades_per_coin_day then
+          insert into public.coingame_bot_log (bot_id, coin_id, action, reason)
+          values (bot.bot_id, c.coin_id, 'skip', 'coin_daily_limit');
+          continue;
+        end if;
 
-      if c.tokens_minted <= 0 or c.tokens_minted < cfg.min_tokens_abs * 2 then
-        action_name := 'buy';
-      elsif reserve_low then
-        action_name := 'sell';
-      else
-        select count(*) filter (where action = 'buy'), count(*)
-          into recent_buys, recent_total
-          from (
-            select action
-              from public.coingame_bot_log
-              where coin_id = c.coin_id and action in ('buy', 'sell')
-              order by tick_at desc
-              limit 10
-          ) recent;
+        select max(created_at) into last_real_trade
+          from public.coingame_transactions
+          where coin_id = c.coin_id
+            and tx_type in ('buy', 'sell')
+            and from_user_id is not null
+            and (metadata is null or metadata->>'bot' is null);
+        if not is_new_coin and last_real_trade is not null
+           and last_real_trade > timezone('utc', now()) - make_interval(hours => cfg.inactivity_threshold_h) then
+          continue;
+        end if;
 
-        if recent_total > 0 and recent_buys::numeric / recent_total > 0.6 then
+        if c.tokens_minted <= 0 or c.tokens_minted < bot.min_tokens_abs * 2 then
+          action_name := 'buy';
+        elsif reserve_low then
           action_name := 'sell';
-        elsif recent_total > 0 and recent_buys::numeric / recent_total < 0.4 then
-          action_name := 'buy';
-        elsif random() < 0.5 then
-          action_name := 'buy';
         else
-          action_name := 'sell';
+          select count(*) filter (where action = 'buy'), count(*)
+            into recent_buys, recent_total
+            from (
+              select action
+                from public.coingame_bot_log
+                where coin_id = c.coin_id
+                  and bot_id = bot.bot_id
+                  and action in ('buy', 'sell')
+                order by tick_at desc
+                limit 10
+            ) recent;
+
+          if recent_total > 0 and recent_buys::numeric / recent_total > 0.6 then
+            action_name := 'sell';
+          elsif recent_total > 0 and recent_buys::numeric / recent_total < 0.4 then
+            action_name := 'buy';
+          elsif random() < 0.5 then
+            action_name := 'buy';
+          else
+            action_name := 'sell';
+          end if;
+
+          if random() < 0.30 then
+            action_name := case when action_name = 'buy' then 'sell' else 'buy' end;
+          end if;
         end if;
 
-        if random() < 0.30 then
-          action_name := case when action_name = 'buy' then 'sell' else 'buy' end;
+        if reserve_low and action_name = 'buy' then
+          continue;
         end if;
-      end if;
+        if action_name = 'sell' and c.tokens_minted <= 0 then
+          continue;
+        end if;
 
-      if reserve_low and action_name = 'buy' then
-        continue;
-      end if;
-      if action_name = 'sell' and c.tokens_minted <= 0 then
-        continue;
-      end if;
+        pct := bot.min_trade_pct + random() * greatest(bot.max_trade_pct - bot.min_trade_pct, 0);
+        v_tokens := greatest(bot.min_tokens_abs, c.tokens_minted * pct);
+        if action_name = 'sell' then
+          v_tokens := least(v_tokens, c.tokens_minted * 0.5);
+        end if;
 
-      pct := cfg.min_trade_pct + random() * greatest(cfg.max_trade_pct - cfg.min_trade_pct, 0);
-      v_tokens := greatest(cfg.min_tokens_abs, c.tokens_minted * pct);
-      if action_name = 'sell' then
-        v_tokens := least(v_tokens, c.tokens_minted * 0.5);
-      end if;
+        current_spot := public.cg_spot_price(c.tokens_minted, c.base_price);
+        reduction_guard := 0;
+        loop
+          if action_name = 'buy' then
+            post_spot := public.cg_spot_price(c.tokens_minted + v_tokens, c.base_price);
+          else
+            post_spot := public.cg_spot_price(c.tokens_minted - v_tokens, c.base_price);
+          end if;
+          delta_pct := abs(post_spot - current_spot) / nullif(current_spot, 0);
+          exit when coalesce(delta_pct, 0) <= bot.max_price_impact_pct or v_tokens < bot.min_tokens_abs or reduction_guard >= 8;
+          v_tokens := v_tokens * 0.5;
+          reduction_guard := reduction_guard + 1;
+        end loop;
 
-      current_spot := public.cg_spot_price(c.tokens_minted, c.base_price);
-      reduction_guard := 0;
-      loop
+        if v_tokens < bot.min_tokens_abs then
+          insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens)
+          values (bot.bot_id, c.coin_id, 'skip', 'price_impact_min_tokens', v_tokens);
+          continue;
+        end if;
+
+        if coalesce(delta_pct, 0) > bot.max_price_impact_pct then
+          insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens, metadata)
+          values (bot.bot_id, c.coin_id, 'skip', 'price_impact_limit', v_tokens, jsonb_build_object('delta_pct', delta_pct));
+          continue;
+        end if;
+
         if action_name = 'buy' then
-          post_spot := public.cg_spot_price(c.tokens_minted + v_tokens, c.base_price);
+          if c.tokens_minted + v_tokens > public.cg_const_total_supply_cap() then
+            insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens)
+            values (bot.bot_id, c.coin_id, 'skip', 'supply_cap', v_tokens);
+            continue;
+          end if;
+          amount_fc := public.cg_curve_integral(c.tokens_minted, c.tokens_minted + v_tokens, c.base_price);
+          if amount_fc > cfg.reserve_fc then
+            insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens, fc_amount)
+            values (bot.bot_id, c.coin_id, 'skip', 'reserve_insufficient', v_tokens, amount_fc);
+            continue;
+          end if;
+
+          update public.coingame_bot_config
+            set reserve_fc = reserve_fc - amount_fc, updated_at = timezone('utc', now())
+            where id = 1
+            returning * into cfg;
+          update public.coingame_coins
+            set tokens_minted = tokens_minted + v_tokens
+            where coin_id = c.coin_id;
+          update public.coingame_economy
+            set total_supply_minted = total_supply_minted + v_tokens,
+                updated_at = timezone('utc', now())
+            where id = 1;
+
+          insert into public.coingame_transactions
+            (tx_type, from_user_id, to_user_id, coin_id, tokens, fc_amount, spot_price, metadata)
+          values
+            ('buy', null, null, c.coin_id, v_tokens, amount_fc, post_spot,
+             jsonb_build_object('bot', true, 'bot_id', bot.bot_id, 'label', bot.bot_name));
         else
-          post_spot := public.cg_spot_price(c.tokens_minted - v_tokens, c.base_price);
-        end if;
-        delta_pct := abs(post_spot - current_spot) / nullif(current_spot, 0);
-        exit when coalesce(delta_pct, 0) <= cfg.max_price_impact_pct or v_tokens < cfg.min_tokens_abs or reduction_guard >= 8;
-        v_tokens := v_tokens * 0.5;
-        reduction_guard := reduction_guard + 1;
-      end loop;
+          if c.tokens_minted < v_tokens then
+            insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens)
+            values (bot.bot_id, c.coin_id, 'skip', 'minted_below_sell', v_tokens);
+            continue;
+          end if;
+          amount_fc := public.cg_curve_integral(c.tokens_minted - v_tokens, c.tokens_minted, c.base_price);
 
-      if v_tokens < cfg.min_tokens_abs then
-        insert into public.coingame_bot_log (coin_id, action, reason, tokens)
-        values (c.coin_id, 'skip', 'price_impact_min_tokens', v_tokens);
-        continue;
-      end if;
+          update public.coingame_bot_config
+            set reserve_fc = reserve_fc + amount_fc, updated_at = timezone('utc', now())
+            where id = 1
+            returning * into cfg;
+          update public.coingame_coins
+            set tokens_minted = tokens_minted - v_tokens
+            where coin_id = c.coin_id;
+          update public.coingame_economy
+            set total_supply_minted = greatest(0, total_supply_minted - v_tokens),
+                updated_at = timezone('utc', now())
+            where id = 1;
 
-      if coalesce(delta_pct, 0) > cfg.max_price_impact_pct then
-        insert into public.coingame_bot_log (coin_id, action, reason, tokens, metadata)
-        values (c.coin_id, 'skip', 'price_impact_limit', v_tokens, jsonb_build_object('delta_pct', delta_pct));
-        continue;
-      end if;
-
-      if action_name = 'buy' then
-        if c.tokens_minted + v_tokens > public.cg_const_total_supply_cap() then
-          insert into public.coingame_bot_log (coin_id, action, reason, tokens)
-          values (c.coin_id, 'skip', 'supply_cap', v_tokens);
-          continue;
-        end if;
-        amount_fc := public.cg_curve_integral(c.tokens_minted, c.tokens_minted + v_tokens, c.base_price);
-        if amount_fc > cfg.reserve_fc then
-          insert into public.coingame_bot_log (coin_id, action, reason, tokens, fc_amount)
-          values (c.coin_id, 'skip', 'reserve_insufficient', v_tokens, amount_fc);
-          continue;
+          insert into public.coingame_transactions
+            (tx_type, from_user_id, to_user_id, coin_id, tokens, fc_amount, spot_price, metadata)
+          values
+            ('sell', null, null, c.coin_id, v_tokens, amount_fc, post_spot,
+             jsonb_build_object('bot', true, 'bot_id', bot.bot_id, 'label', bot.bot_name));
         end if;
 
-        update public.coingame_bot_config
-          set reserve_fc = reserve_fc - amount_fc, updated_at = timezone('utc', now())
-          where id = 1;
-        update public.coingame_coins
-          set tokens_minted = tokens_minted + v_tokens
-          where coin_id = c.coin_id;
-        update public.coingame_economy
-          set total_supply_minted = total_supply_minted + v_tokens,
-              updated_at = timezone('utc', now())
-          where id = 1;
+        perform public.cg_recompute_status(c.coin_id);
 
-        insert into public.coingame_transactions
-          (tx_type, from_user_id, to_user_id, coin_id, tokens, fc_amount, spot_price, metadata)
-        values
-          ('buy', null, null, c.coin_id, v_tokens, amount_fc, post_spot,
-           jsonb_build_object('bot', true, 'label', 'System Liquidity'));
-      else
-        if c.tokens_minted < v_tokens then
-          insert into public.coingame_bot_log (coin_id, action, reason, tokens)
-          values (c.coin_id, 'skip', 'minted_below_sell', v_tokens);
-          continue;
-        end if;
-        amount_fc := public.cg_curve_integral(c.tokens_minted - v_tokens, c.tokens_minted, c.base_price);
+        insert into public.coingame_bot_log (bot_id, coin_id, action, reason, tokens, fc_amount, spot_price)
+        values (bot.bot_id, c.coin_id, action_name, 'inactivity_liquidity', v_tokens, amount_fc, post_spot);
 
-        update public.coingame_bot_config
-          set reserve_fc = reserve_fc + amount_fc, updated_at = timezone('utc', now())
-          where id = 1;
-        update public.coingame_coins
-          set tokens_minted = tokens_minted - v_tokens
-          where coin_id = c.coin_id;
-        update public.coingame_economy
-          set total_supply_minted = greatest(0, total_supply_minted - v_tokens),
-              updated_at = timezone('utc', now())
-          where id = 1;
+        insert into public.coingame_bot_daily_volume (trade_date, bot_volume_fc)
+        values (today, abs(amount_fc))
+        on conflict (trade_date) do update
+          set bot_volume_fc = public.coingame_bot_daily_volume.bot_volume_fc + abs(amount_fc);
+      exception when others then
+        insert into public.coingame_bot_log (bot_id, coin_id, action, reason, metadata)
+        values (bot.bot_id, c.coin_id, 'error', SQLERRM, jsonb_build_object('sqlstate', SQLSTATE));
+      end;
+    end loop;
 
-        insert into public.coingame_transactions
-          (tx_type, from_user_id, to_user_id, coin_id, tokens, fc_amount, spot_price, metadata)
-        values
-          ('sell', null, null, c.coin_id, v_tokens, amount_fc, post_spot,
-           jsonb_build_object('bot', true, 'label', 'System Liquidity'));
-      end if;
-
-      perform public.cg_recompute_status(c.coin_id);
-
-      insert into public.coingame_bot_log (coin_id, action, reason, tokens, fc_amount, spot_price)
-      values (c.coin_id, action_name, 'inactivity_liquidity', v_tokens, amount_fc, post_spot);
-
-      insert into public.coingame_bot_daily_volume (trade_date, bot_volume_fc)
-      values (today, abs(amount_fc))
-      on conflict (trade_date) do update
-        set bot_volume_fc = public.coingame_bot_daily_volume.bot_volume_fc + abs(amount_fc);
-    exception when others then
-      insert into public.coingame_bot_log (coin_id, action, reason, metadata)
-      values (c.coin_id, 'error', SQLERRM, jsonb_build_object('sqlstate', SQLSTATE));
-    end;
+    update public.coingame_bot_profiles
+      set last_tick_at = timezone('utc', now()), updated_at = timezone('utc', now())
+      where bot_id = bot.bot_id;
   end loop;
 
   update public.coingame_bot_config
@@ -1238,7 +1286,10 @@ returns table (
          t.spot_price,
          t.created_at,
          coalesce((t.metadata->>'bot')::boolean, false) as is_bot,
-         p.username::text as actor_username
+         case
+           when coalesce((t.metadata->>'bot')::boolean, false) then coalesce(t.metadata->>'label', 'System Liquidity')
+           else p.username::text
+         end as actor_username
     from public.coingame_transactions t
     left join public.profiles p on p.user_id = t.from_user_id
     where t.coin_id = p_coin_id
@@ -1253,6 +1304,7 @@ create or replace function public.cg_bot_get_config()
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   cfg jsonb;
+  bots jsonb;
   coins jsonb;
 begin
   if not public.cg_is_admin() then raise exception 'unauthorized'; end if;
@@ -1260,6 +1312,10 @@ begin
   select to_jsonb(c) into cfg
     from public.coingame_bot_config c
     where id = 1;
+
+  select coalesce(jsonb_agg(to_jsonb(b) order by b.tick_interval_seconds desc), '[]'::jsonb)
+    into bots
+    from public.coingame_bot_profiles b;
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'coin_id', coin.coin_id,
@@ -1283,11 +1339,13 @@ begin
     left join public.profiles p on p.user_id = coin.owner_user_id
     left join public.coingame_bot_coin_config bcc on bcc.coin_id = coin.coin_id;
 
-  return jsonb_build_object('global', cfg, 'coins', coins);
+  return jsonb_build_object('global', cfg, 'bots', bots, 'coins', coins);
 end;
 $$;
 
 grant execute on function public.cg_bot_get_config() to authenticated;
+
+drop function if exists public.cg_bot_update_global_config(boolean, numeric, numeric, numeric, integer, numeric, numeric, integer, numeric, numeric, integer);
 
 create or replace function public.cg_bot_update_global_config(
   p_enabled boolean default null,
@@ -1300,8 +1358,11 @@ create or replace function public.cg_bot_update_global_config(
   p_max_trades_per_coin_day integer default null,
   p_max_price_impact_pct numeric default null,
   p_reserve_low_threshold_fc numeric default null,
-  p_tick_interval_minutes integer default null
+  p_tick_interval_seconds integer default null,
+  p_bot_profiles jsonb default null
 ) returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  profile jsonb;
 begin
   if not public.cg_is_admin() then raise exception 'unauthorized'; end if;
 
@@ -1316,15 +1377,32 @@ begin
         max_trades_per_coin_day = coalesce(p_max_trades_per_coin_day, max_trades_per_coin_day),
         max_price_impact_pct = coalesce(p_max_price_impact_pct, max_price_impact_pct),
         reserve_low_threshold_fc = coalesce(p_reserve_low_threshold_fc, reserve_low_threshold_fc),
-        tick_interval_minutes = greatest(coalesce(p_tick_interval_minutes, tick_interval_minutes), 1),
+        tick_interval_seconds = greatest(coalesce(p_tick_interval_seconds, tick_interval_seconds), 1),
         updated_at = timezone('utc', now())
     where id = 1;
+
+  if p_bot_profiles is not null then
+    for profile in select * from jsonb_array_elements(p_bot_profiles)
+    loop
+      update public.coingame_bot_profiles
+        set bot_name = coalesce(nullif(profile->>'bot_name', ''), bot_name),
+            enabled = coalesce((profile->>'enabled')::boolean, enabled),
+            min_trade_pct = coalesce((profile->>'min_trade_pct')::numeric, min_trade_pct),
+            max_trade_pct = coalesce((profile->>'max_trade_pct')::numeric, max_trade_pct),
+            min_tokens_abs = coalesce((profile->>'min_tokens_abs')::numeric, min_tokens_abs),
+            tick_interval_seconds = greatest(coalesce((profile->>'tick_interval_seconds')::integer, tick_interval_seconds), 1),
+            max_trades_per_coin_day = greatest(coalesce((profile->>'max_trades_per_coin_day')::integer, max_trades_per_coin_day), 1),
+            max_price_impact_pct = coalesce((profile->>'max_price_impact_pct')::numeric, max_price_impact_pct),
+            updated_at = timezone('utc', now())
+        where bot_id = profile->>'bot_id';
+    end loop;
+  end if;
 
   return public.cg_bot_get_config();
 end;
 $$;
 
-grant execute on function public.cg_bot_update_global_config(boolean, numeric, numeric, numeric, integer, numeric, numeric, integer, numeric, numeric, integer) to authenticated;
+grant execute on function public.cg_bot_update_global_config(boolean, numeric, numeric, numeric, integer, numeric, numeric, integer, numeric, numeric, integer, jsonb) to authenticated;
 
 create or replace function public.cg_bot_set_coin_enabled(p_coin_id uuid, p_enabled boolean)
 returns void language plpgsql security definer set search_path = public as $$
@@ -1340,10 +1418,14 @@ $$;
 
 grant execute on function public.cg_bot_set_coin_enabled(uuid, boolean) to authenticated;
 
+drop function if exists public.cg_bot_get_logs(integer, uuid);
+
 create or replace function public.cg_bot_get_logs(p_limit integer default 50, p_coin_id uuid default null)
 returns table (
   id uuid,
   tick_at timestamptz,
+  bot_id text,
+  bot_name text,
   coin_id uuid,
   coin_name text,
   action text,
@@ -1358,6 +1440,8 @@ begin
   return query
     select l.id,
            l.tick_at,
+           l.bot_id,
+           coalesce(bp.bot_name, 'System Liquidity')::text as bot_name,
            l.coin_id,
            coalesce(nullif(trim(c.coin_name), ''), p.username, 'System')::text as coin_name,
            l.action,
@@ -1367,6 +1451,7 @@ begin
            l.spot_price,
            l.metadata
       from public.coingame_bot_log l
+      left join public.coingame_bot_profiles bp on bp.bot_id = l.bot_id
       left join public.coingame_coins c on c.coin_id = l.coin_id
       left join public.profiles p on p.user_id = c.owner_user_id
       where p_coin_id is null or l.coin_id = p_coin_id

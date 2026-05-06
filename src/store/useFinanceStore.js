@@ -3701,7 +3701,7 @@ export const useFinanceStore = create((set, get) => ({
       const key = 'coingame.lastBotTickAttempt';
       const now = Date.now();
       const last = Number(localStorage.getItem(key) || 0);
-      if (last && now - last < 60 * 1000) return;
+      if (last && now - last < 5 * 1000) return;
       localStorage.setItem(key, String(now));
       await apiTriggerBotTick();
     } catch {
