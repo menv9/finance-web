@@ -869,11 +869,15 @@ create table if not exists public.coingame_bot_config (
   max_price_impact_pct numeric not null default 0.05,
   reserve_fc numeric not null default 1000000,
   reserve_low_threshold_fc numeric not null default 10000,
+  tick_interval_minutes integer not null default 30,
   last_tick_at timestamptz,
   updated_at timestamptz not null default timezone('utc', now())
 );
 
 alter table public.coingame_bot_config enable row level security;
+
+alter table public.coingame_bot_config
+  add column if not exists tick_interval_minutes integer not null default 30;
 
 insert into public.coingame_bot_config (id)
 values (1)
@@ -992,7 +996,8 @@ begin
     select * into cfg from public.coingame_bot_config where id = 1 for update;
   end if;
 
-  if cfg.last_tick_at is not null and cfg.last_tick_at > timezone('utc', now()) - interval '30 minutes' then
+  if cfg.last_tick_at is not null
+     and cfg.last_tick_at > timezone('utc', now()) - make_interval(mins => greatest(cfg.tick_interval_minutes, 1)) then
     return;
   end if;
 
@@ -1294,7 +1299,8 @@ create or replace function public.cg_bot_update_global_config(
   p_daily_volume_floor_fc numeric default null,
   p_max_trades_per_coin_day integer default null,
   p_max_price_impact_pct numeric default null,
-  p_reserve_low_threshold_fc numeric default null
+  p_reserve_low_threshold_fc numeric default null,
+  p_tick_interval_minutes integer default null
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 begin
   if not public.cg_is_admin() then raise exception 'unauthorized'; end if;
@@ -1310,6 +1316,7 @@ begin
         max_trades_per_coin_day = coalesce(p_max_trades_per_coin_day, max_trades_per_coin_day),
         max_price_impact_pct = coalesce(p_max_price_impact_pct, max_price_impact_pct),
         reserve_low_threshold_fc = coalesce(p_reserve_low_threshold_fc, reserve_low_threshold_fc),
+        tick_interval_minutes = greatest(coalesce(p_tick_interval_minutes, tick_interval_minutes), 1),
         updated_at = timezone('utc', now())
     where id = 1;
 
@@ -1317,7 +1324,7 @@ begin
 end;
 $$;
 
-grant execute on function public.cg_bot_update_global_config(boolean, numeric, numeric, numeric, integer, numeric, numeric, integer, numeric, numeric) to authenticated;
+grant execute on function public.cg_bot_update_global_config(boolean, numeric, numeric, numeric, integer, numeric, numeric, integer, numeric, numeric, integer) to authenticated;
 
 create or replace function public.cg_bot_set_coin_enabled(p_coin_id uuid, p_enabled boolean)
 returns void language plpgsql security definer set search_path = public as $$

@@ -50,6 +50,7 @@ function BotVariablesInfo() {
     ['Daily floor FC', 'Free daily bot volume before the percentage cap applies. This lets empty markets bootstrap.'],
     ['Trades per coin/day', 'Hard limit for bot trades on each coin per UTC day. Higher keeps charts moving longer.'],
     ['Max price impact', 'Maximum allowed price move per bot trade. Higher allows bigger jumps; lower keeps movement subtle.'],
+    ['Tick interval minutes', 'Minimum time between bot runs at the server level. Lower values make the whole system wake up more often.'],
   ];
 
   return (
@@ -92,6 +93,7 @@ function BotsTab({ config, onSave }) {
       max_trades_per_coin_day: Number(draft.max_trades_per_coin_day),
       max_price_impact_pct: Number(draft.max_price_impact_pct),
       reserve_low_threshold_fc: Number(draft.reserve_low_threshold_fc),
+      tick_interval_minutes: Number(draft.tick_interval_minutes),
     });
   }
 
@@ -114,6 +116,7 @@ function BotsTab({ config, onSave }) {
         <NumberField label="Daily floor FC" value={draft.daily_volume_floor_fc} onChange={(v) => set('daily_volume_floor_fc', v)} step="100" />
         <NumberField label="Trades per coin/day" value={draft.max_trades_per_coin_day} onChange={(v) => set('max_trades_per_coin_day', v)} step="1" />
         <NumberField label="Max price impact" value={draft.max_price_impact_pct} onChange={(v) => set('max_price_impact_pct', v)} step="0.01" />
+        <NumberField label="Tick interval minutes" value={draft.tick_interval_minutes} onChange={(v) => set('tick_interval_minutes', v)} step="1" min="1" />
       </div>
 
       <BotVariablesInfo />
