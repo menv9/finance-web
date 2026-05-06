@@ -649,8 +649,8 @@ export default function FriendsMoneyPage() {
   const ACTIVE = ['pending', 'accepted'];
   // "They owe me" — manual IOUs or requests where I'm creditor (excl. payments)
   const oweYouEntries   = friendLedger.filter((e) => e.creditor_id === uid && ACTIVE.includes(e.status) && e.kind !== 'payment');
-  // "I owe" — manual IOUs only (requests get their own tab)
-  const youOweEntries   = friendLedger.filter((e) => e.debtor_id === uid && ACTIVE.includes(e.status) && e.kind !== 'request');
+  // "I owe" — manual IOUs only (exclude requests and in-flight payments to avoid double-counting)
+  const youOweEntries   = friendLedger.filter((e) => e.debtor_id === uid && ACTIVE.includes(e.status) && e.kind !== 'request' && e.kind !== 'payment');
   // Incoming money requests — someone asking me to pay them
   const requestEntries  = friendLedger.filter((e) => e.debtor_id === uid && ACTIVE.includes(e.status) && e.kind === 'request');
   const incomingEntries = friendLedger.filter((e) => e.creditor_id === uid && ACTIVE.includes(e.status) && e.kind === 'payment');
