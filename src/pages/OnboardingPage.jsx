@@ -93,6 +93,11 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const settings = useFinanceStore((state) => state.settings);
   const savingsConfig = useFinanceStore((state) => state.savingsConfig);
+
+  if (settings.onboardingCompleted) {
+    navigate('/', { replace: true });
+    return null;
+  }
   const holdings = useFinanceStore((state) => state.holdings);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const investmentPortfolios = useFinanceStore((state) => state.investmentPortfolios || []);
