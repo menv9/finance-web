@@ -119,6 +119,7 @@ export default function ThisMonthPage() {
 
   // Compute monthly KPIs from raw data for the selected month
   const metrics = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
     // Expenses paid from savings shouldn't count toward the monthly expense
     // total — the money already left "savings" balance, not the bank. Hybrid:
     // legacy transfer-linked expense IDs + new-style savings entries with
@@ -146,7 +147,7 @@ export default function ThisMonthPage() {
     const monthExpenses = expenses.filter(
       (e) => e.date?.slice(0, 7) === selectedMonth && !savingsPaidExpenseIds.has(e.id),
     );
-    const monthTransfers = transfers.filter((t) => t.date?.startsWith(selectedMonth));
+    const monthTransfers = transfers.filter((t) => t.date?.startsWith(selectedMonth) && t.date <= today);
 
     const incomeCents = monthIncomes.reduce((s, e) => s + (e.amountCents || 0), 0);
     const cashflowIncomeCents = monthCashflowIncomes.reduce((s, e) => s + (e.amountCents || 0), 0);

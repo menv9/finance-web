@@ -378,7 +378,11 @@ export default function IncomePage() {
   );
 
   const selectedMonthRows = useMemo(
-    () => incomeLedgerRows.filter((row) => incomeReportMonth(row) === selectedMonth),
+    () => incomeLedgerRows.filter((row) =>
+      incomeReportMonth(row) === selectedMonth &&
+      row.incomeKind !== 'transfer' &&
+      row.incomeKind !== 'portfolio_sale'
+    ),
     [incomeLedgerRows, selectedMonth],
   );
 

@@ -35,17 +35,25 @@ export function buildDividendIncomeRows(dividends = []) {
 }
 
 export function computeExpenseSeries(expenses) {
+  const today = new Date().toISOString().slice(0, 10);
   return lastTwelveMonths().map((month) => ({
     month: month.label,
-    amountCents: sumAmount(expenses.filter((expense) => monthKey(expense.date) === month.key)),
+    amountCents: sumAmount(expenses.filter((expense) =>
+      monthKey(expense.date) === month.key && expense.date <= today
+    )),
   }));
 }
 
 export function computeIncomeSeries(incomes, derivedIncomes = []) {
+  const today = new Date().toISOString().slice(0, 10);
   const rows = [...(incomes || []), ...(derivedIncomes || [])];
   return lastTwelveMonths().map((month) => ({
     month: month.label,
-    amountCents: sumAmount(rows.filter((income) => isReceivedIncome(income) && (income.accountingMonth || monthKey(income.date)) === month.key)),
+    amountCents: sumAmount(rows.filter((income) =>
+      isReceivedIncome(income) &&
+      (income.accountingMonth || monthKey(income.date)) === month.key &&
+      (income.accountingMonth || income.date) <= today
+    )),
   }));
 }
 
@@ -251,7 +259,7 @@ export function computeDashboardData({ expenses, incomes, fixedExpenses, investm
   // Distributions this month (income → savings / portfolio) are money you've
   // deliberately set aside — they're no longer "usable" discretionary cash.
   // Hybrid derivation: legacy transfer rows + new-style direct records.
-  const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth));
+  const thisMonthTransfers = (transfers || []).filter((t) => t.date?.startsWith(currentMonth) && t.date <= today);
   const isCashflowSource = (t) => t.fromModule === 'income' || t.fromModule === 'cashflow';
   const legacyDistToSavings = thisMonthTransfers
     .filter((t) => isCashflowSource(t) && t.toModule === 'savings')
