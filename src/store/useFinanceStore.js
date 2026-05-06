@@ -3252,6 +3252,7 @@ export const useFinanceStore = create((set, get) => ({
       const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
       let nextConflicts = [...state.syncMeta.conflicts];
       const nextLastPulledAt = { ...perStoreCursors };
+      let latestTimestamp = null;
 
       for (const change of changes) {
         if (!STORE_KEYS.includes(change.store_name)) continue;
@@ -3285,6 +3286,9 @@ export const useFinanceStore = create((set, get) => ({
         // Advance this store's cursor independently
         if (!nextLastPulledAt[change.store_name] || change.updated_at > nextLastPulledAt[change.store_name]) {
           nextLastPulledAt[change.store_name] = change.updated_at;
+        }
+        if (!latestTimestamp || change.updated_at > latestTimestamp) {
+          latestTimestamp = change.updated_at;
         }
       }
 
