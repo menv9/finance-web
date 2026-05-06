@@ -72,7 +72,7 @@ function BotVariablesInfo() {
   );
 }
 
-function BotsTab({ config, onSave }) {
+function BotsTab({ config, onSave, onRunTick }) {
   const global = config?.global || {};
   const bots = useMemo(() => config?.bots || [], [config]);
   const [draft, setDraft] = useState(global);
@@ -111,6 +111,10 @@ function BotsTab({ config, onSave }) {
     });
   }
 
+  async function runTick() {
+    await onRunTick();
+  }
+
   return (
     <div className="cg-admin-panel">
       <div className="cg-admin-toolbar">
@@ -118,7 +122,10 @@ function BotsTab({ config, onSave }) {
           <input type="checkbox" checked={Boolean(draft.enabled)} onChange={(event) => set('enabled', event.target.checked)} />
           <span>Global bot system</span>
         </label>
-        <div className="cg-admin-muted">Last tick: {timeAgo(global.last_tick_at)}</div>
+        <div className="cg-admin-toolbar-actions">
+          <div className="cg-admin-muted">Last tick: {timeAgo(global.last_tick_at)}</div>
+          <button type="button" className="cg-btn cg-btn-secondary cg-btn-sm" onClick={runTick}>Run tick now</button>
+        </div>
       </div>
 
       <div className="cg-admin-form-grid">
@@ -331,6 +338,7 @@ export default function CoingameAdminPage() {
   const addAdmin = useFinanceStore((s) => s.addCoingameAdmin);
   const removeAdmin = useFinanceStore((s) => s.removeCoingameAdmin);
   const refreshLogs = useFinanceStore((s) => s.refreshBotLogs);
+  const runBotTickNow = useFinanceStore((s) => s.runBotTickNow);
   const [tab, setTab] = useState('bots');
   const coins = useMemo(() => config?.coins || [], [config]);
 
@@ -367,7 +375,7 @@ export default function CoingameAdminPage() {
       </div>
 
       {error && <div className="cg-error">{error}</div>}
-      {tab === 'bots' && <BotsTab config={config} onSave={updateConfig} />}
+      {tab === 'bots' && <BotsTab config={config} onSave={updateConfig} onRunTick={runBotTickNow} />}
       {tab === 'health' && <HealthTab health={health} />}
       {tab === 'reserve' && <ReserveTab health={health} onSave={setReserve} />}
       {tab === 'casino' && <CasinoTab casino={casino} onSave={setCasinoHouseBalance} />}

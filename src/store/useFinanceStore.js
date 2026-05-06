@@ -3731,11 +3731,13 @@ export const useFinanceStore = create((set, get) => ({
       const key = 'coingame.lastBotTickAttempt';
       const now = Date.now();
       const last = Number(localStorage.getItem(key) || 0);
-      if (last && now - last < 5 * 1000) return;
+      if (last && now - last < 5 * 1000) return false;
       localStorage.setItem(key, String(now));
       await apiTriggerBotTick();
+      return true;
     } catch {
       // Bot ticks are opportunistic; user-facing Coingame loading should not fail.
+      return false;
     }
   },
 
@@ -3759,6 +3761,7 @@ export const useFinanceStore = create((set, get) => ({
         await get().loadProfile();
       }
       await ensureWallet();
+      await get().triggerBotTick();
       const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy, casino, gamblingBets] = await Promise.all([
         fetchWallet(user.id),
         fetchCoinByOwner(user.id),
@@ -3783,7 +3786,6 @@ export const useFinanceStore = create((set, get) => ({
         coingameStatus: 'idle',
         coingameNeedsCoinSetup: !ownCoin,
       });
-      get().triggerBotTick();
       get().loadCoingameAdminStatus();
     } catch (err) {
       set({ coingameStatus: 'error', coingameError: err.message || 'Failed to load Coingame' });
@@ -3849,6 +3851,39 @@ export const useFinanceStore = create((set, get) => ({
   setBotReserve: async (amount) => {
     await apiSetBotReserve(amount);
     await get().loadCoingameAdmin();
+  },
+
+  runBotTickNow: async () => {
+    set({ coingameAdminError: '' });
+    try {
+      localStorage.removeItem('coingame.lastBotTickAttempt');
+      await apiTriggerBotTick();
+      await get().loadCoingameAdmin();
+      const user = get().supabaseUser;
+      if (user) {
+        const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
+          fetchWallet(user.id),
+          fetchCoinByOwner(user.id),
+          apiFetchHoldings(user.id),
+          apiFetchTransactions(user.id),
+          fetchTrending(),
+          fetchWeeklyLeaderboard(get().coingameLeaderboardMetric),
+          fetchEconomy(),
+        ]);
+        set({
+          coingameWallet: wallet,
+          coingameOwnCoin: ownCoin,
+          coingameHoldings: holdings,
+          coingameTransactions: transactions,
+          coingameTrending: trending,
+          coingameLeaderboard: leaderboard,
+          coingameEconomy: economy,
+        });
+      }
+    } catch (err) {
+      set({ coingameAdminError: err.message || 'Failed to run bot tick' });
+      throw err;
+    }
   },
 
   setCasinoHouseBalance: async (amount) => {

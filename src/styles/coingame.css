@@ -1594,6 +1594,14 @@ button.cg-back-link {
   margin-bottom: 1rem;
 }
 
+.cg-admin-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .cg-admin-toggle {
   display: inline-flex;
   align-items: center;

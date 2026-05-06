@@ -1094,7 +1094,9 @@ begin
   daily_bot_volume := coalesce(daily_bot_volume, 0);
   daily_market_volume := coalesce(daily_market_volume, 0);
 
-  if daily_bot_volume >= cfg.daily_volume_floor_fc
+  if cfg.max_bot_daily_volume_pct > 0
+     and daily_market_volume > 0
+     and daily_bot_volume >= cfg.daily_volume_floor_fc
      and daily_bot_volume >= cfg.max_bot_daily_volume_pct * daily_market_volume then
     update public.coingame_bot_config
       set last_tick_at = timezone('utc', now()), updated_at = timezone('utc', now())
