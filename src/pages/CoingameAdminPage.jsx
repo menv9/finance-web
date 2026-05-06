@@ -77,6 +77,8 @@ function BotsTab({ config, onSave, onRunTick }) {
   const bots = useMemo(() => config?.bots || [], [config]);
   const [draft, setDraft] = useState(global);
   const [botDrafts, setBotDrafts] = useState(bots);
+  const [autoTickEnabled, setAutoTickEnabled] = useState(false);
+  const [autoTickMs, setAutoTickMs] = useState('1000');
 
   useEffect(() => {
     setDraft(global);
@@ -89,6 +91,15 @@ function BotsTab({ config, onSave, onRunTick }) {
       bot.bot_id === botId ? { ...bot, [key]: value } : bot
     )));
   };
+
+  useEffect(() => {
+    if (!autoTickEnabled) return undefined;
+    const ms = Math.max(100, Number(autoTickMs) || 1000);
+    const timer = setInterval(() => {
+      onRunTick().catch(() => {});
+    }, ms);
+    return () => clearInterval(timer);
+  }, [autoTickEnabled, autoTickMs, onRunTick]);
 
   async function save() {
     await onSave({
@@ -124,6 +135,23 @@ function BotsTab({ config, onSave, onRunTick }) {
         </label>
         <div className="cg-admin-toolbar-actions">
           <div className="cg-admin-muted">Last tick: {timeAgo(global.last_tick_at)}</div>
+          <label className="cg-auto-tick-control">
+            <input
+              type="checkbox"
+              checked={autoTickEnabled}
+              onChange={(event) => setAutoTickEnabled(event.target.checked)}
+              aria-label="Enable automatic bot ticks"
+            />
+            <input
+              type="number"
+              min="100"
+              step="100"
+              value={autoTickMs}
+              onChange={(event) => setAutoTickMs(event.target.value)}
+              aria-label="Automatic tick interval in milliseconds"
+            />
+            <span>ms</span>
+          </label>
           <button type="button" className="cg-btn cg-btn-secondary cg-btn-sm" onClick={runTick}>Run tick now</button>
         </div>
       </div>

@@ -1602,6 +1602,36 @@ button.cg-back-link {
   flex-wrap: wrap;
 }
 
+.cg-auto-tick-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 30px;
+  padding: 0 0.55rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 7px;
+  background: var(--cg-surface-raised);
+  color: var(--cg-text-3);
+  font-family: var(--cg-font-mono);
+  font-size: 0.72rem;
+}
+
+.cg-auto-tick-control input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--cg-accent);
+}
+
+.cg-auto-tick-control input[type="number"] {
+  width: 78px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cg-text);
+  font-family: var(--cg-font-mono);
+  font-size: 0.74rem;
+}
+
 .cg-admin-toggle {
   display: inline-flex;
   align-items: center;
