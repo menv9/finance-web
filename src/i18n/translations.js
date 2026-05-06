@@ -573,6 +573,7 @@ export const translations = {
         errorAccount: 'Please select an account to pay from.',
       },
       cancel: 'Cancel IOU',
+      accept: 'Accept',
       emptyTitle: 'All settled up!',
       request: {
         create: 'Request money',
@@ -614,6 +615,7 @@ export const translations = {
         settled: 'Settled',
         cancelled: 'Cancelled',
         rejected: 'Rejected',
+        awaiting: 'Awaiting',
       },
       form: {
         friend: 'Friend',
@@ -979,6 +981,20 @@ export const translations = {
         title: 'Delete debt',
         description: 'Remove "{name}" from Debts? Linked expenses won\'t be deleted.',
         confirm: 'Delete debt',
+      },
+      payment: {
+        button: 'Record payment',
+        eyebrow: 'Debt payment',
+        modalTitle: 'Record payment',
+        amountLabel: 'Amount paid ({currency})',
+        dateLabel: 'Date',
+        bankAccountLabel: 'Bank account',
+        bankAccountHint: 'Optional. Deducts an expense from the selected account.',
+        noBankAccount: 'No account deduction',
+        noBankAccountsHint: 'No bank accounts set up yet. Payment will only reduce the balance.',
+        save: 'Record payment',
+        errorAmount: { title: 'Missing amount', description: 'Enter the payment amount.' },
+        errorSave: { title: 'Unable to record payment', description: 'Something went wrong.' },
       },
     },
     expenses: {
@@ -2195,6 +2211,7 @@ export const translations = {
         errorAccount: 'Selecciona una cuenta desde la que pagar.',
       },
       cancel: 'Cancelar deuda',
+      accept: 'Aceptar',
       emptyTitle: '¡Todo saldado!',
       request: {
         create: 'Pedir dinero',
@@ -2236,6 +2253,7 @@ export const translations = {
         settled: 'Saldado',
         cancelled: 'Cancelado',
         rejected: 'Rechazado',
+        awaiting: 'Esperando',
       },
       form: {
         friend: 'Amigo',
@@ -2601,6 +2619,20 @@ export const translations = {
         title: 'Eliminar deuda',
         description: '¿Eliminar "{name}" de Deudas? Los gastos vinculados no se eliminarán.',
         confirm: 'Eliminar deuda',
+      },
+      payment: {
+        button: 'Registrar pago',
+        eyebrow: 'Pago de deuda',
+        modalTitle: 'Registrar pago',
+        amountLabel: 'Cantidad pagada ({currency})',
+        dateLabel: 'Fecha',
+        bankAccountLabel: 'Cuenta bancaria',
+        bankAccountHint: 'Opcional. Deduce un gasto de la cuenta seleccionada.',
+        noBankAccount: 'Sin deducción de cuenta',
+        noBankAccountsHint: 'No hay cuentas bancarias configuradas. El pago solo reducirá el saldo.',
+        save: 'Registrar pago',
+        errorAmount: { title: 'Falta el importe', description: 'Introduce el importe del pago.' },
+        errorSave: { title: 'No se pudo registrar el pago', description: 'Algo ha salido mal.' },
       },
     },
     expenses: {
