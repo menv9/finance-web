@@ -5,24 +5,20 @@ import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   Cell,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from 'recharts';
+import LWHistogram from '../components/charts/LWHistogram';
 import { MonthSelector } from '../components/MonthSelector';
 import { PageHeader } from '../components/PageHeader';
 import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows, computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
@@ -423,6 +419,15 @@ export default function IncomePage() {
     .filter((row) => row.incomeKind === 'variable')
     .reduce((sum, row) => sum + row.amountCents, 0);
   const topSource = sourceBreakdown.slice().sort((a, b) => b.value - a.value)[0];
+
+  const lwIncomeData = useMemo(() => {
+    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    return computeIncomeSeries(incomes, dividendIncomeRows).map((entry) => {
+      const [mon, yr] = entry.month.split(' ');
+      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
+      return { time, value: entry.amountCents };
+    });
+  }, [incomes, dividendIncomeRows]);
   const fixedIncomeRows = useMemo(
     () =>
       fixedSchedules
@@ -491,20 +496,7 @@ export default function IncomePage() {
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
         <Card data-tour="income-chart" eyebrow={t('income.chartCard.eyebrow')} title={t('income.chartCard.title')} variant="chart" className="lg:col-span-8">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={computeIncomeSeries(incomes, dividendIncomeRows)} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-              <Bar dataKey="amountCents" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <LWHistogram data={lwIncomeData} color="var(--accent)" />
         </Card>
 
         <Card eyebrow={t('income.sourceCard.eyebrow')} title={t('income.sourceCard.title')} className="lg:col-span-4">

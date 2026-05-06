@@ -1,25 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchPortfolioNews, clearNewsCache } from '../utils/yahoo';
 import { useAlert, useConfirm } from '../components/ConfirmContext';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
   Cell,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from 'recharts';
+import { BaselineSeries, ColorType, createChart, AreaSeries } from 'lightweight-charts';
+import LWAreaChart from '../components/charts/LWAreaChart';
+import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { PageHeader } from '../components/PageHeader';
 import { DividendForm } from '../components/forms/DividendForm';
 import { HoldingForm } from '../components/forms/HoldingForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency, formatCurrencyCompact, formatNumber } from '../utils/formatters';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
 import { assignedPortfolioHoldings, assignedPortfolioRecords, computePortfolioMetrics } from '../utils/finance';
 import { Card, Button, Stat, Table, EmptyState, Modal, FormField, Input, Select, cn } from '../components/ui';
@@ -1228,42 +1224,74 @@ function PortfolioNews({ tickers, apiKey }) {
   );
 }
 
-function PortfolioTooltip({ active, payload, currency, locale }) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0]?.payload;
-  if (!point) return null;
-  const valueCents = point.valueCents ?? null;
-  const costCents  = point.costCents  ?? null;
-  const pnlCents   = valueCents != null && costCents != null ? valueCents - costCents : null;
-  const isUp       = pnlCents != null && pnlCents >= 0;
-  const dateLabel  = point.capturedAt
-    ? new Intl.DateTimeFormat(locale || 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(point.capturedAt))
-    : '';
-  return (
-    <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--rule-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 12, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.18)' }}>
-      <p style={{ color: 'var(--ink-muted)', marginBottom: 8, fontWeight: 500 }}>{dateLabel}</p>
-      {valueCents != null && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
-          <span style={{ color: 'var(--ink-muted)' }}>Market value</span>
-          <span style={{ color: 'var(--accent)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(valueCents, currency, locale)}</span>
-        </div>
-      )}
-      {costCents != null && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
-          <span style={{ color: 'var(--ink-muted)' }}>Cost basis</span>
-          <span style={{ color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(costCents, currency, locale)}</span>
-        </div>
-      )}
-      {pnlCents != null && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--rule)' }}>
-          <span style={{ color: 'var(--ink-muted)' }}>P&L</span>
-          <span style={{ color: isUp ? 'var(--positive)' : 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-            {isUp ? '+' : ''}{formatCurrency(pnlCents, currency, locale)}
-          </span>
-        </div>
-      )}
-    </div>
-  );
+
+function resolveColor(color, element) {
+  if (!color || !color.includes('var(')) return color;
+  const match = color.match(/var\((--[^)]+)\)/);
+  if (!match) return color;
+  return getComputedStyle(element).getPropertyValue(match[1]).trim() || color;
+}
+
+function withAlpha(color, alpha) {
+  if (!color) return `rgba(128,128,128,${alpha})`;
+  if (color.startsWith('#')) {
+    const c = color.replace('#', '');
+    const r = parseInt(c.slice(0, 2), 16);
+    const g = parseInt(c.slice(2, 4), 16);
+    const b = parseInt(c.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  if (color.startsWith('rgb(')) return color.replace('rgb(', 'rgba(').replace(')', `,${alpha})`);
+  return color;
+}
+
+function LWSalesChart({ data = [] }) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const chart = createChart(container, {
+      autoSize: true,
+      attributionLogo: false,
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: 'rgba(128,128,128,0.65)' },
+      grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'rgba(128,128,128,0.08)' } },
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: false, timeVisible: false },
+      handleScroll: false,
+      handleScale: false,
+      crosshair: { vertLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false }, horzLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false } },
+    });
+    chartRef.current = chart;
+    return () => { chart.remove(); chartRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !data.length) return;
+    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    const container = containerRef.current;
+    const pos = resolveColor('var(--positive)', container);
+    const neg = resolveColor('var(--danger)', container);
+    const series = chart.addSeries(BaselineSeries, {
+      baseValue: { type: 'price', price: 0 },
+      topLineColor: pos,
+      topFillColor1: withAlpha(pos, 0.28),
+      topFillColor2: withAlpha(pos, 0.04),
+      bottomLineColor: neg,
+      bottomFillColor1: withAlpha(neg, 0.04),
+      bottomFillColor2: withAlpha(neg, 0.28),
+      lineWidth: 1.75,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true,
+    });
+    series.setData(data);
+    chart.timeScale().fitContent();
+  }, [data]);
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }
 
 const PORTFOLIO_PERIOD_OPTIONS = ['1d', '1w', '1m', '6m', '1y', 'all'];
@@ -1383,44 +1411,37 @@ export default function PortfolioPage() {
     fxRates,
     currency,
   );
-  const portfolioValueDomain = useMemo(() => {
-    const realTimes = portfolioValueSeries
-      .filter((p) => p.valueCents > 0)
-      .map((p) => new Date(p.capturedAt).getTime())
-      .filter(Boolean);
-    if (portfolioValuePeriod !== 'all') {
-      const [windowStart] = getPortfolioPeriodWindow(portfolioValuePeriod);
-      const firstRealTime = realTimes.length ? Math.min(...realTimes) : windowStart;
-      return [Math.max(windowStart, firstRealTime), Date.now()];
-    }
-    if (!realTimes.length) return [Date.now() - 30 * 24 * 60 * 60 * 1000, Date.now()];
-    return [Math.min(...realTimes), Date.now()];
-  }, [portfolioValueSeries, portfolioValuePeriod]);
   const visiblePortfolioValueSeries = useMemo(
     () => filterPortfolioValueSeries(portfolioValueSeries, portfolioValuePeriod, locale),
     [portfolioValueSeries, portfolioValuePeriod, locale],
   );
-  const portfolioYDomain = useMemo(() => {
-    const values = visiblePortfolioValueSeries
-      .flatMap((p) => [p.valueCents, p.costCents])
-      .filter((v) => v != null && v > 0);
-    if (!values.length) return [0, 1000];
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || max;
-    return [Math.max(0, Math.floor(min - range * 0.25)), Math.ceil(max + range * 0.05)];
-  }, [visiblePortfolioValueSeries]);
-  const portfolioTickFormatter = useMemo(() => {
-    const [domainStart, domainEnd] = portfolioValueDomain;
-    const spanMs = domainEnd - domainStart;
-    const DAY = 24 * 60 * 60 * 1000;
-    let fmt;
-    if (spanMs < 2 * DAY)       fmt = { hour: '2-digit', minute: '2-digit' };
-    else if (spanMs < 14 * DAY) fmt = { month: 'short', day: 'numeric', hour: '2-digit' };
-    else                        fmt = { month: 'short', day: 'numeric' };
-    const intl = new Intl.DateTimeFormat(locale || 'en-GB', fmt);
-    return (value) => intl.format(new Date(value));
-  }, [portfolioValueDomain, locale]);
+  const lwPortfolioValueData = useMemo(() => ({
+    main: visiblePortfolioValueSeries.map((p) => ({ time: Math.floor(new Date(p.capturedAt).getTime() / 1000), value: p.valueCents })),
+    cost: visiblePortfolioValueSeries.filter((p) => p.costCents != null).map((p) => ({ time: Math.floor(new Date(p.capturedAt).getTime() / 1000), value: p.costCents })),
+  }), [visiblePortfolioValueSeries]);
+
+  const lwRebalanceData = useMemo(() => {
+    const items = visiblePortfolioMetrics.allocationActual || [];
+    return {
+      seriesA: items.map((item, i) => {
+        const year = 2024 + Math.floor(i / 12);
+        const month = String((i % 12) + 1).padStart(2, '0');
+        return { time: `${year}-${month}-01`, value: item.actualWeight };
+      }),
+      seriesB: items.map((item, i) => {
+        const year = 2024 + Math.floor(i / 12);
+        const month = String((i % 12) + 1).padStart(2, '0');
+        return { time: `${year}-${month}-01`, value: item.targetWeight };
+      }),
+      tickers: items.map((item) => item.ticker),
+    };
+  }, [visiblePortfolioMetrics.allocationActual]);
+
+  const lwSalesData = useMemo(() =>
+    salesPerformanceSeries.map((p) => ({ time: p.date, value: p.cumulativePnlCents })),
+    [salesPerformanceSeries],
+  );
+
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
 
@@ -1676,14 +1697,7 @@ export default function PortfolioPage() {
       });
       return series;
     }, []);
-  const salesPerformanceValues = salesPerformanceSeries.map((item) => item.cumulativePnlCents || 0);
-  const salesPerformanceMin = Math.min(0, ...salesPerformanceValues);
-  const salesPerformanceMax = Math.max(0, ...salesPerformanceValues);
-  const salesPerformanceRange = salesPerformanceMax - salesPerformanceMin || 1;
-  const salesPerformanceZeroOffset = ((salesPerformanceMax - 0) / salesPerformanceRange) * 100;
   const salesPerformanceTotalCents = salesPerformanceSeries.at(-1)?.cumulativePnlCents || 0;
-  const salesPerformanceActiveColor =
-    salesPerformanceTotalCents < 0 ? 'var(--danger)' : 'var(--positive)';
   const portfolioViews = [
     { id: 'holdings', label: t('portfolio.views.holdings') },
     { id: 'activity', label: t('portfolio.views.activity') },
@@ -2020,65 +2034,15 @@ export default function PortfolioPage() {
           );
         })()}
 
-        {visiblePortfolioValueSeries.length ? (
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={visiblePortfolioValueSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="portfolioValueArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="portfolioCostArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.06} />
-                  <stop offset="100%" stopColor="var(--danger)" stopOpacity={0.06} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis
-                dataKey="capturedAtMs"
-                type="number"
-                scale="time"
-                domain={portfolioValueDomain}
-                tickFormatter={portfolioTickFormatter}
-                tickLine={false}
-                axisLine={false}
-                interval="preserveStartEnd"
-                minTickGap={24}
-              />
-              <YAxis
-                tickFormatter={(value) => formatCurrencyCompact(value, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-                domain={portfolioYDomain}
-              />
-              <Tooltip
-                content={(props) => <PortfolioTooltip {...props} currency={currency} locale={locale} />}
-                cursor={{ stroke: 'var(--ink-faint)', strokeWidth: 1, strokeDasharray: '2 4' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="costCents"
-                stroke="var(--danger)"
-                strokeDasharray="4 3"
-                strokeWidth={1.5}
-                fill="url(#portfolioCostArea)"
-                fillOpacity={1}
-                dot={false}
-                connectNulls={false}
-                activeDot={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="valueCents"
-                stroke="var(--accent)"
-                strokeWidth={1.75}
-                fill="url(#portfolioValueArea)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        {lwPortfolioValueData.main.length ? (
+          <div style={{ height: 280 }}>
+            <LWAreaChart
+              data={lwPortfolioValueData.main}
+              color="var(--accent)"
+              topOpacity={0.22}
+              secondSeries={{ data: lwPortfolioValueData.cost, color: 'var(--danger)', topOpacity: 0.06, bottomOpacity: 0.06, dashed: true }}
+            />
+          </div>
         ) : (
           <EmptyState title={t('portfolio.valueChart.emptyTitle')} description={t('portfolio.valueChart.emptyDescription')} />
         )}
@@ -2269,17 +2233,13 @@ export default function PortfolioPage() {
         </Card>
 
         <Card eyebrow={t('portfolio.rebalanceCard.eyebrow')} title={t('portfolio.rebalanceCard.title')} variant="chart" className={'order-1 lg:col-span-7 ' + rise(3)}>
-          {visiblePortfolioMetrics.allocationActual?.length ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={visiblePortfolioMetrics.allocationActual} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="2 4" vertical={false} />
-                <XAxis dataKey="ticker" tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} width={44} />
-                <Tooltip formatter={(v) => `${formatNumber(v, locale, 1)}%`} />
-                <Bar dataKey="actualWeight" fill="var(--accent)" radius={[3, 3, 0, 0]} name={t('portfolio.rebalanceCard.barActual')} />
-                <Bar dataKey="targetWeight" fill="var(--ink-muted)" radius={[3, 3, 0, 0]} name={t('portfolio.rebalanceCard.barTarget')} opacity={0.45} />
-              </BarChart>
-            </ResponsiveContainer>
+          {lwRebalanceData.tickers.length ? (
+            <LWGroupedHistogram
+              seriesA={{ data: lwRebalanceData.seriesA, color: 'var(--accent)' }}
+              seriesB={{ data: lwRebalanceData.seriesB, color: 'var(--ink-muted)' }}
+              offsetDays={7}
+              xLabels={lwRebalanceData.tickers}
+            />
           ) : (
             <EmptyState title={t('portfolio.rebalanceCard.emptyTitle')} description={t('portfolio.rebalanceCard.emptyDescription')} />
           )}
@@ -2340,54 +2300,8 @@ export default function PortfolioPage() {
         variant="chart"
         className={rise(6)}
       >
-        {salesPerformanceSeries.length ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={salesPerformanceSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="salesPnlStroke" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--positive)" />
-                  <stop offset={`${salesPerformanceZeroOffset}%`} stopColor="var(--positive)" />
-                  <stop offset={`${salesPerformanceZeroOffset}%`} stopColor="var(--danger)" />
-                  <stop offset="100%" stopColor="var(--danger)" />
-                </linearGradient>
-                <linearGradient id="salesPnlArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--positive)" stopOpacity={0.28} />
-                  <stop offset={`${salesPerformanceZeroOffset}%`} stopColor="var(--positive)" stopOpacity={0.12} />
-                  <stop offset={`${salesPerformanceZeroOffset}%`} stopColor="var(--danger)" stopOpacity={0.12} />
-                  <stop offset="100%" stopColor="var(--danger)" stopOpacity={0.28} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
-              <YAxis
-                domain={[salesPerformanceMin, salesPerformanceMax]}
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip
-                formatter={(value, name) => [
-                  formatCurrency(value, currency, locale),
-                  name === 'cumulativePnlCents' ? t('portfolio.salesPerformanceCard.tooltipCumulative') : t('portfolio.salesPerformanceCard.tooltipSale'),
-                ]}
-                labelFormatter={(_, payload) => {
-                  const sale = payload?.[0]?.payload;
-                  return sale ? `${sale.date} - ${sale.ticker}` : '';
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="cumulativePnlCents"
-                stroke="url(#salesPnlStroke)"
-                strokeWidth={1.75}
-                fill="url(#salesPnlArea)"
-                dot={false}
-                baseValue={0}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--canvas)', fill: salesPerformanceActiveColor }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        {lwSalesData.length ? (
+          <LWSalesChart data={lwSalesData} />
         ) : (
           <EmptyState title={t('portfolio.salesPerformanceCard.emptyTitle')} description={t('portfolio.salesPerformanceCard.emptyDescription')} />
         )}

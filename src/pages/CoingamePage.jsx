@@ -1,6 +1,6 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, ReferenceLine, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { bondingCurvePoints, spotPrice } from '../utils/coingameApi';
@@ -122,11 +122,71 @@ function DailyClaimCard({ wallet, onClaim }) {
 }
 
 function BondingCurveCard({ coin }) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+
   if (!coin) return null;
   const max = Math.max(coin.tokens_minted * 2, 10000);
   const points = bondingCurvePoints(max, coin.base_price, 80);
   const price = spotPrice(coin.tokens_minted, coin.base_price);
   const coinName = coin.coin_name || coin.profiles?.username || 'coin';
+
+  // Map index → sequential YYYY-MM-DD dates (fake time axis)
+  const lwData = points.map((p, i) => {
+    const y = 2020 + Math.floor(i / 365);
+    const dayOfYear = i % 365;
+    const d = new Date(Date.UTC(y, 0, 1 + dayOfYear));
+    return { time: d.toISOString().slice(0, 10), value: p.price };
+  });
+
+  // Approximate x-position for the reference line overlay
+  const refPct = Math.min(coin.tokens_minted / Math.max(max, 1), 1);
+  // Chart body occupies roughly 85% of width (remaining ~15% is right price scale + margins)
+  const refLeftPct = (0.04 + refPct * 0.82) * 100;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !lwData.length) return;
+
+    const chart = createChart(container, {
+      autoSize: true,
+      attributionLogo: false,
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: 'rgba(255,255,255,0.25)',
+        fontFamily: "'DM Mono', monospace",
+      },
+      grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
+      rightPriceScale: { visible: false },
+      timeScale: { visible: false },
+      handleScroll: false,
+      handleScale: false,
+      crosshair: {
+        vertLine: { color: 'rgba(23,245,0,0.3)', labelVisible: false },
+        horzLine: { color: 'rgba(23,245,0,0.2)', labelVisible: false },
+      },
+    });
+
+    const series = chart.addSeries(AreaSeries, {
+      lineColor: '#17f500',
+      topColor: 'rgba(23,245,0,0.25)',
+      bottomColor: 'rgba(23,245,0,0)',
+      lineWidth: 1.5,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 3,
+    });
+    series.setData(lwData);
+    chart.timeScale().fitContent();
+    chartRef.current = chart;
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coin.id, coin.tokens_minted, coin.base_price]);
 
   return (
     <div className="cg-chart-wrap">
@@ -138,52 +198,22 @@ function BondingCurveCard({ coin }) {
         <span className="cg-chart-price">{price.toFixed(6)} FC/{coinName}</span>
       </div>
       <div style={{ padding: '0.75rem 0.5rem 0.5rem' }}>
-        <ResponsiveContainer width="100%" height={120}>
-          <AreaChart data={points} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="cgCurve" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#17f500" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#17f500" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis
-              dataKey="tokens"
-              type="number"
-              domain={[0, max]}
-              tickFormatter={(v) => Number(v).toLocaleString(undefined, { notation: 'compact' })}
-              tick={{ fill: 'var(--cg-text-3)', fontSize: 10, fontFamily: 'var(--cg-font-mono)' }}
-              axisLine={false}
-              tickLine={false}
-              minTickGap={18}
-            />
-            <YAxis hide />
-            <Tooltip
-              formatter={(v) => [`${v.toFixed(8)} FC`, 'Price']}
-              labelFormatter={(v) => `${Number(v).toLocaleString()} ${coinName} minted`}
-              contentStyle={{
-                background: 'rgba(17,17,17,0.95)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                fontSize: 12,
-                fontFamily: "'DM Mono', monospace",
-                color: '#f0f0f0',
+        <div style={{ position: 'relative', height: 120 }}>
+          <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+          {refPct > 0 && refPct < 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 4,
+                bottom: 0,
+                left: `${refLeftPct}%`,
+                width: 1,
+                borderLeft: '1px dashed #17f500',
+                pointerEvents: 'none',
               }}
             />
-            <ReferenceLine
-              x={Number(coin.tokens_minted)}
-              stroke="#17f500"
-              strokeDasharray="3 3"
-              label={{
-                value: 'Current supply',
-                position: 'insideTopRight',
-                fill: '#17f500',
-                fontSize: 10,
-                fontFamily: 'DM Mono, monospace',
-              }}
-            />
-            <Area type="monotone" dataKey="price" stroke="#17f500" fill="url(#cgCurve)" strokeWidth={1.5} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+          )}
+        </div>
         <div className="cg-curve-axis-note">
           <span>Minted supply</span>
           <span>{Number(max).toLocaleString()} max shown</span>

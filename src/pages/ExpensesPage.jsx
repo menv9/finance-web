@@ -4,7 +4,8 @@ import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import LWHistogram from '../components/charts/LWHistogram';
 import { AttachmentViewer } from '../components/AttachmentViewer';
 import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { MonthSelector } from '../components/MonthSelector';
@@ -13,7 +14,7 @@ import { ExpenseForm } from '../components/forms/ExpenseForm';
 import { FixedExpenseForm } from '../components/forms/FixedExpenseForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { categoryBreakdown, computeExpenseSeries } from '../utils/finance';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
 import { rowsToCsv } from '../utils/csv';
 import {
@@ -337,6 +338,15 @@ export default function ExpensesPage() {
 
   const chartData = computeExpenseSeries(expenses);
   const breakdown = categoryBreakdown(filteredExpenses);
+
+  const lwExpenseData = useMemo(() => {
+    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    return chartData.map((entry) => {
+      const [mon, yr] = entry.month.split(' ');
+      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
+      return { time, value: entry.amountCents };
+    });
+  }, [chartData]);
   const editingExpense = expenses.find((item) => item.id === expenseModal.id);
   const editingFixedExpense = fixedExpenses.find((item) => item.id === fixedModal.id);
 
@@ -563,20 +573,7 @@ export default function ExpensesPage() {
       {/* charts */}
       <section className="grid gap-6 lg:grid-cols-12">
         <Card eyebrow={t('expenses.spendChart.eyebrow')} title={t('expenses.spendChart.title')} variant="chart" className={'lg:col-span-8 ' + rise(2)}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-              <Bar dataKey="amountCents" fill="var(--danger)" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <LWHistogram data={lwExpenseData} color="var(--danger)" />
         </Card>
 
         <Card data-tour="expenses-breakdown" eyebrow={t('expenses.breakdownCard.eyebrow')} title={t('expenses.breakdownCard.title')} className={'lg:col-span-4 ' + rise(3)}>

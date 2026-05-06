@@ -1,20 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from 'recharts';
+import LWAreaChart from '../components/charts/LWAreaChart';
+import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows } from '../utils/finance';
 import { exportElementToPdf } from '../utils/pdf';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { rise } from '../utils/motion';
@@ -174,6 +165,24 @@ export default function DashboardPage() {
     if (Math.abs(delta) > 500) return null;
     return delta;
   }, [dashboard.netWorthSeries]);
+
+  const lwNetWorthData = useMemo(() => {
+    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    return (dashboard.netWorthSeries || []).map((entry) => {
+      const [mon, yr] = entry.month.split(' ');
+      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
+      return { time, value: entry.netWorthCents };
+    });
+  }, [dashboard.netWorthSeries]);
+
+  const lwCashflowData = useMemo(() => {
+    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    return (dashboard.cashflowSeries || []).map((entry) => {
+      const [mon, yr] = entry.month.split(' ');
+      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
+      return { incomeTime: time, expenseTime: time, incomeCents: entry.incomeCents, expenseCents: entry.expenseCents };
+    });
+  }, [dashboard.cashflowSeries]);
 
   const recentActivity = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -356,35 +365,8 @@ export default function DashboardPage() {
         variant="chart"
         className={rise(2)}
       >
-        {dashboard.netWorthSeries?.length ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dashboard.netWorthSeries} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="nwArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.32} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis
-                tickFormatter={(v) => (hideKpis ? '****' : formatCurrencyCompact(v, currency, locale))}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip formatter={(v) => (hideKpis ? '****' : formatCurrency(v, currency, locale))} />
-              <Area
-                type="monotone"
-                dataKey="netWorthCents"
-                stroke="var(--accent)"
-                strokeWidth={1.75}
-                fill="url(#nwArea)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        {lwNetWorthData.length ? (
+          <LWAreaChart data={lwNetWorthData} color="var(--accent)" topOpacity={0.32} />
         ) : (
           <EmptyState title="No data yet" description="Log income or expenses to see this chart come to life." />
         )}
@@ -399,26 +381,11 @@ export default function DashboardPage() {
           variant="chart"
           className={'lg:col-span-7 h-full ' + rise(3)}
         >
-          {dashboard.cashflowSeries?.length ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={dashboard.cashflowSeries}
-                margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
-                barCategoryGap="22%"
-              >
-                <CartesianGrid strokeDasharray="2 4" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                <YAxis
-                  tickFormatter={(v) => (hideKpis ? '****' : formatCurrencyCompact(v, currency, locale))}
-                  tickLine={false}
-                  axisLine={false}
-                  width={60}
-                />
-                <Tooltip formatter={(v) => (hideKpis ? '****' : formatCurrency(v, currency, locale))} />
-                <Bar dataKey="incomeCents" fill="var(--accent)" radius={[3, 3, 0, 0]} name="Income" />
-                <Bar dataKey="expenseCents" fill="var(--danger)" radius={[3, 3, 0, 0]} name="Expenses" />
-              </BarChart>
-            </ResponsiveContainer>
+          {lwCashflowData.length ? (
+            <LWGroupedHistogram
+              seriesA={{ data: lwCashflowData.map((d) => ({ time: d.incomeTime, value: d.incomeCents })), color: 'var(--accent)' }}
+              seriesB={{ data: lwCashflowData.map((d) => ({ time: d.expenseTime, value: d.expenseCents })), color: 'var(--danger)' }}
+            />
           ) : (
             <EmptyState title="No data yet" description="Income and expense bars populate once you log them." />
           )}

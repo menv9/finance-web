@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows } from '../utils/finance';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import { chartMonthLabel, normalizeDateInput } from '../utils/dates';
 import { Card, Stat, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
@@ -266,6 +257,17 @@ export default function ThisMonthPage() {
   const chartData = dashboard.cashflowSeries || [];
   const selectedMonthChartLabel = chartMonthLabel(`${selectedMonth}-01`);
 
+  const lwCashflowData = useMemo(() => {
+    const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    return chartData.map((entry) => {
+      const [mon, yr] = entry.month.split(' ');
+      const time = `${2000 + parseInt(yr, 10)}-${String(MONTHS[mon]).padStart(2, '0')}-01`;
+      return { time, incomeCents: entry.incomeCents, expenseCents: entry.expenseCents, isSelected: entry.month === selectedMonthChartLabel };
+    });
+  }, [chartData, selectedMonthChartLabel]);
+
+  const selectedChartTime = lwCashflowData.find((d) => d.isSelected)?.time ?? null;
+
   const savedHint = metrics.savedCents >= 0
     ? t('thisMonth.kpiSaved.hintPositive')
     : t('thisMonth.kpiSaved.hintNegative');
@@ -370,42 +372,12 @@ export default function ThisMonthPage() {
         variant="chart"
         className={rise(5)}
       >
-        {chartData.length ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
-              barCategoryGap="22%"
-            >
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-              />
-              <Tooltip formatter={(v) => formatCurrency(v, currency, locale)} />
-              <Bar dataKey="incomeCents" name={t('thisMonth.chartCard.barIncome')} radius={[3, 3, 0, 0]}>
-                {chartData.map((entry) => (
-                  <Cell
-                    key={entry.month}
-                    fill="var(--accent)"
-                    fillOpacity={entry.month === selectedMonthChartLabel ? 1 : 0.35}
-                  />
-                ))}
-              </Bar>
-              <Bar dataKey="expenseCents" name={t('thisMonth.chartCard.barExpenses')} radius={[3, 3, 0, 0]}>
-                {chartData.map((entry) => (
-                  <Cell
-                    key={entry.month}
-                    fill="var(--danger)"
-                    fillOpacity={entry.month === selectedMonthChartLabel ? 1 : 0.35}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        {lwCashflowData.length ? (
+          <LWGroupedHistogram
+            seriesA={{ data: lwCashflowData.map((d) => ({ time: d.time, value: d.incomeCents })), color: 'var(--accent)' }}
+            seriesB={{ data: lwCashflowData.map((d) => ({ time: d.time, value: d.expenseCents })), color: 'var(--danger)' }}
+            selectedTime={selectedChartTime}
+          />
         ) : (
           <EmptyState title={t('thisMonth.chartCard.emptyTitle')} description={t('thisMonth.chartCard.emptyDescription')} />
         )}

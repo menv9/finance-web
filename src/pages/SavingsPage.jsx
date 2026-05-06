@@ -5,22 +5,12 @@ import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import LWAreaChart from '../components/charts/LWAreaChart';
+import LWLineSegments from '../components/charts/LWLineSegments';
 import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -224,21 +214,6 @@ function TrashIcon() {
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-function SavingsTooltip({ active, payload, label, currency, locale }) {
-  const { t } = useTranslation();
-  if (!active || !payload?.length) return null;
-  const amountCents = payload.find((item) => item.dataKey === 'amountCents')?.value ?? payload[0]?.payload?.amountCents;
-  if (amountCents == null) return null;
-
-  return (
-    <div className="rounded-md border border-rule-strong bg-surface-raised px-3 py-2 shadow-card">
-      <p className="text-xs uppercase tracking-wide text-ink-muted">{label}</p>
-      <p className="mt-1 text-sm font-medium text-ink">
-        {t('savings.evolutionChart.savedTooltip', { amount: formatCurrency(amountCents, currency, locale) })}
-      </p>
-    </div>
-  );
-}
 
 function SavingsGoalForm({ initialValue, currency, onSubmit, onCancel }) {
   const { t } = useTranslation();
@@ -444,8 +419,6 @@ export default function SavingsPage() {
   const annualReturnRate     = savingsConfig.annualReturnRate ?? 0;
   const goalCents            = savingsConfig.goalCents || 0;
   const projectionYears      = Number(config.projectionYears) || 30;
-  const xAxisInterval        = projectionYears <= 10 ? 0 : projectionYears <= 20 ? 1 : 4;
-
   const totalEntriesCents = useMemo(
     () => savingsEntries
       .filter((entry) => entry.source !== 'allocation')
@@ -572,6 +545,31 @@ export default function SavingsPage() {
   );
 
   const goalYear      = yearsToGoal(projection, goalCents);
+
+  const lwTrendData = useMemo(() =>
+    savingsTrendData.map((entry) => ({ time: `${entry.month}-01`, value: entry.savedCents })),
+    [savingsTrendData],
+  );
+
+  const lwHistorySegments = useMemo(() =>
+    monthlySavingSegments.map((seg) => ({
+      key: seg.key,
+      color: seg.color,
+      data: seg.data
+        .filter((d) => d.segmentAmountCents !== null)
+        .map((d) => ({ time: `${d.month}-01`, value: d.segmentAmountCents })),
+    })),
+    [monthlySavingSegments],
+  );
+
+  const lwProjectionData = useMemo(() => {
+    const now = new Date();
+    return projection.map((p) => {
+      const d = new Date(Date.UTC(now.getFullYear() + p.year, now.getMonth(), 1));
+      const time = d.toISOString().slice(0, 10);
+      return { time, value: p.valueCents };
+    });
+  }, [projection]);
   const goalProgress  = goalCents > 0 ? Math.min(100, (totalSavedCents / goalCents) * 100) : 0;
 
   // ── Filters ──
@@ -775,35 +773,8 @@ export default function SavingsPage() {
             <InfoPopover info={t('savings.evolutionChart.info')} />
           </div>
           <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
-            {savingsTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={savingsTrendData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                  <defs>
-                    <linearGradient id="savingsKpiArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="2 4" vertical={false} />
-                  <XAxis dataKey="label" tick={false} tickLine={false} axisLine={false} />
-                  <YAxis
-                    tick={false}
-                    tickLine={false}
-                    axisLine={false}
-                    width={0}
-                  />
-                  <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), t('savings.kpiTotalSaved.label')]} />
-                  <Area
-                    type="monotone"
-                    dataKey="savedCents"
-                    stroke="var(--accent)"
-                    strokeWidth={1.75}
-                    fill="url(#savingsKpiArea)"
-                    dot={false}
-                    activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--canvas)', fill: 'var(--accent)' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            {lwTrendData.length > 0 ? (
+              <LWAreaChart data={lwTrendData} color="var(--accent)" topOpacity={0.3} />
             ) : (
               <div className="flex h-full items-center justify-center text-center text-xs text-ink-faint">
                 {t('savings.evolutionChart.addToSee')}
@@ -1018,55 +989,8 @@ export default function SavingsPage() {
           </>
         }
       >
-        {visibleMonthlyChartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={visibleMonthlyChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" vertical={false} />
-              <XAxis
-                dataKey="label"
-                type="category"
-                allowDuplicatedCategory={false}
-                interval={visibleMonthlyChartData.length <= 12 ? 0 : 'preserveStartEnd'}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                dataKey="amountCents"
-                type="number"
-                tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-                tickLine={false} axisLine={false} width={60}
-              />
-              <Tooltip
-                content={(props) => (
-                  <SavingsTooltip {...props} currency={currency} locale={locale} />
-                )}
-              />
-              {monthlySavingSegments.map((segment) => (
-                <Line
-                  key={segment.key}
-                  data={segment.data}
-                  type="linear"
-                  dataKey="segmentAmountCents"
-                  stroke={segment.color}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={false}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                  legendType="none"
-                />
-              ))}
-              <Line
-                dataKey="amountCents"
-                type="linear"
-                stroke="transparent"
-                strokeWidth={0}
-                dot={{ r: 5, fill: 'var(--accent)', stroke: 'var(--canvas)', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--canvas)', strokeWidth: 2 }}
-                legendType="none"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        {lwHistorySegments.length > 0 ? (
+          <LWLineSegments segments={lwHistorySegments} />
         ) : (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-ink-faint">{t('savings.historyChart.noEntries')}</p>
@@ -1156,40 +1080,13 @@ export default function SavingsPage() {
           </div>
         }
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={projection} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.32} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="2 4" vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval={xAxisInterval} />
-            <YAxis
-              tickFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
-              tickLine={false} axisLine={false} width={60}
-            />
-            <Tooltip formatter={(v) => [formatCurrency(v, currency, locale), t('savings.kpiTotalSaved.label')]} />
-            {goalCents > 0 && (
-              <ReferenceLine
-                y={goalCents}
-                stroke="var(--positive)"
-                strokeDasharray="4 4"
-                label={{ value: t('savings.projectionChartCard.goalLabel'), position: 'insideTopRight', fill: 'var(--positive)', fontSize: 11 }}
-              />
-            )}
-            <Area
-              type="monotone"
-              dataKey="valueCents"
-              stroke="#f59e0b"
-              strokeWidth={2}
-              fill="url(#savingsGradient)"
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: '#fbbf24' }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <LWAreaChart
+          data={lwProjectionData}
+          color="#f59e0b"
+          topOpacity={0.32}
+          referenceY={goalCents > 0 ? goalCents : null}
+          referenceColor="var(--positive)"
+        />
       </Card>
 
       {/* Goal progress */}
