@@ -101,24 +101,33 @@ create policy "activity own read"
   on public.social_activity for select to authenticated
   using (auth.uid() = user_id);
 
+-- Checks a user's activity_privacy settings without being blocked by that
+-- table's self-only RLS. Mirrors the pattern used by are_friends/is_goal_creator.
+create or replace function public.user_activity_visible(p_user_id uuid, p_type text)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select
+    not exists (
+      select 1 from public.activity_privacy where user_id = p_user_id
+    )
+    or exists (
+      select 1 from public.activity_privacy ap
+      where ap.user_id = p_user_id
+        and ap.feed_enabled = true
+        and p_type = any(ap.visible_types)
+    );
+$$;
+
+grant execute on function public.user_activity_visible(uuid, text) to authenticated;
+
 drop policy if exists "activity friend read" on public.social_activity;
 create policy "activity friend read"
   on public.social_activity for select to authenticated
   using (
     auth.uid() <> user_id
     and public.are_friends(auth.uid(), user_id)
-    and (
-      not exists (
-        select 1 from public.activity_privacy
-        where user_id = social_activity.user_id
-      )
-      or exists (
-        select 1 from public.activity_privacy ap
-        where ap.user_id = social_activity.user_id
-          and ap.feed_enabled = true
-          and social_activity.type = any(ap.visible_types)
-      )
-    )
+    and public.user_activity_visible(user_id, type)
   );
 
 drop policy if exists "activity own insert" on public.social_activity;
@@ -278,7 +287,8 @@ create policy "shared_goals insert by creator"
 drop policy if exists "shared_goals update by creator" on public.shared_goals;
 create policy "shared_goals update by creator"
   on public.shared_goals for update to authenticated
-  using (auth.uid() = creator_id);
+  using (auth.uid() = creator_id)
+  with check (auth.uid() = creator_id);
 
 drop policy if exists "shared_goals delete by creator" on public.shared_goals;
 create policy "shared_goals delete by creator"
@@ -311,6 +321,12 @@ create policy "sgc insert by participant"
     auth.uid() = user_id
     and public.is_goal_participant(goal_id, auth.uid())
   );
+
+drop policy if exists "sgc update own" on public.shared_goal_contributions;
+create policy "sgc update own"
+  on public.shared_goal_contributions for update to authenticated
+  using (auth.uid() = user_id and public.is_goal_participant(goal_id, auth.uid()))
+  with check (auth.uid() = user_id);
 
 drop policy if exists "sgc delete own" on public.shared_goal_contributions;
 create policy "sgc delete own"

@@ -9,7 +9,7 @@ create table if not exists public.friend_ledger (
   currency          text not null default 'EUR',
   kind              text not null check (kind in ('split', 'request', 'manual', 'payment')),
   status            text not null default 'pending'
-                    check (status in ('pending', 'settled', 'cancelled', 'rejected')),
+                    check (status in ('pending', 'accepted', 'settled', 'cancelled', 'rejected')),
   note              text,
   parent_expense_id text,
   group_key         uuid,
@@ -45,7 +45,27 @@ create policy "ledger participant insert"
 drop policy if exists "ledger participant update" on public.friend_ledger;
 create policy "ledger participant update"
   on public.friend_ledger for update to authenticated
-  using (auth.uid() in (creditor_id, debtor_id));
+  using (auth.uid() in (creditor_id, debtor_id))
+  with check (
+    -- other party accepts the request
+    (status = 'accepted'  and auth.uid() <> created_by and auth.uid() in (creditor_id, debtor_id)) or
+    -- creditor confirms payment received
+    (status = 'settled'   and auth.uid() = creditor_id) or
+    -- creator withdraws their own entry
+    (status = 'cancelled' and auth.uid() = created_by)  or
+    -- non-creator declines the request
+    (status = 'rejected'  and auth.uid() <> created_by and auth.uid() in (creditor_id, debtor_id)) or
+    -- creator edits details while still pending
+    (status = 'pending'   and auth.uid() = created_by)
+  );
+
+-- Widen the status check constraint to include 'accepted'.
+-- The inline check constraint auto-named by Postgres; we drop and re-add it.
+alter table public.friend_ledger
+  drop constraint if exists friend_ledger_status_check;
+alter table public.friend_ledger
+  add constraint friend_ledger_status_check
+    check (status in ('pending', 'accepted', 'settled', 'cancelled', 'rejected'));
 
 drop policy if exists "ledger creator delete pending" on public.friend_ledger;
 create policy "ledger creator delete pending"

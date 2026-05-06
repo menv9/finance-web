@@ -80,7 +80,8 @@ create policy "friendships insert own request"
 drop policy if exists "friendships accept by addressee" on public.friendships;
 create policy "friendships accept by addressee"
   on public.friendships for update to authenticated
-  using (auth.uid() = addressee_id) with check (auth.uid() = addressee_id);
+  using (auth.uid() = addressee_id and status = 'pending')
+  with check (auth.uid() = addressee_id and status = 'accepted');
 
 drop policy if exists "friendships delete by either side" on public.friendships;
 create policy "friendships delete by either side"

@@ -31,3 +31,9 @@ for update
 to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+create policy "Users can delete their own finance records"
+on public.finance_records
+for delete
+to authenticated
+using (auth.uid() = user_id);
