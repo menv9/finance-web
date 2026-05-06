@@ -44,6 +44,7 @@ export default function LWGroupedHistogram({
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -81,7 +82,8 @@ export default function LWGroupedHistogram({
     const chart = chartRef.current;
     if (!chart) return;
 
-    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    seriesRef.current = [];
 
     const container = containerRef.current;
     const hasA = seriesA.data?.length > 0;
@@ -95,6 +97,7 @@ export default function LWGroupedHistogram({
         priceLineVisible: false,
         lastValueVisible: false,
       });
+      seriesRef.current.push(sA);
       sA.setData(seriesA.data.map((d) => {
         const isSelected = !selectedTime || d.time === selectedTime;
         const itemColor = d.color || (selectedTime ? withAlpha(colorA, isSelected ? 1 : dimOpacity) : colorA);
@@ -109,6 +112,7 @@ export default function LWGroupedHistogram({
         priceLineVisible: false,
         lastValueVisible: false,
       });
+      seriesRef.current.push(sB);
       sB.setData(seriesB.data.map((d) => {
         const shifted = shiftDate(d.time, offsetDays);
         const isSelected = !selectedTime || d.time === selectedTime;

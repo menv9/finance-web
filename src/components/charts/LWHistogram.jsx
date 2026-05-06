@@ -14,6 +14,7 @@ export default function LWHistogram({
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -51,7 +52,8 @@ export default function LWHistogram({
     const chart = chartRef.current;
     if (!chart) return;
 
-    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    seriesRef.current = [];
 
     if (!data.length) return;
 
@@ -70,6 +72,7 @@ export default function LWHistogram({
       ...(d.color ? { color: d.color } : {}),
     })));
 
+    seriesRef.current.push(series);
     chart.timeScale().fitContent();
   }, [data, color]);
 

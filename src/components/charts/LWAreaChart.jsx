@@ -33,6 +33,7 @@ export default function LWAreaChart({
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -70,7 +71,8 @@ export default function LWAreaChart({
     const chart = chartRef.current;
     if (!chart) return;
 
-    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    seriesRef.current = [];
 
     if (!data.length) return;
 
@@ -89,6 +91,7 @@ export default function LWAreaChart({
       crosshairMarkerRadius: 4,
     });
     series.setData(data);
+    seriesRef.current.push(series);
 
     if (referenceY !== null) {
       series.createPriceLine({
@@ -113,6 +116,7 @@ export default function LWAreaChart({
         crosshairMarkerVisible: false,
       });
       s2.setData(secondSeries.data);
+      seriesRef.current.push(s2);
     }
 
     chart.timeScale().fitContent();

@@ -14,6 +14,7 @@ export default function LWLineSegments({
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -51,7 +52,8 @@ export default function LWLineSegments({
     const chart = chartRef.current;
     if (!chart) return;
 
-    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    seriesRef.current = [];
 
     if (!segments.length) return;
 
@@ -68,6 +70,7 @@ export default function LWLineSegments({
         crosshairMarkerVisible: false,
       });
       series.setData(segment.data);
+      seriesRef.current.push(series);
     });
 
     chart.timeScale().fitContent();

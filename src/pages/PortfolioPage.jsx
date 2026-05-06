@@ -1248,6 +1248,7 @@ function withAlpha(color, alpha) {
 function LWSalesChart({ data = [] }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1270,7 +1271,8 @@ function LWSalesChart({ data = [] }) {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !data.length) return;
-    chart.getSeries().forEach((s) => chart.removeSeries(s));
+    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    seriesRef.current = [];
     const container = containerRef.current;
     const pos = resolveColor('var(--positive)', container);
     const neg = resolveColor('var(--danger)', container);
@@ -1288,6 +1290,7 @@ function LWSalesChart({ data = [] }) {
       crosshairMarkerVisible: true,
     });
     series.setData(data);
+    seriesRef.current.push(series);
     chart.timeScale().fitContent();
   }, [data]);
 
