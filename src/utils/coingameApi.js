@@ -188,8 +188,8 @@ export async function fetchTransactions(userId, { limit = 50, offset = 0 } = {})
   return (data ?? []).map(transactionFromView);
 }
 
-export async function fetchCoinChart(coinId, hours = 24) {
-  const rows = await rpc('cg_coin_chart', { p_coin_id: coinId, p_hours: hours });
+export async function fetchCoinChart(coinId, rangeMinutes = 1440) {
+  const rows = await rpc('cg_coin_chart_range', { p_coin_id: coinId, p_minutes: rangeMinutes });
   return (rows ?? []).map((row) => ({
     bucketStart: row.bucket_start,
     label: new Date(row.bucket_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),

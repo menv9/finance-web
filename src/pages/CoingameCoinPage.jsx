@@ -4,6 +4,16 @@ import { AreaSeries, CandlestickSeries, ColorType, createChart, HistogramSeries 
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
 
+const CHART_RANGES = [
+  { key: '1m', label: '1m', minutes: 1 },
+  { key: '5m', label: '5m', minutes: 5 },
+  { key: '15m', label: '15m', minutes: 15 },
+  { key: '1h', label: '1h', minutes: 60 },
+  { key: '4h', label: '4h', minutes: 240 },
+  { key: '24h', label: '24h', minutes: 1440 },
+  { key: '7d', label: '7d', minutes: 10080 },
+];
+
 function FC({ amount, decimals = 2 }) {
   return (
     <span>
@@ -290,8 +300,10 @@ export default function CoingameCoinPage() {
   const [coin, setCoin] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [chartType, setChartType] = useState('candles');
+  const [chartRangeKey, setChartRangeKey] = useState('24h');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const chartRange = CHART_RANGES.find((range) => range.key === chartRangeKey) ?? CHART_RANGES[5];
 
   async function loadCoin() {
     setLoading(true);
@@ -299,7 +311,7 @@ export default function CoingameCoinPage() {
     try {
       const [nextCoin, nextChart] = await Promise.all([
         fetchCoinById(coinId),
-        fetchCoinChart(coinId, 24),
+        fetchCoinChart(coinId, chartRange.minutes),
       ]);
       if (!nextCoin) throw new Error('Coin not found');
       setCoin(nextCoin);
@@ -313,17 +325,17 @@ export default function CoingameCoinPage() {
 
   useEffect(() => {
     loadCoin();
-  }, [coinId]);
+  }, [coinId, chartRange.minutes]);
 
   const holding = holdings.find((item) => item.coin_id === coinId);
   const price = coin ? spotPrice(Number(coin.tokens_minted), Number(coin.base_price)) : 0;
   const marketCap = coin ? price * Number(coin.tokens_minted) : 0;
   const isOwnCoin = coin?.coin_id === ownCoin?.coin_id;
-  const volume24h = useMemo(
+  const rangeVolume = useMemo(
     () => chartData.reduce((sum, point) => sum + Number(point.volume || 0), 0),
     [chartData],
   );
-  const volumeFc24h = useMemo(
+  const rangeVolumeFc = useMemo(
     () => chartData.reduce((sum, point) => sum + Number(point.volumeFc || 0), 0),
     [chartData],
   );
@@ -381,7 +393,18 @@ export default function CoingameCoinPage() {
                   <button className={chartType === 'candles' ? 'active' : ''} onClick={() => setChartType('candles')}>Velas</button>
                   <button className={chartType === 'line' ? 'active' : ''} onClick={() => setChartType('line')}>Linea</button>
                 </div>
-                <div className="cg-chart-pill">24h real transactions</div>
+                <div className="cg-chart-range-toggle" aria-label="Time range">
+                  {CHART_RANGES.map((range) => (
+                    <button
+                      key={range.key}
+                      className={chartRangeKey === range.key ? 'active' : ''}
+                      onClick={() => setChartRangeKey(range.key)}
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="cg-chart-pill">{chartRange.label} real transactions</div>
               </div>
             </div>
             <div className="cg-big-chart">
@@ -390,8 +413,8 @@ export default function CoingameCoinPage() {
           </section>
 
           <section className="cg-coin-info-grid">
-            <div><span>Vol 24h</span><strong>{volume24h.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
-            <div><span>Volume FC</span><strong><FC amount={volumeFc24h} /></strong></div>
+            <div><span>Vol {chartRange.label}</span><strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
+            <div><span>Volume FC</span><strong><FC amount={rangeVolumeFc} /></strong></div>
             <div><span>Base Price</span><strong><FC amount={coin.base_price} decimals={4} /></strong></div>
             <div><span>Fee</span><strong>1% burn/pool</strong></div>
           </section>

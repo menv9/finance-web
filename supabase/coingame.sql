@@ -765,6 +765,93 @@ $$;
 
 grant execute on function public.cg_coin_chart(uuid, integer) to authenticated;
 
+create or replace function public.cg_coin_chart_range(p_coin_id uuid, p_minutes integer default 1440)
+returns table (
+  bucket_start timestamptz,
+  price numeric,
+  volume_tokens numeric,
+  volume_fc numeric,
+  trades_count integer
+)
+language sql stable security definer set search_path = public as $$
+  with params as (
+    select greatest(1, least(coalesce(p_minutes, 1440), 10080))::integer as minutes_back
+  ),
+  bucket_params as (
+    select params.minutes_back,
+           case
+             when params.minutes_back <= 60 then interval '1 minute'
+             when params.minutes_back <= 240 then interval '5 minutes'
+             when params.minutes_back <= 1440 then interval '15 minutes'
+             else interval '1 hour'
+           end as bucket_interval,
+           case
+             when params.minutes_back <= 60 then 60
+             when params.minutes_back <= 240 then 300
+             when params.minutes_back <= 1440 then 900
+             else 3600
+           end::numeric as bucket_seconds
+      from params
+  ),
+  bounds as (
+    select bp.minutes_back,
+           bp.bucket_interval,
+           bp.bucket_seconds,
+           to_timestamp(floor(extract(epoch from now()) / bp.bucket_seconds) * bp.bucket_seconds) as end_bucket
+      from bucket_params bp
+  ),
+  selected_coin as (
+    select c.coin_id,
+           c.base_price,
+           c.tokens_minted,
+           public.cg_spot_price(c.tokens_minted, c.base_price) as current_price
+      from public.coingame_coins c
+     where c.coin_id = p_coin_id
+  ),
+  buckets as (
+    select generate_series(
+             bounds.end_bucket - (bounds.minutes_back * interval '1 minute'),
+             bounds.end_bucket,
+             bounds.bucket_interval
+           ) as bucket_start,
+           bounds.bucket_interval
+      from bounds
+  ),
+  bucket_trades as (
+    select to_timestamp(floor(extract(epoch from t.created_at) / bounds.bucket_seconds) * bounds.bucket_seconds) as bucket_start,
+           coalesce(sum(abs(t.tokens)), 0) as volume_tokens,
+           coalesce(sum(abs(t.fc_amount)), 0) as volume_fc,
+           count(*)::integer as trades_count
+      from public.coingame_transactions t
+      cross join bounds
+     where t.coin_id = p_coin_id
+       and t.tx_type in ('buy', 'sell')
+       and t.created_at >= bounds.end_bucket - (bounds.minutes_back * interval '1 minute')
+     group by to_timestamp(floor(extract(epoch from t.created_at) / bounds.bucket_seconds) * bounds.bucket_seconds)
+  )
+  select b.bucket_start,
+         coalesce(last_trade.spot_price, sc.current_price, sc.base_price, 0) as price,
+         coalesce(bt.volume_tokens, 0) as volume_tokens,
+         coalesce(bt.volume_fc, 0) as volume_fc,
+         coalesce(bt.trades_count, 0) as trades_count
+    from buckets b
+    cross join selected_coin sc
+    left join bucket_trades bt on bt.bucket_start = b.bucket_start
+    left join lateral (
+      select t.spot_price
+        from public.coingame_transactions t
+       where t.coin_id = sc.coin_id
+         and t.tx_type in ('buy', 'sell')
+         and t.spot_price is not null
+         and t.created_at < b.bucket_start + b.bucket_interval
+       order by t.created_at desc
+       limit 1
+    ) last_trade on true
+   order by b.bucket_start;
+$$;
+
+grant execute on function public.cg_coin_chart_range(uuid, integer) to authenticated;
+
 create or replace view public.coingame_leaderboard_current_week
 with (security_invoker = true) as
   select lw.user_id,

@@ -1020,21 +1020,33 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.cg-chart-type-toggle {
+.cg-chart-type-toggle,
+.cg-chart-range-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 2px;
-  min-width: 128px;
   padding: 2px;
   border: 1px solid var(--cg-border);
   border-radius: 8px;
   background: rgba(255,255,255,0.03);
 }
 
-.cg-chart-type-toggle button {
+.cg-chart-type-toggle {
+  grid-template-columns: 1fr 1fr;
+  min-width: 128px;
+}
+
+.cg-chart-range-toggle {
+  grid-template-columns: repeat(7, minmax(32px, 1fr));
+}
+
+.cg-chart-type-toggle button,
+.cg-chart-range-toggle button {
   height: 28px;
+  min-width: 32px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -1045,7 +1057,8 @@
   cursor: pointer;
 }
 
-.cg-chart-type-toggle button.active {
+.cg-chart-type-toggle button.active,
+.cg-chart-range-toggle button.active {
   background: var(--cg-accent);
   color: #000;
 }
@@ -1279,6 +1292,14 @@
   .cg-trade-panel { position: static; }
   .cg-coin-stat-strip,
   .cg-coin-info-grid { grid-template-columns: 1fr 1fr; }
+  .cg-chart-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cg-chart-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
   .cg-big-chart { height: 320px; }
   .cg-coin-market-link { display: none; }
 }
