@@ -334,7 +334,9 @@ export default function DebtsPage() {
   );
 
   const totalDebtCents = sortedDebts.reduce((sum, d) => sum + Math.max(0, d.currentBalanceCents || 0), 0);
-  const totalMonthlyCents = sortedDebts.reduce((sum, d) => sum + (d.monthlyPaymentCents || 0), 0);
+  const totalMonthlyCents = sortedDebts
+    .filter((d) => (d.currentBalanceCents || 0) > 0)
+    .reduce((sum, d) => sum + (d.monthlyPaymentCents || 0), 0);
 
   const openNew = () => { setEditingDebt(null); setModalOpen(true); };
   const openEdit = (debt) => { setEditingDebt(debt); setModalOpen(true); };
