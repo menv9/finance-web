@@ -361,9 +361,11 @@ export default function CoingameCoinPage() {
   const [error, setError] = useState('');
   const chartRange = CHART_RANGES.find((range) => range.key === chartRangeKey) ?? CHART_RANGES[5];
 
-  async function loadCoin() {
-    setLoading(true);
-    setError('');
+  async function loadCoin({ silent = false } = {}) {
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const [nextCoin, nextChart] = await Promise.all([
         fetchCoinById(coinId),
@@ -373,14 +375,23 @@ export default function CoingameCoinPage() {
       setCoin(nextCoin);
       setChartData(nextChart);
     } catch (err) {
-      setError(err.message || 'Could not load coin');
+      if (!silent) setError(err.message || 'Could not load coin');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     loadCoin();
+  }, [coinId, chartRange.minutes]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      loadCoin({ silent: true });
+      setTradesRefreshKey((key) => key + 1);
+    }, 5000);
+    return () => clearInterval(timer);
   }, [coinId, chartRange.minutes]);
 
   const holding = holdings.find((item) => item.coin_id === coinId);
