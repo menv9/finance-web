@@ -453,6 +453,7 @@ p { margin: 0; }
 
 /* lightweight-charts attribution logo */
 .tv-lightweight-charts table tr:last-child { display: none !important; }
+#tv-attr-logo { display: none !important; }
 
 /* ——————————————————————————————————————————————
    Motion — first-mount stagger hook
