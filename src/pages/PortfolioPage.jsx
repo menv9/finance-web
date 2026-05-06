@@ -8,9 +8,9 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { BaselineSeries, ColorType, createChart, AreaSeries } from 'lightweight-charts';
 import LWAreaChart from '../components/charts/LWAreaChart';
 import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
+import LWSalesChart from '../components/charts/LWSalesChart';
 import { PageHeader } from '../components/PageHeader';
 import { DividendForm } from '../components/forms/DividendForm';
 import { HoldingForm } from '../components/forms/HoldingForm';
@@ -1225,77 +1225,6 @@ function PortfolioNews({ tickers, apiKey }) {
 }
 
 
-function resolveColor(color, element) {
-  if (!color || !color.includes('var(')) return color;
-  const match = color.match(/var\((--[^)]+)\)/);
-  if (!match) return color;
-  return getComputedStyle(element).getPropertyValue(match[1]).trim() || color;
-}
-
-function withAlpha(color, alpha) {
-  if (!color) return `rgba(128,128,128,${alpha})`;
-  if (color.startsWith('#')) {
-    const c = color.replace('#', '');
-    const r = parseInt(c.slice(0, 2), 16);
-    const g = parseInt(c.slice(2, 4), 16);
-    const b = parseInt(c.slice(4, 6), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  if (color.startsWith('rgb(')) return color.replace('rgb(', 'rgba(').replace(')', `,${alpha})`);
-  return color;
-}
-
-function LWSalesChart({ data = [] }) {
-  const containerRef = useRef(null);
-  const chartRef = useRef(null);
-  const seriesRef = useRef([]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const chart = createChart(container, {
-      autoSize: true,
-      attributionLogo: false,
-      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: 'rgba(128,128,128,0.65)' },
-      grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'rgba(128,128,128,0.08)' } },
-      rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: false },
-      handleScroll: false,
-      handleScale: false,
-      crosshair: { vertLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false }, horzLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false } },
-    });
-    chartRef.current = chart;
-    return () => { chart.remove(); chartRef.current = null; };
-  }, []);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart || !data.length) return;
-    seriesRef.current.forEach((s) => chart.removeSeries(s));
-    seriesRef.current = [];
-    const container = containerRef.current;
-    const pos = resolveColor('var(--positive)', container);
-    const neg = resolveColor('var(--danger)', container);
-    const series = chart.addSeries(BaselineSeries, {
-      baseValue: { type: 'price', price: 0 },
-      topLineColor: pos,
-      topFillColor1: withAlpha(pos, 0.28),
-      topFillColor2: withAlpha(pos, 0.04),
-      bottomLineColor: neg,
-      bottomFillColor1: withAlpha(neg, 0.04),
-      bottomFillColor2: withAlpha(neg, 0.28),
-      lineWidth: 1.75,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: true,
-    });
-    series.setData(data);
-    seriesRef.current.push(series);
-    chart.timeScale().fitContent();
-  }, [data]);
-
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
-}
 
 const PORTFOLIO_PERIOD_OPTIONS = ['1d', '1w', '1m', '6m', '1y', 'all'];
 const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
