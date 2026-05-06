@@ -1369,10 +1369,6 @@ export default function PortfolioPage() {
     };
   }, [visiblePortfolioMetrics.allocationActual]);
 
-  const lwSalesData = useMemo(() =>
-    salesPerformanceSeries.map((p) => ({ time: p.date, value: p.cumulativePnlCents })),
-    [salesPerformanceSeries],
-  );
 
   const editingHoldingGroup = holdingGroups.find((group) => group.ticker === holdingGroupModal.ticker);
   const sellingAllGroup = holdingGroups.find((group) => group.ticker === sellAllModal.ticker);
@@ -1630,6 +1626,10 @@ export default function PortfolioPage() {
       return series;
     }, []);
   const salesPerformanceTotalCents = salesPerformanceSeries.at(-1)?.cumulativePnlCents || 0;
+  const lwSalesData = useMemo(() =>
+    salesPerformanceSeries.map((p) => ({ time: p.date, value: p.cumulativePnlCents })),
+    [salesPerformanceSeries],
+  );
   const portfolioViews = [
     { id: 'holdings', label: t('portfolio.views.holdings') },
     { id: 'activity', label: t('portfolio.views.activity') },
