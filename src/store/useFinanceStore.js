@@ -92,6 +92,7 @@ import {
   claimDaily as apiClaimDaily,
   createCoin as apiCreateCoin,
   ensureWallet,
+  fetchWallet,
   addAdminUser as apiAddCoingameAdminUser,
   fetchAdminUsers as apiFetchCoingameAdminUsers,
   fetchBotConfig as apiFetchBotConfig,
@@ -3728,9 +3729,9 @@ export const useFinanceStore = create((set, get) => ({
       if (!get().profile) {
         await get().loadProfile();
       }
-      const init = await ensureWallet();
+      await ensureWallet();
       const [wallet, ownCoin, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
-        init ? { user_id: init.user_id, fc_balance: init.fc_balance } : null,
+        fetchWallet(user.id),
         fetchCoinByOwner(user.id),
         apiFetchHoldings(user.id),
         apiFetchTransactions(user.id),
@@ -3832,7 +3833,7 @@ export const useFinanceStore = create((set, get) => ({
     try {
       const ownCoin = await apiCreateCoin(coinName);
       const [wallet, holdings, transactions, trending, leaderboard, economy] = await Promise.all([
-        ensureWallet(),
+        fetchWallet(user.id),
         apiFetchHoldings(user.id),
         apiFetchTransactions(user.id),
         fetchTrending(),
@@ -3840,7 +3841,7 @@ export const useFinanceStore = create((set, get) => ({
         fetchEconomy(),
       ]);
       set({
-        coingameWallet: wallet ? { user_id: wallet.user_id, fc_balance: wallet.fc_balance } : get().coingameWallet,
+        coingameWallet: wallet ?? get().coingameWallet,
         coingameOwnCoin: ownCoin,
         coingameHoldings: holdings,
         coingameTransactions: transactions,
