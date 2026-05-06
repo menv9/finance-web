@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, searchCoins, sellProceeds, spotPrice } from '../utils/coingameApi';
 
@@ -110,6 +111,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
         <div className="cg-modal-header">
           <span className="cg-modal-title">
             {mode === 'buy' ? 'Buy' : 'Sell'} {coin.coin_name || `@${coin.profiles?.username}`}
+            <InfoTooltip text={`${mode === 'buy' ? 'Buy' : 'Sell'} ${coinName} through the bonding curve. The preview includes the 1% trade fee.`} />
           </span>
           <button className="cg-modal-close" onClick={onClose}>×</button>
         </div>
@@ -215,8 +217,9 @@ export default function CoingameMarketPage() {
   return (
     <div className="cg-page">
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
+        <h1 className="cg-heading-with-info" style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
           Market
+          <InfoTooltip text="Discover and trade user coins with virtual FingesCoin." />
         </h1>
       </div>
 
@@ -231,10 +234,12 @@ export default function CoingameMarketPage() {
             placeholder="Search coin or username..."
           />
         </div>
+        <InfoTooltip text="Search by coin name or owner username. Filters below narrow results by coin status." />
       </div>
 
       {/* Filters */}
       <div className="cg-filter-tabs">
+        <InfoTooltip text="Filter market coins by status. Strong and active coins have more minted supply or recent activity." />
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -255,6 +260,7 @@ export default function CoingameMarketPage() {
         </div>
       ) : displayList.length === 0 ? (
         <div className="cg-table">
+          <InfoTooltip text="Market results appear here when coins match your search and filter." />
           <div className="cg-empty">
             <div className="cg-empty-icon">◎</div>
             <div className="cg-empty-title">{query.trim() ? 'No results found' : 'No coins yet'}</div>
@@ -262,7 +268,8 @@ export default function CoingameMarketPage() {
           </div>
         </div>
       ) : (
-        <div className="cg-grid">
+        <div className="cg-grid cg-grid-with-info">
+          <InfoTooltip text="Each market card shows a coin, its owner, minted supply, market cap, and quick trade actions." />
           {displayList.map((coin) => (
             <CoinCard
               key={coin.coin_id}

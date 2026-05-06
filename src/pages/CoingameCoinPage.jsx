@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Info } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { AreaSeries, CandlestickSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
+import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
 
@@ -20,15 +20,6 @@ function FC({ amount, decimals = 2 }) {
     <span>
       {Number(amount ?? 0).toLocaleString(undefined, { maximumFractionDigits: decimals })}
       <span style={{ marginLeft: '0.25em', fontSize: '0.75em', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>FC</span>
-    </span>
-  );
-}
-
-function InfoTooltip({ text }) {
-  return (
-    <span className="cg-info-tooltip" tabIndex={0} aria-label={text}>
-      <Info size={13} strokeWidth={2.4} aria-hidden="true" />
-      <span className="cg-info-tooltip-bubble" role="tooltip">{text}</span>
     </span>
   );
 }
@@ -210,7 +201,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
 
   return (
     <aside className="cg-trade-panel">
-      <InfoTooltip text={`Compra o vende ${coinName} usando FingesCoin. Las compras pagan FC y las ventas devuelven FC menos la fee.`} />
+      <InfoTooltip text={`Buy or sell ${coinName} using FingesCoin. Buys spend FC, while sells return FC after fees.`} />
       <div className="cg-trade-tabs">
         {['buy', 'sell'].map((key) => (
           <button
@@ -289,7 +280,7 @@ function CoinHeader({ coin }) {
   const name = coin.coin_name || profile?.username || 'Unnamed coin';
   return (
     <section className="cg-coin-hero">
-      <InfoTooltip text="Resumen de la moneda del usuario: propietario, estado y cantidad total emitida." />
+      <InfoTooltip text="Overview of this user coin: owner, status, and total minted supply." />
       <div className="cg-coin-hero-avatar">{(name[0] || '?').toUpperCase()}</div>
       <div>
         <div className="cg-coin-eyebrow">USERCOIN / FINGESCOIN</div>
@@ -385,21 +376,21 @@ export default function CoingameCoinPage() {
             <div>
               <div className="cg-metric-label">
                 <span>Market Cap</span>
-                <InfoTooltip text={`Valor total estimado de ${coinName}: precio actual multiplicado por la cantidad emitida.`} />
+                <InfoTooltip text={`Estimated total value of ${coinName}: current price multiplied by minted supply.`} />
               </div>
               <strong><FC amount={marketCap} /></strong>
             </div>
             <div>
               <div className="cg-metric-label">
                 <span>Price</span>
-                <InfoTooltip text={`Precio actual de 1 ${coinName} en FingesCoin, calculado con la bonding curve.`} />
+                <InfoTooltip text={`Current price of 1 ${coinName} in FingesCoin, calculated from the bonding curve.`} />
               </div>
               <strong><FC amount={price} decimals={6} /></strong>
             </div>
             <div>
               <div className="cg-metric-label">
                 <span>Your Position</span>
-                <InfoTooltip text={`Cantidad de ${coinName} que tienes ahora mismo en tu cartera de Coingame.`} />
+                <InfoTooltip text={`Amount of ${coinName} currently held in your Coingame wallet.`} />
               </div>
               <strong>{Number(holding?.tokens_held ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong>
             </div>
@@ -411,7 +402,7 @@ export default function CoingameCoinPage() {
                 <span className="cg-coin-eyebrow">TRADE DISPLAY</span>
                 <div>
                   <strong>{coin.coin_name}/FC</strong>
-                  <InfoTooltip text={`Histórico de precio y volumen de ${coinName}. Puedes alternar entre velas o línea y elegir el rango temporal.`} />
+                  <InfoTooltip text={`Price and volume history for ${coinName}. Switch between candles or line view and choose a time range.`} />
                 </div>
               </div>
               <div className="cg-chart-actions">
@@ -442,28 +433,28 @@ export default function CoingameCoinPage() {
             <div>
               <div className="cg-metric-label">
                 <span>Vol {chartRange.label}</span>
-                <InfoTooltip text={`Cantidad de ${coinName} comprada o vendida en el rango temporal seleccionado.`} />
+                <InfoTooltip text={`Amount of ${coinName} bought or sold in the selected time range.`} />
               </div>
               <strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong>
             </div>
             <div>
               <div className="cg-metric-label">
                 <span>Volume FC</span>
-                <InfoTooltip text="Valor total movido en FingesCoin dentro del rango temporal seleccionado." />
+                <InfoTooltip text="Total FingesCoin value traded during the selected time range." />
               </div>
               <strong><FC amount={rangeVolumeFc} /></strong>
             </div>
             <div>
               <div className="cg-metric-label">
                 <span>Base Price</span>
-                <InfoTooltip text={`Precio mínimo de referencia desde el que empieza la curva de ${coinName}.`} />
+                <InfoTooltip text={`Starting reference price for the ${coinName} bonding curve.`} />
               </div>
               <strong><FC amount={coin.base_price} decimals={4} /></strong>
             </div>
             <div>
               <div className="cg-metric-label">
                 <span>Fee</span>
-                <InfoTooltip text="Comisión aplicada a cada trade. Parte se quema o alimenta la pool según las reglas de Coingame." />
+                <InfoTooltip text="Fee applied to each trade. It is burned or routed to the pool according to Coingame rules." />
               </div>
               <strong>1% burn/pool</strong>
             </div>

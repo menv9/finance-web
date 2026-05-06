@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import FaultyTerminal from './FaultyTerminal';
 import CoinEntryAnimation from './CoinEntryAnimation';
+import InfoTooltip from './InfoTooltip';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import '../../styles/coingame.css';
 
@@ -44,7 +45,10 @@ function CoinSetupModal() {
     <div className="cg-overlay cg-setup-overlay">
       <form className="cg-modal cg-setup-modal" onSubmit={handleSubmit}>
         <div className="cg-modal-header">
-          <span className="cg-modal-title">Your coin is ready</span>
+          <span className="cg-modal-title">
+            Your coin is ready
+            <InfoTooltip text="Choose the public name for your personal user coin before launching it to the marketplace." />
+          </span>
         </div>
 
         <div className="cg-modal-body">

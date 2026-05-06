@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 
 const METRICS = [
@@ -109,8 +110,9 @@ export default function CoingameLeaderboardPage() {
   return (
     <div className="cg-page">
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
+        <h1 className="cg-heading-with-info" style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
           Rankings
+          <InfoTooltip text="Weekly Coingame rankings based on virtual trading performance." />
         </h1>
         <p style={{ color: 'var(--cg-text-3)', fontSize: '0.875rem', marginTop: '0.3rem', fontFamily: 'var(--cg-font-mono)' }}>
           Week of {weekStart} · Resets every Monday 00:00 UTC
@@ -119,6 +121,7 @@ export default function CoingameLeaderboardPage() {
 
       {/* Metric tabs */}
       <div className="cg-filter-tabs">
+        <InfoTooltip text="Switch the leaderboard between gains, traded volume, and number of trades." />
         {METRICS.map((m) => (
           <button
             key={m.key}
@@ -132,7 +135,10 @@ export default function CoingameLeaderboardPage() {
 
       <div className="cg-table">
         <div className="cg-table-header">
-          <span className="cg-table-title">Top Traders</span>
+          <span className="cg-table-title">
+            Top Traders
+            <InfoTooltip text="Players are ranked by the selected weekly metric. The bar shows relative size versus the current leader." />
+          </span>
           {leaderboard.length > 0 && (
             <span style={{ fontSize: '0.78rem', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>
               {leaderboard.length} players

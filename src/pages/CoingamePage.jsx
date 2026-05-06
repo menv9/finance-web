@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { bondingCurvePoints, spotPrice } from '../utils/coingameApi';
 
@@ -21,17 +22,26 @@ function StatRow({ wallet, ownCoin }) {
   return (
     <div className="cg-stat-row">
       <div className="cg-stat-card">
-        <div className="cg-stat-label">FC Balance</div>
+        <div className="cg-card-title-line">
+          <div className="cg-stat-label">FC Balance</div>
+          <InfoTooltip text="Your available FingesCoin balance for Coingame trades and rewards." />
+        </div>
         <div className="cg-stat-value accent" style={{ fontFamily: 'var(--cg-font-mono)', fontSize: '1.1rem' }}>
           <FC amount={wallet?.fc_balance} />
         </div>
       </div>
       <div className="cg-stat-card">
-        <div className="cg-stat-label">Login Streak</div>
+        <div className="cg-card-title-line">
+          <div className="cg-stat-label">Login Streak</div>
+          <InfoTooltip text="Consecutive daily claims. Longer streaks can increase your daily Coingame rewards." />
+        </div>
         <div className="cg-stat-value">{wallet?.login_streak ?? 0} <span style={{ fontSize: '0.7em', color: 'var(--cg-text-3)' }}>days</span></div>
       </div>
       <div className="cg-stat-card">
-        <div className="cg-stat-label">Coin Price</div>
+        <div className="cg-card-title-line">
+          <div className="cg-stat-label">Coin Price</div>
+          <InfoTooltip text="Current price of your own user coin, calculated from its bonding curve." />
+        </div>
         <div className="cg-stat-value" style={{ fontFamily: 'var(--cg-font-mono)', fontSize: '0.95rem' }}>
           <FC amount={price} decimals={6} />
         </div>
@@ -44,7 +54,10 @@ function StatRow({ wallet, ownCoin }) {
         )}
       </div>
       <div className="cg-stat-card">
-        <div className="cg-stat-label">Market Cap</div>
+        <div className="cg-card-title-line">
+          <div className="cg-stat-label">Market Cap</div>
+          <InfoTooltip text="Estimated value of your coin: current price multiplied by minted supply." />
+        </div>
         <div className="cg-stat-value" style={{ fontFamily: 'var(--cg-font-mono)', fontSize: '0.95rem' }}>
           <FC amount={marketCap} />
         </div>
@@ -78,6 +91,7 @@ function DailyClaimCard({ wallet, onClaim }) {
 
   return (
     <div className="cg-claim-card">
+      <InfoTooltip text="Claim your daily Coingame reward. Rewards are virtual FC and separate from real finances." />
       <div>
         <div style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.25rem' }}>
           Daily Reward
@@ -117,7 +131,10 @@ function BondingCurveCard({ coin }) {
   return (
     <div className="cg-chart-wrap">
       <div className="cg-chart-header">
-        <span className="cg-chart-title">Bonding Curve</span>
+        <span className="cg-chart-title">
+          Bonding Curve
+          <InfoTooltip text={`Shows how ${coinName} price rises as more supply is minted.`} />
+        </span>
         <span className="cg-chart-price">{price.toFixed(6)} FC/{coinName}</span>
       </div>
       <div style={{ padding: '0.75rem 0.5rem 0.5rem' }}>
@@ -160,7 +177,10 @@ function HoldingsCard({ holdings }) {
   return (
     <div className="cg-table" style={{ marginBottom: '1.5rem' }}>
       <div className="cg-table-header">
-        <span className="cg-table-title">My Holdings</span>
+        <span className="cg-table-title">
+          My Holdings
+          <InfoTooltip text="Coins you own from other users, including current value and unrealized gain or loss." />
+        </span>
         <Link to="/coingame/market" className="cg-section-link">Market →</Link>
       </div>
       {holdings.length === 0 ? (
@@ -211,12 +231,15 @@ function EconomyStrip({ economy }) {
   return (
     <div className="cg-economy-strip">
       {[
-        { label: 'Minted', value: Number(economy.total_supply_minted).toLocaleString(), unit: 'coins' },
-        { label: 'Burned', value: Number(economy.total_burned).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC' },
-        { label: 'Prize Pool', value: Number(economy.prize_pool_fc).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC', accent: true },
+        { label: 'Minted', value: Number(economy.total_supply_minted).toLocaleString(), unit: 'coins', help: 'Total user coin supply minted across Coingame.' },
+        { label: 'Burned', value: Number(economy.total_burned).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC', help: 'FingesCoin removed from circulation through fees and game rules.' },
+        { label: 'Prize Pool', value: Number(economy.prize_pool_fc).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC', accent: true, help: 'Virtual FC reserved for Coingame rewards and competitions.' },
       ].map((item) => (
         <div key={item.label} className="cg-economy-cell">
-          <div className="cg-economy-cell-label">{item.label}</div>
+          <div className="cg-card-title-line">
+            <div className="cg-economy-cell-label">{item.label}</div>
+            <InfoTooltip text={item.help} />
+          </div>
           <div className="cg-economy-cell-value" style={item.accent ? { color: 'var(--cg-positive)' } : {}}>
             {item.value}
           </div>

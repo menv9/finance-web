@@ -383,6 +383,17 @@
   gap: 0.875rem;
 }
 
+.cg-grid-with-info {
+  position: relative;
+  padding-top: 1.65rem;
+}
+
+.cg-grid-with-info > .cg-info-tooltip {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 .cg-coin-card {
   background: var(--cg-surface);
   border: 1px solid var(--cg-border);
@@ -485,6 +496,7 @@
 /* ── Filter tabs ──────────────────────────────────────────────────────────── */
 .cg-filter-tabs {
   display: flex;
+  align-items: center;
   gap: 0.4rem;
   overflow-x: auto;
   scrollbar-width: none;
@@ -531,6 +543,25 @@
   padding: 1rem 1.125rem;
 }
 
+.cg-card-title-line,
+.cg-heading-with-info,
+.cg-table-title,
+.cg-chart-title,
+.cg-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cg-heading-with-info {
+  line-height: 1.15;
+}
+
+.cg-card-title-line .cg-stat-label,
+.cg-card-title-line .cg-economy-cell-label {
+  margin-bottom: 0;
+}
+
 .cg-stat-label {
   font-size: 0.78rem;
   color: var(--cg-text-3);
@@ -560,6 +591,7 @@
   border: 1px solid var(--cg-border);
   border-radius: 12px;
   overflow: hidden;
+  position: relative;
 }
 
 .cg-table-header {
@@ -568,6 +600,12 @@
   justify-content: space-between;
   padding: 0.875rem 1.125rem;
   border-bottom: 1px solid var(--cg-border);
+}
+
+.cg-table > .cg-info-tooltip {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
 }
 
 .cg-table-title {
@@ -616,6 +654,13 @@
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.cg-claim-card > .cg-info-tooltip {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
 }
 
 /* ── Bonding curve chart ──────────────────────────────────────────────────── */
@@ -625,6 +670,7 @@
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 1.5rem;
+  position: relative;
 }
 .cg-chart-header {
   display: flex;

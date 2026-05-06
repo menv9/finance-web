@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
 
 const TX_META = {
@@ -79,8 +80,9 @@ export default function CoingameTransactionsPage() {
   return (
     <div className="cg-page">
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
+        <h1 className="cg-heading-with-info" style={{ fontFamily: 'var(--cg-font-display)', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
           History
+          <InfoTooltip text="A record of your Coingame rewards, grants, buys, and sells." />
         </h1>
         <p style={{ color: 'var(--cg-text-3)', fontSize: '0.875rem', marginTop: '0.3rem' }}>
           All your FC transactions
@@ -89,7 +91,10 @@ export default function CoingameTransactionsPage() {
 
       <div className="cg-table">
         <div className="cg-table-header">
-          <span className="cg-table-title">Transactions</span>
+          <span className="cg-table-title">
+            Transactions
+            <InfoTooltip text="Each record shows the FC amount, transaction type, coin, and time." />
+          </span>
           {transactions.length > 0 && (
             <span style={{ fontSize: '0.78rem', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>
               {transactions.length} records
