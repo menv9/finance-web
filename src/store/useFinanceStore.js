@@ -92,13 +92,24 @@ import {
   claimDaily as apiClaimDaily,
   createCoin as apiCreateCoin,
   ensureWallet,
+  addAdminUser as apiAddCoingameAdminUser,
+  fetchAdminUsers as apiFetchCoingameAdminUsers,
+  fetchBotConfig as apiFetchBotConfig,
+  fetchBotLogs as apiFetchBotLogs,
   fetchCoinByOwner,
+  fetchCoingameAdminStatus as apiFetchCoingameAdminStatus,
   fetchEconomy,
   fetchHoldings as apiFetchHoldings,
+  fetchMarketHealth as apiFetchMarketHealth,
   fetchTransactions as apiFetchTransactions,
   fetchTrending,
   fetchWeeklyLeaderboard,
+  removeAdminUser as apiRemoveCoingameAdminUser,
   sellCoin as apiSellCoin,
+  setBotCoinEnabled as apiSetBotCoinEnabled,
+  setBotReserve as apiSetBotReserve,
+  triggerBotTick as apiTriggerBotTick,
+  updateBotGlobalConfig as apiUpdateBotGlobalConfig,
 } from '../utils/coingameApi';
 
 const STORE_KEYS = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots'];
@@ -762,6 +773,13 @@ export const useFinanceStore = create((set, get) => ({
   coingameStatus: 'idle',
   coingameError: '',
   coingameNeedsCoinSetup: false,
+  coingameBotConfig: null,
+  coingameBotLogs: [],
+  coingameMarketHealth: null,
+  coingameAdminUsers: [],
+  coingameIsAdmin: false,
+  coingameAdminStatus: 'idle',
+  coingameAdminError: '',
   syncMeta: {
     lastPulledAt: {},
     deletedRecords: {},
@@ -3678,6 +3696,30 @@ export const useFinanceStore = create((set, get) => ({
 
   // ── Coingame ──────────────────────────────────────────────────────────────
 
+  triggerBotTick: async () => {
+    try {
+      const key = 'coingame.lastBotTickAttempt';
+      const now = Date.now();
+      const last = Number(localStorage.getItem(key) || 0);
+      if (last && now - last < 25 * 60 * 1000) return;
+      localStorage.setItem(key, String(now));
+      await apiTriggerBotTick();
+    } catch {
+      // Bot ticks are opportunistic; user-facing Coingame loading should not fail.
+    }
+  },
+
+  loadCoingameAdminStatus: async () => {
+    try {
+      const isAdmin = await apiFetchCoingameAdminStatus();
+      set({ coingameIsAdmin: Boolean(isAdmin) });
+      return Boolean(isAdmin);
+    } catch {
+      set({ coingameIsAdmin: false });
+      return false;
+    }
+  },
+
   loadCoingame: async () => {
     const user = get().supabaseUser;
     if (!user) return;
@@ -3707,9 +3749,80 @@ export const useFinanceStore = create((set, get) => ({
         coingameStatus: 'idle',
         coingameNeedsCoinSetup: !ownCoin,
       });
+      get().triggerBotTick();
+      get().loadCoingameAdminStatus();
     } catch (err) {
       set({ coingameStatus: 'error', coingameError: err.message || 'Failed to load Coingame' });
     }
+  },
+
+  loadCoingameAdmin: async () => {
+    set({ coingameAdminStatus: 'loading', coingameAdminError: '' });
+    try {
+      const [config, health, logs, admins] = await Promise.all([
+        apiFetchBotConfig(),
+        apiFetchMarketHealth(),
+        apiFetchBotLogs(50),
+        apiFetchCoingameAdminUsers(),
+      ]);
+      set({
+        coingameBotConfig: config,
+        coingameMarketHealth: health,
+        coingameBotLogs: logs,
+        coingameAdminUsers: admins,
+        coingameIsAdmin: true,
+        coingameAdminStatus: 'idle',
+      });
+    } catch (err) {
+      set({
+        coingameIsAdmin: false,
+        coingameAdminStatus: 'error',
+        coingameAdminError: err.message || 'Failed to load Coingame admin',
+      });
+    }
+  },
+
+  updateBotConfig: async (params) => {
+    await apiUpdateBotGlobalConfig(params);
+    await get().loadCoingameAdmin();
+  },
+
+  toggleBotCoin: async (coinId, enabled) => {
+    await apiSetBotCoinEnabled(coinId, enabled);
+    await get().loadCoingameAdmin();
+  },
+
+  refreshBotLogs: async (coinId = null, limit = 50) => {
+    try {
+      const logs = await apiFetchBotLogs(limit, coinId);
+      set({ coingameBotLogs: logs });
+    } catch (err) {
+      set({ coingameAdminError: err.message || 'Failed to load bot logs' });
+    }
+  },
+
+  refreshMarketHealth: async () => {
+    try {
+      const health = await apiFetchMarketHealth();
+      set({ coingameMarketHealth: health });
+    } catch (err) {
+      set({ coingameAdminError: err.message || 'Failed to load market health' });
+    }
+  },
+
+  setBotReserve: async (amount) => {
+    await apiSetBotReserve(amount);
+    await get().loadCoingameAdmin();
+  },
+
+  addCoingameAdmin: async (userId) => {
+    await apiAddCoingameAdminUser(userId);
+    await get().loadCoingameAdmin();
+  },
+
+  removeCoingameAdmin: async (userId) => {
+    await apiRemoveCoingameAdminUser(userId);
+    await get().loadCoingameAdmin();
   },
 
   coingameCreateCoin: async (coinName) => {

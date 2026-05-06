@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { AreaSeries, CandlestickSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
 import InfoTooltip from '../components/coingame/InfoTooltip';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
+import { buyCost, fetchCoinById, fetchCoinChart, fetchCoinRecentTrades, sellProceeds, spotPrice } from '../utils/coingameApi';
 
 const CHART_RANGES = [
   { key: '1m', label: '1m', minutes: 1 },
@@ -164,6 +164,52 @@ function LightweightCoinChart({ data, chartType }) {
   return <div className="cg-lightweight-chart" ref={containerRef} />;
 }
 
+function RecentTradesSection({ coinId, refreshKey }) {
+  const [trades, setTrades] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTrades() {
+      const rows = await fetchCoinRecentTrades(coinId, 20);
+      if (!cancelled) setTrades(rows ?? []);
+    }
+    loadTrades().catch(() => {
+      if (!cancelled) setTrades([]);
+    });
+    return () => { cancelled = true; };
+  }, [coinId, refreshKey]);
+
+  return (
+    <section className="cg-recent-trades">
+      <div className="cg-chart-header">
+        <span className="cg-chart-title">Recent Trades</span>
+        <span className="cg-chart-price">{trades.length} fills</span>
+      </div>
+      <div className="cg-recent-trade-list">
+        {trades.length === 0 ? (
+          <div className="cg-admin-muted">No trades yet</div>
+        ) : trades.map((trade) => {
+          const isBuy = trade.tx_type === 'buy';
+          return (
+            <div className={`cg-recent-trade ${trade.is_bot ? 'bot' : ''}`} key={trade.id}>
+              <span className={`cg-trade-dot ${isBuy ? 'buy' : 'sell'}`}>{isBuy ? '^' : 'v'}</span>
+              <div>
+                <strong>{trade.is_bot ? 'System Liquidity' : `@${trade.actor_username || 'user'}`}</strong>
+                <span>{new Date(trade.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              {trade.is_bot && <span className="cg-system-badge">SYS</span>}
+              <div className="cg-recent-trade-amounts">
+                <strong>{Number(trade.tokens ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+                <span><FC amount={trade.fc_amount} /></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
   const coingameBuy = useFinanceStore((s) => s.coingameBuy);
   const coingameSell = useFinanceStore((s) => s.coingameSell);
@@ -305,6 +351,7 @@ export default function CoingameCoinPage() {
   const [chartData, setChartData] = useState([]);
   const [chartType, setChartType] = useState('candles');
   const [chartRangeKey, setChartRangeKey] = useState('24h');
+  const [tradesRefreshKey, setTradesRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const chartRange = CHART_RANGES.find((range) => range.key === chartRangeKey) ?? CHART_RANGES[5];
@@ -347,6 +394,7 @@ export default function CoingameCoinPage() {
 
   async function refreshAfterTrade() {
     await Promise.all([loadCoingame(), loadCoin()]);
+    setTradesRefreshKey((key) => key + 1);
   }
 
   if (loading) {
@@ -428,6 +476,8 @@ export default function CoingameCoinPage() {
               <LightweightCoinChart data={chartData} chartType={chartType} />
             </div>
           </section>
+
+          <RecentTradesSection coinId={coinId} refreshKey={tradesRefreshKey} />
 
           <section className="cg-coin-info-grid">
             <div>

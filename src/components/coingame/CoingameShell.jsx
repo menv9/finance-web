@@ -92,16 +92,26 @@ function CoinSetupModal() {
 export default function CoingameShell({ children }) {
   const loadCoingame = useFinanceStore((s) => s.loadCoingame);
   const needsCoinSetup = useFinanceStore((s) => s.coingameNeedsCoinSetup);
+  const isAdmin = useFinanceStore((s) => s.coingameIsAdmin);
   const [showCoin, setShowCoin] = useState(
     () => sessionStorage.getItem('cg_intro') !== '1'
+  );
+  const [theme, setTheme] = useState(
+    () => (typeof localStorage !== 'undefined' && localStorage.getItem('cg_theme')) || 'dark'
   );
 
   useEffect(() => {
     loadCoingame();
   }, [loadCoingame]);
 
+  useEffect(() => {
+    try { localStorage.setItem('cg_theme', theme); } catch { /* ignore */ }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+
   return (
-    <div className="coingame-theme cg-shell">
+    <div className={`coingame-theme cg-shell${theme === 'light' ? ' light' : ''}`}>
       {/* WebGL background */}
       <div className="cg-bg-layer">
         <FaultyTerminal
@@ -138,7 +148,7 @@ export default function CoingameShell({ children }) {
         </div>
 
         <nav className="cg-sidebar-nav">
-          {NAV.map(({ to, end, icon, label }) => (
+          {[...NAV, ...(isAdmin ? [{ to: '/coingame/admin', end: false, icon: '*', label: 'Admin' }] : [])].map(({ to, end, icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -152,6 +162,10 @@ export default function CoingameShell({ children }) {
         </nav>
 
         <div className="cg-sidebar-bottom">
+          <button type="button" className="cg-back-link cg-theme-toggle" onClick={toggleTheme}>
+            <span className="cg-nav-item-icon">{theme === 'light' ? '☾' : '☀'}</span>
+            <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+          </button>
           <Link to="/dashboard" className="cg-back-link">
             <span className="cg-nav-item-icon">←</span>
             <span>Back to Finges</span>

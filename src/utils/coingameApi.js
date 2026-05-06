@@ -207,6 +207,10 @@ export async function fetchCoinChart(coinId, rangeMinutes = 1440) {
   }));
 }
 
+export async function fetchCoinRecentTrades(coinId, limit = 25) {
+  return rpc('cg_coin_recent_trades', { p_coin_id: coinId, p_limit: limit });
+}
+
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 
 /**
@@ -235,6 +239,62 @@ export async function fetchEconomy() {
     .single();
   if (error) throw error;
   return data;
+}
+
+// Bot admin
+export async function triggerBotTick() {
+  return rpc('cg_bot_tick');
+}
+
+export async function fetchCoingameAdminStatus() {
+  return rpc('cg_admin_status');
+}
+
+export async function fetchBotConfig() {
+  return rpc('cg_bot_get_config');
+}
+
+export async function updateBotGlobalConfig(params = {}) {
+  return rpc('cg_bot_update_global_config', {
+    p_enabled: params.enabled,
+    p_min_trade_pct: params.min_trade_pct,
+    p_max_trade_pct: params.max_trade_pct,
+    p_min_tokens_abs: params.min_tokens_abs,
+    p_inactivity_threshold_h: params.inactivity_threshold_h,
+    p_max_bot_daily_volume_pct: params.max_bot_daily_volume_pct,
+    p_daily_volume_floor_fc: params.daily_volume_floor_fc,
+    p_max_trades_per_coin_day: params.max_trades_per_coin_day,
+    p_max_price_impact_pct: params.max_price_impact_pct,
+    p_reserve_low_threshold_fc: params.reserve_low_threshold_fc,
+  });
+}
+
+export async function setBotCoinEnabled(coinId, enabled) {
+  return rpc('cg_bot_set_coin_enabled', { p_coin_id: coinId, p_enabled: enabled });
+}
+
+export async function fetchBotLogs(limit = 50, coinId = null) {
+  return rpc('cg_bot_get_logs', { p_limit: limit, p_coin_id: coinId });
+}
+
+export async function fetchMarketHealth() {
+  return rpc('cg_bot_get_market_health');
+}
+
+export async function setBotReserve(amount) {
+  return rpc('cg_bot_set_reserve', { p_amount: amount });
+}
+
+export async function fetchAdminUsers() {
+  return rpc('cg_admin_list_users');
+}
+
+export async function addAdminUser(userId) {
+  return rpc('cg_admin_add_user', { p_target_user_id: userId });
+}
+
+export async function removeAdminUser(userId) {
+  return rpc('cg_admin_remove_user', { p_target_user_id: userId });
 }
 
 // ── Pricing helpers (client-side, mirrors SQL curve) ─────────────────────────

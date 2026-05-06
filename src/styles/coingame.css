@@ -28,6 +28,20 @@
   --cg-danger-soft:    rgba(255,68,68,0.12);
   --cg-positive:       #00d68f;
   --cg-positive-soft:  rgba(0,214,143,0.12);
+  --cg-positive-border: rgba(0,214,143,0.25);
+  --cg-danger-border:  rgba(255,68,68,0.2);
+  --cg-danger-border-strong: rgba(255,68,68,0.3);
+  --cg-sidebar-bg:     rgba(10,10,10,0.92);
+  --cg-overlay-soft:   rgba(255,255,255,0.04);
+  --cg-overlay-softer: rgba(255,255,255,0.025);
+  --cg-overlay-strong: rgba(0,0,0,0.75);
+  --cg-overlay-stronger: rgba(0,0,0,0.9);
+  --cg-tooltip-bg:     rgba(9,9,9,0.98);
+  --cg-modal-bg:       rgba(17,17,17,0.94);
+  --cg-shadow:         0 8px 24px rgba(0,0,0,0.4);
+  --cg-shadow-strong:  0 12px 32px rgba(0,0,0,0.35);
+  --cg-scrollbar:      rgba(255,255,255,0.1);
+  --cg-on-accent:      #000;
   --cg-sidebar-w:      200px;
   --cg-font:           'DM Sans', system-ui, sans-serif;
   --cg-font-display:   'Syne', system-ui, sans-serif;
@@ -38,6 +52,50 @@
   background: var(--cg-bg);
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ── Light theme override ─────────────────────────────────────────────────── */
+.coingame-theme.light {
+  --cg-bg:             #f5f5f3;
+  --cg-surface:        #ffffff;
+  --cg-surface-raised: #fafaf8;
+  --cg-surface-hover:  #efefec;
+  --cg-border:         rgba(0,0,0,0.08);
+  --cg-border-strong:  rgba(0,0,0,0.16);
+  --cg-accent:         #0fb800;
+  --cg-accent-soft:    rgba(15,184,0,0.14);
+  --cg-accent-border:  rgba(15,184,0,0.4);
+  --cg-accent-glow:    rgba(15,184,0,0.35);
+  --cg-text:           #0a0a0a;
+  --cg-text-2:         #555555;
+  --cg-text-3:         #888888;
+  --cg-danger:         #d92020;
+  --cg-danger-soft:    rgba(217,32,32,0.10);
+  --cg-danger-border:  rgba(217,32,32,0.25);
+  --cg-danger-border-strong: rgba(217,32,32,0.35);
+  --cg-positive:       #008f5a;
+  --cg-positive-soft:  rgba(0,143,90,0.12);
+  --cg-positive-border: rgba(0,143,90,0.3);
+  --cg-sidebar-bg:     rgba(255,255,255,0.92);
+  --cg-overlay-soft:   rgba(0,0,0,0.04);
+  --cg-overlay-softer: rgba(0,0,0,0.025);
+  --cg-overlay-strong: rgba(0,0,0,0.5);
+  --cg-overlay-stronger: rgba(0,0,0,0.55);
+  --cg-tooltip-bg:     rgba(20,20,20,0.96);
+  --cg-modal-bg:       rgba(255,255,255,0.98);
+  --cg-shadow:         0 8px 24px rgba(0,0,0,0.10);
+  --cg-shadow-strong:  0 12px 32px rgba(0,0,0,0.12);
+  --cg-scrollbar:      rgba(0,0,0,0.18);
+  --cg-on-accent:      #000;
+}
+
+/* Dim the WebGL terminal background in light mode so content stays readable */
+.coingame-theme.light .cg-bg-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(245,245,243,0.85);
+  pointer-events: none;
 }
 
 /* ── Shell layout ─────────────────────────────────────────────────────────── */
@@ -62,7 +120,7 @@
   z-index: 20;
   width: var(--cg-sidebar-w);
   flex-shrink: 0;
-  background: rgba(10,10,10,0.92);
+  background: var(--cg-sidebar-bg);
   backdrop-filter: blur(20px);
   border-right: 1px solid var(--cg-border);
   display: flex;
@@ -90,7 +148,7 @@
   font-family: var(--cg-font-display);
   font-weight: 800;
   font-size: 0.7rem;
-  color: #000;
+  color: var(--cg-on-accent);
   flex-shrink: 0;
 }
 
@@ -166,6 +224,15 @@
   color: var(--cg-text-2);
 }
 
+button.cg-back-link {
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 /* ── Main area ────────────────────────────────────────────────────────────── */
 .cg-main-area {
   position: relative;
@@ -174,10 +241,10 @@
   min-width: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.1) transparent;
+  scrollbar-color: var(--cg-scrollbar) transparent;
 }
 .cg-main-area::-webkit-scrollbar { width: 4px; }
-.cg-main-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.cg-main-area::-webkit-scrollbar-thumb { background: var(--cg-scrollbar); border-radius: 4px; }
 
 .cg-page {
   max-width: 900px;
@@ -245,7 +312,7 @@
 
 .cg-btn-primary {
   background: var(--cg-accent);
-  color: #000;
+  color: var(--cg-on-accent);
 }
 .cg-btn-primary:not(:disabled):hover { opacity: 0.88; }
 
@@ -259,9 +326,9 @@
 .cg-btn-danger {
   background: var(--cg-danger-soft);
   color: var(--cg-danger);
-  border: 1px solid rgba(255,68,68,0.2);
+  border: 1px solid var(--cg-danger-border);
 }
-.cg-btn-danger:not(:disabled):hover { background: rgba(255,68,68,0.2); }
+.cg-btn-danger:not(:disabled):hover { background: var(--cg-danger-border); }
 
 .cg-btn-sm {
   height: 30px;
@@ -408,7 +475,7 @@
 .cg-coin-card:hover {
   border-color: var(--cg-border-strong);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  box-shadow: var(--cg-shadow);
 }
 
 .cg-coin-card-image {
@@ -489,7 +556,7 @@
   letter-spacing: 0.02em;
   border: 1px solid transparent;
 }
-.cg-badge-strong  { background: var(--cg-positive-soft); color: var(--cg-positive); border-color: rgba(0,214,143,0.25); }
+.cg-badge-strong  { background: var(--cg-positive-soft); color: var(--cg-positive); border-color: var(--cg-positive-border); }
 .cg-badge-active  { background: var(--cg-accent-soft);   color: var(--cg-accent);   border-color: var(--cg-accent-border); }
 .cg-badge-starter { background: var(--cg-surface-raised); color: var(--cg-text-3);  border-color: var(--cg-border); }
 
@@ -523,7 +590,7 @@
 .cg-filter-tab:hover { background: var(--cg-surface-raised); color: var(--cg-text); }
 .cg-filter-tab.active {
   background: var(--cg-accent);
-  color: #000;
+  color: var(--cg-on-accent);
   border-color: var(--cg-accent);
   font-weight: 700;
 }
@@ -724,7 +791,7 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgba(0,0,0,0.75);
+  background: var(--cg-overlay-strong);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
@@ -871,7 +938,7 @@
 /* ── Error ────────────────────────────────────────────────────────────────── */
 .cg-error {
   background: var(--cg-danger-soft);
-  border: 1px solid rgba(255,68,68,0.2);
+  border: 1px solid var(--cg-danger-border);
   border-radius: 8px;
   padding: 0.625rem 0.875rem;
   font-size: 0.825rem;
@@ -947,7 +1014,7 @@
 .cg-trade-panel,
 .cg-coin-stat-strip,
 .cg-coin-info-grid > div {
-  background: rgba(17,17,17,0.94);
+  background: var(--cg-modal-bg);
   border: 1px solid var(--cg-border);
   border-radius: 8px;
 }
@@ -970,7 +1037,7 @@
   font-family: var(--cg-font-display);
   font-size: 1.6rem;
   font-weight: 800;
-  color: #000;
+  color: var(--cg-on-accent);
   background: var(--cg-accent);
   box-shadow: 0 0 20px rgba(23,245,0,0.22);
   flex-shrink: 0;
@@ -1084,7 +1151,7 @@
   border: 1px solid var(--cg-border-strong);
   border-radius: 50%;
   color: var(--cg-text-3);
-  background: rgba(255,255,255,0.04);
+  background: var(--cg-overlay-soft);
   cursor: help;
   flex-shrink: 0;
   outline: none;
@@ -1114,8 +1181,8 @@
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--cg-border-strong);
   border-radius: 8px;
-  background: rgba(9,9,9,0.98);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  background: var(--cg-tooltip-bg);
+  box-shadow: var(--cg-shadow-strong);
   color: var(--cg-text-2);
   font-family: var(--cg-font);
   font-size: 0.76rem;
@@ -1172,7 +1239,7 @@
   padding: 2px;
   border: 1px solid var(--cg-border);
   border-radius: 8px;
-  background: rgba(255,255,255,0.03);
+  background: var(--cg-overlay-softer);
 }
 
 .cg-chart-type-toggle {
@@ -1201,7 +1268,7 @@
 .cg-chart-type-toggle button.active,
 .cg-chart-range-toggle button.active {
   background: var(--cg-accent);
-  color: #000;
+  color: var(--cg-on-accent);
 }
 
 .cg-big-chart {
@@ -1222,7 +1289,7 @@
 
 .cg-info-hero,
 .cg-info-section {
-  background: rgba(17,17,17,0.94);
+  background: var(--cg-modal-bg);
   border: 1px solid var(--cg-border);
   border-radius: 8px;
 }
@@ -1269,7 +1336,7 @@
   padding: 0.85rem;
   border: 1px solid var(--cg-border);
   border-radius: 8px;
-  background: rgba(255,255,255,0.025);
+  background: var(--cg-overlay-softer);
 }
 
 .cg-info-definition h3,
@@ -1313,7 +1380,7 @@
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--cg-border);
   border-radius: 8px;
-  background: rgba(255,255,255,0.025);
+  background: var(--cg-overlay-softer);
 }
 
 .cg-info-tier-list strong {
@@ -1358,7 +1425,7 @@
 
 .cg-trade-tabs button.active {
   background: var(--cg-accent);
-  color: #000;
+  color: var(--cg-on-accent);
   font-weight: 800;
 }
 
@@ -1439,7 +1506,7 @@
   padding: 0.75rem;
   margin-bottom: 0.75rem;
   border-radius: 8px;
-  background: rgba(255,255,255,0.025);
+  background: var(--cg-overlay-softer);
   font-size: 0.78rem;
   color: var(--cg-text-3);
 }
@@ -1458,6 +1525,233 @@
   justify-content: center;
 }
 
+/* Admin + recent trades */
+.cg-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.cg-admin-tabs button,
+.cg-admin-toggle,
+.cg-admin-result {
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface);
+  color: var(--cg-text-2);
+  cursor: pointer;
+}
+
+.cg-admin-tabs button {
+  height: 36px;
+  padding: 0 0.8rem;
+  font-family: var(--cg-font-mono);
+  font-size: 0.74rem;
+}
+
+.cg-admin-tabs button.active {
+  background: var(--cg-accent);
+  color: var(--cg-on-accent);
+  font-weight: 800;
+}
+
+.cg-admin-panel,
+.cg-recent-trades {
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface);
+  padding: 1rem;
+}
+
+.cg-admin-toolbar,
+.cg-admin-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cg-admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  font-weight: 700;
+}
+
+.cg-admin-muted {
+  color: var(--cg-text-3);
+  font-family: var(--cg-font-mono);
+  font-size: 0.76rem;
+}
+
+.cg-admin-form-grid,
+.cg-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cg-admin-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--cg-text-3);
+  font-size: 0.76rem;
+}
+
+.cg-admin-field input,
+.cg-admin-toolbar select {
+  height: 38px;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface-raised);
+  color: var(--cg-text);
+  padding: 0 0.65rem;
+  font-family: var(--cg-font-mono);
+}
+
+.cg-admin-reserve {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.cg-admin-reserve span {
+  color: var(--cg-text-3);
+  font-size: 0.8rem;
+}
+
+.cg-admin-reserve strong {
+  color: var(--cg-accent);
+  font-family: var(--cg-font-display);
+  font-size: 2rem;
+}
+
+.cg-admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+}
+
+.cg-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+}
+
+.cg-admin-table th,
+.cg-admin-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--cg-border);
+  text-align: left;
+  font-size: 0.78rem;
+}
+
+.cg-admin-table th {
+  color: var(--cg-text-3);
+  font-family: var(--cg-font-mono);
+  font-weight: 600;
+}
+
+.cg-admin-table td {
+  color: var(--cg-text-2);
+}
+
+.cg-admin-action {
+  color: var(--cg-text);
+  font-family: var(--cg-font-mono);
+  text-transform: uppercase;
+}
+
+.cg-admin-action.buy { color: var(--cg-positive); }
+.cg-admin-action.sell,
+.cg-admin-action.error { color: var(--cg-danger); }
+
+.cg-admin-list,
+.cg-admin-search,
+.cg-recent-trade-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.cg-admin-list {
+  margin-bottom: 1rem;
+}
+
+.cg-admin-list-row,
+.cg-admin-result,
+.cg-recent-trade {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: var(--cg-surface-raised);
+}
+
+.cg-admin-list-row div,
+.cg-admin-result {
+  min-width: 0;
+}
+
+.cg-admin-list-row span,
+.cg-admin-result small,
+.cg-recent-trade > div > span {
+  display: block;
+  color: var(--cg-text-3);
+  font-size: 0.72rem;
+}
+
+.cg-recent-trades {
+  margin-top: 1rem;
+}
+
+.cg-recent-trade {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+}
+
+.cg-recent-trade.bot {
+  opacity: 0.78;
+}
+
+.cg-trade-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid !important;
+  place-items: center;
+  font-family: var(--cg-font-mono);
+  font-weight: 800;
+}
+
+.cg-trade-dot.buy {
+  color: #000;
+  background: var(--cg-positive);
+}
+
+.cg-trade-dot.sell {
+  color: #000;
+  background: var(--cg-danger);
+}
+
+.cg-system-badge {
+  border: 1px solid var(--cg-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.4rem;
+  font-family: var(--cg-font-mono);
+}
+
+.cg-recent-trade-amounts {
+  text-align: right;
+  font-family: var(--cg-font-mono);
+}
+
 /* ── Coin entry animation ─────────────────────────────────────────────────── */
 .cg-coin-overlay {
   position: fixed;
@@ -1466,7 +1760,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.9);
+  background: var(--cg-overlay-stronger);
   pointer-events: none;
 }
 
