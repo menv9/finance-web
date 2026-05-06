@@ -483,13 +483,15 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
 
 // ── IOU / request row ──────────────────────────────────────────────────────────
 
-function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel, onReject }) {
+function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel, onReject, onAccept }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const iAmCreditor = entry.creditor_id === currentUserId;
   const counterpart = iAmCreditor ? entry.debtor : entry.creditor;
-  const isPending = entry.status === 'pending';
+  const isAccepted = entry.status === 'accepted';
+  const isAwaitingAcceptance = entry.status === 'pending';
   const isCreator = entry.created_by === currentUserId;
+  const needsMyAcceptance = isAwaitingAcceptance && !isCreator;
   const isRequest = entry.kind === 'request';
   const date = new Date(entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -503,6 +505,11 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
     try { await onReject(entry.id); } finally { setBusy(false); }
   }
 
+  async function handleAccept() {
+    setBusy(true);
+    try { await onAccept(entry.id); } finally { setBusy(false); }
+  }
+
   return (
     <li className="flex items-start gap-3 py-3 border-b border-rule last:border-0">
       <Avatar profile={counterpart} />
@@ -514,6 +521,11 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
               {t('friendsMoney.request.badge')}
             </span>
           )}
+          {isAwaitingAcceptance && isCreator && (
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink-muted border border-rule rounded-full px-1.5 py-0.5 leading-none">
+              {t('friendsMoney.status.awaiting')}
+            </span>
+          )}
         </div>
         {entry.note && <p className="text-xs text-ink-muted truncate">{entry.note}</p>}
         <p className="text-xs text-ink-muted">{date}</p>
@@ -522,12 +534,27 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
         <span className={`text-sm font-semibold tabular-nums ${iAmCreditor ? 'text-success' : 'text-danger'}`}>
           {iAmCreditor ? '+' : '-'}{formatCurrency(entry.amount_cents, entry.currency)}
         </span>
-        {isPending && entry.kind === 'payment' && !iAmCreditor && (
+        {isAccepted && entry.kind === 'payment' && !iAmCreditor && (
           <span className="text-[11px] font-medium text-ink-muted bg-surface-raised border border-rule rounded-full px-2 py-0.5 whitespace-nowrap">
             {t('friendsMoney.payment.pendingBadge')}
           </span>
         )}
-        {isPending && entry.kind !== 'payment' && (
+        {needsMyAcceptance && (
+          <div className="flex gap-1.5">
+            <Button size="xs" variant="ghost" onClick={handleAccept} disabled={busy} title={t('friendsMoney.accept')}>
+              <Check size={13} />
+            </Button>
+            <Button size="xs" variant="ghost" onClick={handleReject} disabled={busy} title={t('friendsMoney.request.decline')}>
+              <X size={13} />
+            </Button>
+          </div>
+        )}
+        {isAwaitingAcceptance && isCreator && (
+          <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
+            <X size={13} />
+          </Button>
+        )}
+        {isAccepted && entry.kind !== 'payment' && (
           <div className="flex gap-1.5">
             {!iAmCreditor && (
               <Button size="xs" variant="ghost" onClick={() => onSendPayment(entry)} disabled={busy} title={t('friendsMoney.payment.sendTitle')}>
@@ -537,24 +564,14 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
             <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} disabled={busy} title={t('friendsMoney.settle.title')}>
               <Check size={13} />
             </Button>
-            {isRequest && !iAmCreditor && (
-              <Button size="xs" variant="ghost" onClick={handleReject} disabled={busy} title={t('friendsMoney.request.decline')}>
-                <X size={13} />
-              </Button>
-            )}
-            {!isRequest && isCreator && (
-              <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
-                <X size={13} />
-              </Button>
-            )}
-            {isRequest && iAmCreditor && (
+            {isCreator && (
               <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
                 <X size={13} />
               </Button>
             )}
           </div>
         )}
-        {!isPending && (
+        {!isAwaitingAcceptance && !isAccepted && (
           <span className="text-xs text-ink-muted capitalize">{t(`friendsMoney.status.${entry.status}`)}</span>
         )}
       </div>
@@ -598,6 +615,7 @@ export default function FriendsMoneyPage() {
   const friendLedger = useFinanceStore((s) => s.friendLedger);
   const loadFriendLedger = useFinanceStore((s) => s.loadFriendLedger);
   const cancelLedgerEntry = useFinanceStore((s) => s.cancelLedgerEntry);
+  const acceptLedgerEntry = useFinanceStore((s) => s.acceptLedgerEntry);
   const rejectRequest = useFinanceStore((s) => s.rejectRequest);
   const settings = useFinanceStore((s) => s.settings);
 
@@ -628,20 +646,22 @@ export default function FriendsMoneyPage() {
   const uid = supabaseUser?.id;
   const currency = settings.currency || 'EUR';
 
+  const ACTIVE = ['pending', 'accepted'];
   // "They owe me" — manual IOUs or requests where I'm creditor (excl. payments)
-  const oweYouEntries   = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind !== 'payment');
+  const oweYouEntries   = friendLedger.filter((e) => e.creditor_id === uid && ACTIVE.includes(e.status) && e.kind !== 'payment');
   // "I owe" — manual IOUs only (requests get their own tab)
-  const youOweEntries   = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending' && e.kind !== 'request');
+  const youOweEntries   = friendLedger.filter((e) => e.debtor_id === uid && ACTIVE.includes(e.status) && e.kind !== 'request');
   // Incoming money requests — someone asking me to pay them
-  const requestEntries  = friendLedger.filter((e) => e.debtor_id === uid && e.status === 'pending' && e.kind === 'request');
-  const incomingEntries = friendLedger.filter((e) => e.creditor_id === uid && e.status === 'pending' && e.kind === 'payment');
-  const historyEntries  = friendLedger.filter((e) => e.status !== 'pending');
+  const requestEntries  = friendLedger.filter((e) => e.debtor_id === uid && ACTIVE.includes(e.status) && e.kind === 'request');
+  const incomingEntries = friendLedger.filter((e) => e.creditor_id === uid && ACTIVE.includes(e.status) && e.kind === 'payment');
+  const historyEntries  = friendLedger.filter((e) => !ACTIVE.includes(e.status));
 
   const tabEntries = { oweYou: oweYouEntries, youOwe: youOweEntries, requests: requestEntries, incoming: incomingEntries, history: historyEntries };
   const entries = tabEntries[tab] || [];
 
-  const oweYouTotal = oweYouEntries.reduce((s, e) => s + e.amount_cents, 0);
-  const youOweTotal = [...youOweEntries, ...requestEntries].reduce((s, e) => s + e.amount_cents, 0);
+  // Balances only count confirmed (accepted) entries, not ones still awaiting acceptance
+  const oweYouTotal = oweYouEntries.filter((e) => e.status === 'accepted').reduce((s, e) => s + e.amount_cents, 0);
+  const youOweTotal = [...youOweEntries, ...requestEntries].filter((e) => e.status === 'accepted').reduce((s, e) => s + e.amount_cents, 0);
 
   return (
     <div>
@@ -729,6 +749,7 @@ export default function FriendsMoneyPage() {
                 onSendPayment={setSendEntry}
                 onCancel={cancelLedgerEntry}
                 onReject={rejectRequest}
+                onAccept={acceptLedgerEntry}
               />
             ))}
           </ul>

@@ -71,6 +71,17 @@ export async function cancelLedgerEntry(entryId) {
   return data;
 }
 
+export async function acceptLedgerEntry(entryId) {
+  const { data, error } = await client()
+    .from('friend_ledger')
+    .update({ status: 'accepted' })
+    .eq('id', entryId)
+    .select(LEDGER_SELECT)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function rejectLedgerEntry(entryId) {
   const { data, error } = await client()
     .from('friend_ledger')
@@ -80,6 +91,17 @@ export async function rejectLedgerEntry(entryId) {
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function applyPartialIouPayment(paymentId, iouId, paymentCents, settledBy) {
+  const { error } = await client()
+    .rpc('apply_partial_iou_payment', {
+      p_payment_id: paymentId,
+      p_iou_id: iouId,
+      p_payment_cents: paymentCents,
+      p_settled_by: settledBy,
+    });
+  if (error) throw error;
 }
 
 export async function deleteLedgerEntry(entryId) {

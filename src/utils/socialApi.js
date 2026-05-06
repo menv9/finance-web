@@ -58,6 +58,13 @@ const ALL_TYPES = [
 
 export { ALL_TYPES as ACTIVITY_TYPES };
 
+export async function completeSharedGoalIfReached(goalId) {
+  const { data, error } = await client()
+    .rpc('complete_shared_goal_if_reached', { p_goal_id: goalId });
+  if (error) throw error;
+  return data; // boolean: true if this call newly completed the goal
+}
+
 export async function fetchActivityPrivacy(userId) {
   const { data, error } = await client()
     .from('activity_privacy')
