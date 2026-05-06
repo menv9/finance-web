@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { buyCost, fetchCoinById, sellProceeds, spotPrice } from '../utils/coingameApi';
+import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
 
 function FC({ amount, decimals = 2 }) {
   return (
@@ -20,24 +20,6 @@ function FC({ amount, decimals = 2 }) {
       <span style={{ marginLeft: '0.25em', fontSize: '0.75em', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>FC</span>
     </span>
   );
-}
-
-function makeChartData(coin) {
-  const minted = Number(coin?.tokens_minted ?? 0);
-  const base = Number(coin?.base_price ?? 1);
-  const current = spotPrice(minted, base);
-  const seed = String(coin?.coin_id || '').split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  return Array.from({ length: 48 }, (_, i) => {
-    const drift = 0.76 + (i / 47) * 0.34;
-    const wave = Math.sin((i + seed) * 0.48) * 0.075;
-    const pulse = Math.sin((i + seed) * 1.13) * 0.035;
-    const price = Math.max(base, current * (drift + wave + pulse));
-    return {
-      label: i % 8 === 0 ? `${i}h` : '',
-      price,
-      volume: Math.max(4, Math.round((minted / 1200) * (1 + Math.sin((i + seed) * 0.7)) + 18 + (i > 40 ? i * 3 : 0))),
-    };
-  });
 }
 
 function tokensForBudget(coin, budgetFc) {
@@ -191,6 +173,7 @@ export default function CoingameCoinPage() {
   const ownCoin = useFinanceStore((s) => s.coingameOwnCoin);
   const loadCoingame = useFinanceStore((s) => s.loadCoingame);
   const [coin, setCoin] = useState(null);
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -198,9 +181,13 @@ export default function CoingameCoinPage() {
     setLoading(true);
     setError('');
     try {
-      const nextCoin = await fetchCoinById(coinId);
+      const [nextCoin, nextChart] = await Promise.all([
+        fetchCoinById(coinId),
+        fetchCoinChart(coinId, 24),
+      ]);
       if (!nextCoin) throw new Error('Coin not found');
       setCoin(nextCoin);
+      setChartData(nextChart);
     } catch (err) {
       setError(err.message || 'Could not load coin');
     } finally {
@@ -213,10 +200,17 @@ export default function CoingameCoinPage() {
   }, [coinId]);
 
   const holding = holdings.find((item) => item.coin_id === coinId);
-  const chartData = useMemo(() => makeChartData(coin), [coin]);
   const price = coin ? spotPrice(Number(coin.tokens_minted), Number(coin.base_price)) : 0;
   const marketCap = coin ? price * Number(coin.tokens_minted) : 0;
   const isOwnCoin = coin?.coin_id === ownCoin?.coin_id;
+  const volume24h = useMemo(
+    () => chartData.reduce((sum, point) => sum + Number(point.volume || 0), 0),
+    [chartData],
+  );
+  const volumeFc24h = useMemo(
+    () => chartData.reduce((sum, point) => sum + Number(point.volumeFc || 0), 0),
+    [chartData],
+  );
 
   async function refreshAfterTrade() {
     await Promise.all([loadCoingame(), loadCoin()]);
@@ -266,7 +260,7 @@ export default function CoingameCoinPage() {
                 <span className="cg-coin-eyebrow">TRADE DISPLAY</span>
                 <strong>{coin.coin_name}/FC</strong>
               </div>
-              <div className="cg-chart-pill">24h synthetic feed</div>
+              <div className="cg-chart-pill">24h real transactions</div>
             </div>
             <div className="cg-big-chart">
               <ResponsiveContainer width="100%" height="100%">
@@ -276,7 +270,7 @@ export default function CoingameCoinPage() {
                   <YAxis yAxisId="price" orientation="right" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
                   <YAxis yAxisId="volume" hide />
                   <Tooltip
-                    formatter={(value, key) => key === 'price' ? [`${Number(value).toFixed(6)} FC`, 'Price'] : [value, 'Volume']}
+                    formatter={(value, key) => key === 'price' ? [`${Number(value).toFixed(6)} FC`, 'Price'] : [Number(value).toLocaleString(undefined, { maximumFractionDigits: 4 }), 'Tokens']}
                     contentStyle={{ background: 'rgba(17,17,17,0.96)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#f0f0f0' }}
                   />
                   <Bar yAxisId="volume" dataKey="volume" fill="rgba(23,245,0,0.22)" barSize={5} />
@@ -287,10 +281,10 @@ export default function CoingameCoinPage() {
           </section>
 
           <section className="cg-coin-info-grid">
-            <div><span>Vol 24h</span><strong>{Math.round(Number(coin.tokens_minted || 0) / 8).toLocaleString()} tokens</strong></div>
+            <div><span>Vol 24h</span><strong>{volume24h.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
+            <div><span>Volume FC</span><strong><FC amount={volumeFc24h} /></strong></div>
             <div><span>Base Price</span><strong><FC amount={coin.base_price} decimals={4} /></strong></div>
             <div><span>Fee</span><strong>1% burn/pool</strong></div>
-            <div><span>Pair</span><strong>UserCoin / FingesCoin</strong></div>
           </section>
         </div>
 

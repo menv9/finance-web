@@ -724,6 +724,69 @@ with (security_invoker = true) as
 grant select on public.coingame_transactions_view to authenticated;
 
 -- ── LEADERBOARD VIEW ─────────────────────────────────────────────────────────
+-- Real chart data derived from coin buy/sell transactions.
+create or replace function public.cg_coin_chart(p_coin_id uuid, p_hours integer default 24)
+returns table (
+  bucket_start timestamptz,
+  price numeric,
+  volume_tokens numeric,
+  volume_fc numeric,
+  trades_count integer
+)
+language sql stable security definer set search_path = public as $$
+  with params as (
+    select greatest(1, least(coalesce(p_hours, 24), 168))::integer as hours_back
+  ),
+  selected_coin as (
+    select c.coin_id,
+           c.base_price,
+           c.tokens_minted,
+           public.cg_spot_price(c.tokens_minted, c.base_price) as current_price
+      from public.coingame_coins c
+     where c.coin_id = p_coin_id
+  ),
+  buckets as (
+    select generate_series(
+             date_trunc('hour', now()) - ((params.hours_back - 1) * interval '1 hour'),
+             date_trunc('hour', now()),
+             interval '1 hour'
+           ) as bucket_start
+      from params
+  ),
+  bucket_trades as (
+    select date_trunc('hour', t.created_at) as bucket_start,
+           coalesce(sum(abs(t.tokens)), 0) as volume_tokens,
+           coalesce(sum(abs(t.fc_amount)), 0) as volume_fc,
+           count(*)::integer as trades_count
+      from public.coingame_transactions t
+     where t.coin_id = p_coin_id
+       and t.tx_type in ('buy', 'sell')
+       and t.created_at >= date_trunc('hour', now()) - ((select (hours_back - 1) from params) * interval '1 hour')
+     group by date_trunc('hour', t.created_at)
+  )
+  select b.bucket_start,
+         coalesce(last_trade.spot_price, sc.current_price, sc.base_price, 0) as price,
+         coalesce(bt.volume_tokens, 0) as volume_tokens,
+         coalesce(bt.volume_fc, 0) as volume_fc,
+         coalesce(bt.trades_count, 0) as trades_count
+    from buckets b
+    cross join selected_coin sc
+    left join bucket_trades bt on bt.bucket_start = b.bucket_start
+    left join lateral (
+      select t.spot_price
+        from public.coingame_transactions t
+       where t.coin_id = sc.coin_id
+         and t.tx_type in ('buy', 'sell')
+         and t.spot_price is not null
+         and t.created_at < b.bucket_start + interval '1 hour'
+       order by t.created_at desc
+       limit 1
+    ) last_trade on true
+   order by b.bucket_start;
+$$;
+
+grant execute on function public.cg_coin_chart(uuid, integer) to authenticated;
+
 create or replace view public.coingame_leaderboard_current_week
 with (security_invoker = true) as
   select lw.user_id,
