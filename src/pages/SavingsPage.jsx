@@ -457,14 +457,16 @@ export default function SavingsPage() {
     () => new Map(savingsGoals.map((goal) => [goal.id, goal.name])),
     [savingsGoals],
   );
+  const activeGoalIds = useMemo(() => new Set(savingsGoals.map((g) => g.id)), [savingsGoals]);
   const goalBalances = useMemo(() => {
     const map = {};
     savingsEntries.forEach((entry) => {
-      if (!entry.goalId) return;
+      // Ignore entries for deleted goals so their balance returns to the unallocated pool.
+      if (!entry.goalId || !activeGoalIds.has(entry.goalId)) return;
       map[entry.goalId] = (map[entry.goalId] || 0) + entry.amountCents;
     });
     return map;
-  }, [savingsEntries]);
+  }, [savingsEntries, activeGoalIds]);
   const goalsWithBalances = useMemo(
     () =>
       savingsGoals.map((goal) => {
