@@ -58,18 +58,54 @@ function detectSantander(headers) {
   return h.includes('fecha operacion') && h.includes('concepto') && h.includes('importe') && h.includes('divisa');
 }
 
+function detectBBVA(headers) {
+  const h = headers.map(normHeader);
+  return h.includes('movimiento') && h.includes('disponible');
+}
+
+function detectUnicaja(headers) {
+  const h = headers.map(normHeader);
+  return h.some((x) => x.includes('fecha de operac')) && h.includes('saldo');
+}
+
 // Santander CSVs start with 7 rows of account metadata before the real header.
 // Find the header row by scanning for "Fecha operación" and discard everything above it.
 function stripSantanderPreamble(text) {
   const lines = text.split(/\r?\n/);
-  const headerIndex = lines.findIndex((line) => /fecha\s+operaci[oó]n/i.test(line));
+  const headerIndex = lines.findIndex((line) => /fecha\s+operaci[oó]n/i.test(line) && !/fecha\s+de\s+operaci[oó]n/i.test(line));
   if (headerIndex <= 0) return text;
   return lines.slice(headerIndex).join('\n');
+}
+
+// BBVA CSVs have 4 header rows (blanks + report metadata) before the real header.
+function stripBBVAPreamble(text) {
+  const lines = text.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => /movimiento/i.test(line) && /disponible/i.test(line));
+  if (headerIndex <= 0) return text;
+  return lines.slice(headerIndex).join('\n');
+}
+
+// Unicaja CSVs have 10 blank rows before the real header.
+function stripUnicajaPreamble(text) {
+  const lines = text.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => /fecha\s+de\s+operaci[oó]n/i.test(line));
+  if (headerIndex <= 0) return text;
+  return lines.slice(headerIndex).join('\n');
+}
+
+function stripPreamble(text) {
+  for (const strip of [stripSantanderPreamble, stripBBVAPreamble, stripUnicajaPreamble]) {
+    const stripped = strip(text);
+    if (stripped !== text) return stripped;
+  }
+  return text;
 }
 
 function detectFormat(headers) {
   if (detectRevolut(headers)) return { id: 'revolut', label: 'Revolut' };
   if (detectSantander(headers)) return { id: 'santander', label: 'Santander' };
+  if (detectBBVA(headers)) return { id: 'bbva', label: 'BBVA' };
+  if (detectUnicaja(headers)) return { id: 'unicaja', label: 'Unicaja' };
   if (detectImagin(headers)) return { id: 'imagin', label: 'Imagin / CaixaBank' };
   return null;
 }
@@ -82,7 +118,7 @@ function autoMapping(headers) {
     description: findHeader(headers, 'name', 'description', 'descripcion', 'merchant', 'concepto', 'details', 'text'),
     currency: findHeader(headers, 'currency', 'moneda', 'wahrung', 'divisa'),
     mcc: findHeader(headers, 'mcc_code', 'mcc', 'category code', 'mcc code'),
-    balance: findHeader(headers, 'saldo', 'balance', 'running balance', 'kontostand'),
+    balance: findHeader(headers, 'saldo', 'balance', 'running balance', 'kontostand', 'disponible'),
     state: findHeader(headers, 'state', 'status', 'estado'),
   };
 }
@@ -246,7 +282,7 @@ export function SmartBankImport({
     const file = e.target.files?.[0];
     if (!file) return;
     const rawText = await file.text();
-    const text = stripSantanderPreamble(rawText);
+    const text = stripPreamble(rawText);
     const parsed = parseCsv(text);
     setHeaders(parsed.headers);
     setRawRows(parsed.rows);
@@ -285,7 +321,7 @@ export function SmartBankImport({
       <FormField
         label="Bank export CSV"
         htmlFor="smart-csv"
-        hint="Supports Revolut, N26, ING, and most standard bank exports."
+        hint="Supports Revolut, BBVA, Unicaja, Santander, Imagin / CaixaBank, and most standard bank exports."
       >
         {(props) => (
           <Input
