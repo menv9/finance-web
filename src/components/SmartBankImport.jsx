@@ -53,8 +53,23 @@ function detectImagin(headers) {
   return h.includes('concepto') && h.includes('fecha') && h.includes('importe') && h.includes('saldo');
 }
 
+function detectSantander(headers) {
+  const h = headers.map(normHeader);
+  return h.includes('fecha operacion') && h.includes('concepto') && h.includes('importe') && h.includes('divisa');
+}
+
+// Santander CSVs start with 7 rows of account metadata before the real header.
+// Find the header row by scanning for "Fecha operación" and discard everything above it.
+function stripSantanderPreamble(text) {
+  const lines = text.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => /fecha\s+operaci[oó]n/i.test(line));
+  if (headerIndex <= 0) return text;
+  return lines.slice(headerIndex).join('\n');
+}
+
 function detectFormat(headers) {
   if (detectRevolut(headers)) return { id: 'revolut', label: 'Revolut' };
+  if (detectSantander(headers)) return { id: 'santander', label: 'Santander' };
   if (detectImagin(headers)) return { id: 'imagin', label: 'Imagin / CaixaBank' };
   return null;
 }
@@ -65,7 +80,7 @@ function autoMapping(headers) {
     date: findHeader(headers, 'completed date', 'date', 'fecha', 'datum', 'booking date', 'transaction date'),
     amount: findHeader(headers, 'amount', 'importe', 'betrag', 'monto', 'transaction amount'),
     description: findHeader(headers, 'name', 'description', 'descripcion', 'merchant', 'concepto', 'details', 'text'),
-    currency: findHeader(headers, 'currency', 'moneda', 'wahrung'),
+    currency: findHeader(headers, 'currency', 'moneda', 'wahrung', 'divisa'),
     mcc: findHeader(headers, 'mcc_code', 'mcc', 'category code', 'mcc code'),
     balance: findHeader(headers, 'saldo', 'balance', 'running balance', 'kontostand'),
     state: findHeader(headers, 'state', 'status', 'estado'),
@@ -230,7 +245,8 @@ export function SmartBankImport({
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
+    const rawText = await file.text();
+    const text = stripSantanderPreamble(rawText);
     const parsed = parseCsv(text);
     setHeaders(parsed.headers);
     setRawRows(parsed.rows);
