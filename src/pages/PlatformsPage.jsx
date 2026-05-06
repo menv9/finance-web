@@ -218,8 +218,6 @@ export default function PlatformsPage() {
   const brokerSummaries = platformNames.map((platform) => {
     const platformHoldings = holdings.filter((holding) => (
       holding.platform === platform &&
-      holding.portfolioId &&
-      knownPortfolioIds.has(holding.portfolioId) &&
       !holding.archivedAt &&
       (holding.quantity || 0) > 0
     ));

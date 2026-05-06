@@ -341,12 +341,14 @@ export function AppShell({ children }) {
   // save their theme so 'dark' and 'light' remain explicitly selectable afterward.
   useEffect(() => {
     if (!isEris && !isGorka) return;
-    const initialized = localStorage.getItem('pft-theme-identity-set');
-    if (initialized) return;
+    const userId = supabaseUser?.id;
+    if (!userId) return;
+    const storageKey = `pft-theme-identity-set-${userId}`;
+    if (localStorage.getItem(storageKey)) return;
     if (isEris) setTheme('eris');
     else if (isGorka) setTheme('gorka');
-    localStorage.setItem('pft-theme-identity-set', '1');
-  }, [isEris, isGorka, setTheme]);
+    localStorage.setItem(storageKey, '1');
+  }, [isEris, isGorka, supabaseUser?.id, setTheme]);
 
   // Simple: theme value is applied directly. No mapping.
   const appliedTheme = ['dark', 'light', 'eris', 'gorka', 'gorka-light'].includes(theme) ? theme : 'dark';
