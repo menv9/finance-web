@@ -12,6 +12,7 @@ const NAV = [
   { to: '/coingame/casino',      end: false, icon: '$', label: 'Casino' },
   { to: '/coingame/leaderboard', end: false, icon: 'R', label: 'Rankings' },
   { to: '/coingame/history',     end: false, icon: 'T', label: 'History' },
+  { to: '/coingame/profile',     end: false, icon: 'P', label: 'Profile' },
   { to: '/coingame/info',        end: false, icon: 'i', label: 'Info' },
 ];
 
