@@ -199,7 +199,7 @@ export function BudgetTab() {
     }
     const existing = budgets.find((b) => b.category === category);
     await saveEntity('budgets', {
-      id: `budget-${category}`,
+      id: existing?.id || `budget-${crypto.randomUUID()}`,
       category,
       monthlyCents: cents,
       currency,
@@ -208,7 +208,10 @@ export function BudgetTab() {
     closeModal();
   };
 
-  const removeBudget = (category) => removeEntity('budgets', `budget-${category}`);
+  const removeBudget = (category) => {
+    const budget = budgets.find((b) => b.category === category);
+    if (budget) removeEntity('budgets', budget.id);
+  };
 
   const handleRollover = async (item, type) => {
     await saveEntity('rollovers', {

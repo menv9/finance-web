@@ -7,6 +7,8 @@ export function ManageCategoriesModal({ open, onClose }) {
   const confirm = useConfirm();
   const settings = useFinanceStore((s) => s.settings);
   const updateSettings = useFinanceStore((s) => s.updateSettings);
+  const budgets = useFinanceStore((s) => s.budgets);
+  const removeEntity = useFinanceStore((s) => s.removeEntity);
   const [draft, setDraft] = useState('');
 
   const categories = settings.categories;
@@ -20,6 +22,8 @@ export function ManageCategoriesModal({ open, onClose }) {
 
   const remove = (cat) => {
     updateSettings({ categories: categories.filter((c) => c !== cat) });
+    const budget = budgets.find((b) => b.category === cat);
+    if (budget) removeEntity('budgets', budget.id);
   };
 
   return (
