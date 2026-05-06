@@ -40,6 +40,36 @@ function NumberField({ label, value, onChange, step = '0.01', min = '0' }) {
   );
 }
 
+function BotVariablesInfo() {
+  const items = [
+    ['Min trade pct', 'Lower bound for trade size as a fraction of minted supply. Higher means every bot trade starts larger.'],
+    ['Max trade pct', 'Upper bound for trade size as a fraction of minted supply. This is the main aggression dial.'],
+    ['Min tokens', 'Absolute minimum trade size. Useful for young coins where percentage-based trades would be tiny.'],
+    ['Inactive hours', 'How long a coin must go without real user trades before the bot can step in. Use 0 for always eligible.'],
+    ['Daily volume cap', 'Maximum bot volume compared with real market volume after the daily floor is spent. 0.5 means 50%.'],
+    ['Daily floor FC', 'Free daily bot volume before the percentage cap applies. This lets empty markets bootstrap.'],
+    ['Trades per coin/day', 'Hard limit for bot trades on each coin per UTC day. Higher keeps charts moving longer.'],
+    ['Max price impact', 'Maximum allowed price move per bot trade. Higher allows bigger jumps; lower keeps movement subtle.'],
+  ];
+
+  return (
+    <div className="cg-admin-info-panel">
+      <div>
+        <strong>Bot variables</strong>
+        <span>Use these as controls for frequency, size, and safety.</span>
+      </div>
+      <div className="cg-admin-info-grid">
+        {items.map(([label, description]) => (
+          <div key={label}>
+            <strong>{label}</strong>
+            <p>{description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BotsTab({ config, onSave }) {
   const global = config?.global || {};
   const [draft, setDraft] = useState(global);
@@ -85,6 +115,8 @@ function BotsTab({ config, onSave }) {
         <NumberField label="Trades per coin/day" value={draft.max_trades_per_coin_day} onChange={(v) => set('max_trades_per_coin_day', v)} step="1" />
         <NumberField label="Max price impact" value={draft.max_price_impact_pct} onChange={(v) => set('max_price_impact_pct', v)} step="0.01" />
       </div>
+
+      <BotVariablesInfo />
 
       <button className="cg-btn cg-btn-primary" onClick={save}>Save Settings</button>
     </div>

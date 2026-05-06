@@ -1595,6 +1595,60 @@ button.cg-back-link {
   margin-bottom: 1rem;
 }
 
+.cg-admin-info-panel {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(23,245,0,0.22);
+  border-radius: 8px;
+  background: rgba(23,245,0,0.045);
+}
+
+.cg-admin-info-panel > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cg-admin-info-panel > div:first-child strong {
+  color: var(--cg-text);
+  font-family: var(--cg-font-display);
+}
+
+.cg-admin-info-panel > div:first-child span {
+  color: var(--cg-text-3);
+  font-size: 0.76rem;
+}
+
+.cg-admin-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.cg-admin-info-grid div {
+  padding: 0.65rem;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.18);
+}
+
+.cg-admin-info-grid strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--cg-accent);
+  font-family: var(--cg-font-mono);
+  font-size: 0.74rem;
+}
+
+.cg-admin-info-grid p {
+  margin: 0;
+  color: var(--cg-text-2);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .cg-admin-field {
   display: grid;
   gap: 0.35rem;
