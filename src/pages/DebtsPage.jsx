@@ -223,16 +223,108 @@ function DebtModal({ open, debt, currency, onClose, onSave }) {
   );
 }
 
+function DebtPaymentModal({ open, debt, bankAccounts, currency, onClose, onSave }) {
+  const alert = useAlert();
+  const { t } = useTranslation();
+  const today = new Date().toISOString().slice(0, 10);
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(today);
+  const [bankAccountId, setBankAccountId] = useState(bankAccounts[0]?.id || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const amountCents = parseAmountToCents(amount);
+    if (!amountCents || amountCents <= 0) {
+      await alert({
+        title: t('debts.payment.errorAmount.title'),
+        description: t('debts.payment.errorAmount.description'),
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({ amountCents, date, bankAccountId: bankAccountId || null });
+      onClose();
+    } catch (err) {
+      await alert({
+        title: t('debts.payment.errorSave.title'),
+        description: err.message || t('debts.payment.errorSave.description'),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      eyebrow={t('debts.payment.eyebrow')}
+      title={t('debts.payment.modalTitle')}
+      description={debt?.name}
+      size="sm"
+    >
+      <form className="grid gap-5" onSubmit={handleSubmit}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label={t('debts.payment.amountLabel', { currency: debt?.currency || currency })} htmlFor="dp-amount">
+            <Input
+              id="dp-amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              numeric
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+            />
+          </FormField>
+          <FormField label={t('debts.payment.dateLabel')} htmlFor="dp-date">
+            <Input
+              id="dp-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        {bankAccounts.length > 0 ? (
+          <FormField label={t('debts.payment.bankAccountLabel')} htmlFor="dp-account" hint={t('debts.payment.bankAccountHint')}>
+            <Select id="dp-account" value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)}>
+              <option value="">{t('debts.payment.noBankAccount')}</option>
+              {bankAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>{acc.name}{acc.isMain ? ' (main)' : ''}</option>
+              ))}
+            </Select>
+          </FormField>
+        ) : (
+          <p className="text-sm text-ink-muted">{t('debts.payment.noBankAccountsHint')}</p>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-rule pt-5">
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" loading={saving}>{t('debts.payment.save')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function DebtsPage() {
   const confirm = useConfirm();
   const { t, locale } = useTranslation();
   const debts = useFinanceStore((s) => s.debts || []);
   const settings = useFinanceStore((s) => s.settings);
+  const bankAccounts = useFinanceStore((s) => s.bankAccounts || []);
   const saveDebt = useFinanceStore((s) => s.saveDebt);
+  const saveEntity = useFinanceStore((s) => s.saveEntity);
   const removeDebt = useFinanceStore((s) => s.removeDebt);
 
   const [editingDebt, setEditingDebt] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [paymentDebt, setPaymentDebt] = useState(null);
 
   const currency = settings.baseCurrency || 'EUR';
 
@@ -250,6 +342,22 @@ export default function DebtsPage() {
 
   const handleSave = async (debt) => {
     await saveDebt(debt);
+  };
+
+  const handlePayment = async (debt, { amountCents, date, bankAccountId }) => {
+    const newBalance = Math.max(0, (debt.currentBalanceCents || 0) - amountCents);
+    if (bankAccountId) {
+      await saveEntity('expenses', {
+        date,
+        amountCents,
+        currency: debt.currency || currency,
+        category: 'Other',
+        description: debt.name,
+        isRecurring: false,
+        bankAccountId,
+      });
+    }
+    await saveDebt({ ...debt, currentBalanceCents: newBalance });
   };
 
   const handleDelete = async (debt) => {
@@ -355,6 +463,7 @@ export default function DebtsPage() {
                   )}
 
                   <div className="mt-4 flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setPaymentDebt(debt)}>{t('debts.payment.button')}</Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(debt)}>{t('common.edit')}</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDelete(debt)}>{t('common.delete')}</Button>
                   </div>
@@ -379,6 +488,18 @@ export default function DebtsPage() {
           currency={currency}
           onClose={closeModal}
           onSave={handleSave}
+        />
+      ) : null}
+
+      {paymentDebt ? (
+        <DebtPaymentModal
+          key={paymentDebt.id}
+          open={Boolean(paymentDebt)}
+          debt={paymentDebt}
+          bankAccounts={bankAccounts}
+          currency={currency}
+          onClose={() => setPaymentDebt(null)}
+          onSave={(payment) => handlePayment(paymentDebt, payment)}
         />
       ) : null}
     </div>

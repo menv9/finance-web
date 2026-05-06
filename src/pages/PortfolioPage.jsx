@@ -1534,6 +1534,8 @@ export default function PortfolioPage() {
 
   const sellAllHoldingGroup = async (group, { date, bankAccountId }) => {
     if (!group) return;
+    const missingPrice = group.lots.some((lot) => !(lot.currentPriceCents || group.currentPriceCents));
+    if (missingPrice) throw new Error('Cannot sell: one or more lots have no current price. Refresh prices first.');
     for (const lot of group.lots) {
       await sellHolding({
         holdingId: lot.id,
