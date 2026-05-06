@@ -3885,10 +3885,10 @@ export const useFinanceStore = create((set, get) => ({
     set({ coingameStatus: 'loading', coingameError: '' });
     try {
       const result = await apiBuyCoin(coinId, tokens);
-      // Refresh wallet balance + holdings + trending after trade
-      const [holdings, trending] = await Promise.all([
+      const [holdings, trending, transactions] = await Promise.all([
         apiFetchHoldings(user.id),
         fetchTrending(),
+        apiFetchTransactions(user.id),
       ]);
       set((state) => ({
         coingameWallet: state.coingameWallet
@@ -3896,6 +3896,7 @@ export const useFinanceStore = create((set, get) => ({
           : state.coingameWallet,
         coingameHoldings: holdings,
         coingameTrending: trending,
+        coingameTransactions: transactions,
         coingameStatus: 'idle',
       }));
       return result;
@@ -3911,9 +3912,10 @@ export const useFinanceStore = create((set, get) => ({
     set({ coingameStatus: 'loading', coingameError: '' });
     try {
       const result = await apiSellCoin(coinId, tokens);
-      const [holdings, trending] = await Promise.all([
+      const [holdings, trending, transactions] = await Promise.all([
         apiFetchHoldings(user.id),
         fetchTrending(),
+        apiFetchTransactions(user.id),
       ]);
       set((state) => ({
         coingameWallet: state.coingameWallet
@@ -3921,6 +3923,7 @@ export const useFinanceStore = create((set, get) => ({
           : state.coingameWallet,
         coingameHoldings: holdings,
         coingameTrending: trending,
+        coingameTransactions: transactions,
         coingameStatus: 'idle',
       }));
       return result;

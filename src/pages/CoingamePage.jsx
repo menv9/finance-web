@@ -74,7 +74,7 @@ function DailyClaimCard({ wallet, onClaim }) {
   const canClaim = (() => {
     if (!wallet?.last_daily_claim_at) return true;
     const last = new Date(wallet.last_daily_claim_at);
-    return last.toDateString() !== new Date().toDateString();
+    return last.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
   })();
 
   async function handleClaim() {

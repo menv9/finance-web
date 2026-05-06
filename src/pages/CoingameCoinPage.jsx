@@ -229,7 +229,11 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
   const maxSell = Number(holding?.tokens_held ?? 0);
   const buyTokens = mode === 'buy' ? tokensForBudget(coin, numericAmount) : 0;
   const sellGross = mode === 'sell' ? sellProceeds(Number(coin.tokens_minted), numericAmount, Number(coin.base_price)) : 0;
-  const sellNet = sellGross * 0.99;
+  const isAntiFlip = holding?.last_buy_at
+    ? (Date.now() - new Date(holding.last_buy_at).getTime()) < 3_600_000
+    : false;
+  const sellFeeRate = isAntiFlip ? 0.05 : 0.01;
+  const sellNet = sellGross * (1 - sellFeeRate);
 
   async function submitTrade() {
     setError('');
@@ -237,6 +241,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
       if (mode === 'buy') {
         if (isOwnCoin) throw new Error('You cannot buy your own coin.');
         if (numericAmount <= 0 || buyTokens <= 0) throw new Error('Enter an FC amount.');
+        if (wallet?.fc_balance != null && numericAmount > Number(wallet.fc_balance)) throw new Error('Insufficient FC balance.');
         await coingameBuy(coin.coin_id, buyTokens);
       } else {
         if (numericAmount <= 0) throw new Error(`Enter a ${coinName} amount.`);
@@ -309,6 +314,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
         ) : (
           <>
             <div><span>You receive</span><strong><FC amount={sellNet} /></strong></div>
+            <div><span>Fee</span><strong>{isAntiFlip ? '5% (anti-flip)' : '1%'}</strong></div>
             <div><span>Available</span><strong>{maxSell.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong></div>
           </>
         )}
