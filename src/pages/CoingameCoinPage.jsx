@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { AreaSeries, CandlestickSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -19,6 +20,15 @@ function FC({ amount, decimals = 2 }) {
     <span>
       {Number(amount ?? 0).toLocaleString(undefined, { maximumFractionDigits: decimals })}
       <span style={{ marginLeft: '0.25em', fontSize: '0.75em', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>FC</span>
+    </span>
+  );
+}
+
+function InfoTooltip({ text }) {
+  return (
+    <span className="cg-info-tooltip" tabIndex={0} aria-label={text}>
+      <Info size={13} strokeWidth={2.4} aria-hidden="true" />
+      <span className="cg-info-tooltip-bubble" role="tooltip">{text}</span>
     </span>
   );
 }
@@ -200,6 +210,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
 
   return (
     <aside className="cg-trade-panel">
+      <InfoTooltip text={`Compra o vende ${coinName} usando FingesCoin. Las compras pagan FC y las ventas devuelven FC menos la fee.`} />
       <div className="cg-trade-tabs">
         {['buy', 'sell'].map((key) => (
           <button
@@ -278,6 +289,7 @@ function CoinHeader({ coin }) {
   const name = coin.coin_name || profile?.username || 'Unnamed coin';
   return (
     <section className="cg-coin-hero">
+      <InfoTooltip text="Resumen de la moneda del usuario: propietario, estado y cantidad total emitida." />
       <div className="cg-coin-hero-avatar">{(name[0] || '?').toUpperCase()}</div>
       <div>
         <div className="cg-coin-eyebrow">USERCOIN / FINGESCOIN</div>
@@ -371,24 +383,36 @@ export default function CoingameCoinPage() {
 
           <section className="cg-coin-stat-strip">
             <div>
-              <span>Market Cap</span>
+              <div className="cg-metric-label">
+                <span>Market Cap</span>
+                <InfoTooltip text={`Valor total estimado de ${coinName}: precio actual multiplicado por la cantidad emitida.`} />
+              </div>
               <strong><FC amount={marketCap} /></strong>
             </div>
             <div>
-              <span>Price</span>
+              <div className="cg-metric-label">
+                <span>Price</span>
+                <InfoTooltip text={`Precio actual de 1 ${coinName} en FingesCoin, calculado con la bonding curve.`} />
+              </div>
               <strong><FC amount={price} decimals={6} /></strong>
             </div>
             <div>
-              <span>Your Position</span>
+              <div className="cg-metric-label">
+                <span>Your Position</span>
+                <InfoTooltip text={`Cantidad de ${coinName} que tienes ahora mismo en tu cartera de Coingame.`} />
+              </div>
               <strong>{Number(holding?.tokens_held ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong>
             </div>
           </section>
 
           <section className="cg-chart-card">
             <div className="cg-chart-toolbar">
-              <div>
+              <div className="cg-chart-heading">
                 <span className="cg-coin-eyebrow">TRADE DISPLAY</span>
-                <strong>{coin.coin_name}/FC</strong>
+                <div>
+                  <strong>{coin.coin_name}/FC</strong>
+                  <InfoTooltip text={`Histórico de precio y volumen de ${coinName}. Puedes alternar entre velas o línea y elegir el rango temporal.`} />
+                </div>
               </div>
               <div className="cg-chart-actions">
                 <div className="cg-chart-type-toggle" aria-label="Chart type">
@@ -415,10 +439,34 @@ export default function CoingameCoinPage() {
           </section>
 
           <section className="cg-coin-info-grid">
-            <div><span>Vol {chartRange.label}</span><strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong></div>
-            <div><span>Volume FC</span><strong><FC amount={rangeVolumeFc} /></strong></div>
-            <div><span>Base Price</span><strong><FC amount={coin.base_price} decimals={4} /></strong></div>
-            <div><span>Fee</span><strong>1% burn/pool</strong></div>
+            <div>
+              <div className="cg-metric-label">
+                <span>Vol {chartRange.label}</span>
+                <InfoTooltip text={`Cantidad de ${coinName} comprada o vendida en el rango temporal seleccionado.`} />
+              </div>
+              <strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong>
+            </div>
+            <div>
+              <div className="cg-metric-label">
+                <span>Volume FC</span>
+                <InfoTooltip text="Valor total movido en FingesCoin dentro del rango temporal seleccionado." />
+              </div>
+              <strong><FC amount={rangeVolumeFc} /></strong>
+            </div>
+            <div>
+              <div className="cg-metric-label">
+                <span>Base Price</span>
+                <InfoTooltip text={`Precio mínimo de referencia desde el que empieza la curva de ${coinName}.`} />
+              </div>
+              <strong><FC amount={coin.base_price} decimals={4} /></strong>
+            </div>
+            <div>
+              <div className="cg-metric-label">
+                <span>Fee</span>
+                <InfoTooltip text="Comisión aplicada a cada trade. Parte se quema o alimenta la pool según las reglas de Coingame." />
+              </div>
+              <strong>1% burn/pool</strong>
+            </div>
           </section>
         </div>
 
