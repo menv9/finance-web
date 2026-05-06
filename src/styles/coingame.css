@@ -997,6 +997,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--cg-border);
 }
@@ -1013,6 +1014,40 @@
   font-family: var(--cg-font-mono);
   font-size: 0.68rem;
   color: var(--cg-text-3);
+}
+
+.cg-chart-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cg-chart-type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  min-width: 128px;
+  padding: 2px;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+}
+
+.cg-chart-type-toggle button {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cg-text-2);
+  font-family: var(--cg-font);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cg-chart-type-toggle button.active {
+  background: var(--cg-accent);
+  color: #000;
 }
 
 .cg-big-chart {

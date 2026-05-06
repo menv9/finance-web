@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AreaSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
+import { AreaSeries, CandlestickSeries, ColorType, createChart, HistogramSeries } from 'lightweight-charts';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buyCost, fetchCoinById, fetchCoinChart, sellProceeds, spotPrice } from '../utils/coingameApi';
 
@@ -29,10 +29,10 @@ function tokensForBudget(coin, budgetFc) {
   return lo;
 }
 
-function LightweightCoinChart({ data }) {
+function LightweightCoinChart({ data, chartType }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
-  const areaSeriesRef = useRef(null);
+  const priceSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
 
   useEffect(() => {
@@ -41,6 +41,7 @@ function LightweightCoinChart({ data }) {
 
     const chart = createChart(container, {
       autoSize: true,
+      attributionLogo: false,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#707070',
@@ -68,16 +69,6 @@ function LightweightCoinChart({ data }) {
       },
     });
 
-    const areaSeries = chart.addSeries(AreaSeries, {
-      lineColor: '#17f500',
-      topColor: 'rgba(23,245,0,0.26)',
-      bottomColor: 'rgba(23,245,0,0.02)',
-      lineWidth: 2,
-      priceLineColor: '#17f500',
-      priceLineWidth: 1,
-      lastValueVisible: true,
-    });
-
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: '',
@@ -88,32 +79,76 @@ function LightweightCoinChart({ data }) {
     volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
     chartRef.current = chart;
-    areaSeriesRef.current = areaSeries;
     volumeSeriesRef.current = volumeSeries;
 
     return () => {
       chart.remove();
       chartRef.current = null;
-      areaSeriesRef.current = null;
+      priceSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!areaSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (priceSeriesRef.current) {
+      chart.removeSeries(priceSeriesRef.current);
+    }
+
+    priceSeriesRef.current = chart.addSeries(chartType === 'candles' ? CandlestickSeries : AreaSeries, chartType === 'candles' ? {
+      upColor: '#17f500',
+      downColor: '#ff4444',
+      borderUpColor: '#17f500',
+      borderDownColor: '#ff4444',
+      wickUpColor: '#8aff80',
+      wickDownColor: '#ff7777',
+      priceLineColor: '#17f500',
+      priceLineWidth: 1,
+      lastValueVisible: true,
+    } : {
+      lineColor: '#17f500',
+      topColor: 'rgba(23,245,0,0.26)',
+      bottomColor: 'rgba(23,245,0,0.02)',
+      lineWidth: 2,
+      priceLineColor: '#17f500',
+      priceLineWidth: 1,
+      lastValueVisible: true,
+    });
+  }, [chartType]);
+
+  useEffect(() => {
+    if (!priceSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
     const priceData = data.map((point) => ({
       time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
       value: Number(point.price || 0),
     }));
-    const volumeData = data.map((point) => ({
-      time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
-      value: Number(point.volume || 0),
-      color: Number(point.volume || 0) > 0 ? 'rgba(23,245,0,0.32)' : 'rgba(255,255,255,0.06)',
-    }));
-    areaSeriesRef.current.setData(priceData);
+    const candleData = priceData.map((point, index) => {
+      const previousClose = index > 0 ? priceData[index - 1].value : point.value;
+      return {
+        time: point.time,
+        open: previousClose,
+        high: Math.max(previousClose, point.value),
+        low: Math.min(previousClose, point.value),
+        close: point.value,
+      };
+    });
+    const volumeData = data.map((point, index) => {
+      const previousPrice = Number(data[Math.max(index - 1, 0)]?.price || point.price || 0);
+      const currentPrice = Number(point.price || 0);
+      const hasVolume = Number(point.volume || 0) > 0;
+      return {
+        time: Math.floor(new Date(point.bucketStart).getTime() / 1000),
+        value: Number(point.volume || 0),
+        color: hasVolume
+          ? (currentPrice >= previousPrice ? 'rgba(23,245,0,0.32)' : 'rgba(255,68,68,0.26)')
+          : 'rgba(255,255,255,0.06)',
+      };
+    });
+    priceSeriesRef.current.setData(chartType === 'candles' ? candleData : priceData);
     volumeSeriesRef.current.setData(volumeData);
     chartRef.current.timeScale().fitContent();
-  }, [data]);
+  }, [data, chartType]);
 
   return <div className="cg-lightweight-chart" ref={containerRef} />;
 }
@@ -254,6 +289,7 @@ export default function CoingameCoinPage() {
   const loadCoingame = useFinanceStore((s) => s.loadCoingame);
   const [coin, setCoin] = useState(null);
   const [chartData, setChartData] = useState([]);
+  const [chartType, setChartType] = useState('candles');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -340,10 +376,16 @@ export default function CoingameCoinPage() {
                 <span className="cg-coin-eyebrow">TRADE DISPLAY</span>
                 <strong>{coin.coin_name}/FC</strong>
               </div>
-              <div className="cg-chart-pill">24h real transactions</div>
+              <div className="cg-chart-actions">
+                <div className="cg-chart-type-toggle" aria-label="Chart type">
+                  <button className={chartType === 'candles' ? 'active' : ''} onClick={() => setChartType('candles')}>Velas</button>
+                  <button className={chartType === 'line' ? 'active' : ''} onClick={() => setChartType('line')}>Linea</button>
+                </div>
+                <div className="cg-chart-pill">24h real transactions</div>
+              </div>
             </div>
             <div className="cg-big-chart">
-              <LightweightCoinChart data={chartData} />
+              <LightweightCoinChart data={chartData} chartType={chartType} />
             </div>
           </section>
 
