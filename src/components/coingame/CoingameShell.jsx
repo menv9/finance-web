@@ -11,6 +11,7 @@ const NAV = [
   { to: '/coingame/market',      end: false, icon: '◈', label: 'Market' },
   { to: '/coingame/leaderboard', end: false, icon: '▲', label: 'Rankings' },
   { to: '/coingame/history',     end: false, icon: '◎', label: 'History' },
+  { to: '/coingame/info',        end: false, icon: 'i', label: 'Info' },
 ];
 
 function CoinSetupModal() {

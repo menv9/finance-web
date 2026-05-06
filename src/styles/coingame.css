@@ -1215,6 +1215,116 @@
   height: 100%;
 }
 
+/* Info page */
+.cg-info-page {
+  max-width: 1120px;
+}
+
+.cg-info-hero,
+.cg-info-section {
+  background: rgba(17,17,17,0.94);
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+}
+
+.cg-info-hero {
+  padding: 1.25rem 1.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.cg-info-hero h1 {
+  font-family: var(--cg-font-display);
+  font-size: 1.8rem;
+  line-height: 1.1;
+  margin-bottom: 0.45rem;
+}
+
+.cg-info-hero p,
+.cg-info-section p {
+  color: var(--cg-text-2);
+  font-size: 0.9rem;
+}
+
+.cg-info-section {
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.cg-info-section h2 {
+  font-family: var(--cg-font-display);
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.cg-info-definition-grid,
+.cg-info-note-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.cg-info-definition,
+.cg-info-note-grid > div {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+}
+
+.cg-info-definition h3,
+.cg-info-note-grid h3 {
+  font-family: var(--cg-font-display);
+  font-size: 0.92rem;
+  margin-bottom: 0.35rem;
+}
+
+.cg-info-definition p,
+.cg-info-note-grid p {
+  line-height: 1.45;
+}
+
+.cg-info-explainer {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.cg-info-formula {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--cg-accent-border);
+  border-radius: 8px;
+  background: var(--cg-accent-soft);
+  color: var(--cg-accent);
+  font-family: var(--cg-font-mono);
+  font-size: 0.9rem;
+}
+
+.cg-info-tier-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cg-info-tier-list > div {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+}
+
+.cg-info-tier-list strong {
+  font-family: var(--cg-font-mono);
+  color: var(--cg-text);
+}
+
+.cg-info-tier-list span {
+  color: var(--cg-text-2);
+}
+
 .cg-trade-panel {
   position: sticky;
   top: 1rem;
@@ -1451,4 +1561,9 @@
   }
   .cg-big-chart { height: 320px; }
   .cg-coin-market-link { display: none; }
+  .cg-info-definition-grid,
+  .cg-info-note-grid,
+  .cg-info-tier-list > div {
+    grid-template-columns: 1fr;
+  }
 }
