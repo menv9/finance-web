@@ -18,6 +18,12 @@ function getPrevMonth(yyyyMm) {
   return `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
+function getNextMonth(yyyyMm) {
+  const [y, m] = yyyyMm.split('-').map(Number);
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
 function monthLabel(yyyyMm, locale) {
   const [y, m] = yyyyMm.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString(locale, { month: 'long', year: 'numeric' });
@@ -101,9 +107,11 @@ export function BudgetTab() {
   const confirm = useConfirm();
   const { baseCurrency: currency, categories: expenseCategories } = settings;
 
-  const [selectedMonth] = useState(
+  const [selectedMonth, setSelectedMonth] = useState(
     () => normalizeDateInput(new Date()).slice(0, 7),
   );
+  const currentMonth = normalizeDateInput(new Date()).slice(0, 7);
+  const isCurrentMonth = selectedMonth === currentMonth;
   // modal: { open, category } — category is null for new, string for edit
   const [modal, setModal] = useState({ open: false, category: null });
   const [newCategory, setNewCategory] = useState('');
@@ -252,6 +260,13 @@ export function BudgetTab() {
             );
           })()}
         </p>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(getPrevMonth(selectedMonth))}>‹</Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(getNextMonth(selectedMonth))} disabled={isCurrentMonth}>›</Button>
+          {!isCurrentMonth && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(currentMonth)}>{t('common.today')}</Button>
+          )}
+        </div>
       </div>
 
       <section data-tour="budgets-stats" className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule sm:grid-cols-2">
