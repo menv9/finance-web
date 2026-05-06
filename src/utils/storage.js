@@ -28,17 +28,37 @@ function normalizeSettings(settings) {
   };
 }
 
+// Per-version data migrations. Add an entry here whenever DB_VERSION is bumped.
+// Each function receives the IDBDatabase and the upgrade transaction.
+// Versions 1-13 predate this registry; no migrations are registered for them.
+const MIGRATIONS = {
+  // Example for future contributors:
+  // 14: (_db, tx) => {
+  //   const store = tx.objectStore('expenses');
+  //   // mutate records, add indexes, etc.
+  // },
+};
+
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
+      const oldVersion = event.oldVersion;
+
+      // Ensure all stores exist (always safe to run)
       STORE_NAMES.forEach((storeName) => {
         if (!db.objectStoreNames.contains(storeName)) {
           db.createObjectStore(storeName, { keyPath: 'id' });
         }
       });
+
+      // Run any pending migrations in order, starting after the last known version
+      const fromVersion = Math.max(oldVersion, 13);
+      for (let v = fromVersion + 1; v <= DB_VERSION; v++) {
+        if (MIGRATIONS[v]) MIGRATIONS[v](db, event.target.transaction);
+      }
     };
 
     request.onsuccess = () => resolve(request.result);

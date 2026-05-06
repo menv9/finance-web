@@ -65,7 +65,7 @@ export async function fetchRemoteChanges(client, userId, sinceIso) {
     .order('updated_at', { ascending: true });
 
   if (sinceIso) {
-    query = query.gt('updated_at', sinceIso);
+    query = query.gte('updated_at', sinceIso);
   }
 
   const { data, error } = await query;

@@ -61,6 +61,7 @@ import {
   acceptGoalInvitation as apiAcceptGoalInvitation,
   addGoalParticipant,
   addReaction as apiAddReaction,
+  completeSharedGoalIfReached as apiCompleteSharedGoalIfReached,
   createSharedGoal as apiCreateSharedGoal,
   fetchGoalInvitations,
   deleteActivity as apiDeleteActivity,
@@ -77,6 +78,8 @@ import {
   upsertActivityPrivacy,
 } from '../utils/socialApi';
 import {
+  acceptLedgerEntry as apiAcceptLedgerEntry,
+  applyPartialIouPayment as apiApplyPartialIouPayment,
   cancelLedgerEntry as apiCancelLedgerEntry,
   createLedgerEntry as apiCreateLedgerEntry,
   fetchFriendLedger,
@@ -248,11 +251,11 @@ function makeId(prefix) {
 }
 
 function portfolioSnapshotId(timestamp = new Date().toISOString()) {
-  return `psn-${timestamp.slice(0, 13)}`;
+  return `psn-${timestamp.slice(0, 16)}`;
 }
 
 function portfolioScopedSnapshotId(portfolioId, timestamp = new Date().toISOString()) {
-  return `psn-${portfolioId}-${timestamp.slice(0, 13)}`;
+  return `psn-${portfolioId}-${timestamp.slice(0, 16)}`;
 }
 
 function defaultInvestmentPortfolio(timestamp = new Date().toISOString()) {
@@ -990,8 +993,15 @@ export const useFinanceStore = create((set, get) => ({
         window.setTimeout(async () => {
           const storedUserId = getActiveUserId();
           if (newUserId && storedUserId && newUserId !== storedUserId) {
+            // Different user on same device — wipe everything
             await clearAllStores();
             clearLocalUserData();
+            await get().reloadStoreData();
+          } else if (newUserId && !storedUserId) {
+            // First-ever login or login after anonymous use — wipe local data so
+            // it doesn't get pushed up to the new account as if it were theirs
+            await clearAllStores();
+            saveSyncMeta({ lastPulledAt: {}, deletedRecords: {}, conflicts: [] });
             await get().reloadStoreData();
           }
           if (newUserId) setActiveUserId(newUserId);
@@ -1002,6 +1012,7 @@ export const useFinanceStore = create((set, get) => ({
       }
       if (event === 'SIGNED_OUT') {
         clearActiveUserId();
+        clearLocalUserData();
         set({
           profile: null,
           friends: [],
@@ -1010,6 +1021,10 @@ export const useFinanceStore = create((set, get) => ({
           profileStatus: 'idle',
           profileError: '',
         });
+        window.setTimeout(async () => {
+          await clearAllStores();
+          await get().reloadStoreData();
+        }, 0);
       }
     });
 
@@ -1538,6 +1553,13 @@ export const useFinanceStore = create((set, get) => ({
         throw new Error('This portfolio has holdings or history. Move or remove its data before deleting it.');
       }
     }
+    if (storeName === 'bankAccounts') {
+      const linkedStores = ['expenses', 'incomes', 'savingsEntries', 'transfers', 'portfolioCashflows'];
+      const hasLinkedData = linkedStores.some((s) => (get()[s] || []).some((item) => item.bankAccountId === id));
+      if (hasLinkedData) {
+        throw new Error('This account has linked transactions. Reassign or remove them before deleting the account.');
+      }
+    }
     // Cascade: deleting a holding must remove its cost-basis cashflows and dividends,
     // otherwise XIRR/TWRR keep seeing phantom flows against a ticker that no longer exists.
     if (storeName === 'holdings') {
@@ -1545,6 +1567,10 @@ export const useFinanceStore = create((set, get) => ({
       const cashflows = get().portfolioCashflows.filter((c) => c.holdingId === id);
       for (const cf of cashflows) {
         await get().removeEntity('portfolioCashflows', cf.id);
+      }
+      const sales = get().portfolioSales.filter((s) => s.holdingId === id);
+      for (const sale of sales) {
+        await get().removeEntity('portfolioSales', sale.id);
       }
       if (holding?.ticker) {
         const dividends = get().dividends.filter((d) => (
@@ -2547,8 +2573,9 @@ export const useFinanceStore = create((set, get) => ({
     const updated = refreshedActive.filter((holding) => resultsByTicker.get(holding.ticker)?.status === 'fulfilled');
     await Promise.all(updated.map((holding) => putRecord('holdings', holding)));
     set((state) => {
-      const nextState = { ...state, holdings: refreshed, fxRates };
-      return { holdings: refreshed, fxRates, derived: buildDerived(nextState) };
+      const mergedFxRates = { ...state.fxRates, ...fxRates };
+      const nextState = { ...state, holdings: refreshed, fxRates: mergedFxRates };
+      return { holdings: refreshed, fxRates: mergedFxRates, derived: buildDerived(nextState) };
     });
     await persistActivityLogs(set, updated.map((holding) =>
       buildActivityLog({
@@ -3169,16 +3196,23 @@ export const useFinanceStore = create((set, get) => ({
       const userId = authData.user?.id;
       if (!userId) throw new Error('No authenticated Supabase user');
       const state = get();
-      const since = Object.values(state.syncMeta.lastPulledAt || {}).sort().at(-1);
+      const perStoreCursors = state.syncMeta.lastPulledAt || {};
+      const cursorValues = Object.values(perStoreCursors).filter(Boolean);
+      // Use the minimum cursor so stores that are behind don't miss changes
+      const since = cursorValues.length > 0 ? cursorValues.sort().at(0) : null;
       const changes = await fetchRemoteChanges(client, userId, since);
       const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
       let nextConflicts = [...state.syncMeta.conflicts];
+      const nextLastPulledAt = { ...perStoreCursors };
 
       for (const change of changes) {
         if (!STORE_KEYS.includes(change.store_name)) continue;
+        const storeCursor = perStoreCursors[change.store_name];
+        // Skip records already processed by this store's cursor
+        if (storeCursor && change.updated_at < storeCursor) continue;
         const localRecord = getStateRecords(state, change.store_name).find((item) => item.id === change.record_id);
         const localTombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
-        if (detectConflict({ localRecord, localTombstone, remoteChange: change, lastPulledAt: since })) {
+        if (detectConflict({ localRecord, localTombstone, remoteChange: change, lastPulledAt: storeCursor })) {
           nextConflicts = upsertConflict(
             nextConflicts,
             buildConflict({
@@ -3199,13 +3233,15 @@ export const useFinanceStore = create((set, get) => ({
           nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
         }
         nextConflicts = removeConflict(nextConflicts, `${change.store_name}:${change.record_id}`);
+
+        // Advance this store's cursor independently
+        if (!nextLastPulledAt[change.store_name] || change.updated_at > nextLastPulledAt[change.store_name]) {
+          nextLastPulledAt[change.store_name] = change.updated_at;
+        }
       }
 
-      const latestTimestamp = changes.at(-1)?.updated_at;
       const nextSyncMeta = {
-        lastPulledAt: latestTimestamp
-          ? Object.fromEntries(STORE_KEYS.map((storeName) => [storeName, latestTimestamp]))
-          : state.syncMeta.lastPulledAt,
+        lastPulledAt: nextLastPulledAt,
         deletedRecords: nextDeletedRecords,
         conflicts: nextConflicts,
       };
@@ -3461,12 +3497,13 @@ export const useFinanceStore = create((set, get) => ({
     const user = get().supabaseUser;
     if (!user) return;
     await apiAddContribution(goalId, user.id, amountCents, note);
+    // Atomic DB check: only the call that actually flips completed_at returns true,
+    // so exactly one "goal reached" activity fires even with simultaneous contributions.
+    const wasNewlyCompleted = await apiCompleteSharedGoalIfReached(goalId);
     const goals = await fetchSharedGoals(user.id);
-    const goal = goals.find((g) => g.id === goalId);
-    if (goal) {
-      const totalCents = (goal.shared_goal_contributions || []).reduce((s, c) => s + c.amount_cents, 0);
-      if (totalCents >= goal.target_cents && !goal.completed_at) {
-        await apiUpdateSharedGoal(goalId, { completedAt: new Date().toISOString() });
+    if (wasNewlyCompleted) {
+      const goal = goals.find((g) => g.id === goalId);
+      if (goal) {
         await get().postActivity('shared_goal_reached', { goalId, goalName: goal.name, targetCents: goal.target_cents });
       }
     }
@@ -3513,6 +3550,8 @@ export const useFinanceStore = create((set, get) => ({
     const user = get().supabaseUser;
     if (!user) return;
     const entry = get().friendLedger.find((e) => e.id === entryId);
+    // Ledger op first — if this fails, no orphan expense is created
+    const updated = await apiSettleLedgerEntry(entryId, user.id);
     if (bankAccountId && entry && entry.debtor_id === user.id) {
       const today = new Date().toISOString().slice(0, 10);
       await get().saveEntity('expenses', {
@@ -3525,7 +3564,6 @@ export const useFinanceStore = create((set, get) => ({
         bankAccountId,
       });
     }
-    const updated = await apiSettleLedgerEntry(entryId, user.id);
     set((state) => ({
       friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
     }));
@@ -3541,6 +3579,17 @@ export const useFinanceStore = create((set, get) => ({
   sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '', parentIouId = null, bankAccountId = null }) => {
     const user = get().supabaseUser;
     if (!user) return;
+    // Ledger op first — if this fails, no orphan expense is created
+    const entry = await apiCreateLedgerEntry({
+      creditorId: friendId,
+      debtorId: user.id,
+      amountCents,
+      currency,
+      kind: 'payment',
+      note,
+      createdBy: user.id,
+      parentIouId,
+    });
     if (bankAccountId) {
       const today = new Date().toISOString().slice(0, 10);
       await get().saveEntity('expenses', {
@@ -3553,16 +3602,6 @@ export const useFinanceStore = create((set, get) => ({
         bankAccountId,
       });
     }
-    const entry = await apiCreateLedgerEntry({
-      creditorId: friendId,
-      debtorId: user.id,
-      amountCents,
-      currency,
-      kind: 'payment',
-      note,
-      createdBy: user.id,
-      parentIouId,
-    });
     set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
     return entry;
   },
@@ -3571,7 +3610,20 @@ export const useFinanceStore = create((set, get) => ({
     const user = get().supabaseUser;
     if (!user) return;
     const entry = get().friendLedger.find((e) => e.id === entryId);
+    const linkedIouId = entry?.parent_expense_id;
+    const linkedIou = linkedIouId
+      ? get().friendLedger.find((e) => e.id === linkedIouId && ['accepted', 'pending'].includes(e.status))
+      : null;
 
+    // Ledger op first — atomic RPC handles payment + IOU reduction in one transaction,
+    // eliminating the race condition when two partial payments land simultaneously.
+    if (linkedIou) {
+      await apiApplyPartialIouPayment(entryId, linkedIou.id, entry.amount_cents, user.id);
+    } else {
+      await apiSettleLedgerEntry(entryId, user.id);
+    }
+
+    // Income record second — ledger is already committed, so this is recoverable if it fails
     if (entry && bankAccountId) {
       const today = new Date().toISOString().slice(0, 10);
       await get().saveEntity('incomes', {
@@ -3583,29 +3635,8 @@ export const useFinanceStore = create((set, get) => ({
       });
     }
 
-    const updatedPayment = await apiSettleLedgerEntry(entryId, user.id);
-
-    // If this payment was linked to an IOU, reduce or settle it
-    const linkedIouId = entry?.parent_expense_id;
-    const linkedIou = linkedIouId ? get().friendLedger.find((e) => e.id === linkedIouId && e.status === 'pending') : null;
-
-    let updatedIou = null;
-    if (linkedIou) {
-      const remaining = linkedIou.amount_cents - entry.amount_cents;
-      if (remaining <= 0) {
-        updatedIou = await apiSettleLedgerEntry(linkedIou.id, user.id);
-      } else {
-        updatedIou = await apiUpdateLedgerEntry(linkedIou.id, { amountCents: remaining });
-      }
-    }
-
-    set((state) => ({
-      friendLedger: state.friendLedger.map((e) => {
-        if (e.id === entryId) return updatedPayment;
-        if (updatedIou && e.id === linkedIou.id) return updatedIou;
-        return e;
-      }),
-    }));
+    // Reload ledger to reflect DB-side changes rather than recomputing locally
+    await get().loadFriendLedger();
   },
 
   declinePayment: async (entryId) => {
@@ -3629,6 +3660,13 @@ export const useFinanceStore = create((set, get) => ({
     });
     set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
     return entry;
+  },
+
+  acceptLedgerEntry: async (entryId) => {
+    const updated = await apiAcceptLedgerEntry(entryId);
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+    }));
   },
 
   rejectRequest: async (entryId) => {
