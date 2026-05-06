@@ -2827,11 +2827,7 @@ export const useFinanceStore = create((set, get) => ({
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Land on /login so its <Navigate to="/dashboard" /> guard kicks in
-        // once the session is parsed from the URL hash. Returning to '/'
-        // gets immediately rerouted to '/landing' (public) and the user
-        // appears stuck even though they're authenticated.
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     if (error) {

@@ -39,6 +39,7 @@ const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
 const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
@@ -121,6 +122,7 @@ export default function App() {
           {/* Public — standalone pages (no AppShell) */}
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
