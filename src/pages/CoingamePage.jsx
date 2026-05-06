@@ -98,12 +98,12 @@ function DailyClaimCard({ wallet, onClaim }) {
         </div>
         <div style={{ fontSize: '0.8rem', color: 'var(--cg-text-2)' }}>
           {canClaim
-            ? `Streak: ${wallet?.login_streak ?? 0} days Â· Claim now`
-            : 'Already claimed Â· Next: tomorrow'}
+            ? `Streak: ${wallet?.login_streak ?? 0} days - Claim now`
+            : 'Already claimed - Next: tomorrow'}
         </div>
         {result && (
           <div style={{ fontSize: '0.8rem', color: 'var(--cg-positive)', marginTop: '0.3rem', fontFamily: 'var(--cg-font-mono)' }}>
-            +{result.reward} FC Â· Streak {result.streak}
+            +{result.reward} FC - Streak {result.streak}
           </div>
         )}
         {err && (
@@ -115,7 +115,7 @@ function DailyClaimCard({ wallet, onClaim }) {
         onClick={handleClaim}
         disabled={!canClaim || busy}
       >
-        {busy ? 'Claimingâ€¦' : '+ Claim'}
+        {busy ? 'Claiming...' : '+ Claim'}
       </button>
     </div>
   );
@@ -184,7 +184,11 @@ function BondingCurveCard({ coin }) {
             <Area type="monotone" dataKey="price" stroke="#17f500" fill="url(#cgCurve)" strokeWidth={1.5} dot={false} />
           </AreaChart>
         </ResponsiveContainer>
-        <div className="cg-curve-axis-note">`r`n          <span>Minted supply</span>`r`n          <span>{Number(max).toLocaleString()} max shown</span>`r`n          <span style={{ color: 'var(--cg-accent)' }}>{Number(coin.tokens_minted).toLocaleString()} current</span>`r`n        </div>
+        <div className="cg-curve-axis-note">
+          <span>Minted supply</span>
+          <span>{Number(max).toLocaleString()} max shown</span>
+          <span style={{ color: 'var(--cg-accent)' }}>{Number(coin.tokens_minted).toLocaleString()} current</span>
+        </div>
       </div>
     </div>
   );
@@ -198,11 +202,11 @@ function HoldingsCard({ holdings }) {
           My Holdings
           <InfoTooltip text="Coins you own from other users, including current value and unrealized gain or loss." />
         </span>
-        <Link to="/coingame/market" className="cg-section-link">Market â†’</Link>
+        <Link to="/coingame/market" className="cg-section-link">Market</Link>
       </div>
       {holdings.length === 0 ? (
         <div className="cg-empty">
-          <div className="cg-empty-icon">â—ˆ</div>
+          <div className="cg-empty-icon">CG</div>
           <div className="cg-empty-title">No holdings yet</div>
           <div className="cg-empty-desc">Buy coins from other users in the market</div>
         </div>
@@ -224,7 +228,7 @@ function HoldingsCard({ holdings }) {
                   {coinName}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>
-                  @{profile?.username ?? '...'} Â· {Number(h.tokens_held).toLocaleString()} {coinName}
+                  @{profile?.username ?? '...'} - {Number(h.tokens_held).toLocaleString()} {coinName}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -285,7 +289,7 @@ export default function CoingamePage() {
           Home
         </h1>
         <p style={{ color: 'var(--cg-text-3)', fontSize: '0.875rem' }}>
-          Virtual social economy Â· Fully separate from real finances
+          Virtual social economy - Fully separate from real finances
         </p>
       </div>
 
@@ -306,9 +310,9 @@ export default function CoingamePage() {
           {/* Quick nav */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
             {[
-              { to: '/coingame/market',      icon: 'â—ˆ', label: 'Market' },
-              { to: '/coingame/leaderboard', icon: 'â–²', label: 'Rankings' },
-              { to: '/coingame/history',     icon: 'â—Ž', label: 'History' },
+              { to: '/coingame/market',      icon: 'M', label: 'Market' },
+              { to: '/coingame/leaderboard', icon: 'R', label: 'Rankings' },
+              { to: '/coingame/history',     icon: 'H', label: 'History' },
             ].map(({ to, icon, label }) => (
               <Link
                 key={to}

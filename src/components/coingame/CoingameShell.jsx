@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import FaultyTerminal from './FaultyTerminal';
 import CoinEntryAnimation from './CoinEntryAnimation';
@@ -7,10 +7,10 @@ import { useFinanceStore } from '../../store/useFinanceStore';
 import '../../styles/coingame.css';
 
 const NAV = [
-  { to: '/coingame',             end: true, icon: '⌂', label: 'Home' },
-  { to: '/coingame/market',      end: false, icon: '◈', label: 'Market' },
-  { to: '/coingame/leaderboard', end: false, icon: '▲', label: 'Rankings' },
-  { to: '/coingame/history',     end: false, icon: '◎', label: 'History' },
+  { to: '/coingame',             end: true, icon: 'H', label: 'Home' },
+  { to: '/coingame/market',      end: false, icon: 'M', label: 'Market' },
+  { to: '/coingame/leaderboard', end: false, icon: 'R', label: 'Rankings' },
+  { to: '/coingame/history',     end: false, icon: 'T', label: 'History' },
   { to: '/coingame/info',        end: false, icon: 'i', label: 'Info' },
 ];
 
@@ -133,7 +133,7 @@ export default function CoingameShell({ children }) {
         />
       </div>
 
-      {/* Coin entry animation — first visit only */}
+      {/* Coin entry animation - first visit only */}
       {showCoin && (
         <CoinEntryAnimation onComplete={() => setShowCoin(false)} />
       )}
@@ -163,11 +163,11 @@ export default function CoingameShell({ children }) {
 
         <div className="cg-sidebar-bottom">
           <button type="button" className="cg-back-link cg-theme-toggle" onClick={toggleTheme}>
-            <span className="cg-nav-item-icon">{theme === 'light' ? '☾' : '☀'}</span>
+            <span className="cg-nav-item-icon">{theme === 'light' ? 'D' : 'L'}</span>
             <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
           </button>
           <Link to="/dashboard" className="cg-back-link">
-            <span className="cg-nav-item-icon">←</span>
+            <span className="cg-nav-item-icon">&lt;-</span>
             <span>Back to Finges</span>
           </Link>
         </div>
