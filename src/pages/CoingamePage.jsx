@@ -39,7 +39,7 @@ function StatRow({ wallet, ownCoin }) {
           <div className="cg-stat-sub">
             <span className={`cg-badge cg-badge-${ownCoin.status}`}>{ownCoin.status}</span>
             <span style={{ marginLeft: '0.4rem' }}>{ownCoin.coin_name || 'Your coin'}</span>
-            <span style={{ marginLeft: '0.4rem' }}>{Number(ownCoin.tokens_minted).toLocaleString()} minted</span>
+            <span style={{ marginLeft: '0.4rem' }}>{Number(ownCoin.tokens_minted).toLocaleString()} {ownCoin.coin_name || 'Your coin'} minted</span>
           </div>
         )}
       </div>
@@ -112,12 +112,13 @@ function BondingCurveCard({ coin }) {
   const max = Math.max(coin.tokens_minted * 2, 10000);
   const points = bondingCurvePoints(max, coin.base_price, 80);
   const price = spotPrice(coin.tokens_minted, coin.base_price);
+  const coinName = coin.coin_name || coin.profiles?.username || 'coin';
 
   return (
     <div className="cg-chart-wrap">
       <div className="cg-chart-header">
         <span className="cg-chart-title">Bonding Curve</span>
-        <span className="cg-chart-price">{price.toFixed(6)} FC/token</span>
+        <span className="cg-chart-price">{price.toFixed(6)} FC/{coinName}</span>
       </div>
       <div style={{ padding: '0.75rem 0.5rem 0.5rem' }}>
         <ResponsiveContainer width="100%" height={120}>
@@ -132,7 +133,7 @@ function BondingCurveCard({ coin }) {
             <YAxis hide />
             <Tooltip
               formatter={(v) => [`${v.toFixed(8)} FC`, 'Price']}
-              labelFormatter={(v) => `${Number(v).toLocaleString()} tokens`}
+              labelFormatter={(v) => `${Number(v).toLocaleString()} ${coinName}`}
               contentStyle={{
                 background: 'rgba(17,17,17,0.95)',
                 border: '1px solid rgba(255,255,255,0.1)',
@@ -186,7 +187,7 @@ function HoldingsCard({ holdings }) {
                   {coinName}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cg-text-3)', fontFamily: 'var(--cg-font-mono)' }}>
-                  @{profile?.username ?? '...'} · {Number(h.tokens_held).toLocaleString()} tokens
+                  @{profile?.username ?? '...'} · {Number(h.tokens_held).toLocaleString()} {coinName}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -210,7 +211,7 @@ function EconomyStrip({ economy }) {
   return (
     <div className="cg-economy-strip">
       {[
-        { label: 'Minted', value: Number(economy.total_supply_minted).toLocaleString(), unit: 'tokens' },
+        { label: 'Minted', value: Number(economy.total_supply_minted).toLocaleString(), unit: 'coins' },
         { label: 'Burned', value: Number(economy.total_burned).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC' },
         { label: 'Prize Pool', value: Number(economy.prize_pool_fc).toLocaleString(undefined, { maximumFractionDigits: 0 }), unit: 'FC', accent: true },
       ].map((item) => (

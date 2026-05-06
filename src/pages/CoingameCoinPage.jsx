@@ -171,6 +171,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
   const [mode, setMode] = useState('buy');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  const coinName = coin.coin_name || coin.profiles?.username || 'coin';
 
   const numericAmount = Number(amount || 0);
   const maxSell = Number(holding?.tokens_held ?? 0);
@@ -186,8 +187,8 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
         if (numericAmount <= 0 || buyTokens <= 0) throw new Error('Enter an FC amount.');
         await coingameBuy(coin.coin_id, buyTokens);
       } else {
-        if (numericAmount <= 0) throw new Error('Enter a token amount.');
-        if (numericAmount > maxSell) throw new Error(`Max sell: ${maxSell.toLocaleString()} tokens`);
+        if (numericAmount <= 0) throw new Error(`Enter a ${coinName} amount.`);
+        if (numericAmount > maxSell) throw new Error(`Max sell: ${maxSell.toLocaleString()} ${coinName}`);
         await coingameSell(coin.coin_id, numericAmount);
       }
       setAmount('');
@@ -227,7 +228,7 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
           inputMode="decimal"
           placeholder="0"
         />
-        <span>{mode === 'buy' ? 'FC' : 'TOKENS'}</span>
+        <span>{mode === 'buy' ? 'FC' : coinName}</span>
       </div>
 
       {mode === 'buy' ? (
@@ -249,13 +250,13 @@ function TradePanel({ coin, holding, isOwnCoin, onTradeComplete }) {
       <div className="cg-trade-preview">
         {mode === 'buy' ? (
           <>
-            <div><span>You receive</span><strong>{buyTokens.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
+            <div><span>You receive</span><strong>{buyTokens.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong></div>
             <div><span>Pair</span><strong>{coin.coin_name}/FC</strong></div>
           </>
         ) : (
           <>
             <div><span>You receive</span><strong><FC amount={sellNet} /></strong></div>
-            <div><span>Available</span><strong>{maxSell.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
+            <div><span>Available</span><strong>{maxSell.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong></div>
           </>
         )}
       </div>
@@ -284,7 +285,7 @@ function CoinHeader({ coin }) {
         <div className="cg-coin-meta">
           <span>@{profile?.username || 'unknown'}</span>
           <span>{coin.status}</span>
-          <span>{Number(coin.tokens_minted ?? 0).toLocaleString()} minted</span>
+          <span>{Number(coin.tokens_minted ?? 0).toLocaleString()} {name} minted</span>
         </div>
       </div>
       <Link className="cg-btn cg-btn-secondary cg-coin-market-link" to="/coingame/market">Market</Link>
@@ -339,6 +340,7 @@ export default function CoingameCoinPage() {
     () => chartData.reduce((sum, point) => sum + Number(point.volumeFc || 0), 0),
     [chartData],
   );
+  const coinName = coin?.coin_name || coin?.profiles?.username || 'coin';
 
   async function refreshAfterTrade() {
     await Promise.all([loadCoingame(), loadCoin()]);
@@ -378,7 +380,7 @@ export default function CoingameCoinPage() {
             </div>
             <div>
               <span>Your Position</span>
-              <strong>{Number(holding?.tokens_held ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              <strong>{Number(holding?.tokens_held ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong>
             </div>
           </section>
 
@@ -413,7 +415,7 @@ export default function CoingameCoinPage() {
           </section>
 
           <section className="cg-coin-info-grid">
-            <div><span>Vol {chartRange.label}</span><strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens</strong></div>
+            <div><span>Vol {chartRange.label}</span><strong>{rangeVolume.toLocaleString(undefined, { maximumFractionDigits: 4 })} {coinName}</strong></div>
             <div><span>Volume FC</span><strong><FC amount={rangeVolumeFc} /></strong></div>
             <div><span>Base Price</span><strong><FC amount={coin.base_price} decimals={4} /></strong></div>
             <div><span>Fee</span><strong>1% burn/pool</strong></div>

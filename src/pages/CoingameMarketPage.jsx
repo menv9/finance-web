@@ -33,11 +33,11 @@ function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
       <div className="cg-coin-card-body">
         <div className="cg-coin-card-name">{coinName}</div>
         <div className="cg-coin-card-handle" style={{ fontFamily: 'var(--cg-font-mono)' }}>
-          @{profile?.username ?? '...'} · {Number(coin.tokens_minted).toLocaleString()} minted
+          @{profile?.username ?? '...'} · {Number(coin.tokens_minted).toLocaleString()} {coinName} minted
         </div>
         {owned > 0 && (
           <div style={{ fontSize: '0.75rem', color: 'var(--cg-accent)', fontFamily: 'var(--cg-font-mono)' }}>
-            {Number(owned).toLocaleString()} held
+            {Number(owned).toLocaleString()} {coinName} held
           </div>
         )}
         <div className="cg-coin-card-footer">
@@ -45,7 +45,7 @@ function CoinCard({ coin, ownHolding, isOwnCoin, onBuy, onSell }) {
             <FC amount={marketCap} decimals={2} />
           </span>
           <span style={{ fontFamily: 'var(--cg-font-mono)', fontSize: '0.7rem', color: 'var(--cg-text-3)' }}>
-            {price.toFixed(4)} FC/t
+            {price.toFixed(4)} FC/{coinName}
           </span>
         </div>
       </div>
@@ -81,6 +81,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const maxSell = ownHolding?.tokens_held ?? 0;
+  const coinName = coin.coin_name || coin.profiles?.username || 'coin';
 
   const t = parseFloat(tokens) || 0;
   const preview = mode === 'buy'
@@ -91,7 +92,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
 
   async function handleSubmit() {
     if (t <= 0) { setErr('Enter a positive amount'); return; }
-    if (mode === 'sell' && t > maxSell) { setErr(`Max sell: ${maxSell}`); return; }
+    if (mode === 'sell' && t > maxSell) { setErr(`Max sell: ${maxSell} ${coinName}`); return; }
     setBusy(true); setErr('');
     try {
       await onConfirm(coin.coin_id, t);
@@ -114,7 +115,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
         </div>
 
         <div className="cg-modal-body">
-          <label className="cg-label">Tokens</label>
+          <label className="cg-label">{coinName}</label>
           <input
             className="cg-input"
             type="number"
@@ -131,7 +132,7 @@ function TradeModal({ coin, mode, ownHolding, onClose, onConfirm }) {
               style={{ marginTop: '0.4rem', background: 'none', border: 'none', color: 'var(--cg-accent)', fontSize: '0.78rem', cursor: 'pointer', padding: 0, fontFamily: 'var(--cg-font-mono)' }}
               onClick={() => setTokens(String(maxSell))}
             >
-              Max: {Number(maxSell).toLocaleString()}
+              Max: {Number(maxSell).toLocaleString()} {coinName}
             </button>
           )}
 
