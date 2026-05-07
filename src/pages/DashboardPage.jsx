@@ -77,6 +77,12 @@ function IncomeArrowIcon() {
   );
 }
 
+const NET_WORTH_PERIODS = [
+  { key: '3m', label: '3M', months: 3 },
+  { key: '6m', label: '6M', months: 6 },
+  { key: '1y', label: '1Y', months: 12 },
+];
+
 function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription }) {
   if (!items.length) {
     return (
@@ -138,6 +144,7 @@ export default function DashboardPage() {
 
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const isGorka = supabaseUser?.email === 'gorkaaamendiola@gmail.com';
+  const [netWorthPeriod, setNetWorthPeriod] = useState('1y');
 
   const currency = settings.baseCurrency;
   const portfolioEnabled = settings.modules?.portfolio !== false;
@@ -172,6 +179,24 @@ export default function DashboardPage() {
       value: entry.netWorthCents,
     })),
   [dashboard.netWorthSeries]);
+
+  const visibleNetWorthData = useMemo(() => {
+    const period = NET_WORTH_PERIODS.find((item) => item.key === netWorthPeriod) || NET_WORTH_PERIODS.at(-1);
+    return lwNetWorthData.slice(-Math.min(period.months + 1, lwNetWorthData.length));
+  }, [lwNetWorthData, netWorthPeriod]);
+
+  const visibleNetWorthRange = useMemo(() => {
+    const period = NET_WORTH_PERIODS.find((item) => item.key === netWorthPeriod) || NET_WORTH_PERIODS.at(-1);
+    const lastPoint = lwNetWorthData.at(-1);
+    if (!lastPoint?.time) return null;
+    const to = new Date(`${lastPoint.time}T00:00:00`);
+    const from = new Date(to);
+    from.setUTCMonth(from.getUTCMonth() - period.months);
+    return {
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+    };
+  }, [lwNetWorthData, netWorthPeriod]);
 
   const lwCashflowData = useMemo(() =>
     (dashboard.cashflowSeries || []).map((entry) => ({
@@ -360,15 +385,35 @@ export default function DashboardPage() {
         eyebrow="Twelve-month arc"
         title="Net worth"
         description="How your total position has moved through the last year."
+        action={
+          <div className="inline-flex h-8 rounded-md border border-rule bg-surface-raised p-0.5" aria-label="Net worth period">
+            {NET_WORTH_PERIODS.map((period) => (
+              <button
+                key={period.key}
+                type="button"
+                onClick={() => setNetWorthPeriod(period.key)}
+                className={
+                  'min-w-9 rounded px-2 text-xs font-medium transition-colors duration-150 ' +
+                  (netWorthPeriod === period.key
+                    ? 'bg-accent text-accent-contrast shadow-sm'
+                    : 'text-ink-muted hover:text-ink')
+                }
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+        }
         variant="chart"
         className={rise(2)}
       >
         {lwNetWorthData.length ? (
           <LWAreaChart
-            data={lwNetWorthData}
+            data={visibleNetWorthData}
             color="var(--accent)"
             topOpacity={0.32}
             priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+            visibleRange={visibleNetWorthRange}
           />
         ) : (
           <EmptyState title="No data yet" description="Log income or expenses to see this chart come to life." />

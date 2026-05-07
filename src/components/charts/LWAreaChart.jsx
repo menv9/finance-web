@@ -47,6 +47,7 @@ export default function LWAreaChart({
   referenceColor = 'var(--positive)',
   secondSeries = null, // { data, color, topOpacity, bottomOpacity, dashed }
   priceFormatter = null,
+  visibleRange = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -146,9 +147,13 @@ export default function LWAreaChart({
       seriesRef.current.push(s2);
     }
 
-    chart.timeScale().fitContent();
+    if (visibleRange?.from && visibleRange?.to) {
+      chart.timeScale().setVisibleRange(visibleRange);
+    } else {
+      chart.timeScale().fitContent();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter]);
+  }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter, visibleRange?.from, visibleRange?.to]);
 
   const labels = axisLabelsFromPoints(data);
 
