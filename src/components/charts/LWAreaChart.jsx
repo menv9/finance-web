@@ -30,6 +30,7 @@ export default function LWAreaChart({
   referenceY = null,
   referenceColor = 'var(--positive)',
   secondSeries = null, // { data, color, topOpacity, bottomOpacity, dashed }
+  priceFormatter = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -89,6 +90,7 @@ export default function LWAreaChart({
       lastValueVisible: false,
       crosshairMarkerVisible: true,
       crosshairMarkerRadius: 4,
+      ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
     });
     series.setData(data);
     seriesRef.current.push(series);
@@ -114,6 +116,7 @@ export default function LWAreaChart({
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
+        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
       });
       s2.setData(secondSeries.data);
       seriesRef.current.push(s2);
@@ -121,7 +124,7 @@ export default function LWAreaChart({
 
     chart.timeScale().fitContent();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed]);
+  }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

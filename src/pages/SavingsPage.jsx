@@ -10,7 +10,7 @@ import LWLineSegments from '../components/charts/LWLineSegments';
 import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -774,7 +774,12 @@ export default function SavingsPage() {
           </div>
           <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
             {lwTrendData.length > 0 ? (
-              <LWAreaChart data={lwTrendData} color="var(--accent)" topOpacity={0.3} />
+              <LWAreaChart
+                data={lwTrendData}
+                color="var(--accent)"
+                topOpacity={0.3}
+                priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-center text-xs text-ink-faint">
                 {t('savings.evolutionChart.addToSee')}
@@ -990,7 +995,10 @@ export default function SavingsPage() {
         }
       >
         {lwHistorySegments.length > 0 ? (
-          <LWLineSegments segments={lwHistorySegments} />
+          <LWLineSegments
+            segments={lwHistorySegments}
+            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+          />
         ) : (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-ink-faint">{t('savings.historyChart.noEntries')}</p>
@@ -1086,6 +1094,7 @@ export default function SavingsPage() {
           topOpacity={0.32}
           referenceY={goalCents > 0 ? goalCents : null}
           referenceColor="var(--positive)"
+          priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
         />
       </Card>
 

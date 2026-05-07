@@ -21,7 +21,7 @@ function withAlpha(color, alpha) {
   return color;
 }
 
-export default function LWSalesChart({ data = [] }) {
+export default function LWSalesChart({ data = [], priceFormatter = null }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
@@ -45,9 +45,10 @@ export default function LWSalesChart({ data = [] }) {
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !data.length) return;
+    if (!chart) return;
     seriesRef.current.forEach((s) => chart.removeSeries(s));
     seriesRef.current = [];
+    if (!data.length) return;
     const container = containerRef.current;
     const pos = resolveColor('var(--positive)', container);
     const neg = resolveColor('var(--danger)', container);
@@ -63,11 +64,12 @@ export default function LWSalesChart({ data = [] }) {
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: true,
+      ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
     });
     series.setData(data);
     seriesRef.current.push(series);
     chart.timeScale().fitContent();
-  }, [data]);
+  }, [data, priceFormatter]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

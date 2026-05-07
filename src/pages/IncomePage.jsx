@@ -18,7 +18,7 @@ import { IncomeForm } from '../components/forms/IncomeForm';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows, computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
@@ -494,7 +494,11 @@ export default function IncomePage() {
       {/* split + trend — same grid pattern as portfolio */}
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
         <Card data-tour="income-chart" eyebrow={t('income.chartCard.eyebrow')} title={t('income.chartCard.title')} variant="chart" className="lg:col-span-8">
-          <LWHistogram data={lwIncomeData} color="var(--accent)" />
+          <LWHistogram
+            data={lwIncomeData}
+            color="var(--accent)"
+            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+          />
         </Card>
 
         <Card eyebrow={t('income.sourceCard.eyebrow')} title={t('income.sourceCard.title')} className="lg:col-span-4">

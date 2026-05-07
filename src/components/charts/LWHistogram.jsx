@@ -11,6 +11,7 @@ function resolveColor(color, element) {
 export default function LWHistogram({
   data = [], // [{ time: 'YYYY-MM-DD', value: number, color?: string }]
   color = 'var(--accent)',
+  priceFormatter = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -64,6 +65,7 @@ export default function LWHistogram({
       color: resolved,
       priceLineVisible: false,
       lastValueVisible: false,
+      ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
     });
 
     series.setData(data.map((d) => ({
@@ -74,7 +76,7 @@ export default function LWHistogram({
 
     seriesRef.current.push(series);
     chart.timeScale().fitContent();
-  }, [data, color]);
+  }, [data, color, priceFormatter]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

@@ -41,6 +41,7 @@ export default function LWGroupedHistogram({
   dimOpacity = 0.35,
   // xLabels: string[] — custom labels rendered as HTML overlay (hides time axis when set)
   xLabels = null,
+  priceFormatter = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -96,6 +97,7 @@ export default function LWGroupedHistogram({
         color: colorA,
         priceLineVisible: false,
         lastValueVisible: false,
+        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
       });
       seriesRef.current.push(sA);
       sA.setData(seriesA.data.map((d) => {
@@ -111,6 +113,7 @@ export default function LWGroupedHistogram({
         color: colorB,
         priceLineVisible: false,
         lastValueVisible: false,
+        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
       });
       seriesRef.current.push(sB);
       sB.setData(seriesB.data.map((d) => {
@@ -122,7 +125,7 @@ export default function LWGroupedHistogram({
     }
 
     chart.timeScale().fitContent();
-  }, [seriesA, seriesB, offsetDays, selectedTime, dimOpacity]);
+  }, [seriesA, seriesB, offsetDays, selectedTime, dimOpacity, priceFormatter]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

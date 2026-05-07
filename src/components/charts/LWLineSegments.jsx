@@ -11,6 +11,7 @@ function resolveColor(color, element) {
 export default function LWLineSegments({
   // segments: [{ key, color, data: [{ time: 'YYYY-MM-DD', value: number }] }]
   segments = [],
+  priceFormatter = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -68,13 +69,14 @@ export default function LWLineSegments({
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
+        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
       });
       series.setData(segment.data);
       seriesRef.current.push(series);
     });
 
     chart.timeScale().fitContent();
-  }, [segments]);
+  }, [segments, priceFormatter]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

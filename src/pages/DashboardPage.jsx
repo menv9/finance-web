@@ -5,7 +5,7 @@ import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows } from '../utils/finance';
 import { exportElementToPdf } from '../utils/pdf';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
 import { PageHeader } from '../components/PageHeader';
 import { rise } from '../utils/motion';
@@ -364,7 +364,12 @@ export default function DashboardPage() {
         className={rise(2)}
       >
         {lwNetWorthData.length ? (
-          <LWAreaChart data={lwNetWorthData} color="var(--accent)" topOpacity={0.32} />
+          <LWAreaChart
+            data={lwNetWorthData}
+            color="var(--accent)"
+            topOpacity={0.32}
+            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+          />
         ) : (
           <EmptyState title="No data yet" description="Log income or expenses to see this chart come to life." />
         )}
@@ -383,6 +388,7 @@ export default function DashboardPage() {
             <LWGroupedHistogram
               seriesA={{ data: lwCashflowData.map((d) => ({ time: d.incomeTime, value: d.incomeCents })), color: 'var(--accent)' }}
               seriesB={{ data: lwCashflowData.map((d) => ({ time: d.expenseTime, value: d.expenseCents })), color: 'var(--danger)' }}
+              priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
             />
           ) : (
             <EmptyState title="No data yet" description="Income and expense bars populate once you log them." />

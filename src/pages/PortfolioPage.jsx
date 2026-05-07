@@ -2172,6 +2172,7 @@ export default function PortfolioPage() {
               seriesB={{ data: lwRebalanceData.seriesB, color: 'var(--ink-muted)' }}
               offsetDays={7}
               xLabels={lwRebalanceData.tickers}
+              priceFormatter={(v) => `${Number(v || 0).toFixed(1)}%`}
             />
           ) : (
             <EmptyState title={t('portfolio.rebalanceCard.emptyTitle')} description={t('portfolio.rebalanceCard.emptyDescription')} />
