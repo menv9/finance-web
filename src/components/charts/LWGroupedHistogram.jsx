@@ -30,6 +30,47 @@ function shiftDate(isoDate, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function customPriceFormat(formatter) {
+  return formatter ? { priceFormat: { type: 'custom', minMove: 0.01, formatter } } : {};
+}
+
+function validPoint(point) {
+  return point?.time != null && Number.isFinite(Number(point.value));
+}
+
+function cleanData(points = []) {
+  return points.filter(validPoint).map((point) => ({ ...point, value: Number(point.value) }));
+}
+
+function removeSeriesSafely(chart, seriesList) {
+  seriesList.forEach((series) => {
+    if (!series) return;
+    try {
+      chart.removeSeries(series);
+    } catch {
+      // React dev remounts can leave a stale series handle behind.
+    }
+  });
+}
+
+function formatAxisTime(time) {
+  if (time == null) return '';
+  const date = typeof time === 'number'
+    ? new Date(time * 1000)
+    : new Date(String(time).length === 10 ? `${time}T00:00:00` : time);
+  if (Number.isNaN(date.getTime())) return String(time);
+  return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit' }).format(date);
+}
+
+function axisLabels(points = []) {
+  const clean = cleanData(points);
+  if (!clean.length) return [];
+  const mid = Math.floor((clean.length - 1) / 2);
+  return [clean[0], clean[mid], clean[clean.length - 1]]
+    .filter((point, index, list) => index === 0 || point.time !== list[index - 1].time)
+    .map((point) => formatAxisTime(point.time));
+}
+
 export default function LWGroupedHistogram({
   // seriesA: { data: [{ time, value, color? }], color }
   // seriesB: { data: [{ time, value, color? }], color }
@@ -46,6 +87,7 @@ export default function LWGroupedHistogram({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const dateLabels = xLabels?.length ? [] : axisLabels([...(seriesA.data || []), ...(seriesB.data || [])]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -63,7 +105,12 @@ export default function LWGroupedHistogram({
         horzLines: { color: 'rgba(128,128,128,0.08)' },
       },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: false, ticksVisible: xLabels ? false : true },
+      timeScale: {
+        borderVisible: false,
+        visible: true,
+        timeVisible: false,
+        ticksVisible: xLabels ? false : true,
+      },
       handleScroll: false,
       handleScale: false,
       crosshair: {
@@ -74,6 +121,7 @@ export default function LWGroupedHistogram({
 
     chartRef.current = chart;
     return () => {
+      seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
     };
@@ -83,12 +131,14 @@ export default function LWGroupedHistogram({
     const chart = chartRef.current;
     if (!chart) return;
 
-    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    removeSeriesSafely(chart, seriesRef.current);
     seriesRef.current = [];
 
     const container = containerRef.current;
-    const hasA = seriesA.data?.length > 0;
-    const hasB = seriesB.data?.length > 0;
+    const dataA = cleanData(seriesA.data);
+    const dataB = cleanData(seriesB.data);
+    const hasA = dataA.length > 0;
+    const hasB = dataB.length > 0;
     if (!hasA && !hasB) return;
 
     if (hasA) {
@@ -97,10 +147,10 @@ export default function LWGroupedHistogram({
         color: colorA,
         priceLineVisible: false,
         lastValueVisible: false,
-        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
+        ...customPriceFormat(priceFormatter),
       });
       seriesRef.current.push(sA);
-      sA.setData(seriesA.data.map((d) => {
+      sA.setData(dataA.map((d) => {
         const isSelected = !selectedTime || d.time === selectedTime;
         const itemColor = d.color || (selectedTime ? withAlpha(colorA, isSelected ? 1 : dimOpacity) : colorA);
         return { time: d.time, value: d.value, color: itemColor };
@@ -113,10 +163,10 @@ export default function LWGroupedHistogram({
         color: colorB,
         priceLineVisible: false,
         lastValueVisible: false,
-        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
+        ...customPriceFormat(priceFormatter),
       });
       seriesRef.current.push(sB);
-      sB.setData(seriesB.data.map((d) => {
+      sB.setData(dataB.map((d) => {
         const shifted = shiftDate(d.time, offsetDays);
         const isSelected = !selectedTime || d.time === selectedTime;
         const itemColor = d.color || (selectedTime ? withAlpha(colorB, isSelected ? 1 : dimOpacity) : colorB);
@@ -150,6 +200,13 @@ export default function LWGroupedHistogram({
             >
               {label}
             </span>
+          ))}
+        </div>
+      )}
+      {!xLabels?.length && dateLabels.length > 0 && (
+        <div style={{ position: 'absolute', left: 8, right: 8, bottom: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
+          {dateLabels.map((label) => (
+            <span key={label} style={{ fontSize: 11, color: 'rgba(128,128,128,0.75)', fontFamily: 'JetBrains Mono, monospace' }}>{label}</span>
           ))}
         </div>
       )}

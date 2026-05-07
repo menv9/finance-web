@@ -22,6 +22,47 @@ function withAlpha(color, alpha) {
   return color;
 }
 
+function customPriceFormat(formatter) {
+  return formatter ? { priceFormat: { type: 'custom', minMove: 0.01, formatter } } : {};
+}
+
+function validPoint(point) {
+  return point?.time != null && Number.isFinite(Number(point.value));
+}
+
+function cleanData(points = []) {
+  return points.filter(validPoint).map((point) => ({ ...point, value: Number(point.value) }));
+}
+
+function removeSeriesSafely(chart, seriesList) {
+  seriesList.forEach((series) => {
+    if (!series) return;
+    try {
+      chart.removeSeries(series);
+    } catch {
+      // React dev remounts can leave a stale series handle behind.
+    }
+  });
+}
+
+function formatAxisTime(time) {
+  if (time == null) return '';
+  const date = typeof time === 'number'
+    ? new Date(time * 1000)
+    : new Date(String(time).length === 10 ? `${time}T00:00:00` : time);
+  if (Number.isNaN(date.getTime())) return String(time);
+  return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit' }).format(date);
+}
+
+function axisLabels(points = []) {
+  const clean = cleanData(points);
+  if (!clean.length) return [];
+  const mid = Math.floor((clean.length - 1) / 2);
+  return [clean[0], clean[mid], clean[clean.length - 1]]
+    .filter((point, index, list) => index === 0 || point.time !== list[index - 1].time)
+    .map((point) => formatAxisTime(point.time));
+}
+
 export default function LWAreaChart({
   data = [],
   color = 'var(--accent)',
@@ -52,7 +93,12 @@ export default function LWAreaChart({
         horzLines: { color: 'rgba(128,128,128,0.08)' },
       },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: false },
+      timeScale: {
+        borderVisible: false,
+        visible: true,
+        ticksVisible: true,
+        timeVisible: false,
+      },
       handleScroll: false,
       handleScale: false,
       crosshair: {
@@ -63,6 +109,7 @@ export default function LWAreaChart({
 
     chartRef.current = chart;
     return () => {
+      seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
     };
@@ -72,10 +119,11 @@ export default function LWAreaChart({
     const chart = chartRef.current;
     if (!chart) return;
 
-    seriesRef.current.forEach((s) => chart.removeSeries(s));
+    removeSeriesSafely(chart, seriesRef.current);
     seriesRef.current = [];
 
-    if (!data.length) return;
+    const mainData = cleanData(data);
+    if (!mainData.length) return;
 
     const container = containerRef.current;
     const resolved = resolveColor(color, container);
@@ -90,9 +138,9 @@ export default function LWAreaChart({
       lastValueVisible: false,
       crosshairMarkerVisible: true,
       crosshairMarkerRadius: 4,
-      ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
+      ...customPriceFormat(priceFormatter),
     });
-    series.setData(data);
+    series.setData(mainData);
     seriesRef.current.push(series);
 
     if (referenceY !== null) {
@@ -105,7 +153,8 @@ export default function LWAreaChart({
       });
     }
 
-    if (secondSeries?.data?.length) {
+    const secondaryData = cleanData(secondSeries?.data);
+    if (secondaryData.length) {
       const s2Color = resolveColor(secondSeries.color || 'var(--danger)', container);
       const s2 = chart.addSeries(AreaSeries, {
         lineColor: s2Color,
@@ -116,9 +165,9 @@ export default function LWAreaChart({
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
-        ...(priceFormatter ? { priceFormat: { type: 'custom', formatter: priceFormatter } } : {}),
+        ...customPriceFormat(priceFormatter),
       });
-      s2.setData(secondSeries.data);
+      s2.setData(secondaryData);
       seriesRef.current.push(s2);
     }
 
@@ -126,5 +175,18 @@ export default function LWAreaChart({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+  const labels = axisLabels(data);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      {labels.length > 0 && (
+        <div style={{ position: 'absolute', left: 8, right: 8, bottom: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
+          {labels.map((label) => (
+            <span key={label} style={{ fontSize: 11, color: 'rgba(128,128,128,0.75)', fontFamily: 'JetBrains Mono, monospace' }}>{label}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

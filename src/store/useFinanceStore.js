@@ -170,6 +170,14 @@ const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
 let authSubscription = null;
 let autoPushTimer = null;
 
+function withTimeout(promise, ms, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
+
 function addMonthsToMonth(month, offset) {
   const [year, monthNumber] = (month || '').split('-').map(Number);
   if (!year || !monthNumber) return month;
@@ -885,55 +893,71 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   bootstrap: async () => {
-    await ensureSeedData();
-    const settings = loadSettings();
-    const syncMeta = loadSyncMeta();
-    const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
-    const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
-    normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
-    const portfolioRecords = await normalizeInvestmentPortfolioRecords({
-      investmentPortfolios: normalizedRecords[3],
-      holdings: normalizedRecords[4],
-      dividends: normalizedRecords[5],
-      portfolioCashflows: normalizedRecords[6],
-      portfolioSales: normalizedRecords[7],
-    }, settings);
-    await Promise.all(
-      STORE_KEYS.map(async (storeName, index) => {
-        const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
-        await Promise.all(dirty.map((item) => putRecord(storeName, item)));
-      }),
-    );
-    const nextState = {
-      settings,
-      expenses: normalizedRecords[0],
-      fixedExpenses: normalizedRecords[1],
-      incomes: normalizedRecords[2],
-      investmentPortfolios: portfolioRecords.investmentPortfolios,
-      holdings: portfolioRecords.holdings,
-      dividends: portfolioRecords.dividends,
-      portfolioCashflows: portfolioRecords.portfolioCashflows,
-      portfolioSales: portfolioRecords.portfolioSales,
-      savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
-      savingsEntries: normalizedRecords[9],
-      savingsGoals: normalizedRecords[10],
-      budgets: normalizedRecords[11],
-      rollovers: normalizedRecords[12],
-      transfers: normalizedRecords[13],
-      bankAccounts: normalizedRecords[14],
-      debts: normalizedRecords[15],
-      attachments: normalizedRecords[16],
-      activityLog: normalizedRecords[17],
-      portfolioSnapshots: normalizedRecords[18],
-      hydrated: false,
-      supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
-      syncMeta,
-    };
-    set({ ...nextState, derived: buildDerived(nextState) });
-    await cleanupGeneratedPortfolioIncomesForState(get, set);
-    await get().autoCreateFixedExpenses();
-    await get().initializeSupabase();
-    set({ hydrated: true });
+    const hydrationWatchdog = window.setTimeout(() => {
+      set((state) => state.hydrated ? state : {
+        hydrated: true,
+        supabaseSyncStatus: 'error',
+        supabaseError: state.supabaseError || 'Startup took too long. Opened the local workspace anyway.',
+      });
+    }, 6_000);
+    try {
+      await ensureSeedData();
+      const settings = loadSettings();
+      const syncMeta = loadSyncMeta();
+      const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
+      const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
+      normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
+      const portfolioRecords = await normalizeInvestmentPortfolioRecords({
+        investmentPortfolios: normalizedRecords[3],
+        holdings: normalizedRecords[4],
+        dividends: normalizedRecords[5],
+        portfolioCashflows: normalizedRecords[6],
+        portfolioSales: normalizedRecords[7],
+      }, settings);
+      await Promise.all(
+        STORE_KEYS.map(async (storeName, index) => {
+          const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
+          await Promise.all(dirty.map((item) => putRecord(storeName, item)));
+        }),
+      );
+      const nextState = {
+        settings,
+        expenses: normalizedRecords[0],
+        fixedExpenses: normalizedRecords[1],
+        incomes: normalizedRecords[2],
+        investmentPortfolios: portfolioRecords.investmentPortfolios,
+        holdings: portfolioRecords.holdings,
+        dividends: portfolioRecords.dividends,
+        portfolioCashflows: portfolioRecords.portfolioCashflows,
+        portfolioSales: portfolioRecords.portfolioSales,
+        savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
+        savingsEntries: normalizedRecords[9],
+        savingsGoals: normalizedRecords[10],
+        budgets: normalizedRecords[11],
+        rollovers: normalizedRecords[12],
+        transfers: normalizedRecords[13],
+        bankAccounts: normalizedRecords[14],
+        debts: normalizedRecords[15],
+        attachments: normalizedRecords[16],
+        activityLog: normalizedRecords[17],
+        portfolioSnapshots: normalizedRecords[18],
+        hydrated: false,
+        supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
+        syncMeta,
+      };
+      set({ ...nextState, derived: buildDerived(nextState) });
+      await cleanupGeneratedPortfolioIncomesForState(get, set);
+      await get().autoCreateFixedExpenses();
+      await get().initializeSupabase();
+    } catch (error) {
+      set({
+        supabaseSyncStatus: 'error',
+        supabaseError: error?.message || 'Unable to load the finance workspace.',
+      });
+    } finally {
+      window.clearTimeout(hydrationWatchdog);
+      set({ hydrated: true });
+    }
   },
 
   initializeSupabase: async () => {
@@ -960,7 +984,11 @@ export const useFinanceStore = create((set, get) => ({
       return;
     }
 
-    const { data, error } = await client.auth.getSession();
+    const { data, error } = await withTimeout(
+      client.auth.getSession(),
+      4_000,
+      'Supabase session check timed out. Continuing in local mode.',
+    );
     if (error) {
       set({
         supabaseConfigured: Boolean(config.url && config.anonKey),
