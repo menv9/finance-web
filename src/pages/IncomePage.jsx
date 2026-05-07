@@ -498,6 +498,7 @@ export default function IncomePage() {
             data={lwIncomeData}
             color="var(--accent)"
             priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+            showAllMonthLabels
           />
         </Card>
 

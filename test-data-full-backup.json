@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-05-03T15:30:00.000Z",
+  "exportedAt": "2026-05-08T10:00:00.000Z",
   "settings": {
     "baseCurrency": "EUR",
     "locale": "en-GB",
@@ -15,8 +15,8 @@
     "initialCashBalanceCents": 0,
     "categories": [
       "Housing",
+      "Utilities",
       "Transport",
-      "Food",
       "Groceries",
       "Restaurants",
       "Health",
@@ -24,20 +24,30 @@
       "Travel",
       "Education",
       "Shopping",
-      "Other"
+      "Insurance",
+      "Gifts",
+      "Pets",
+      "Taxes",
+      "Other",
+      "Savings",
+      "Transfer"
     ],
     "holdingPlatforms": [
       "Trade Republic",
       "IBKR",
       "DEGIRO",
-      "Revolut"
+      "Revolut",
+      "Coinbase",
+      "Wise"
     ],
     "finnhubApiKey": "",
     "supabaseUrl": "",
     "supabaseAnonKey": "",
     "localOnlyMode": true,
     "modules": {
-      "portfolio": true
+      "portfolio": true,
+      "social": true,
+      "coingame": false
     },
     "setupIntent": {
       "buckets": true,
@@ -46,10 +56,30 @@
       "recurringBills": true
     },
     "allocationTargets": [
-      { "ticker": "VWCE.DE", "targetWeight": 55 },
-      { "ticker": "AAPL", "targetWeight": 20 },
-      { "ticker": "MSFT", "targetWeight": 15 },
-      { "ticker": "BTC/EUR", "targetWeight": 10 }
+      {
+        "ticker": "VWCE.DE",
+        "targetWeight": 42
+      },
+      {
+        "ticker": "EUNA.DE",
+        "targetWeight": 18
+      },
+      {
+        "ticker": "AAPL",
+        "targetWeight": 14
+      },
+      {
+        "ticker": "MSFT",
+        "targetWeight": 14
+      },
+      {
+        "ticker": "BTC/EUR",
+        "targetWeight": 8
+      },
+      {
+        "ticker": "ETH/EUR",
+        "targetWeight": 4
+      }
     ],
     "csvMapping": {
       "date": "date",
@@ -62,56 +92,383 @@
   "data": {
     "bankAccounts": [
       {
-        "id": "bank-main",
-        "name": "N26 Main",
-        "balanceCents": 482350,
+        "id": "bank-main-eur",
+        "name": "N26 Main EUR",
+        "balanceCents": 423142,
         "currency": "EUR",
         "isMain": true,
-        "updatedAt": "2026-05-03T10:00:00.000Z"
+        "color": "#2563eb",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "bank-emergency",
+        "id": "bank-buffer-eur",
         "name": "Revolut Buffer",
-        "balanceCents": 126040,
+        "balanceCents": 186075,
         "currency": "EUR",
         "isMain": false,
-        "updatedAt": "2026-05-03T10:00:00.000Z"
+        "color": "#16a34a",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "bank-usd",
+        "id": "bank-rent-eur",
+        "name": "Rent & Bills Pocket",
+        "balanceCents": 149000,
+        "currency": "EUR",
+        "isMain": false,
+        "color": "#f59e0b",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "bank-wise-usd",
         "name": "Wise USD",
-        "balanceCents": 218500,
+        "balanceCents": 312580,
         "currency": "USD",
         "isMain": false,
-        "updatedAt": "2026-05-03T10:00:00.000Z"
+        "color": "#7c3aed",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "bank-cash-eur",
+        "name": "Cash Wallet",
+        "balanceCents": 14530,
+        "currency": "EUR",
+        "isMain": false,
+        "color": "#64748b",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       }
     ],
     "incomes": [
       {
+        "id": "inc-salary-2025-06",
+        "date": "2025-06-01",
+        "accountingMonth": "2025-06",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-06-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2025-06",
+        "date": "2025-06-18",
+        "accountingMonth": "2025-06",
+        "amountCents": 48000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Northwind Analytics",
+        "invoiceStatus": "paid",
+        "source": "Freelance project",
+        "updatedAt": "2025-06-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-07",
+        "date": "2025-07-01",
+        "accountingMonth": "2025-07",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-07-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-08",
+        "date": "2025-08-01",
+        "accountingMonth": "2025-08",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-08-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2025-08",
+        "date": "2025-08-18",
+        "accountingMonth": "2025-08",
+        "amountCents": 55000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Alpine Labs",
+        "invoiceStatus": "paid",
+        "source": "Freelance project",
+        "updatedAt": "2025-08-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-09",
+        "date": "2025-09-01",
+        "accountingMonth": "2025-09",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-09-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-10",
+        "date": "2025-10-01",
+        "accountingMonth": "2025-10",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-10-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2025-10",
+        "date": "2025-10-18",
+        "accountingMonth": "2025-10",
+        "amountCents": 62000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Bluebird Design",
+        "invoiceStatus": "paid",
+        "source": "Freelance project",
+        "updatedAt": "2025-10-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-refund-2025-10",
+        "date": "2025-10-22",
+        "accountingMonth": "2025-10",
+        "amountCents": 7450,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "refund",
+        "source": "Tax / travel refund",
+        "invoiceStatus": "paid",
+        "updatedAt": "2025-10-22T13:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-11",
+        "date": "2025-11-01",
+        "accountingMonth": "2025-11",
+        "amountCents": 385000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-11-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-salary-2025-12",
+        "date": "2025-12-01",
+        "accountingMonth": "2025-12",
+        "amountCents": 392000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2025-12-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2025-12",
+        "date": "2025-12-18",
+        "accountingMonth": "2025-12",
+        "amountCents": 69000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Northwind Analytics",
+        "invoiceStatus": "paid",
+        "source": "Freelance project",
+        "updatedAt": "2025-12-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2026-01",
+        "date": "2026-01-01",
+        "accountingMonth": "2026-01",
+        "amountCents": 392000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-01-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-salary-2026-02",
+        "date": "2026-02-01",
+        "accountingMonth": "2026-02",
+        "amountCents": 392000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-02-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2026-02",
+        "date": "2026-02-18",
+        "accountingMonth": "2026-02",
+        "amountCents": 76000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Alpine Labs",
+        "invoiceStatus": "paid",
+        "source": "Freelance project",
+        "updatedAt": "2026-02-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-salary-2026-03",
+        "date": "2026-03-01",
+        "accountingMonth": "2026-03",
+        "amountCents": 392000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-03-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-salary-2026-04",
+        "date": "2026-04-01",
+        "accountingMonth": "2026-04",
+        "amountCents": 392000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "updatedAt": "2026-04-01T07:15:00.000Z"
+      },
+      {
+        "id": "inc-client-2026-04",
+        "date": "2026-04-18",
+        "accountingMonth": "2026-04",
+        "amountCents": 83000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "client",
+        "client": "Bluebird Design",
+        "invoiceStatus": "sent",
+        "source": "Freelance project",
+        "updatedAt": "2026-04-18T12:00:00.000Z"
+      },
+      {
+        "id": "inc-refund-2026-04",
+        "date": "2026-04-22",
+        "accountingMonth": "2026-04",
+        "amountCents": 7450,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "variable",
+        "variableSourceType": "refund",
+        "source": "Tax / travel refund",
+        "invoiceStatus": "paid",
+        "updatedAt": "2026-04-22T13:00:00.000Z"
+      },
+      {
         "id": "inc-salary-2026-05",
         "date": "2026-05-01",
         "accountingMonth": "2026-05",
-        "amountCents": 385000,
+        "amountCents": 392000,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "incomeKind": "fixed",
-        "source": "Demo Studio GmbH",
+        "source": "FinGes Demo Studio GmbH",
         "frequency": "monthly",
         "payDay": 1,
         "updatedAt": "2026-05-01T07:15:00.000Z"
       },
       {
-        "id": "inc-client-2026-04",
-        "date": "2026-04-19",
-        "accountingMonth": "2026-04",
-        "amountCents": 82000,
+        "id": "inc-fixed-schedule-salary",
+        "date": "2026-05-01",
+        "accountingMonth": "2026-05",
+        "amountCents": 392000,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
-        "incomeKind": "variable",
-        "variableSourceType": "client",
-        "client": "Northwind Analytics",
-        "invoiceStatus": "paid",
-        "updatedAt": "2026-04-19T12:00:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "fixed",
+        "source": "FinGes Demo Studio GmbH",
+        "frequency": "monthly",
+        "payDay": 1,
+        "isRecurringSchedule": true,
+        "active": true,
+        "updatedAt": "2026-05-01T09:00:00.000Z"
+      },
+      {
+        "id": "inc-fixed-schedule-rent-room",
+        "date": "2026-05-05",
+        "accountingMonth": "2026-05",
+        "amountCents": 45000,
+        "currency": "EUR",
+        "bankAccountId": "bank-buffer-eur",
+        "incomeKind": "fixed",
+        "source": "Room contribution",
+        "frequency": "monthly",
+        "payDay": 5,
+        "isRecurringSchedule": true,
+        "active": true,
+        "updatedAt": "2026-05-05T09:00:00.000Z"
+      },
+      {
+        "id": "inc-sale-vwce-2026-04",
+        "date": "2026-04-21",
+        "accountingMonth": "2026-04",
+        "amountCents": 36450,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "portfolio_sale",
+        "source": "VWCE.DE sale proceeds",
+        "linkedSaleId": "sale-vwce-demo",
+        "updatedAt": "2026-04-21T11:00:00.000Z"
+      },
+      {
+        "id": "inc-div-aapl-2025-11",
+        "date": "2025-11-15",
+        "accountingMonth": "2025-11",
+        "amountCents": 1480,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "dividend",
+        "source": "AAPL dividend",
+        "assetTicker": "AAPL",
+        "updatedAt": "2025-11-15T09:00:00.000Z"
+      },
+      {
+        "id": "inc-div-msft-2026-03",
+        "date": "2026-03-13",
+        "accountingMonth": "2026-03",
+        "amountCents": 1140,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "incomeKind": "dividend",
+        "source": "MSFT dividend",
+        "assetTicker": "MSFT",
+        "updatedAt": "2026-03-13T09:00:00.000Z"
       },
       {
         "id": "inc-div-aapl-2026-04",
@@ -119,98 +476,1801 @@
         "accountingMonth": "2026-04",
         "amountCents": 1840,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "incomeKind": "dividend",
         "source": "AAPL dividend",
         "assetTicker": "AAPL",
         "updatedAt": "2026-04-25T09:00:00.000Z"
-      },
-      {
-        "id": "inc-salary-2026-04",
-        "date": "2026-04-01",
-        "accountingMonth": "2026-04",
-        "amountCents": 385000,
-        "currency": "EUR",
-        "bankAccountId": "bank-main",
-        "incomeKind": "fixed",
-        "source": "Demo Studio GmbH",
-        "frequency": "monthly",
-        "payDay": 1,
-        "updatedAt": "2026-04-01T07:15:00.000Z"
       }
     ],
     "expenses": [
+      {
+        "id": "exp-rent-2025-06",
+        "date": "2025-06-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-06",
+        "date": "2025-06-04",
+        "amountCents": 7500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-06",
+        "date": "2025-06-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-06",
+        "date": "2025-06-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-06",
+        "date": "2025-06-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-06",
+        "date": "2025-06-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-06",
+        "date": "2025-06-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-06",
+        "date": "2025-06-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-06",
+        "date": "2025-06-16",
+        "amountCents": 9500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-06",
+        "date": "2025-06-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-06",
+        "date": "2025-06-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-06",
+        "date": "2025-06-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-06-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-07",
+        "date": "2025-07-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-07",
+        "date": "2025-07-04",
+        "amountCents": 8400,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-07",
+        "date": "2025-07-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-07",
+        "date": "2025-07-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-07",
+        "date": "2025-07-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-07",
+        "date": "2025-07-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-07",
+        "date": "2025-07-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-07",
+        "date": "2025-07-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-07",
+        "date": "2025-07-16",
+        "amountCents": 11700,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-07",
+        "date": "2025-07-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-07",
+        "date": "2025-07-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-07",
+        "date": "2025-07-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-07-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-08",
+        "date": "2025-08-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-08",
+        "date": "2025-08-04",
+        "amountCents": 9300,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-08",
+        "date": "2025-08-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-08",
+        "date": "2025-08-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-08",
+        "date": "2025-08-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-08",
+        "date": "2025-08-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-08",
+        "date": "2025-08-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-08",
+        "date": "2025-08-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-08",
+        "date": "2025-08-16",
+        "amountCents": 13900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-08",
+        "date": "2025-08-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-08",
+        "date": "2025-08-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-08",
+        "date": "2025-08-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-08-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-09",
+        "date": "2025-09-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-09",
+        "date": "2025-09-04",
+        "amountCents": 10200,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-09",
+        "date": "2025-09-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-09",
+        "date": "2025-09-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-09",
+        "date": "2025-09-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-09",
+        "date": "2025-09-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-09",
+        "date": "2025-09-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-09",
+        "date": "2025-09-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-09",
+        "date": "2025-09-16",
+        "amountCents": 9500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-09",
+        "date": "2025-09-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-09",
+        "date": "2025-09-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-09",
+        "date": "2025-09-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-10",
+        "date": "2025-10-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-10",
+        "date": "2025-10-04",
+        "amountCents": 7500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-10",
+        "date": "2025-10-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-10",
+        "date": "2025-10-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-10",
+        "date": "2025-10-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-10",
+        "date": "2025-10-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-10",
+        "date": "2025-10-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-10",
+        "date": "2025-10-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-10",
+        "date": "2025-10-16",
+        "amountCents": 11700,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-10",
+        "date": "2025-10-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-10",
+        "date": "2025-10-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-10",
+        "date": "2025-10-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-10-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-11",
+        "date": "2025-11-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-11",
+        "date": "2025-11-04",
+        "amountCents": 8400,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-11",
+        "date": "2025-11-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-11",
+        "date": "2025-11-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-11",
+        "date": "2025-11-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-11",
+        "date": "2025-11-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-11",
+        "date": "2025-11-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-11",
+        "date": "2025-11-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-11",
+        "date": "2025-11-16",
+        "amountCents": 13900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-11",
+        "date": "2025-11-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-11",
+        "date": "2025-11-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-11",
+        "date": "2025-11-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-11-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2025-12",
+        "date": "2025-12-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2025-12",
+        "date": "2025-12-04",
+        "amountCents": 9300,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2025-12",
+        "date": "2025-12-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2025-12",
+        "date": "2025-12-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2025-12",
+        "date": "2025-12-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2025-12",
+        "date": "2025-12-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2025-12",
+        "date": "2025-12-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2025-12",
+        "date": "2025-12-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2025-12",
+        "date": "2025-12-16",
+        "amountCents": 9500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2025-12",
+        "date": "2025-12-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2025-12",
+        "date": "2025-12-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2025-12",
+        "date": "2025-12-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2026-01",
+        "date": "2026-01-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2026-01",
+        "date": "2026-01-04",
+        "amountCents": 10200,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2026-01",
+        "date": "2026-01-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2026-01",
+        "date": "2026-01-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2026-01",
+        "date": "2026-01-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2026-01",
+        "date": "2026-01-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2026-01",
+        "date": "2026-01-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2026-01",
+        "date": "2026-01-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2026-01",
+        "date": "2026-01-16",
+        "amountCents": 11700,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2026-01",
+        "date": "2026-01-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2026-01",
+        "date": "2026-01-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2026-01",
+        "date": "2026-01-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-01-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2026-02",
+        "date": "2026-02-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2026-02",
+        "date": "2026-02-04",
+        "amountCents": 7500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2026-02",
+        "date": "2026-02-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2026-02",
+        "date": "2026-02-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2026-02",
+        "date": "2026-02-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2026-02",
+        "date": "2026-02-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2026-02",
+        "date": "2026-02-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2026-02",
+        "date": "2026-02-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2026-02",
+        "date": "2026-02-16",
+        "amountCents": 13900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2026-02",
+        "date": "2026-02-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2026-02",
+        "date": "2026-02-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2026-02",
+        "date": "2026-02-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-02-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2026-03",
+        "date": "2026-03-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2026-03",
+        "date": "2026-03-04",
+        "amountCents": 8400,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2026-03",
+        "date": "2026-03-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2026-03",
+        "date": "2026-03-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2026-03",
+        "date": "2026-03-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2026-03",
+        "date": "2026-03-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2026-03",
+        "date": "2026-03-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2026-03",
+        "date": "2026-03-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2026-03",
+        "date": "2026-03-16",
+        "amountCents": 9500,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2026-03",
+        "date": "2026-03-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2026-03",
+        "date": "2026-03-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2026-03",
+        "date": "2026-03-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-rent-2026-04",
+        "date": "2026-04-02",
+        "amountCents": 128000,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Housing",
+        "description": "Apartment rent",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-02T10:30:00.000Z"
+      },
+      {
+        "id": "exp-groceries-2026-04",
+        "date": "2026-04-04",
+        "amountCents": 9300,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Groceries",
+        "description": "Weekly groceries",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-04T10:30:00.000Z"
+      },
+      {
+        "id": "exp-transport-2026-04",
+        "date": "2026-04-05",
+        "amountCents": 4900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Transport",
+        "description": "Monthly transit pass",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-05T10:30:00.000Z"
+      },
+      {
+        "id": "exp-coffee-2026-04",
+        "date": "2026-04-08",
+        "amountCents": 1600,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-08T10:30:00.000Z"
+      },
+      {
+        "id": "exp-utilities-2026-04",
+        "date": "2026-04-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2026-04",
+        "date": "2026-04-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2026-04",
+        "date": "2026-04-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2026-04",
+        "date": "2026-04-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2026-04",
+        "date": "2026-04-16",
+        "amountCents": 11700,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2026-04",
+        "date": "2026-04-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2026-04",
+        "date": "2026-04-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2026-04",
+        "date": "2026-04-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-04-24T10:30:00.000Z"
+      },
       {
         "id": "exp-rent-2026-05",
         "date": "2026-05-02",
         "amountCents": 128000,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-rent-eur",
         "category": "Housing",
         "description": "Apartment rent",
         "isRecurring": true,
         "linkedDebtId": null,
-        "updatedAt": "2026-05-02T08:30:00.000Z"
+        "updatedAt": "2026-05-02T10:30:00.000Z"
       },
       {
-        "id": "exp-groceries-2026-05-01",
-        "date": "2026-05-01",
-        "amountCents": 6845,
+        "id": "exp-groceries-2026-05",
+        "date": "2026-05-04",
+        "amountCents": 10200,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "category": "Groceries",
         "description": "Weekly groceries",
         "isRecurring": false,
         "linkedDebtId": null,
-        "updatedAt": "2026-05-01T18:22:00.000Z"
+        "updatedAt": "2026-05-04T10:30:00.000Z"
       },
       {
-        "id": "exp-dinner-2026-04-28",
-        "date": "2026-04-28",
-        "amountCents": 4630,
+        "id": "exp-transport-2026-05",
+        "date": "2026-05-05",
+        "amountCents": 4900,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
-        "category": "Restaurants",
-        "description": "Dinner with friends",
-        "isRecurring": false,
-        "linkedDebtId": null,
-        "updatedAt": "2026-04-28T21:10:00.000Z"
-      },
-      {
-        "id": "exp-train-2026-04-22",
-        "date": "2026-04-22",
-        "amountCents": 1190,
-        "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "category": "Transport",
-        "description": "City train pass",
+        "description": "Monthly transit pass",
         "isRecurring": false,
         "linkedDebtId": null,
-        "updatedAt": "2026-04-22T07:40:00.000Z"
+        "updatedAt": "2026-05-05T10:30:00.000Z"
       },
       {
-        "id": "exp-course-2026-04-12",
-        "date": "2026-04-12",
-        "amountCents": 12900,
+        "id": "exp-coffee-2026-05",
+        "date": "2026-05-08",
+        "amountCents": 1600,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
-        "category": "Education",
-        "description": "React performance workshop",
+        "bankAccountId": "bank-main-eur",
+        "category": "Restaurants",
+        "description": "Coffee and snacks",
         "isRecurring": false,
         "linkedDebtId": null,
-        "updatedAt": "2026-04-12T16:00:00.000Z"
+        "updatedAt": "2026-05-08T10:30:00.000Z"
       },
       {
-        "id": "exp-card-payment-2026-04",
+        "id": "exp-utilities-2026-05",
+        "date": "2026-05-06",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Electricity + gas",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-06T10:30:00.000Z"
+      },
+      {
+        "id": "exp-gym-2026-05",
+        "date": "2026-05-07",
+        "amountCents": 3490,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Gym membership",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-07T10:30:00.000Z"
+      },
+      {
+        "id": "exp-internet-2026-05",
+        "date": "2026-05-09",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "category": "Utilities",
+        "description": "Fiber internet",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-09T10:30:00.000Z"
+      },
+      {
+        "id": "exp-streaming-2026-05",
+        "date": "2026-05-14",
+        "amountCents": 2298,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Subscriptions",
+        "description": "Streaming bundle",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-14T10:30:00.000Z"
+      },
+      {
+        "id": "exp-shopping-2026-05",
+        "date": "2026-05-16",
+        "amountCents": 13900,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Shopping",
+        "description": "Clothes / household",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-16T10:30:00.000Z"
+      },
+      {
+        "id": "exp-insurance-2026-05",
+        "date": "2026-05-18",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Insurance",
+        "description": "Insurance",
+        "isRecurring": true,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-18T10:30:00.000Z"
+      },
+      {
+        "id": "exp-education-2026-05",
+        "date": "2026-05-20",
+        "amountCents": 5800,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Books and courses",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-20T10:30:00.000Z"
+      },
+      {
+        "id": "exp-health-2026-05",
+        "date": "2026-05-24",
+        "amountCents": 4100,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Health",
+        "description": "Pharmacy / checkup",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-05-24T10:30:00.000Z"
+      },
+      {
+        "id": "exp-travel-lisbon-2025-09",
+        "date": "2025-09-12",
+        "amountCents": 64000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Travel",
+        "description": "Lisbon flights and hotel deposit",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-09-12T09:00:00.000Z"
+      },
+      {
+        "id": "exp-gift-2025-12",
+        "date": "2025-12-19",
+        "amountCents": 21000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Gifts",
+        "description": "Holiday gifts",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2025-12-19T09:00:00.000Z"
+      },
+      {
+        "id": "exp-tax-2026-03",
+        "date": "2026-03-30",
+        "amountCents": 38000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Taxes",
+        "description": "Quarterly tax prepayment",
+        "isRecurring": false,
+        "linkedDebtId": null,
+        "updatedAt": "2026-03-30T09:00:00.000Z"
+      },
+      {
+        "id": "exp-visa-payment-2026-04",
         "date": "2026-04-15",
         "amountCents": 25000,
         "currency": "EUR",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "category": "Other",
-        "description": "Credit card repayment",
+        "description": "Visa card repayment",
         "isRecurring": false,
         "linkedDebtId": "debt-visa",
-        "updatedAt": "2026-04-15T10:30:00.000Z"
+        "updatedAt": "2026-04-15T09:00:00.000Z"
+      },
+      {
+        "id": "exp-student-payment-2026-05",
+        "date": "2026-05-06",
+        "amountCents": 18000,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "category": "Education",
+        "description": "Student loan payment",
+        "isRecurring": false,
+        "linkedDebtId": "debt-student",
+        "updatedAt": "2026-05-06T09:00:00.000Z"
       }
     ],
     "fixedExpenses": [
@@ -219,36 +2279,869 @@
         "name": "Apartment rent",
         "amountCents": 128000,
         "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
         "chargeDay": 2,
         "category": "Housing",
         "active": true,
         "alerts": true,
-        "updatedAt": "2026-04-01T08:00:00.000Z"
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-electricity",
+        "name": "Electricity + gas",
+        "amountCents": 8650,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "chargeDay": 6,
+        "category": "Utilities",
+        "active": true,
+        "alerts": true,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-internet",
+        "name": "Fiber internet",
+        "amountCents": 3999,
+        "currency": "EUR",
+        "bankAccountId": "bank-rent-eur",
+        "chargeDay": 9,
+        "category": "Utilities",
+        "active": true,
+        "alerts": false,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
       },
       {
         "id": "fix-gym",
         "name": "Gym membership",
         "amountCents": 3490,
         "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
         "chargeDay": 7,
         "category": "Health",
         "active": true,
         "alerts": true,
-        "updatedAt": "2026-04-01T08:00:00.000Z"
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-phone",
+        "name": "Mobile plan",
+        "amountCents": 1899,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "chargeDay": 11,
+        "category": "Subscriptions",
+        "active": true,
+        "alerts": false,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
       },
       {
         "id": "fix-streaming",
         "name": "Streaming bundle",
-        "amountCents": 1998,
+        "amountCents": 2298,
         "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
         "chargeDay": 14,
         "category": "Subscriptions",
         "active": true,
         "alerts": false,
-        "updatedAt": "2026-04-01T08:00:00.000Z"
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-insurance",
+        "name": "Personal liability insurance",
+        "amountCents": 1250,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "chargeDay": 18,
+        "category": "Insurance",
+        "active": true,
+        "alerts": true,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
+      },
+      {
+        "id": "fix-storage",
+        "name": "Cloud storage",
+        "amountCents": 999,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "chargeDay": 23,
+        "category": "Subscriptions",
+        "active": false,
+        "alerts": false,
+        "updatedAt": "2026-05-01T08:00:00.000Z"
       }
     ],
     "budgets": [
+      {
+        "id": "bud-housing-2025-06",
+        "month": "2025-06",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-06",
+        "month": "2025-06",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-06",
+        "month": "2025-06",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-06",
+        "month": "2025-06",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-06",
+        "month": "2025-06",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-06",
+        "month": "2025-06",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-06",
+        "month": "2025-06",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-06",
+        "month": "2025-06",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-06",
+        "month": "2025-06",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-06",
+        "month": "2025-06",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-06-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-07",
+        "month": "2025-07",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-07",
+        "month": "2025-07",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-07",
+        "month": "2025-07",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-07",
+        "month": "2025-07",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-07",
+        "month": "2025-07",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-07",
+        "month": "2025-07",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-07",
+        "month": "2025-07",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-07",
+        "month": "2025-07",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-07",
+        "month": "2025-07",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-07",
+        "month": "2025-07",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-07-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-08",
+        "month": "2025-08",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-08",
+        "month": "2025-08",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-08",
+        "month": "2025-08",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-08",
+        "month": "2025-08",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-08",
+        "month": "2025-08",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-08",
+        "month": "2025-08",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-08",
+        "month": "2025-08",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-08",
+        "month": "2025-08",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-08",
+        "month": "2025-08",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-08",
+        "month": "2025-08",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-08-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-09",
+        "month": "2025-09",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-09",
+        "month": "2025-09",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-09",
+        "month": "2025-09",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-09",
+        "month": "2025-09",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-09",
+        "month": "2025-09",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-09",
+        "month": "2025-09",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-09",
+        "month": "2025-09",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-09",
+        "month": "2025-09",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-09",
+        "month": "2025-09",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-09",
+        "month": "2025-09",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-09-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-10",
+        "month": "2025-10",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-10",
+        "month": "2025-10",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-10",
+        "month": "2025-10",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-10",
+        "month": "2025-10",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-10",
+        "month": "2025-10",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-10",
+        "month": "2025-10",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-10",
+        "month": "2025-10",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-10",
+        "month": "2025-10",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-10",
+        "month": "2025-10",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-10",
+        "month": "2025-10",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-10-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-11",
+        "month": "2025-11",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-11",
+        "month": "2025-11",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-11",
+        "month": "2025-11",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-11",
+        "month": "2025-11",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-11",
+        "month": "2025-11",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-11",
+        "month": "2025-11",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-11",
+        "month": "2025-11",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-11",
+        "month": "2025-11",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-11",
+        "month": "2025-11",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-11",
+        "month": "2025-11",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-11-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2025-12",
+        "month": "2025-12",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2025-12",
+        "month": "2025-12",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2025-12",
+        "month": "2025-12",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2025-12",
+        "month": "2025-12",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2025-12",
+        "month": "2025-12",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2025-12",
+        "month": "2025-12",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2025-12",
+        "month": "2025-12",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2025-12",
+        "month": "2025-12",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2025-12",
+        "month": "2025-12",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2025-12",
+        "month": "2025-12",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2025-12-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2026-01",
+        "month": "2026-01",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2026-01",
+        "month": "2026-01",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2026-01",
+        "month": "2026-01",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2026-01",
+        "month": "2026-01",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2026-01",
+        "month": "2026-01",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2026-01",
+        "month": "2026-01",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2026-01",
+        "month": "2026-01",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2026-01",
+        "month": "2026-01",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2026-01",
+        "month": "2026-01",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2026-01",
+        "month": "2026-01",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2026-01-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2026-02",
+        "month": "2026-02",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2026-02",
+        "month": "2026-02",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2026-02",
+        "month": "2026-02",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2026-02",
+        "month": "2026-02",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2026-02",
+        "month": "2026-02",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2026-02",
+        "month": "2026-02",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2026-02",
+        "month": "2026-02",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2026-02",
+        "month": "2026-02",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2026-02",
+        "month": "2026-02",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2026-02",
+        "month": "2026-02",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2026-02-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2026-03",
+        "month": "2026-03",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2026-03",
+        "month": "2026-03",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2026-03",
+        "month": "2026-03",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2026-03",
+        "month": "2026-03",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2026-03",
+        "month": "2026-03",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2026-03",
+        "month": "2026-03",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2026-03",
+        "month": "2026-03",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2026-03",
+        "month": "2026-03",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2026-03",
+        "month": "2026-03",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2026-03",
+        "month": "2026-03",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2026-03-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-housing-2026-04",
+        "month": "2026-04",
+        "category": "Housing",
+        "amountCents": 135000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-utilities-2026-04",
+        "month": "2026-04",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2026-04",
+        "month": "2026-04",
+        "category": "Groceries",
+        "amountCents": 42000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-restaurants-2026-04",
+        "month": "2026-04",
+        "category": "Restaurants",
+        "amountCents": 22000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-transport-2026-04",
+        "month": "2026-04",
+        "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2026-04",
+        "month": "2026-04",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2026-04",
+        "month": "2026-04",
+        "category": "Subscriptions",
+        "amountCents": 9000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2026-04",
+        "month": "2026-04",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2026-04",
+        "month": "2026-04",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2026-04",
+        "month": "2026-04",
+        "category": "Education",
+        "amountCents": 12000,
+        "updatedAt": "2026-04-01T06:00:00.000Z"
+      },
       {
         "id": "bud-housing-2026-05",
         "month": "2026-05",
@@ -257,78 +3150,542 @@
         "updatedAt": "2026-05-01T06:00:00.000Z"
       },
       {
-        "id": "bud-food-2026-05",
+        "id": "bud-utilities-2026-05",
+        "month": "2026-05",
+        "category": "Utilities",
+        "amountCents": 18000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-groceries-2026-05",
         "month": "2026-05",
         "category": "Groceries",
-        "amountCents": 36000,
+        "amountCents": 42000,
         "updatedAt": "2026-05-01T06:00:00.000Z"
       },
       {
         "id": "bud-restaurants-2026-05",
         "month": "2026-05",
         "category": "Restaurants",
-        "amountCents": 18000,
+        "amountCents": 22000,
         "updatedAt": "2026-05-01T06:00:00.000Z"
       },
       {
         "id": "bud-transport-2026-05",
         "month": "2026-05",
         "category": "Transport",
+        "amountCents": 9500,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-health-2026-05",
+        "month": "2026-05",
+        "category": "Health",
+        "amountCents": 14000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-subscriptions-2026-05",
+        "month": "2026-05",
+        "category": "Subscriptions",
         "amountCents": 9000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-shopping-2026-05",
+        "month": "2026-05",
+        "category": "Shopping",
+        "amountCents": 26000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-travel-2026-05",
+        "month": "2026-05",
+        "category": "Travel",
+        "amountCents": 30000,
+        "updatedAt": "2026-05-01T06:00:00.000Z"
+      },
+      {
+        "id": "bud-education-2026-05",
+        "month": "2026-05",
+        "category": "Education",
+        "amountCents": 12000,
         "updatedAt": "2026-05-01T06:00:00.000Z"
       }
     ],
     "rollovers": [
       {
+        "id": "rol-groceries-2025-07",
+        "month": "2025-07",
+        "category": "Groceries",
+        "amountCents": 2200,
+        "updatedAt": "2025-07-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-07",
+        "month": "2025-07",
+        "category": "Restaurants",
+        "amountCents": -1500,
+        "updatedAt": "2025-07-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2025-08",
+        "month": "2025-08",
+        "category": "Groceries",
+        "amountCents": -1800,
+        "updatedAt": "2025-08-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-08",
+        "month": "2025-08",
+        "category": "Restaurants",
+        "amountCents": 4000,
+        "updatedAt": "2025-08-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2025-09",
+        "month": "2025-09",
+        "category": "Groceries",
+        "amountCents": 3500,
+        "updatedAt": "2025-09-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-09",
+        "month": "2025-09",
+        "category": "Restaurants",
+        "amountCents": -3800,
+        "updatedAt": "2025-09-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2025-10",
+        "month": "2025-10",
+        "category": "Groceries",
+        "amountCents": -4200,
+        "updatedAt": "2025-10-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-10",
+        "month": "2025-10",
+        "category": "Restaurants",
+        "amountCents": 1200,
+        "updatedAt": "2025-10-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2025-11",
+        "month": "2025-11",
+        "category": "Groceries",
+        "amountCents": 1600,
+        "updatedAt": "2025-11-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-11",
+        "month": "2025-11",
+        "category": "Restaurants",
+        "amountCents": -2200,
+        "updatedAt": "2025-11-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2025-12",
+        "month": "2025-12",
+        "category": "Groceries",
+        "amountCents": 800,
+        "updatedAt": "2025-12-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2025-12",
+        "month": "2025-12",
+        "category": "Restaurants",
+        "amountCents": 3000,
+        "updatedAt": "2025-12-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2026-01",
+        "month": "2026-01",
+        "category": "Groceries",
+        "amountCents": -2500,
+        "updatedAt": "2026-01-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2026-01",
+        "month": "2026-01",
+        "category": "Restaurants",
+        "amountCents": 1800,
+        "updatedAt": "2026-01-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2026-02",
+        "month": "2026-02",
+        "category": "Groceries",
+        "amountCents": 3100,
+        "updatedAt": "2026-02-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2026-02",
+        "month": "2026-02",
+        "category": "Restaurants",
+        "amountCents": -4400,
+        "updatedAt": "2026-02-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2026-03",
+        "month": "2026-03",
+        "category": "Groceries",
+        "amountCents": -1200,
+        "updatedAt": "2026-03-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2026-03",
+        "month": "2026-03",
+        "category": "Restaurants",
+        "amountCents": 2500,
+        "updatedAt": "2026-03-01T06:05:00.000Z"
+      },
+      {
         "id": "rol-groceries-2026-04",
         "month": "2026-04",
         "category": "Groceries",
-        "amountCents": 4220,
-        "updatedAt": "2026-05-01T06:05:00.000Z"
+        "amountCents": 2700,
+        "updatedAt": "2026-04-01T06:05:00.000Z"
       },
       {
         "id": "rol-restaurants-2026-04",
         "month": "2026-04",
         "category": "Restaurants",
-        "amountCents": -3850,
+        "amountCents": -1000,
+        "updatedAt": "2026-04-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-groceries-2026-05",
+        "month": "2026-05",
+        "category": "Groceries",
+        "amountCents": 1400,
+        "updatedAt": "2026-05-01T06:05:00.000Z"
+      },
+      {
+        "id": "rol-restaurants-2026-05",
+        "month": "2026-05",
+        "category": "Restaurants",
+        "amountCents": 900,
         "updatedAt": "2026-05-01T06:05:00.000Z"
       }
     ],
     "savings": [
       {
         "id": "savings-config",
-        "currentBalanceCents": 950000,
+        "currentBalanceCents": 820000,
         "monthlyOverrideCents": 65000,
         "annualReturnRate": 4.5,
-        "goalCents": 2500000,
-        "projectionYears": 8,
+        "goalCents": 3000000,
+        "projectionYears": 12,
         "updatedAt": "2026-05-01T08:00:00.000Z"
       }
     ],
     "savingsEntries": [
       {
-        "id": "sav-2026-05",
-        "date": "2026-05-01",
-        "amountCents": 65000,
+        "id": "sav-monthly-2025-06",
+        "date": "2025-06-01",
+        "accountingMonth": "2025-06",
+        "amountCents": 60000,
         "source": "monthly",
         "note": "Automatic monthly contribution",
-        "updatedAt": "2026-05-01T08:05:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-06-01T08:05:00.000Z"
       },
       {
-        "id": "sav-2026-04",
-        "date": "2026-04-01",
+        "id": "sav-emergency-2025-06",
+        "date": "2025-06-03",
+        "accountingMonth": "2025-06",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-06-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-07",
+        "date": "2025-07-01",
+        "accountingMonth": "2025-07",
+        "amountCents": 60000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-07-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-07",
+        "date": "2025-07-03",
+        "accountingMonth": "2025-07",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-07-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-japan-2025-07",
+        "date": "2025-07-12",
+        "accountingMonth": "2025-07",
+        "amountCents": 22000,
+        "source": "bonus",
+        "goalId": "goal-japan",
+        "note": "Travel bucket top-up",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-07-12T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-08",
+        "date": "2025-08-01",
+        "accountingMonth": "2025-08",
+        "amountCents": 60000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-08-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-08",
+        "date": "2025-08-03",
+        "accountingMonth": "2025-08",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-08-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-09",
+        "date": "2025-09-01",
+        "accountingMonth": "2025-09",
+        "amountCents": 60000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-09-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-09",
+        "date": "2025-09-03",
+        "accountingMonth": "2025-09",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-09-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-10",
+        "date": "2025-10-01",
+        "accountingMonth": "2025-10",
+        "amountCents": 60000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-10-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-10",
+        "date": "2025-10-03",
+        "accountingMonth": "2025-10",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-10-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-japan-2025-10",
+        "date": "2025-10-12",
+        "accountingMonth": "2025-10",
+        "amountCents": 22000,
+        "source": "bonus",
+        "goalId": "goal-japan",
+        "note": "Travel bucket top-up",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-10-12T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-11",
+        "date": "2025-11-01",
+        "accountingMonth": "2025-11",
+        "amountCents": 60000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-11-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-11",
+        "date": "2025-11-03",
+        "accountingMonth": "2025-11",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-11-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2025-12",
+        "date": "2025-12-01",
+        "accountingMonth": "2025-12",
         "amountCents": 65000,
         "source": "monthly",
         "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2025-12-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2025-12",
+        "date": "2025-12-03",
+        "accountingMonth": "2025-12",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2025-12-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2026-01",
+        "date": "2026-01-01",
+        "accountingMonth": "2026-01",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-01-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2026-01",
+        "date": "2026-01-03",
+        "accountingMonth": "2026-01",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2026-01-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-japan-2026-01",
+        "date": "2026-01-12",
+        "accountingMonth": "2026-01",
+        "amountCents": 22000,
+        "source": "bonus",
+        "goalId": "goal-japan",
+        "note": "Travel bucket top-up",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-01-12T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2026-02",
+        "date": "2026-02-01",
+        "accountingMonth": "2026-02",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-02-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2026-02",
+        "date": "2026-02-03",
+        "accountingMonth": "2026-02",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2026-02-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2026-03",
+        "date": "2026-03-01",
+        "accountingMonth": "2026-03",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-03-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2026-03",
+        "date": "2026-03-03",
+        "accountingMonth": "2026-03",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2026-03-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2026-04",
+        "date": "2026-04-01",
+        "accountingMonth": "2026-04",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
         "updatedAt": "2026-04-01T08:05:00.000Z"
       },
       {
-        "id": "sav-bonus-2026-04",
-        "date": "2026-04-20",
-        "amountCents": 30000,
+        "id": "sav-emergency-2026-04",
+        "date": "2026-04-03",
+        "accountingMonth": "2026-04",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2026-04-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-japan-2026-04",
+        "date": "2026-04-12",
+        "accountingMonth": "2026-04",
+        "amountCents": 22000,
         "source": "bonus",
-        "note": "Freelance surplus",
-        "updatedAt": "2026-04-20T10:00:00.000Z"
+        "goalId": "goal-japan",
+        "note": "Travel bucket top-up",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-04-12T08:05:00.000Z"
+      },
+      {
+        "id": "sav-monthly-2026-05",
+        "date": "2026-05-01",
+        "accountingMonth": "2026-05",
+        "amountCents": 65000,
+        "source": "monthly",
+        "note": "Automatic monthly contribution",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-05-01T08:05:00.000Z"
+      },
+      {
+        "id": "sav-emergency-2026-05",
+        "date": "2026-05-03",
+        "accountingMonth": "2026-05",
+        "amountCents": 18000,
+        "source": "allocation",
+        "goalId": "goal-emergency",
+        "note": "Bucket allocation",
+        "updatedAt": "2026-05-03T08:05:00.000Z"
+      },
+      {
+        "id": "sav-laptop-withdrawal-2026-02",
+        "date": "2026-02-10",
+        "accountingMonth": "2026-02",
+        "amountCents": -42000,
+        "source": "withdrawal",
+        "kind": "expense",
+        "goalId": "goal-laptop",
+        "note": "Laptop repair paid from bucket",
+        "updatedAt": "2026-02-10T09:00:00.000Z"
+      },
+      {
+        "id": "sav-portfolio-buy-2026-04",
+        "date": "2026-04-05",
+        "accountingMonth": "2026-04",
+        "amountCents": -50000,
+        "source": "savings",
+        "kind": "portfolio_buy",
+        "linkedCashflowId": "pcf-msft-2026-04",
+        "note": "Invested from savings",
+        "updatedAt": "2026-04-05T09:00:00.000Z"
       }
     ],
     "savingsGoals": [
@@ -336,188 +3693,384 @@
         "id": "goal-emergency",
         "name": "Emergency fund",
         "targetCents": 1200000,
-        "currentCents": 820000,
-        "color": "#7A9CC6",
-        "updatedAt": "2026-05-01T08:00:00.000Z"
+        "createdAt": "2025-06-01T09:00:00.000Z",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
       },
       {
-        "id": "goal-travel",
+        "id": "goal-japan",
         "name": "Japan trip",
-        "targetCents": 450000,
-        "currentCents": 130000,
-        "color": "#C9A96E",
-        "updatedAt": "2026-05-01T08:00:00.000Z"
+        "targetCents": 520000,
+        "createdAt": "2025-07-01T09:00:00.000Z",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
       },
       {
-        "id": "goal-house",
+        "id": "goal-home",
         "name": "Future down payment",
-        "targetCents": 2000000,
-        "currentCents": 0,
-        "color": "#8FB97E",
-        "updatedAt": "2026-05-01T08:00:00.000Z"
+        "targetCents": 4500000,
+        "createdAt": "2025-08-01T09:00:00.000Z",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
+      },
+      {
+        "id": "goal-laptop",
+        "name": "Laptop replacement",
+        "targetCents": 240000,
+        "createdAt": "2026-01-01T09:00:00.000Z",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
       }
     ],
     "debts": [
       {
         "id": "debt-visa",
         "name": "Visa card",
-        "originalBalanceCents": 185000,
-        "currentBalanceCents": 122500,
-        "interestRate": 17.9,
-        "minimumPaymentCents": 9000,
-        "dueDay": 15,
-        "updatedAt": "2026-04-15T10:30:00.000Z"
+        "lender": "Santander",
+        "type": "credit_card",
+        "originalAmountCents": 185000,
+        "currentBalanceCents": 97500,
+        "interestRatePercent": 17.9,
+        "monthlyPaymentCents": 12000,
+        "startDate": "2025-11-15",
+        "endDate": null,
+        "currency": "EUR",
+        "notes": "Test linked repayments from expenses.",
+        "createdAt": "2025-11-15T09:00:00.000Z",
+        "updatedAt": "2026-05-06T09:00:00.000Z"
       },
       {
         "id": "debt-student",
         "name": "Student loan",
-        "originalBalanceCents": 820000,
-        "currentBalanceCents": 654000,
-        "interestRate": 3.2,
-        "minimumPaymentCents": 18000,
-        "dueDay": 28,
-        "updatedAt": "2026-04-28T08:00:00.000Z"
+        "lender": "Government loan",
+        "type": "student_loan",
+        "originalAmountCents": 820000,
+        "currentBalanceCents": 632000,
+        "interestRatePercent": 3.2,
+        "monthlyPaymentCents": 18000,
+        "startDate": "2022-09-01",
+        "endDate": "2030-09-01",
+        "currency": "EUR",
+        "notes": "Long-term low-rate debt.",
+        "createdAt": "2025-06-01T09:00:00.000Z",
+        "updatedAt": "2026-05-06T09:00:00.000Z"
+      },
+      {
+        "id": "debt-bike",
+        "name": "E-bike financing",
+        "lender": "Local bike shop",
+        "type": "loan",
+        "originalAmountCents": 240000,
+        "currentBalanceCents": 144000,
+        "interestRatePercent": 5.4,
+        "monthlyPaymentCents": 16000,
+        "startDate": "2025-08-01",
+        "endDate": "2026-11-01",
+        "currency": "EUR",
+        "notes": "Installment loan with fixed end date.",
+        "createdAt": "2025-08-01T09:00:00.000Z",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
+      }
+    ],
+    "investmentPortfolios": [
+      {
+        "id": "ipr-core",
+        "name": "Core ETF",
+        "description": "Long-term globally diversified portfolio.",
+        "color": "#2563eb",
+        "createdAt": "2025-06-01T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "ipr-growth",
+        "name": "Growth Stocks",
+        "description": "Satellite individual stocks.",
+        "color": "#16a34a",
+        "createdAt": "2025-07-01T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "ipr-crypto",
+        "name": "Crypto",
+        "description": "High-volatility crypto sleeve.",
+        "color": "#f97316",
+        "createdAt": "2025-09-01T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       }
     ],
     "holdings": [
       {
-        "id": "hold-vwce-1",
+        "id": "hold-vwce-core-1",
+        "portfolioId": "ipr-core",
         "ticker": "VWCE.DE",
         "name": "Vanguard FTSE All-World UCITS ETF",
         "platform": "Trade Republic",
-        "quantity": 18.426,
+        "quantity": 23.426,
         "quantityDecimals": 3,
         "averageBuyPriceCents": 10380,
         "currentPriceCents": 11940,
         "feeCents": 100,
         "currency": "EUR",
         "feeCurrency": "EUR",
-        "bankAccountId": "bank-main",
-        "createdAt": "2026-03-04T09:00:00.000Z",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "purchaseDate": "2025-06-10",
+        "createdAt": "2025-06-10T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "hold-vwce-2",
-        "ticker": "VWCE.DE",
-        "name": "Vanguard FTSE All-World UCITS ETF",
-        "platform": "Trade Republic",
-        "quantity": 7.125,
+        "id": "hold-euna-core",
+        "portfolioId": "ipr-core",
+        "ticker": "EUNA.DE",
+        "name": "iShares Core Global Aggregate Bond UCITS ETF",
+        "platform": "DEGIRO",
+        "quantity": 18.2,
         "quantityDecimals": 3,
-        "averageBuyPriceCents": 11220,
-        "currentPriceCents": 11940,
-        "feeCents": 100,
+        "averageBuyPriceCents": 4820,
+        "currentPriceCents": 5010,
+        "feeCents": 250,
         "currency": "EUR",
         "feeCurrency": "EUR",
-        "bankAccountId": "bank-main",
-        "createdAt": "2026-04-05T09:00:00.000Z",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "purchaseDate": "2025-07-12",
+        "createdAt": "2025-07-12T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "hold-aapl",
+        "id": "hold-aapl-growth",
+        "portfolioId": "ipr-growth",
         "ticker": "AAPL",
         "name": "Apple Inc.",
         "platform": "IBKR",
-        "quantity": 6,
+        "quantity": 8,
         "quantityDecimals": 0,
         "averageBuyPriceCents": 17230,
         "currentPriceCents": 19480,
         "feeCents": 135,
         "currency": "USD",
         "feeCurrency": "USD",
-        "bankAccountId": "bank-usd",
-        "createdAt": "2026-02-14T14:30:00.000Z",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "bankAccountId": "bank-wise-usd",
+        "purchaseDate": "2025-08-14",
+        "createdAt": "2025-08-14T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "hold-msft",
+        "id": "hold-msft-growth",
+        "portfolioId": "ipr-growth",
         "ticker": "MSFT",
         "name": "Microsoft Corporation",
         "platform": "IBKR",
-        "quantity": 3.5,
-        "quantityDecimals": 1,
+        "quantity": 4.5,
+        "quantityDecimals": 2,
         "averageBuyPriceCents": 38200,
         "currentPriceCents": 42150,
         "feeCents": 120,
         "currency": "USD",
         "feeCurrency": "USD",
-        "bankAccountId": "bank-usd",
-        "createdAt": "2026-03-18T14:30:00.000Z",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "bankAccountId": "bank-wise-usd",
+        "purchaseDate": "2026-04-05",
+        "createdAt": "2026-04-05T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
       },
       {
-        "id": "hold-btc",
+        "id": "hold-btc-crypto",
+        "portfolioId": "ipr-crypto",
         "ticker": "BTC/EUR",
         "name": "Bitcoin",
         "platform": "Revolut",
-        "quantity": 0.0185,
+        "quantity": 0.0285,
         "quantityDecimals": 8,
         "averageBuyPriceCents": 6250000,
         "currentPriceCents": 7120000,
         "feeCents": 320,
         "currency": "EUR",
         "feeCurrency": "EUR",
-        "bankAccountId": "bank-emergency",
-        "createdAt": "2026-01-10T11:00:00.000Z",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "bankAccountId": "bank-buffer-eur",
+        "purchaseDate": "2025-09-20",
+        "createdAt": "2025-09-20T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "hold-eth-crypto",
+        "portfolioId": "ipr-crypto",
+        "ticker": "ETH/EUR",
+        "name": "Ethereum",
+        "platform": "Revolut",
+        "quantity": 0.84,
+        "quantityDecimals": 6,
+        "averageBuyPriceCents": 285000,
+        "currentPriceCents": 318000,
+        "feeCents": 280,
+        "currency": "EUR",
+        "feeCurrency": "EUR",
+        "bankAccountId": "bank-buffer-eur",
+        "purchaseDate": "2025-10-15",
+        "createdAt": "2025-10-15T09:00:00.000Z",
+        "updatedAt": "2026-05-08T09:00:00.000Z"
+      },
+      {
+        "id": "hold-vwce-sold-demo",
+        "portfolioId": "ipr-core",
+        "ticker": "VWCE.DE",
+        "name": "Vanguard FTSE All-World UCITS ETF",
+        "platform": "Trade Republic",
+        "quantity": 0,
+        "quantityDecimals": 3,
+        "averageBuyPriceCents": 10400,
+        "currentPriceCents": 12180,
+        "feeCents": 100,
+        "currency": "EUR",
+        "feeCurrency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "purchaseDate": "2025-06-10",
+        "archivedAt": "2026-04-21T11:00:00.000Z",
+        "createdAt": "2025-06-10T09:00:00.000Z",
+        "updatedAt": "2026-04-21T11:00:00.000Z"
       }
     ],
     "dividends": [
       {
-        "id": "div-aapl-2026-04",
-        "date": "2026-04-25",
-        "ticker": "AAPL",
-        "amountCents": 1840,
-        "currency": "EUR",
-        "linkedIncomeId": "inc-div-aapl-2026-04",
-        "updatedAt": "2026-04-25T09:00:00.000Z"
-      },
-      {
-        "id": "div-vwce-2026-03",
-        "date": "2026-03-29",
+        "id": "div-vwce-2025-09",
+        "portfolioId": "ipr-core",
+        "date": "2025-09-29",
+        "accountingMonth": "2025-09",
         "ticker": "VWCE.DE",
         "amountCents": 920,
         "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
         "linkedIncomeId": null,
-        "updatedAt": "2026-03-29T09:00:00.000Z"
+        "updatedAt": "2025-09-29T09:00:00.000Z"
+      },
+      {
+        "id": "div-aapl-2025-11",
+        "portfolioId": "ipr-growth",
+        "date": "2025-11-15",
+        "accountingMonth": "2025-11",
+        "ticker": "AAPL",
+        "amountCents": 1480,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "linkedIncomeId": "inc-div-aapl-2025-11",
+        "updatedAt": "2025-11-15T09:00:00.000Z"
+      },
+      {
+        "id": "div-msft-2026-03",
+        "portfolioId": "ipr-growth",
+        "date": "2026-03-13",
+        "accountingMonth": "2026-03",
+        "ticker": "MSFT",
+        "amountCents": 1140,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "linkedIncomeId": "inc-div-msft-2026-03",
+        "updatedAt": "2026-03-13T09:00:00.000Z"
+      },
+      {
+        "id": "div-aapl-2026-04",
+        "portfolioId": "ipr-growth",
+        "date": "2026-04-25",
+        "accountingMonth": "2026-04",
+        "ticker": "AAPL",
+        "amountCents": 1840,
+        "currency": "EUR",
+        "bankAccountId": "bank-main-eur",
+        "linkedIncomeId": "inc-div-aapl-2026-04",
+        "updatedAt": "2026-04-25T09:00:00.000Z"
       }
     ],
     "portfolioCashflows": [
       {
-        "id": "pcf-vwce-1",
-        "date": "2026-03-04",
-        "amountCents": 191390,
-        "holdingId": "hold-vwce-1",
+        "id": "pcf-vwce-2025-06",
+        "date": "2025-06-10",
+        "amountCents": -243295,
+        "holdingId": "hold-vwce-core-1",
         "ticker": "VWCE.DE",
         "kind": "buy",
-        "bankAccountId": "bank-main",
-        "updatedAt": "2026-03-04T09:00:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "portfolioId": "ipr-core",
+        "source": "cashflow",
+        "linkedSaleId": null,
+        "updatedAt": "2025-06-10T09:00:00.000Z"
       },
       {
-        "id": "pcf-vwce-2",
-        "date": "2026-04-05",
-        "amountCents": 80093,
-        "holdingId": "hold-vwce-2",
-        "ticker": "VWCE.DE",
+        "id": "pcf-euna-2025-07",
+        "date": "2025-07-12",
+        "amountCents": -87974,
+        "holdingId": "hold-euna-core",
+        "ticker": "EUNA.DE",
         "kind": "buy",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
+        "portfolioId": "ipr-core",
+        "source": "cashflow",
+        "linkedSaleId": null,
+        "updatedAt": "2025-07-12T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-aapl-2025-08",
+        "date": "2025-08-14",
+        "amountCents": -137975,
+        "holdingId": "hold-aapl-growth",
+        "ticker": "AAPL",
+        "kind": "buy",
+        "bankAccountId": "bank-wise-usd",
+        "portfolioId": "ipr-growth",
+        "source": "cashflow",
+        "linkedSaleId": null,
+        "updatedAt": "2025-08-14T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-btc-2025-09",
+        "date": "2025-09-20",
+        "amountCents": -178445,
+        "holdingId": "hold-btc-crypto",
+        "ticker": "BTC/EUR",
+        "kind": "buy",
+        "bankAccountId": "bank-buffer-eur",
+        "portfolioId": "ipr-crypto",
+        "source": "cashflow",
+        "linkedSaleId": null,
+        "updatedAt": "2025-09-20T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-eth-2025-10",
+        "date": "2025-10-15",
+        "amountCents": -239680,
+        "holdingId": "hold-eth-crypto",
+        "ticker": "ETH/EUR",
+        "kind": "buy",
+        "bankAccountId": "bank-buffer-eur",
+        "portfolioId": "ipr-crypto",
+        "source": "cashflow",
+        "linkedSaleId": null,
+        "updatedAt": "2025-10-15T09:00:00.000Z"
+      },
+      {
+        "id": "pcf-msft-2026-04",
+        "date": "2026-04-05",
+        "amountCents": -172020,
+        "holdingId": "hold-msft-growth",
+        "ticker": "MSFT",
+        "kind": "buy",
+        "bankAccountId": "bank-wise-usd",
+        "portfolioId": "ipr-growth",
+        "source": "savings",
+        "linkedSaleId": null,
         "updatedAt": "2026-04-05T09:00:00.000Z"
       },
       {
-        "id": "pcf-sale-vwce",
+        "id": "pcf-sale-vwce-2026-04",
         "date": "2026-04-21",
-        "amountCents": 36450,
+        "amountCents": 36540,
         "holdingId": "hold-vwce-sold-demo",
         "ticker": "VWCE.DE",
         "kind": "sell",
+        "bankAccountId": "bank-main-eur",
+        "portfolioId": "ipr-core",
+        "source": "portfolio",
         "linkedSaleId": "sale-vwce-demo",
-        "bankAccountId": "bank-main",
-        "updatedAt": "2026-04-21T11:00:00.000Z"
+        "updatedAt": "2026-04-21T09:00:00.000Z"
       }
     ],
     "portfolioSales": [
       {
         "id": "sale-vwce-demo",
         "date": "2026-04-21",
+        "portfolioId": "ipr-core",
         "holdingId": "hold-vwce-sold-demo",
         "ticker": "VWCE.DE",
         "name": "Vanguard FTSE All-World UCITS ETF",
@@ -535,101 +4088,671 @@
         "realizedPnlCents": 5150,
         "cashflowCents": 36450,
         "linkedIncomeId": "inc-sale-vwce-2026-04",
-        "bankAccountId": "bank-main",
+        "bankAccountId": "bank-main-eur",
         "updatedAt": "2026-04-21T11:00:00.000Z"
       }
     ],
     "transfers": [
       {
+        "id": "trf-main-to-rent-2026-05",
+        "date": "2026-05-01",
+        "amountCents": 145000,
+        "fromModule": "cashflow",
+        "fromId": "bank-main-eur",
+        "toModule": "cashflow",
+        "toId": "bank-rent-eur",
+        "description": "Fill bills pocket",
+        "category": "Transfer",
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
+      },
+      {
         "id": "trf-cash-to-savings-2026-05",
         "date": "2026-05-01",
         "amountCents": 65000,
         "fromModule": "cashflow",
-        "fromId": null,
+        "fromId": "bank-main-eur",
         "toModule": "savings",
+        "toId": null,
         "description": "Monthly savings transfer",
         "category": "Savings",
-        "bankAccountId": "bank-main",
-        "linkedSavingsEntryId": "sav-2026-05",
-        "updatedAt": "2026-05-01T08:05:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "linkedSavingsEntryId": "sav-monthly-2026-05",
+        "updatedAt": "2026-05-01T09:00:00.000Z"
       },
       {
         "id": "trf-main-to-buffer-2026-04",
         "date": "2026-04-18",
-        "amountCents": 20000,
+        "amountCents": 30000,
         "fromModule": "cashflow",
-        "fromId": "bank-main",
+        "fromId": "bank-main-eur",
         "toModule": "cashflow",
-        "toId": "bank-emergency",
+        "toId": "bank-buffer-eur",
         "description": "Move cash to buffer",
         "category": "Transfer",
-        "bankAccountId": "bank-main",
-        "updatedAt": "2026-04-18T13:00:00.000Z"
+        "bankAccountId": "bank-main-eur",
+        "updatedAt": "2026-04-18T09:00:00.000Z"
+      },
+      {
+        "id": "trf-savings-to-portfolio-2026-04",
+        "date": "2026-04-05",
+        "amountCents": 50000,
+        "fromModule": "savings",
+        "fromId": "savings-config",
+        "toModule": "portfolio",
+        "toId": "ipr-growth",
+        "description": "Savings-funded MSFT buy",
+        "category": "Transfer",
+        "linkedSavingsEntryId": "sav-portfolio-buy-2026-04",
+        "linkedCashflowId": "pcf-msft-2026-04",
+        "updatedAt": "2026-04-05T09:00:00.000Z"
       }
     ],
     "portfolioSnapshots": [
       {
-        "id": "psn-2026-04-27T09",
+        "id": "psn-global-2025-06",
+        "capturedAt": "2025-06-27T09:00:00.000Z",
+        "valueCents": 620000,
+        "costCents": 585000,
+        "investedCents": 585000,
+        "source": "manual_demo",
+        "updatedAt": "2025-06-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-06",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-06-27T09:00:00.000Z",
+        "valueCents": 140000,
+        "costCents": 130000,
+        "investedCents": 130000,
+        "source": "manual_demo",
+        "updatedAt": "2025-06-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-06",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-06-27T10:00:00.000Z",
+        "valueCents": 280000,
+        "costCents": 260000,
+        "investedCents": 260000,
+        "source": "manual_demo",
+        "updatedAt": "2025-06-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-06",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-06-27T11:00:00.000Z",
+        "valueCents": 420000,
+        "costCents": 390000,
+        "investedCents": 390000,
+        "source": "manual_demo",
+        "updatedAt": "2025-06-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-07",
+        "capturedAt": "2025-07-27T09:00:00.000Z",
+        "valueCents": 675000,
+        "costCents": 624000,
+        "investedCents": 624000,
+        "source": "manual_demo",
+        "updatedAt": "2025-07-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-07",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-07-27T09:00:00.000Z",
+        "valueCents": 152000,
+        "costCents": 140500,
+        "investedCents": 140500,
+        "source": "manual_demo",
+        "updatedAt": "2025-07-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-07",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-07-27T10:00:00.000Z",
+        "valueCents": 296000,
+        "costCents": 274000,
+        "investedCents": 274000,
+        "source": "manual_demo",
+        "updatedAt": "2025-07-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-07",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-07-27T11:00:00.000Z",
+        "valueCents": 440000,
+        "costCents": 407500,
+        "investedCents": 407500,
+        "source": "manual_demo",
+        "updatedAt": "2025-07-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-08",
+        "capturedAt": "2025-08-27T09:00:00.000Z",
+        "valueCents": 730000,
+        "costCents": 663000,
+        "investedCents": 663000,
+        "source": "manual_demo",
+        "updatedAt": "2025-08-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-08",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-08-27T09:00:00.000Z",
+        "valueCents": 164000,
+        "costCents": 151000,
+        "investedCents": 151000,
+        "source": "manual_demo",
+        "updatedAt": "2025-08-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-08",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-08-27T10:00:00.000Z",
+        "valueCents": 312000,
+        "costCents": 288000,
+        "investedCents": 288000,
+        "source": "manual_demo",
+        "updatedAt": "2025-08-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-08",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-08-27T11:00:00.000Z",
+        "valueCents": 460000,
+        "costCents": 425000,
+        "investedCents": 425000,
+        "source": "manual_demo",
+        "updatedAt": "2025-08-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-09",
+        "capturedAt": "2025-09-27T09:00:00.000Z",
+        "valueCents": 749000,
+        "costCents": 702000,
+        "investedCents": 702000,
+        "source": "manual_demo",
+        "updatedAt": "2025-09-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-09",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-09-27T09:00:00.000Z",
+        "valueCents": 176000,
+        "costCents": 161500,
+        "investedCents": 161500,
+        "source": "manual_demo",
+        "updatedAt": "2025-09-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-09",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-09-27T10:00:00.000Z",
+        "valueCents": 328000,
+        "costCents": 302000,
+        "investedCents": 302000,
+        "source": "manual_demo",
+        "updatedAt": "2025-09-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-09",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-09-27T11:00:00.000Z",
+        "valueCents": 480000,
+        "costCents": 442500,
+        "investedCents": 442500,
+        "source": "manual_demo",
+        "updatedAt": "2025-09-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-10",
+        "capturedAt": "2025-10-27T09:00:00.000Z",
+        "valueCents": 804000,
+        "costCents": 741000,
+        "investedCents": 741000,
+        "source": "manual_demo",
+        "updatedAt": "2025-10-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-10",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-10-27T09:00:00.000Z",
+        "valueCents": 188000,
+        "costCents": 172000,
+        "investedCents": 172000,
+        "source": "manual_demo",
+        "updatedAt": "2025-10-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-10",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-10-27T10:00:00.000Z",
+        "valueCents": 344000,
+        "costCents": 316000,
+        "investedCents": 316000,
+        "source": "manual_demo",
+        "updatedAt": "2025-10-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-10",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-10-27T11:00:00.000Z",
+        "valueCents": 500000,
+        "costCents": 460000,
+        "investedCents": 460000,
+        "source": "manual_demo",
+        "updatedAt": "2025-10-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-11",
+        "capturedAt": "2025-11-27T09:00:00.000Z",
+        "valueCents": 859000,
+        "costCents": 780000,
+        "investedCents": 780000,
+        "source": "manual_demo",
+        "updatedAt": "2025-11-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-11",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-11-27T09:00:00.000Z",
+        "valueCents": 200000,
+        "costCents": 182500,
+        "investedCents": 182500,
+        "source": "manual_demo",
+        "updatedAt": "2025-11-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-11",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-11-27T10:00:00.000Z",
+        "valueCents": 360000,
+        "costCents": 330000,
+        "investedCents": 330000,
+        "source": "manual_demo",
+        "updatedAt": "2025-11-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-11",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-11-27T11:00:00.000Z",
+        "valueCents": 520000,
+        "costCents": 477500,
+        "investedCents": 477500,
+        "source": "manual_demo",
+        "updatedAt": "2025-11-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2025-12",
+        "capturedAt": "2025-12-27T09:00:00.000Z",
+        "valueCents": 878000,
+        "costCents": 819000,
+        "investedCents": 819000,
+        "source": "manual_demo",
+        "updatedAt": "2025-12-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2025-12",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2025-12-27T09:00:00.000Z",
+        "valueCents": 212000,
+        "costCents": 193000,
+        "investedCents": 193000,
+        "source": "manual_demo",
+        "updatedAt": "2025-12-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2025-12",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2025-12-27T10:00:00.000Z",
+        "valueCents": 376000,
+        "costCents": 344000,
+        "investedCents": 344000,
+        "source": "manual_demo",
+        "updatedAt": "2025-12-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2025-12",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2025-12-27T11:00:00.000Z",
+        "valueCents": 540000,
+        "costCents": 495000,
+        "investedCents": 495000,
+        "source": "manual_demo",
+        "updatedAt": "2025-12-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2026-01",
+        "capturedAt": "2026-01-27T09:00:00.000Z",
+        "valueCents": 933000,
+        "costCents": 858000,
+        "investedCents": 858000,
+        "source": "manual_demo",
+        "updatedAt": "2026-01-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2026-01",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2026-01-27T09:00:00.000Z",
+        "valueCents": 224000,
+        "costCents": 203500,
+        "investedCents": 203500,
+        "source": "manual_demo",
+        "updatedAt": "2026-01-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2026-01",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2026-01-27T10:00:00.000Z",
+        "valueCents": 392000,
+        "costCents": 358000,
+        "investedCents": 358000,
+        "source": "manual_demo",
+        "updatedAt": "2026-01-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2026-01",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2026-01-27T11:00:00.000Z",
+        "valueCents": 560000,
+        "costCents": 512500,
+        "investedCents": 512500,
+        "source": "manual_demo",
+        "updatedAt": "2026-01-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2026-02",
+        "capturedAt": "2026-02-27T09:00:00.000Z",
+        "valueCents": 988000,
+        "costCents": 897000,
+        "investedCents": 897000,
+        "source": "manual_demo",
+        "updatedAt": "2026-02-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2026-02",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2026-02-27T09:00:00.000Z",
+        "valueCents": 236000,
+        "costCents": 214000,
+        "investedCents": 214000,
+        "source": "manual_demo",
+        "updatedAt": "2026-02-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2026-02",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2026-02-27T10:00:00.000Z",
+        "valueCents": 408000,
+        "costCents": 372000,
+        "investedCents": 372000,
+        "source": "manual_demo",
+        "updatedAt": "2026-02-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2026-02",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2026-02-27T11:00:00.000Z",
+        "valueCents": 580000,
+        "costCents": 530000,
+        "investedCents": 530000,
+        "source": "manual_demo",
+        "updatedAt": "2026-02-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2026-03",
+        "capturedAt": "2026-03-27T09:00:00.000Z",
+        "valueCents": 1007000,
+        "costCents": 936000,
+        "investedCents": 936000,
+        "source": "manual_demo",
+        "updatedAt": "2026-03-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2026-03",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2026-03-27T09:00:00.000Z",
+        "valueCents": 248000,
+        "costCents": 224500,
+        "investedCents": 224500,
+        "source": "manual_demo",
+        "updatedAt": "2026-03-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2026-03",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2026-03-27T10:00:00.000Z",
+        "valueCents": 424000,
+        "costCents": 386000,
+        "investedCents": 386000,
+        "source": "manual_demo",
+        "updatedAt": "2026-03-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2026-03",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2026-03-27T11:00:00.000Z",
+        "valueCents": 600000,
+        "costCents": 547500,
+        "investedCents": 547500,
+        "source": "manual_demo",
+        "updatedAt": "2026-03-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2026-04",
         "capturedAt": "2026-04-27T09:00:00.000Z",
-        "valueCents": 492000,
-        "investedCents": 455000,
+        "valueCents": 1062000,
+        "costCents": 975000,
+        "investedCents": 975000,
         "source": "manual_demo",
         "updatedAt": "2026-04-27T09:00:00.000Z"
       },
       {
-        "id": "psn-2026-04-29T09",
-        "capturedAt": "2026-04-29T09:00:00.000Z",
-        "valueCents": 501800,
-        "investedCents": 455000,
+        "id": "psn-ipr-core-2026-04",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2026-04-27T09:00:00.000Z",
+        "valueCents": 260000,
+        "costCents": 235000,
+        "investedCents": 235000,
         "source": "manual_demo",
-        "updatedAt": "2026-04-29T09:00:00.000Z"
+        "updatedAt": "2026-04-27T09:00:00.000Z"
       },
       {
-        "id": "psn-2026-05-01T09",
-        "capturedAt": "2026-05-01T09:00:00.000Z",
-        "valueCents": 513900,
-        "investedCents": 455000,
+        "id": "psn-ipr-growth-2026-04",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2026-04-27T10:00:00.000Z",
+        "valueCents": 440000,
+        "costCents": 400000,
+        "investedCents": 400000,
         "source": "manual_demo",
-        "updatedAt": "2026-05-01T09:00:00.000Z"
+        "updatedAt": "2026-04-27T09:00:00.000Z"
       },
       {
-        "id": "psn-2026-05-03T09",
-        "capturedAt": "2026-05-03T09:00:00.000Z",
-        "valueCents": 528400,
-        "investedCents": 455000,
+        "id": "psn-ipr-crypto-2026-04",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2026-04-27T11:00:00.000Z",
+        "valueCents": 620000,
+        "costCents": 565000,
+        "investedCents": 565000,
         "source": "manual_demo",
-        "updatedAt": "2026-05-03T09:00:00.000Z"
+        "updatedAt": "2026-04-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-global-2026-05",
+        "capturedAt": "2026-05-27T09:00:00.000Z",
+        "valueCents": 1117000,
+        "costCents": 1014000,
+        "investedCents": 1014000,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-core-2026-05",
+        "portfolioId": "ipr-core",
+        "capturedAt": "2026-05-27T09:00:00.000Z",
+        "valueCents": 272000,
+        "costCents": 245500,
+        "investedCents": 245500,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-growth-2026-05",
+        "portfolioId": "ipr-growth",
+        "capturedAt": "2026-05-27T10:00:00.000Z",
+        "valueCents": 456000,
+        "costCents": 414000,
+        "investedCents": 414000,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-27T09:00:00.000Z"
+      },
+      {
+        "id": "psn-ipr-crypto-2026-05",
+        "portfolioId": "ipr-crypto",
+        "capturedAt": "2026-05-27T11:00:00.000Z",
+        "valueCents": 640000,
+        "costCents": 582500,
+        "investedCents": 582500,
+        "source": "manual_demo",
+        "updatedAt": "2026-05-27T09:00:00.000Z"
       }
     ],
     "attachments": [
       {
-        "id": "att-rent-receipt",
+        "id": "att-rent-2026-05",
         "expenseId": "exp-rent-2026-05",
-        "fileName": "rent-receipt-demo.pdf",
+        "fileName": "rent-receipt-may-2026.pdf",
         "mimeType": "application/pdf",
         "size": 48216,
         "storagePath": null,
         "updatedAt": "2026-05-02T08:35:00.000Z"
+      },
+      {
+        "id": "att-travel-2025-09",
+        "expenseId": "exp-travel-lisbon-2025-09",
+        "fileName": "lisbon-booking.txt",
+        "mimeType": "text/plain",
+        "size": 128,
+        "storagePath": null,
+        "updatedAt": "2025-09-12T12:30:00.000Z"
+      },
+      {
+        "id": "att-tax-2026-03",
+        "expenseId": "exp-tax-2026-03",
+        "fileName": "tax-prepayment-note.txt",
+        "mimeType": "text/plain",
+        "size": 96,
+        "storagePath": null,
+        "updatedAt": "2026-03-30T10:30:00.000Z"
       }
     ],
     "activityLog": [
       {
-        "id": "log-import-demo",
-        "createdAt": "2026-05-03T15:30:00.000Z",
+        "id": "log-import-full-demo",
+        "createdAt": "2026-05-08T10:00:00.000Z",
         "module": "Settings",
         "action": "create",
         "recordType": "settings",
-        "recordId": "demo-backup",
-        "label": "Demo backup",
-        "summary": "Loaded full demo dataset",
+        "recordId": "test-data-full-backup",
+        "label": "Full app demo backup",
+        "summary": "Loaded a complete FinGes demo dataset without Coingame records.",
         "before": null,
-        "after": { "id": "demo-backup" },
+        "after": {
+          "id": "test-data-full-backup"
+        },
         "undoable": false,
         "undoneAt": null,
         "undoneByLogId": null,
-        "updatedAt": "2026-05-03T15:30:00.000Z"
+        "updatedAt": "2026-05-08T10:00:00.000Z"
+      },
+      {
+        "id": "log-expense-rent",
+        "createdAt": "2026-05-02T08:35:00.000Z",
+        "module": "Expenses",
+        "action": "create",
+        "recordType": "expenses",
+        "recordId": "exp-rent-2026-05",
+        "label": "Apartment rent",
+        "summary": "Created recurring rent expense.",
+        "before": null,
+        "after": {
+          "id": "exp-rent-2026-05"
+        },
+        "undoable": true,
+        "undoneAt": null,
+        "undoneByLogId": null,
+        "updatedAt": "2026-05-02T08:35:00.000Z"
+      },
+      {
+        "id": "log-debt-payment",
+        "createdAt": "2026-05-06T09:00:00.000Z",
+        "module": "Debts",
+        "action": "update",
+        "recordType": "debts",
+        "recordId": "debt-student",
+        "label": "Student loan",
+        "summary": "Recorded a student loan payment.",
+        "before": {
+          "currentBalanceCents": 650000
+        },
+        "after": {
+          "currentBalanceCents": 632000
+        },
+        "undoable": true,
+        "undoneAt": null,
+        "undoneByLogId": null,
+        "updatedAt": "2026-05-06T09:00:00.000Z"
+      },
+      {
+        "id": "log-portfolio-sale",
+        "createdAt": "2026-04-21T11:00:00.000Z",
+        "module": "Portfolio",
+        "action": "create",
+        "recordType": "portfolioSales",
+        "recordId": "sale-vwce-demo",
+        "label": "VWCE.DE sale",
+        "summary": "Recorded a realized gain from a partial ETF sale.",
+        "before": null,
+        "after": {
+          "id": "sale-vwce-demo",
+          "realizedPnlCents": 5150
+        },
+        "undoable": true,
+        "undoneAt": null,
+        "undoneByLogId": null,
+        "updatedAt": "2026-04-21T11:00:00.000Z"
+      },
+      {
+        "id": "log-savings-withdrawal",
+        "createdAt": "2026-02-10T09:00:00.000Z",
+        "module": "Savings",
+        "action": "create",
+        "recordType": "savingsEntries",
+        "recordId": "sav-laptop-withdrawal-2026-02",
+        "label": "Laptop repair",
+        "summary": "Spent from a savings bucket.",
+        "before": null,
+        "after": {
+          "id": "sav-laptop-withdrawal-2026-02"
+        },
+        "undoable": true,
+        "undoneAt": null,
+        "undoneByLogId": null,
+        "updatedAt": "2026-02-10T09:00:00.000Z"
       }
     ],
-    "attachmentBlobs": []
+    "attachmentBlobs": [
+      {
+        "id": "att-travel-2025-09",
+        "dataUrl": "data:text/plain;base64,TGlzYm9uIGRlbW8gYm9va2luZyByZWNlaXB0",
+        "updatedAt": "2025-09-12T12:30:00.000Z"
+      },
+      {
+        "id": "att-tax-2026-03",
+        "dataUrl": "data:text/plain;base64,UXVhcnRlcmx5IHRheCBwcmVwYXltZW50IGRlbW8gbm90ZQ==",
+        "updatedAt": "2026-03-30T10:30:00.000Z"
+      }
+    ]
   }
 }

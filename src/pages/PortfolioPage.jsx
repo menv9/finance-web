@@ -1348,8 +1348,8 @@ export default function PortfolioPage() {
     [portfolioValueSeries, portfolioValuePeriod, locale],
   );
   const lwPortfolioValueData = useMemo(() => ({
-    main: visiblePortfolioValueSeries.map((p) => ({ time: Math.floor(new Date(p.capturedAt).getTime() / 1000), value: p.valueCents })),
-    cost: visiblePortfolioValueSeries.filter((p) => p.costCents != null).map((p) => ({ time: Math.floor(new Date(p.capturedAt).getTime() / 1000), value: p.costCents })),
+    main: visiblePortfolioValueSeries.map((p) => ({ time: p.capturedAt?.slice(0, 10), value: p.valueCents })),
+    cost: visiblePortfolioValueSeries.filter((p) => p.costCents != null).map((p) => ({ time: p.capturedAt?.slice(0, 10), value: p.costCents })),
   }), [visiblePortfolioValueSeries]);
 
   const lwRebalanceData = useMemo(() => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AreaSeries, ColorType, createChart } from 'lightweight-charts';
+import { axisLabelsFromPoints, cleanChartData } from './chartData';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -26,14 +27,6 @@ function customPriceFormat(formatter) {
   return formatter ? { priceFormat: { type: 'custom', minMove: 0.01, formatter } } : {};
 }
 
-function validPoint(point) {
-  return point?.time != null && Number.isFinite(Number(point.value));
-}
-
-function cleanData(points = []) {
-  return points.filter(validPoint).map((point) => ({ ...point, value: Number(point.value) }));
-}
-
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
     if (!series) return;
@@ -43,24 +36,6 @@ function removeSeriesSafely(chart, seriesList) {
       // React dev remounts can leave a stale series handle behind.
     }
   });
-}
-
-function formatAxisTime(time) {
-  if (time == null) return '';
-  const date = typeof time === 'number'
-    ? new Date(time * 1000)
-    : new Date(String(time).length === 10 ? `${time}T00:00:00` : time);
-  if (Number.isNaN(date.getTime())) return String(time);
-  return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit' }).format(date);
-}
-
-function axisLabels(points = []) {
-  const clean = cleanData(points);
-  if (!clean.length) return [];
-  const mid = Math.floor((clean.length - 1) / 2);
-  return [clean[0], clean[mid], clean[clean.length - 1]]
-    .filter((point, index, list) => index === 0 || point.time !== list[index - 1].time)
-    .map((point) => formatAxisTime(point.time));
 }
 
 export default function LWAreaChart({
@@ -122,7 +97,7 @@ export default function LWAreaChart({
     removeSeriesSafely(chart, seriesRef.current);
     seriesRef.current = [];
 
-    const mainData = cleanData(data);
+    const mainData = cleanChartData(data);
     if (!mainData.length) return;
 
     const container = containerRef.current;
@@ -153,7 +128,7 @@ export default function LWAreaChart({
       });
     }
 
-    const secondaryData = cleanData(secondSeries?.data);
+    const secondaryData = cleanChartData(secondSeries?.data);
     if (secondaryData.length) {
       const s2Color = resolveColor(secondSeries.color || 'var(--danger)', container);
       const s2 = chart.addSeries(AreaSeries, {
@@ -175,7 +150,7 @@ export default function LWAreaChart({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter]);
 
-  const labels = axisLabels(data);
+  const labels = axisLabelsFromPoints(data);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

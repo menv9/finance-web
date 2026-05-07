@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ColorType, LineSeries, createChart } from 'lightweight-charts';
+import { axisLabelsFromPoints, cleanChartData } from './chartData';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -10,12 +11,6 @@ function resolveColor(color, element) {
 
 function customPriceFormat(formatter) {
   return formatter ? { priceFormat: { type: 'custom', minMove: 0.01, formatter } } : {};
-}
-
-function cleanData(points = []) {
-  return points
-    .filter((point) => point?.time != null && Number.isFinite(Number(point.value)))
-    .map((point) => ({ ...point, value: Number(point.value) }));
 }
 
 function removeSeriesSafely(chart, seriesList) {
@@ -29,22 +24,8 @@ function removeSeriesSafely(chart, seriesList) {
   });
 }
 
-function formatAxisTime(time) {
-  if (time == null) return '';
-  const date = typeof time === 'number'
-    ? new Date(time * 1000)
-    : new Date(String(time).length === 10 ? `${time}T00:00:00` : time);
-  if (Number.isNaN(date.getTime())) return String(time);
-  return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit' }).format(date);
-}
-
 function axisLabels(segments = []) {
-  const clean = segments.flatMap((segment) => cleanData(segment.data)).sort((a, b) => String(a.time).localeCompare(String(b.time)));
-  if (!clean.length) return [];
-  const mid = Math.floor((clean.length - 1) / 2);
-  return [clean[0], clean[mid], clean[clean.length - 1]]
-    .filter((point, index, list) => index === 0 || point.time !== list[index - 1].time)
-    .map((point) => formatAxisTime(point.time));
+  return axisLabelsFromPoints(segments.flatMap((segment) => segment.data || []));
 }
 
 export default function LWLineSegments({
@@ -106,7 +87,7 @@ export default function LWLineSegments({
     const container = containerRef.current;
 
     segments.forEach((segment) => {
-      const segmentData = cleanData(segment.data);
+      const segmentData = cleanChartData(segment.data);
       if (!segmentData.length) return;
       const resolved = resolveColor(segment.color, container);
       const series = chart.addSeries(LineSeries, {

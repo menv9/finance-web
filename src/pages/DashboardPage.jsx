@@ -389,6 +389,7 @@ export default function DashboardPage() {
               seriesA={{ data: lwCashflowData.map((d) => ({ time: d.incomeTime, value: d.incomeCents })), color: 'var(--accent)' }}
               seriesB={{ data: lwCashflowData.map((d) => ({ time: d.expenseTime, value: d.expenseCents })), color: 'var(--danger)' }}
               priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+              showAllMonthLabels
             />
           ) : (
             <EmptyState title="No data yet" description="Income and expense bars populate once you log them." />

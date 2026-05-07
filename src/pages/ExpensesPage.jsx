@@ -572,6 +572,7 @@ export default function ExpensesPage() {
             data={lwExpenseData}
             color="var(--danger)"
             priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+            showAllMonthLabels
           />
         </Card>
 
