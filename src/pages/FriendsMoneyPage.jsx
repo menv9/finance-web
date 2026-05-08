@@ -5,7 +5,7 @@ import { Check, HandCoins, SendHorizonal, X, BellDot } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Modal, Skeleton } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, parseMoneyCents } from '../utils/formatters';
 import { useTranslation } from '../i18n/useTranslation';
 
 function Avatar({ profile, size = 32 }) {
@@ -229,7 +229,7 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    const cents = Math.round(parseFloat(amount) * 100);
+    const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
     if (!bankAccountId) { setError(t('friendsMoney.settle.errorAccount')); return; }
@@ -328,7 +328,7 @@ function CreateIOUModal({ open, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    const cents = Math.round(parseFloat(amount) * 100);
+    const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
     setBusy(true);
@@ -424,7 +424,7 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    const cents = Math.round(parseFloat(amount) * 100);
+    const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
     setBusy(true);

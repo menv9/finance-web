@@ -11,7 +11,23 @@ import {
 } from 'date-fns';
 
 export function toDate(dateLike) {
-  return typeof dateLike === 'string' ? parseISO(dateLike) : dateLike;
+  if (typeof dateLike !== 'string') return dateLike;
+  // Plain date strings (YYYY-MM-DD) are treated as local dates so that
+  // format()/parseISO() don't shift them because of timezone differences.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateLike)) {
+    const [year, month, day] = dateLike.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return parseISO(dateLike);
+}
+
+export function todayLocalIso() {
+  const now = new Date();
+  return [
+    String(now.getFullYear()).padStart(4, '0'),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 export function monthKey(dateLike) {

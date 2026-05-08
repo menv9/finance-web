@@ -678,9 +678,10 @@ function PortfolioForm({ initialValue, onSubmit, onCancel }) {
 function SellHoldingForm({ holding, sale, currency, locale, fxRates, bankAccounts = [], onSubmit, onCancel }) {
   const { t } = useTranslation();
   const holdingCurrency = holding?.currency || currency;
-  const fxRate = holdingCurrency !== currency
+  const rawFxRate = holdingCurrency !== currency
     ? (fxRates[holdingCurrency] ?? 1)
     : 1;
+  const fxRate = Number.isFinite(rawFxRate) && rawFxRate > 0 ? rawFxRate : 1;
   const defaultBankAccountId = sale?.bankAccountId || bankAccounts.find((account) => account.isMain)?.id || bankAccounts[0]?.id || '';
 
   const [form, setForm] = useState({

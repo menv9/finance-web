@@ -7,7 +7,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Button, Card, EmptyState, FormField, Input, Modal, SectionDivider, Skeleton, Textarea } from '../components/ui';
 import { useAlert, useConfirm } from '../components/ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, parseMoneyCents } from '../utils/formatters';
 import { useTranslation } from '../i18n/useTranslation';
 
 const GOAL_ICONS = [
@@ -122,7 +122,7 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
     setInviteIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
   const handleSave = async () => {
-    const targetCents = Math.round(parseFloat(target || '0') * 100);
+    const targetCents = parseMoneyCents(target || '0');
     if (!name.trim()) return alert({ title: 'Name required', description: 'Please enter a goal name.' });
     if (targetCents <= 0) return alert({ title: 'Invalid target', description: 'Target must be greater than zero.' });
     setSaving(true);
@@ -199,7 +199,7 @@ function ContributionModal({ open, onClose, goal, currency, onAdd }) {
   useEffect(() => { if (open) { setAmount(''); setNote(''); } }, [open]);
 
   const handleAdd = async () => {
-    const amountCents = Math.round(parseFloat(amount || '0') * 100);
+    const amountCents = parseMoneyCents(amount || '0');
     if (amountCents <= 0) return alert({ title: 'Invalid amount', description: 'Enter an amount greater than zero.' });
     setSaving(true);
     try {

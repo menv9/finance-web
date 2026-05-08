@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format, isWithinInterval, parseISO } from 'date-fns';
-import { lastTwelveMonths, monthKey, upcomingWithinDays } from './dates';
+import { lastTwelveMonths, monthKey, todayLocalIso, upcomingWithinDays } from './dates';
 
 function sumAmount(items) {
   return items.reduce((total, item) => total + (item.amountCents || 0), 0);
@@ -35,7 +35,7 @@ export function buildDividendIncomeRows(dividends = []) {
 }
 
 export function computeExpenseSeries(expenses) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   return lastTwelveMonths().map((month) => ({
     month: month.label,
     key: month.key,
@@ -46,7 +46,7 @@ export function computeExpenseSeries(expenses) {
 }
 
 export function computeIncomeSeries(incomes, derivedIncomes = []) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const rows = [...(incomes || []), ...(derivedIncomes || [])];
   return lastTwelveMonths().map((month) => ({
     month: month.label,
@@ -190,7 +190,7 @@ export function computeXIRR(cashflows, endingValueCents) {
       date: flow.date,
       amountCents: flow.amountCents,
     })),
-    { date: new Date().toISOString().slice(0, 10), amountCents: Math.abs(endingValueCents) },
+    { date: todayLocalIso(), amountCents: Math.abs(endingValueCents) },
   ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // XIRR is undefined if all flows share a sign.

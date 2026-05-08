@@ -31,3 +31,12 @@ export function formatNumber(value, locale = 'en-GB', digits = 2) {
     maximumFractionDigits: digits,
   }).format(value || 0);
 }
+
+// Robustly parse a user-entered monetary amount into whole cents.
+// Returns null for empty, non-numeric, Infinity, or NaN inputs.
+export function parseMoneyCents(value) {
+  if (value == null || value === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Math.round(num * 100);
+}

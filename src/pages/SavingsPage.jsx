@@ -10,7 +10,7 @@ import LWLineSegments from '../components/charts/LWLineSegments';
 import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrency, formatCurrencyCompact, parseMoneyCents } from '../utils/formatters';
 import { chartMonthLabel, monthKey, normalizeDateInput } from '../utils/dates';
 import { Card, Button, Stat, InfoPopover, FormField, Input, Select, Modal, EmptyState, SectionDivider } from '../components/ui';
 import { rise } from '../utils/motion';
@@ -29,7 +29,7 @@ function WithdrawalModal({ open, onClose, balanceCents, currency, locale, bankAc
   );
   const [submitting, setSubmitting] = useState(false);
 
-  const amountCents = Math.round(parseFloat(amount || '0') * 100);
+  const amountCents = parseMoneyCents(amount || '0') ?? 0;
   const isOver = amountCents > 0 && amountCents > balanceCents;
   const canSubmit = amountCents > 0 && !isOver && (!bankAccounts.length || bankAccountId);
 
@@ -386,10 +386,10 @@ export default function SavingsPage() {
 
   const saveConfig = async () => {
     await saveSavingsConfig({
-      currentBalanceCents:  Math.round(parseFloat(config.currentBalance  || 0) * 100),
-      monthlyOverrideCents: Math.round(parseFloat(config.monthlySavings  || 0) * 100),
+      currentBalanceCents:  parseMoneyCents(config.currentBalance || 0) ?? 0,
+      monthlyOverrideCents: parseMoneyCents(config.monthlySavings || 0) ?? 0,
       annualReturnRate:     parseFloat(config.annualReturnRate || 0),
-      goalCents:            Math.round(parseFloat(config.goal            || 0) * 100),
+      goalCents:            parseMoneyCents(config.goal || 0) ?? 0,
       projectionYears:      Number(config.projectionYears),
     });
     setConfigDirty(false);

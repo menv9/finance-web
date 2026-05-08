@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase';
+import { uuid } from './makeId';
 
 function client() {
   const c = getSupabaseBrowserClient();
@@ -177,7 +178,7 @@ export async function createSharedGoal(creatorId, { name, targetCents, currency,
 
   // Generate ID client-side so we can add the creator as a participant before
   // selecting the goal back — the SELECT policy requires participant membership.
-  const goalId = crypto.randomUUID();
+  const goalId = uuid();
 
   const { error: gErr } = await c
     .from('shared_goals')

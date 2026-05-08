@@ -39,6 +39,7 @@ import {
 import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 import { loadAppMode, saveAppMode } from '../utils/appMode';
+import { makeId } from '../utils/makeId';
 import {
   acceptFriendRequest as apiAcceptFriendRequest,
   avatarPathFromUrl,
@@ -170,12 +171,20 @@ const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
 let authSubscription = null;
 let autoPushTimer = null;
 
+function appSetTimeout(handler, ms) {
+  return (typeof window !== 'undefined' ? window : globalThis).setTimeout(handler, ms);
+}
+
+function appClearTimeout(timeoutId) {
+  return (typeof window !== 'undefined' ? window : globalThis).clearTimeout(timeoutId);
+}
+
 function withTimeout(promise, ms, message) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(new Error(message)), ms);
+    timeoutId = appSetTimeout(() => reject(new Error(message)), ms);
   });
-  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+  return Promise.race([promise, timeout]).finally(() => appClearTimeout(timeoutId));
 }
 
 function addMonthsToMonth(month, offset) {
@@ -271,16 +280,14 @@ function assertSourceHasFunds(state, source, amountCents) {
   }
 }
 
-function makeId(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
+
 
 function portfolioSnapshotId(timestamp = new Date().toISOString()) {
-  return `psn-${timestamp.slice(0, 16)}`;
+  return `psn-${timestamp.slice(0, 13)}`;
 }
 
 function portfolioScopedSnapshotId(portfolioId, timestamp = new Date().toISOString()) {
-  return `psn-${portfolioId}-${timestamp.slice(0, 16)}`;
+  return `psn-${portfolioId}-${timestamp.slice(0, 13)}`;
 }
 
 function defaultInvestmentPortfolio(timestamp = new Date().toISOString()) {
@@ -893,7 +900,7 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   bootstrap: async () => {
-    const hydrationWatchdog = window.setTimeout(() => {
+    const hydrationWatchdog = appSetTimeout(() => {
       set((state) => state.hydrated ? state : {
         hydrated: true,
         supabaseSyncStatus: 'error',
@@ -955,7 +962,7 @@ export const useFinanceStore = create((set, get) => ({
         supabaseError: error?.message || 'Unable to load the finance workspace.',
       });
     } finally {
-      window.clearTimeout(hydrationWatchdog);
+      appClearTimeout(hydrationWatchdog);
       set({ hydrated: true });
     }
   },
@@ -1168,7 +1175,7 @@ export const useFinanceStore = create((set, get) => ({
       assertSourceHasFunds(get(), 'cashflow', nextPositive - previousPositive);
     }
     const record = ensureEntitySyncFields(
-      { ...entryToSave, id: entryToSave.id || `sav-${crypto.randomUUID()}` },
+      { ...entryToSave, id: entryToSave.id || makeId('sav') },
       timestamp,
     );
     const linkedUpdates = [];

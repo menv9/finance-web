@@ -64,15 +64,56 @@ export function parseAmountToCents(value) {
   const text = `${value ?? ''}`.trim();
   if (!text) return Number.NaN;
 
-  const normalized = text
-    .replace(/\s/g, '')
-    .replace(/[€$£]/g, '')
-    .replace(/[a-zA-Z]/g, '')
-    .replace(/\.(?=.*[.,]\d{2}$)/g, '')
-    .replace(/,(?=\d{3}\b)/g, '')
-    .replace(',', '.');
+  // Remove currency symbols, whitespace and letters, but keep digits,
+  // commas, dots and the leading minus sign.
+  let cleaned = text
+    .replace(/[€$£\s]/g, '')
+    .replace(/[a-zA-Z]/g, '');
 
-  return Math.round(Number(normalized) * 100);
+  const sign = cleaned.startsWith('-') ? -1 : 1;
+  cleaned = cleaned.replace(/-/g, '');
+
+  if (!cleaned) return Number.NaN;
+
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastComma = cleaned.lastIndexOf(',');
+
+  let normalized;
+  if (lastDot !== -1 && lastComma !== -1) {
+    // Both separators present: the last one is the decimal separator.
+    if (lastDot > lastComma) {
+      // 1,234.56  →  dot is decimal
+      normalized = cleaned.replace(/,/g, '');
+    } else {
+      // 1.234,56  →  comma is decimal
+      normalized = cleaned.replace(/\./g, '').replace(/,/g, '.');
+    }
+  } else if (lastComma !== -1) {
+    // Only comma: if exactly three digits follow it and there are digits before,
+    // treat as thousands separator (e.g. 1,234). Otherwise decimal (e.g. 12,34).
+    const after = cleaned.slice(lastComma + 1);
+    const before = cleaned.slice(0, lastComma);
+    if (after.length === 3 && before.length >= 1) {
+      normalized = cleaned.replace(/,/g, '');
+    } else {
+      normalized = cleaned.replace(/,/g, '.');
+    }
+  } else if (lastDot !== -1) {
+    // Only dot: same heuristic as comma.
+    const after = cleaned.slice(lastDot + 1);
+    const before = cleaned.slice(0, lastDot);
+    if (after.length === 3 && before.length >= 1) {
+      normalized = cleaned.replace(/\./g, '');
+    } else {
+      normalized = cleaned;
+    }
+  } else {
+    normalized = cleaned;
+  }
+
+  const num = Number(normalized);
+  if (!Number.isFinite(num)) return Number.NaN;
+  return Math.round(sign * num * 100);
 }
 
 function expandYear(year) {

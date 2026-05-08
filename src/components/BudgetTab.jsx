@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from './ConfirmContext';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, parseMoneyCents } from '../utils/formatters';
 import { normalizeDateInput } from '../utils/dates';
+import { makeId } from '../utils/makeId';
 import { Card, Button, FormField, Input, EmptyState, Modal, Stat } from './ui';
 import { cn } from './ui/cn';
 import { rise } from '../utils/motion';
@@ -199,15 +200,15 @@ export function BudgetTab() {
   const saveBudget = async () => {
     const category = isEditing ? modal.category : newCategory.trim();
     if (!category) return;
-    const cents = Math.round(parseFloat(budgetAmount || '0') * 100);
-    if (!cents || isNaN(cents) || cents <= 0) return;
+    const cents = parseMoneyCents(budgetAmount || '0');
+    if (!cents || cents <= 0) return;
     // Auto-add to expense categories if it doesn't exist there yet
     if (!expenseCategories.includes(category)) {
       updateSettings({ categories: [...expenseCategories, category] });
     }
     const existing = budgets.find((b) => b.category === category);
     await saveEntity('budgets', {
-      id: existing?.id || `budget-${crypto.randomUUID()}`,
+      id: existing?.id || makeId('budget'),
       category,
       monthlyCents: cents,
       currency,
