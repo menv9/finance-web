@@ -135,12 +135,29 @@ function describeRecord(storeName, r) {
   return [date, money, tail].filter(Boolean).join(' · ');
 }
 
-function ChangeDateCard() {
+// Internal/derived fields the user shouldn't usually need to touch — hidden by
+// default to keep the editor uncluttered, restored on save so we don't drop them.
+const HIDDEN_FIELDS = new Set([
+  'id', 'createdAt', 'updatedAt', 'syncToken', 'deletedAt', 'userId', 'user_id',
+]);
+
+function pickEditableShape(record) {
+  const editable = {};
+  const hidden = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (HIDDEN_FIELDS.has(k)) hidden[k] = v;
+    else editable[k] = v;
+  }
+  return { editable, hidden };
+}
+
+function EditRecordCard() {
   const saveEntity = useFinanceStore((s) => s.saveEntity);
   const allState = useFinanceStore((s) => s);
   const [storeName, setStoreName] = useState(DATE_BEARING_STORES[0]);
   const [recordId, setRecordId] = useState('');
-  const [newDate, setNewDate] = useState('');
+  const [draft, setDraft] = useState('');
+  const [parseError, setParseError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const list = allState[storeName] || [];
@@ -150,33 +167,57 @@ function ChangeDateCard() {
 
   const selectedRecord = sortedRecords.find((r) => r.id === recordId);
 
+  const loadDraft = (record) => {
+    if (!record) {
+      setDraft('');
+      return;
+    }
+    const { editable } = pickEditableShape(record);
+    setDraft(JSON.stringify(editable, null, 2));
+    setParseError('');
+  };
+
   const handleStoreChange = (next) => {
     setStoreName(next);
     setRecordId('');
-    setNewDate('');
+    setDraft('');
+    setParseError('');
   };
 
   const handleRecordChange = (nextId) => {
     setRecordId(nextId);
     const found = (allState[storeName] || []).find((r) => r.id === nextId);
-    setNewDate(found?.date || '');
+    loadDraft(found);
   };
+
+  const handleReset = () => loadDraft(selectedRecord);
 
   const handleUpdate = async () => {
     if (!selectedRecord) {
       toast.error('Pick a record first');
       return;
     }
-    if (!newDate) {
-      toast.error('New date is required');
+    let parsedPatch;
+    try {
+      parsedPatch = JSON.parse(draft);
+    } catch (err) {
+      setParseError(err.message);
+      toast.error(`Invalid JSON: ${err.message}`);
+      return;
+    }
+    if (!parsedPatch || typeof parsedPatch !== 'object' || Array.isArray(parsedPatch)) {
+      toast.error('Edited value must be a JSON object');
       return;
     }
     setBusy(true);
+    setParseError('');
     try {
-      await saveEntity(storeName, { ...selectedRecord, date: newDate });
+      // Merge: hidden fields from the original (id etc.) win over the draft, so
+      // the user can't accidentally rename the id by editing the JSON.
+      const { hidden } = pickEditableShape(selectedRecord);
+      const next = { ...parsedPatch, ...hidden };
+      await saveEntity(storeName, next);
       toast.success(`Updated ${storeName}/${selectedRecord.id}`);
-      setRecordId('');
-      setNewDate('');
     } catch (err) {
       toast.error(err.message || 'Update failed');
     } finally {
@@ -187,12 +228,16 @@ function ChangeDateCard() {
   return (
     <Card>
       <div className="flex flex-col gap-3">
-        <h2 className="font-display text-xl text-ink">Change record date</h2>
+        <h2 className="font-display text-xl text-ink">Edit record</h2>
         <p className="text-sm text-ink-muted">
-          Routes through <code className="text-xs">saveEntity</code>, so bank
-          balance adjustments, sync timestamps, and activity logs all run.
+          Pick a record, edit any field as JSON, save. Routes through{' '}
+          <code className="text-xs">saveEntity</code>, so bank balance
+          adjustments, sync timestamps, and activity logs all run. Internal
+          fields (<code className="text-xs">id</code>,{' '}
+          <code className="text-xs">updatedAt</code>, etc.) are preserved
+          automatically.
         </p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Store">
             <Select value={storeName} onChange={(e) => handleStoreChange(e.target.value)}>
               {DATE_BEARING_STORES.map((s) => (
@@ -210,24 +255,35 @@ function ChangeDateCard() {
               ))}
             </Select>
           </FormField>
-          <FormField label="New date">
-            <Input
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              disabled={!selectedRecord}
-            />
-          </FormField>
         </div>
         {selectedRecord && (
-          <p className="text-xs text-ink-faint">
-            Currently <code>{selectedRecord.date}</code> → <code>{newDate || '…'}</code>
-          </p>
+          <>
+            <FormField label="Fields (JSON)">
+              <Textarea
+                value={draft}
+                onChange={(e) => { setDraft(e.target.value); setParseError(''); }}
+                rows={14}
+                spellCheck={false}
+                className="font-mono text-xs"
+              />
+            </FormField>
+            {parseError && (
+              <p className="text-xs text-danger">JSON parse error: {parseError}</p>
+            )}
+            <p className="text-xs text-ink-faint">
+              Editing <code>{storeName}/{selectedRecord.id}</code>
+            </p>
+          </>
         )}
-        <div>
-          <Button onClick={handleUpdate} disabled={busy || !selectedRecord || !newDate}>
-            {busy ? 'Updating…' : 'Update'}
+        <div className="flex gap-2">
+          <Button onClick={handleUpdate} disabled={busy || !selectedRecord}>
+            {busy ? 'Saving…' : 'Save'}
           </Button>
+          {selectedRecord && (
+            <Button variant="ghost" onClick={handleReset} disabled={busy}>
+              Reset
+            </Button>
+          )}
         </div>
       </div>
     </Card>
@@ -256,7 +312,7 @@ export default function AdminPage() {
       />
       <PlannerCard />
       <ImportJsonCard />
-      <ChangeDateCard />
+      <EditRecordCard />
     </div>
   );
 }
