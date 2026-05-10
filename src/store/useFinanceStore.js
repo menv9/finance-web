@@ -40,6 +40,7 @@ import { buildConflict, detectConflict, removeConflict, upsertConflict } from '.
 import { fetchTickerPrice } from '../utils/yahoo';
 import { loadAppMode, saveAppMode } from '../utils/appMode';
 import { makeId } from '../utils/makeId';
+import { toast } from './useToastStore';
 import {
   acceptFriendRequest as apiAcceptFriendRequest,
   avatarPathFromUrl,
@@ -214,6 +215,39 @@ function fixedIncomePaymentDate(schedule, accountingMonth, explicitDate) {
 }
 let focusHandler = null;
 let autoPullInterval = null;
+let realtimeChannel = null;
+let realtimePullTimer = null;
+
+function teardownRealtime() {
+  if (realtimePullTimer) {
+    clearTimeout(realtimePullTimer);
+    realtimePullTimer = null;
+  }
+  if (realtimeChannel) {
+    try { realtimeChannel.unsubscribe(); } catch { /* ignore */ }
+    realtimeChannel = null;
+  }
+}
+
+// Subscribe to postgres_changes on finance_records for this user.
+// Debounces pulls so a burst of writes (e.g. multi-record save) triggers one pull.
+function subscribeRealtime(client, userId, onChange) {
+  realtimeChannel = client
+    .channel(`finance-records-${userId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'finance_records',
+      filter: `user_id=eq.${userId}`,
+    }, () => {
+      if (realtimePullTimer) clearTimeout(realtimePullTimer);
+      realtimePullTimer = setTimeout(() => {
+        realtimePullTimer = null;
+        onChange();
+      }, 300);
+    })
+    .subscribe();
+}
 
 const SAVINGS_DEFAULT = {
   id: 'savings-config',
@@ -981,6 +1015,7 @@ export const useFinanceStore = create((set, get) => ({
     if (!client) {
       if (autoPullInterval) { clearInterval(autoPullInterval); autoPullInterval = null; }
       if (focusHandler) { window.removeEventListener('focus', focusHandler); focusHandler = null; }
+      teardownRealtime();
       set({
         supabaseConfigured: false,
         supabaseSession: null,
@@ -1031,14 +1066,27 @@ export const useFinanceStore = create((set, get) => ({
     };
     window.addEventListener('focus', focusHandler);
 
-    // Poll every 8 s so open tabs on other devices pick up changes quickly
+    // Realtime: push-based cross-device sync. Subscribes to finance_records
+    // changes for this user and triggers a debounced pull on any event.
+    // Falls back to polling if realtime fails to subscribe (network/quota).
+    teardownRealtime();
+    if (data.session?.user?.id) {
+      subscribeRealtime(client, data.session.user.id, () => {
+        const { supabaseSyncStatus } = get();
+        if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+        get().pullFromSupabase().catch(() => {});
+      });
+    }
+
+    // Polling fallback: lighter interval (30 s) since realtime carries the load.
+    // Catches anything realtime missed (dropped websocket, paused tab, etc.).
     if (autoPullInterval) clearInterval(autoPullInterval);
     autoPullInterval = setInterval(() => {
       const { supabaseUser, supabaseSyncStatus } = get();
       if (!supabaseUser) return;
       if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
       get().pullFromSupabase().catch(() => {});
-    }, 8_000);
+    }, 30_000);
 
     const {
       data: { subscription },
@@ -1070,9 +1118,19 @@ export const useFinanceStore = create((set, get) => ({
           get().pullFromSupabase().catch(() => {});
           get().loadProfile().catch(() => {});
           get().loadFriendships().catch(() => {});
+          // Re-subscribe realtime under the new user's filter
+          teardownRealtime();
+          if (newUserId) {
+            subscribeRealtime(client, newUserId, () => {
+              const { supabaseSyncStatus } = get();
+              if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
+              get().pullFromSupabase().catch(() => {});
+            });
+          }
         }, 0);
       }
       if (event === 'SIGNED_OUT') {
+        teardownRealtime();
         clearActiveUserId();
         clearLocalUserData();
         set({
@@ -2986,9 +3044,17 @@ export const useFinanceStore = create((set, get) => ({
       const err = validateUsername(patch.username);
       if (err) throw new Error(err);
     }
-    const profile = await updateOwnProfile(user.id, patch);
-    set({ profile });
-    return profile;
+    const previous = get().profile;
+    set({ profile: { ...(previous || {}), ...patch } });
+    try {
+      const profile = await updateOwnProfile(user.id, patch);
+      set({ profile });
+      return profile;
+    } catch (err) {
+      set({ profile: previous });
+      toast.error(err.message || 'Could not update profile');
+      throw err;
+    }
   },
 
   loadFriendships: async () => {
@@ -3038,79 +3104,140 @@ export const useFinanceStore = create((set, get) => ({
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
     if (targetUserId === user.id) throw new Error('Cannot friend yourself');
-    await insertFriendRequest(user.id, targetUserId);
-    await get().loadFriendships();
+    try {
+      await insertFriendRequest(user.id, targetUserId);
+      get().loadFriendships().catch(() => {});
+    } catch (err) {
+      toast.error(err.message || 'Could not send friend request');
+      throw err;
+    }
   },
 
   acceptFriendRequest: async (requesterId) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
-    await apiAcceptFriendRequest(requesterId, user.id);
-    await get().loadFriendships();
+    const prevIncoming = get().pendingIncoming;
+    const prevFriends = get().friends;
+    const moved = prevIncoming.find((e) => e.requesterId === requesterId);
+    set((state) => ({
+      pendingIncoming: state.pendingIncoming.filter((e) => e.requesterId !== requesterId),
+      friends: moved ? [...state.friends, { ...moved, status: 'accepted' }] : state.friends,
+    }));
+    try {
+      await apiAcceptFriendRequest(requesterId, user.id);
+      get().loadFriendships().catch(() => {});
+    } catch (err) {
+      set({ pendingIncoming: prevIncoming, friends: prevFriends });
+      toast.error(err.message || 'Could not accept request');
+      throw err;
+    }
   },
 
   declineFriendRequest: async (requesterId) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
-    await deleteFriendship(requesterId, user.id);
-    await get().loadFriendships();
+    const prevIncoming = get().pendingIncoming;
+    set((state) => ({
+      pendingIncoming: state.pendingIncoming.filter((e) => e.requesterId !== requesterId),
+    }));
+    try {
+      await deleteFriendship(requesterId, user.id);
+      get().loadFriendships().catch(() => {});
+    } catch (err) {
+      set({ pendingIncoming: prevIncoming });
+      toast.error(err.message || 'Could not decline request');
+      throw err;
+    }
   },
 
   cancelFriendRequest: async (addresseeId) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
-    await deleteFriendship(user.id, addresseeId);
-    await get().loadFriendships();
+    const prevOutgoing = get().pendingOutgoing;
+    set((state) => ({
+      pendingOutgoing: state.pendingOutgoing.filter((e) => e.addresseeId !== addresseeId),
+    }));
+    try {
+      await deleteFriendship(user.id, addresseeId);
+      get().loadFriendships().catch(() => {});
+    } catch (err) {
+      set({ pendingOutgoing: prevOutgoing });
+      toast.error(err.message || 'Could not cancel request');
+      throw err;
+    }
   },
 
   setAvatar: async (file) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
     const previous = get().profile;
-    const { publicUrl } = await uploadAvatar(user.id, file);
-    const profile = await updateOwnProfile(user.id, { avatar_url: publicUrl });
-    set({ profile });
-    const oldPath = avatarPathFromUrl(previous?.avatar_url);
-    if (oldPath) {
-      await removeAvatarObject(oldPath).catch(() => {});
+    const previewUrl = URL.createObjectURL(file);
+    set({ profile: { ...(previous || {}), avatar_url: previewUrl } });
+    try {
+      const { publicUrl } = await uploadAvatar(user.id, file);
+      const profile = await updateOwnProfile(user.id, { avatar_url: publicUrl });
+      set({ profile });
+      URL.revokeObjectURL(previewUrl);
+      const oldPath = avatarPathFromUrl(previous?.avatar_url);
+      if (oldPath) {
+        await removeAvatarObject(oldPath).catch(() => {});
+      }
+      return profile;
+    } catch (err) {
+      URL.revokeObjectURL(previewUrl);
+      set({ profile: previous });
+      toast.error(err.message || 'Avatar upload failed');
+      throw err;
     }
-    return profile;
   },
 
   clearAvatar: async () => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
     const previous = get().profile;
-    const profile = await updateOwnProfile(user.id, { avatar_url: null });
-    set({ profile });
-    const oldPath = avatarPathFromUrl(previous?.avatar_url);
-    if (oldPath) {
-      await removeAvatarObject(oldPath).catch(() => {});
+    set({ profile: { ...(previous || {}), avatar_url: null } });
+    try {
+      const profile = await updateOwnProfile(user.id, { avatar_url: null });
+      set({ profile });
+      const oldPath = avatarPathFromUrl(previous?.avatar_url);
+      if (oldPath) {
+        await removeAvatarObject(oldPath).catch(() => {});
+      }
+      return profile;
+    } catch (err) {
+      set({ profile: previous });
+      toast.error(err.message || 'Could not remove avatar');
+      throw err;
     }
-    return profile;
   },
 
   removeFriend: async (otherUserId) => {
     const user = get().supabaseUser;
     if (!user) throw new Error('Not signed in');
+    const prevFriends = get().friends;
+    const prevLedger = get().friendLedger;
     // Cancel active IOUs between the two users so they don't dangle after the friendship ends.
-    const toCancel = get().friendLedger.filter(
+    const toCancel = prevLedger.filter(
       (e) => ['pending', 'accepted'].includes(e.status) &&
         ((e.creditor_id === user.id && e.debtor_id === otherUserId) ||
          (e.creditor_id === otherUserId && e.debtor_id === user.id)),
     );
-    await Promise.all(toCancel.map((e) => apiCancelLedgerEntry(e.id).catch(() => {})));
-    if (toCancel.length) {
-      set((state) => ({
-        friendLedger: state.friendLedger.map((e) =>
-          toCancel.some((c) => c.id === e.id) ? { ...e, status: 'cancelled' } : e,
-        ),
-      }));
+    set((state) => ({
+      friends: state.friends.filter((f) => f.otherId !== otherUserId),
+      friendLedger: state.friendLedger.map((e) =>
+        toCancel.some((c) => c.id === e.id) ? { ...e, status: 'cancelled' } : e,
+      ),
+    }));
+    try {
+      await Promise.all(toCancel.map((e) => apiCancelLedgerEntry(e.id).catch(() => {})));
+      await deleteFriendship(user.id, otherUserId).catch(() => {});
+      await deleteFriendship(otherUserId, user.id).catch(() => {});
+      get().loadFriendships().catch(() => {});
+    } catch (err) {
+      set({ friends: prevFriends, friendLedger: prevLedger });
+      toast.error(err.message || 'Could not remove friend');
+      throw err;
     }
-    // Delete whichever direction exists.
-    await deleteFriendship(user.id, otherUserId).catch(() => {});
-    await deleteFriendship(otherUserId, user.id).catch(() => {});
-    await get().loadFriendships();
   },
 
   // ── Attachments ───────────────────────────────────────────────────────────
@@ -3448,42 +3575,76 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   deleteActivity: async (activityId) => {
-    await apiDeleteActivity(activityId);
+    const prev = get().activityFeed;
     set((state) => ({ activityFeed: state.activityFeed.filter((a) => a.id !== activityId) }));
+    try {
+      await apiDeleteActivity(activityId);
+    } catch (err) {
+      set({ activityFeed: prev });
+      toast.error(err.message || 'Could not delete activity');
+      throw err;
+    }
   },
 
   updateActivityPrivacy: async (patch) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const updated = await upsertActivityPrivacy(user.id, patch);
-    set({ activityPrivacy: updated });
+    const previous = get().activityPrivacy;
+    set({ activityPrivacy: { ...(previous || {}), ...patch } });
+    try {
+      const updated = await upsertActivityPrivacy(user.id, patch);
+      set({ activityPrivacy: updated });
+    } catch (err) {
+      set({ activityPrivacy: previous });
+      toast.error(err.message || 'Could not save privacy setting');
+      throw err;
+    }
   },
 
   addReaction: async (activityId, emoji) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const existing = get().activityFeed
-      .find((a) => a.id === activityId)
-      ?.activity_reactions?.find((r) => r.user_id === user.id);
-    if (existing) await apiRemoveReaction(activityId, user.id);
-    const reaction = await apiAddReaction(activityId, user.id, emoji);
+    const prev = get().activityFeed;
+    const tempReaction = { activity_id: activityId, user_id: user.id, emoji, created_at: new Date().toISOString() };
     set((state) => ({
       activityFeed: state.activityFeed.map((a) =>
         a.id !== activityId ? a : {
           ...a,
           activity_reactions: [
             ...(a.activity_reactions || []).filter((r) => r.user_id !== user.id),
-            reaction,
+            tempReaction,
           ],
         }
       ),
     }));
+    try {
+      const existing = prev
+        .find((a) => a.id === activityId)
+        ?.activity_reactions?.find((r) => r.user_id === user.id);
+      if (existing) await apiRemoveReaction(activityId, user.id);
+      const reaction = await apiAddReaction(activityId, user.id, emoji);
+      set((state) => ({
+        activityFeed: state.activityFeed.map((a) =>
+          a.id !== activityId ? a : {
+            ...a,
+            activity_reactions: [
+              ...(a.activity_reactions || []).filter((r) => r.user_id !== user.id),
+              reaction,
+            ],
+          }
+        ),
+      }));
+    } catch (err) {
+      set({ activityFeed: prev });
+      toast.error(err.message || 'Could not save reaction');
+      throw err;
+    }
   },
 
   removeReaction: async (activityId) => {
     const user = get().supabaseUser;
     if (!user) return;
-    await apiRemoveReaction(activityId, user.id);
+    const prev = get().activityFeed;
     set((state) => ({
       activityFeed: state.activityFeed.map((a) =>
         a.id !== activityId ? a : {
@@ -3492,24 +3653,60 @@ export const useFinanceStore = create((set, get) => ({
         }
       ),
     }));
+    try {
+      await apiRemoveReaction(activityId, user.id);
+    } catch (err) {
+      set({ activityFeed: prev });
+      toast.error(err.message || 'Could not remove reaction');
+      throw err;
+    }
   },
 
   addComment: async (activityId, body) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const comment = await apiAddComment(activityId, user.id, body);
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempComment = {
+      id: tempId,
+      activity_id: activityId,
+      user_id: user.id,
+      body,
+      created_at: new Date().toISOString(),
+    };
     set((state) => ({
       activityFeed: state.activityFeed.map((a) =>
         a.id !== activityId ? a : {
           ...a,
-          activity_comments: [...(a.activity_comments || []), comment],
+          activity_comments: [...(a.activity_comments || []), tempComment],
         }
       ),
     }));
+    try {
+      const comment = await apiAddComment(activityId, user.id, body);
+      set((state) => ({
+        activityFeed: state.activityFeed.map((a) =>
+          a.id !== activityId ? a : {
+            ...a,
+            activity_comments: (a.activity_comments || []).map((c) => (c.id === tempId ? comment : c)),
+          }
+        ),
+      }));
+    } catch (err) {
+      set((state) => ({
+        activityFeed: state.activityFeed.map((a) =>
+          a.id !== activityId ? a : {
+            ...a,
+            activity_comments: (a.activity_comments || []).filter((c) => c.id !== tempId),
+          }
+        ),
+      }));
+      toast.error(err.message || 'Could not post comment');
+      throw err;
+    }
   },
 
   deleteComment: async (activityId, commentId) => {
-    await apiDeleteComment(commentId);
+    const prev = get().activityFeed;
     set((state) => ({
       activityFeed: state.activityFeed.map((a) =>
         a.id !== activityId ? a : {
@@ -3518,6 +3715,13 @@ export const useFinanceStore = create((set, get) => ({
         }
       ),
     }));
+    try {
+      await apiDeleteComment(commentId);
+    } catch (err) {
+      set({ activityFeed: prev });
+      toast.error(err.message || 'Could not delete comment');
+      throw err;
+    }
   },
 
   // ── Social: shared goals ──────────────────────────────────────────────────
@@ -3540,66 +3744,183 @@ export const useFinanceStore = create((set, get) => ({
   acceptGoalInvitation: async (goalId) => {
     const user = get().supabaseUser;
     if (!user) return;
-    await apiAcceptGoalInvitation(goalId, user.id);
-    await get().loadSharedGoals();
+    const prevInvitations = get().goalInvitations;
+    set((state) => ({ goalInvitations: state.goalInvitations.filter((g) => g.id !== goalId) }));
+    try {
+      await apiAcceptGoalInvitation(goalId, user.id);
+      get().loadSharedGoals().catch(() => {});
+    } catch (err) {
+      set({ goalInvitations: prevInvitations });
+      toast.error(err.message || 'Could not accept invitation');
+      throw err;
+    }
   },
 
   declineGoalInvitation: async (goalId) => {
     const user = get().supabaseUser;
     if (!user) return;
-    await removeGoalParticipant(goalId, user.id);
+    const prevInvitations = get().goalInvitations;
     set((state) => ({ goalInvitations: state.goalInvitations.filter((g) => g.id !== goalId) }));
+    try {
+      await removeGoalParticipant(goalId, user.id);
+    } catch (err) {
+      set({ goalInvitations: prevInvitations });
+      toast.error(err.message || 'Could not decline invitation');
+      throw err;
+    }
   },
 
   createSharedGoal: async ({ name, targetCents, currency, description, emoji, inviteIds = [] }) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const goal = await apiCreateSharedGoal(user.id, { name, targetCents, currency, description, emoji, inviteIds });
-    await get().postActivity('shared_goal_created', { goalId: goal.id, goalName: name });
-    await get().loadSharedGoals();
-    return goal;
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempGoal = {
+      id: tempId,
+      name,
+      target_cents: targetCents,
+      currency,
+      description,
+      emoji,
+      owner_id: user.id,
+      created_at: new Date().toISOString(),
+      contributions: [],
+      participants: [],
+    };
+    set((state) => ({ sharedGoals: [tempGoal, ...state.sharedGoals] }));
+    try {
+      const goal = await apiCreateSharedGoal(user.id, { name, targetCents, currency, description, emoji, inviteIds });
+      get().postActivity('shared_goal_created', { goalId: goal.id, goalName: name }).catch(() => {});
+      get().loadSharedGoals().catch(() => {});
+      return goal;
+    } catch (err) {
+      set((state) => ({ sharedGoals: state.sharedGoals.filter((g) => g.id !== tempId) }));
+      toast.error(err.message || 'Could not create goal');
+      throw err;
+    }
   },
 
   updateSharedGoal: async (goalId, patch) => {
-    await apiUpdateSharedGoal(goalId, patch);
-    await get().loadSharedGoals();
+    const prev = get().sharedGoals;
+    set((state) => ({
+      sharedGoals: state.sharedGoals.map((g) => (g.id === goalId ? { ...g, ...patch } : g)),
+    }));
+    try {
+      await apiUpdateSharedGoal(goalId, patch);
+      get().loadSharedGoals().catch(() => {});
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not update goal');
+      throw err;
+    }
   },
 
   deleteSharedGoal: async (goalId) => {
-    await apiDeleteSharedGoal(goalId);
+    const prev = get().sharedGoals;
     set((state) => ({ sharedGoals: state.sharedGoals.filter((g) => g.id !== goalId) }));
+    try {
+      await apiDeleteSharedGoal(goalId);
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not delete goal');
+      throw err;
+    }
   },
 
   addGoalParticipant: async (goalId, userId) => {
-    await addGoalParticipant(goalId, userId);
-    await get().loadSharedGoals();
+    const prev = get().sharedGoals;
+    set((state) => ({
+      sharedGoals: state.sharedGoals.map((g) => (
+        g.id === goalId
+          ? { ...g, shared_goal_participants: [...(g.shared_goal_participants || []), { user_id: userId, profiles: null }] }
+          : g
+      )),
+    }));
+    try {
+      await addGoalParticipant(goalId, userId);
+      get().loadSharedGoals().catch(() => {});
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not add participant');
+      throw err;
+    }
   },
 
   removeGoalParticipant: async (goalId, userId) => {
-    await removeGoalParticipant(goalId, userId);
-    await get().loadSharedGoals();
+    const prev = get().sharedGoals;
+    set((state) => ({
+      sharedGoals: state.sharedGoals.map((g) => (
+        g.id === goalId
+          ? { ...g, shared_goal_participants: (g.shared_goal_participants || []).filter((p) => p.user_id !== userId) }
+          : g
+      )),
+    }));
+    try {
+      await removeGoalParticipant(goalId, userId);
+      get().loadSharedGoals().catch(() => {});
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not remove participant');
+      throw err;
+    }
   },
 
   addContribution: async (goalId, amountCents, note = '') => {
     const user = get().supabaseUser;
     if (!user) return;
-    await apiAddContribution(goalId, user.id, amountCents, note);
-    // Atomic DB check: only the call that actually flips completed_at returns true,
-    // so exactly one "goal reached" activity fires even with simultaneous contributions.
-    const wasNewlyCompleted = await apiCompleteSharedGoalIfReached(goalId);
-    const goals = await fetchSharedGoals(user.id);
-    if (wasNewlyCompleted) {
-      const goal = goals.find((g) => g.id === goalId);
-      if (goal) {
-        await get().postActivity('shared_goal_reached', { goalId, goalName: goal.name, targetCents: goal.target_cents });
+    const prev = get().sharedGoals;
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempContribution = {
+      id: tempId,
+      goal_id: goalId,
+      user_id: user.id,
+      amount_cents: amountCents,
+      note,
+      created_at: new Date().toISOString(),
+    };
+    set((state) => ({
+      sharedGoals: state.sharedGoals.map((g) => (
+        g.id === goalId
+          ? { ...g, contributions: [...(g.contributions || []), tempContribution] }
+          : g
+      )),
+    }));
+    try {
+      await apiAddContribution(goalId, user.id, amountCents, note);
+      // Atomic DB check: only the call that actually flips completed_at returns true,
+      // so exactly one "goal reached" activity fires even with simultaneous contributions.
+      const wasNewlyCompleted = await apiCompleteSharedGoalIfReached(goalId);
+      const goals = await fetchSharedGoals(user.id);
+      if (wasNewlyCompleted) {
+        const goal = goals.find((g) => g.id === goalId);
+        if (goal) {
+          get().postActivity('shared_goal_reached', { goalId, goalName: goal.name, targetCents: goal.target_cents }).catch(() => {});
+        }
       }
+      set({ sharedGoals: goals });
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not add contribution');
+      throw err;
     }
-    set({ sharedGoals: goals });
   },
 
   deleteContribution: async (goalId, contributionId) => {
-    await apiDeleteContribution(contributionId);
-    await get().loadSharedGoals();
+    const prev = get().sharedGoals;
+    set((state) => ({
+      sharedGoals: state.sharedGoals.map((g) => (
+        g.id === goalId
+          ? { ...g, contributions: (g.contributions || []).filter((c) => c.id !== contributionId) }
+          : g
+      )),
+    }));
+    try {
+      await apiDeleteContribution(contributionId);
+      get().loadSharedGoals().catch(() => {});
+    } catch (err) {
+      set({ sharedGoals: prev });
+      toast.error(err.message || 'Could not delete contribution');
+      throw err;
+    }
   },
 
   // ── Social: friend ledger ─────────────────────────────────────────────────
@@ -3620,147 +3941,278 @@ export const useFinanceStore = create((set, get) => ({
     if (!user) return;
     const creditorId = iOweTheme ? friendId : user.id;
     const debtorId  = iOweTheme ? user.id   : friendId;
-    const entry = await apiCreateLedgerEntry({
-      creditorId,
-      debtorId,
-      amountCents,
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempEntry = {
+      id: tempId,
+      creditor_id: creditorId,
+      debtor_id: debtorId,
+      amount_cents: amountCents,
       currency,
       kind: 'manual',
       note,
-      createdBy: user.id,
-    });
-    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
-    return entry;
+      created_by: user.id,
+      status: 'accepted',
+      created_at: new Date().toISOString(),
+    };
+    set((state) => ({ friendLedger: [tempEntry, ...state.friendLedger] }));
+    try {
+      const entry = await apiCreateLedgerEntry({
+        creditorId,
+        debtorId,
+        amountCents,
+        currency,
+        kind: 'manual',
+        note,
+        createdBy: user.id,
+      });
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === tempId ? entry : e)),
+      }));
+      get().loadFriendLedger().catch(() => {});
+      return entry;
+    } catch (err) {
+      set((state) => ({ friendLedger: state.friendLedger.filter((e) => e.id !== tempId) }));
+      toast.error(err.message || 'Could not create IOU');
+      throw err;
+    }
   },
 
   settleLedgerEntry: async (entryId, { bankAccountId } = {}) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const entry = get().friendLedger.find((e) => e.id === entryId);
-    // Ledger op first — if this fails, no orphan expense is created
-    const updated = await apiSettleLedgerEntry(entryId, user.id);
-    if (bankAccountId && entry && entry.debtor_id === user.id) {
-      const today = new Date().toISOString().slice(0, 10);
-      await get().saveEntity('expenses', {
-        date: today,
-        amountCents: entry.amount_cents,
-        currency: entry.currency,
-        category: 'Other',
-        description: entry.note || 'IOU settlement',
-        isRecurring: false,
-        bankAccountId,
-      });
-    }
+    const prevLedger = get().friendLedger;
+    const entry = prevLedger.find((e) => e.id === entryId);
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'settled' } : e)),
     }));
+    try {
+      // Ledger op first — if this fails, no orphan expense is created
+      const updated = await apiSettleLedgerEntry(entryId, user.id);
+      if (bankAccountId && entry && entry.debtor_id === user.id) {
+        const today = new Date().toISOString().slice(0, 10);
+        await get().saveEntity('expenses', {
+          date: today,
+          amountCents: entry.amount_cents,
+          currency: entry.currency,
+          category: 'Other',
+          description: entry.note || 'IOU settlement',
+          isRecurring: false,
+          bankAccountId,
+        });
+      }
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      }));
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not settle entry');
+      throw err;
+    }
   },
 
   cancelLedgerEntry: async (entryId) => {
-    const updated = await apiCancelLedgerEntry(entryId);
+    const prevLedger = get().friendLedger;
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'cancelled' } : e)),
     }));
+    try {
+      const updated = await apiCancelLedgerEntry(entryId);
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      }));
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not cancel entry');
+      throw err;
+    }
   },
 
   sendPayment: async ({ friendId, amountCents, currency = 'EUR', note = '', parentIouId = null, bankAccountId = null }) => {
     const user = get().supabaseUser;
     if (!user) return;
-    // Ledger op first — if this fails, no orphan expense is created
-    const entry = await apiCreateLedgerEntry({
-      creditorId: friendId,
-      debtorId: user.id,
-      amountCents,
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempEntry = {
+      id: tempId,
+      creditor_id: friendId,
+      debtor_id: user.id,
+      amount_cents: amountCents,
       currency,
       kind: 'payment',
       note,
-      createdBy: user.id,
-      parentIouId,
-    });
-    if (bankAccountId) {
-      const today = new Date().toISOString().slice(0, 10);
-      await get().saveEntity('expenses', {
-        date: today,
+      created_by: user.id,
+      parent_expense_id: parentIouId,
+      status: 'accepted',
+      created_at: new Date().toISOString(),
+    };
+    set((state) => ({ friendLedger: [tempEntry, ...state.friendLedger] }));
+    try {
+      // Ledger op first — if this fails, no orphan expense is created
+      const entry = await apiCreateLedgerEntry({
+        creditorId: friendId,
+        debtorId: user.id,
         amountCents,
         currency,
-        category: 'Other',
-        description: note || 'Payment to friend',
-        isRecurring: false,
-        bankAccountId,
+        kind: 'payment',
+        note,
+        createdBy: user.id,
+        parentIouId,
       });
+      if (bankAccountId) {
+        const today = new Date().toISOString().slice(0, 10);
+        await get().saveEntity('expenses', {
+          date: today,
+          amountCents,
+          currency,
+          category: 'Other',
+          description: note || 'Payment to friend',
+          isRecurring: false,
+          bankAccountId,
+        });
+      }
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === tempId ? entry : e)),
+      }));
+      get().loadFriendLedger().catch(() => {});
+      return entry;
+    } catch (err) {
+      set((state) => ({ friendLedger: state.friendLedger.filter((e) => e.id !== tempId) }));
+      toast.error(err.message || 'Could not send payment');
+      throw err;
     }
-    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
     return entry;
   },
 
   acceptPayment: async (entryId, { bankAccountId, senderName = '' } = {}) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const entry = get().friendLedger.find((e) => e.id === entryId);
+    const prevLedger = get().friendLedger;
+    const entry = prevLedger.find((e) => e.id === entryId);
     const linkedIouId = entry?.parent_expense_id;
     const linkedIou = linkedIouId
-      ? get().friendLedger.find((e) => e.id === linkedIouId && ['accepted', 'pending'].includes(e.status))
+      ? prevLedger.find((e) => e.id === linkedIouId && ['accepted', 'pending'].includes(e.status))
       : null;
 
-    // Ledger op first — atomic RPC handles payment + IOU reduction in one transaction,
-    // eliminating the race condition when two partial payments land simultaneously.
-    if (linkedIou) {
-      await apiApplyPartialIouPayment(entryId, linkedIou.id, entry.amount_cents, user.id);
-    } else {
-      await apiSettleLedgerEntry(entryId, user.id);
-    }
+    set((state) => ({
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'settled' } : e)),
+    }));
+    try {
+      // Ledger op first — atomic RPC handles payment + IOU reduction in one transaction,
+      // eliminating the race condition when two partial payments land simultaneously.
+      if (linkedIou) {
+        await apiApplyPartialIouPayment(entryId, linkedIou.id, entry.amount_cents, user.id);
+      } else {
+        await apiSettleLedgerEntry(entryId, user.id);
+      }
 
-    // Income record second — ledger is already committed, so this is recoverable if it fails
-    if (entry && bankAccountId) {
-      const today = new Date().toISOString().slice(0, 10);
-      await get().saveEntity('incomes', {
-        date: today,
-        amountCents: entry.amount_cents,
-        currency: entry.currency,
-        bankAccountId,
-        source: senderName ? `Payment from ${senderName}` : 'Friend payment',
-      });
-    }
+      // Income record second — ledger is already committed, so this is recoverable if it fails
+      if (entry && bankAccountId) {
+        const today = new Date().toISOString().slice(0, 10);
+        await get().saveEntity('incomes', {
+          date: today,
+          amountCents: entry.amount_cents,
+          currency: entry.currency,
+          bankAccountId,
+          source: senderName ? `Payment from ${senderName}` : 'Friend payment',
+        });
+      }
 
-    // Reload ledger to reflect DB-side changes rather than recomputing locally
-    await get().loadFriendLedger();
+      // Reload ledger to reflect DB-side changes rather than recomputing locally
+      get().loadFriendLedger().catch(() => {});
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not accept payment');
+      throw err;
+    }
   },
 
   declinePayment: async (entryId) => {
-    const updated = await apiRejectLedgerEntry(entryId);
+    const prevLedger = get().friendLedger;
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'rejected' } : e)),
     }));
+    try {
+      const updated = await apiRejectLedgerEntry(entryId);
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      }));
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not decline payment');
+      throw err;
+    }
   },
 
   createMoneyRequest: async ({ friendId, amountCents, currency = 'EUR', note = '' }) => {
     const user = get().supabaseUser;
     if (!user) return;
-    const entry = await apiCreateLedgerEntry({
-      creditorId: user.id,
-      debtorId: friendId,
-      amountCents,
+    const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempEntry = {
+      id: tempId,
+      creditor_id: user.id,
+      debtor_id: friendId,
+      amount_cents: amountCents,
       currency,
       kind: 'request',
       note,
-      createdBy: user.id,
-    });
-    set((state) => ({ friendLedger: [entry, ...state.friendLedger] }));
-    return entry;
+      created_by: user.id,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+    set((state) => ({ friendLedger: [tempEntry, ...state.friendLedger] }));
+    try {
+      const entry = await apiCreateLedgerEntry({
+        creditorId: user.id,
+        debtorId: friendId,
+        amountCents,
+        currency,
+        kind: 'request',
+        note,
+        createdBy: user.id,
+      });
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === tempId ? entry : e)),
+      }));
+      get().loadFriendLedger().catch(() => {});
+      return entry;
+    } catch (err) {
+      set((state) => ({ friendLedger: state.friendLedger.filter((e) => e.id !== tempId) }));
+      toast.error(err.message || 'Could not create request');
+      throw err;
+    }
   },
 
   acceptLedgerEntry: async (entryId) => {
-    const updated = await apiAcceptLedgerEntry(entryId);
+    const prevLedger = get().friendLedger;
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'accepted' } : e)),
     }));
+    try {
+      const updated = await apiAcceptLedgerEntry(entryId);
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      }));
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not accept request');
+      throw err;
+    }
   },
 
   rejectRequest: async (entryId) => {
-    const updated = await apiRejectLedgerEntry(entryId);
+    const prevLedger = get().friendLedger;
     set((state) => ({
-      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      friendLedger: state.friendLedger.map((e) => (e.id === entryId ? { ...e, status: 'rejected' } : e)),
     }));
+    try {
+      const updated = await apiRejectLedgerEntry(entryId);
+      set((state) => ({
+        friendLedger: state.friendLedger.map((e) => (e.id === entryId ? updated : e)),
+      }));
+    } catch (err) {
+      set({ friendLedger: prevLedger });
+      toast.error(err.message || 'Could not reject request');
+      throw err;
+    }
   },
 
   // ── Coingame ──────────────────────────────────────────────────────────────

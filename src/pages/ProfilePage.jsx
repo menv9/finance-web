@@ -67,7 +67,6 @@ function ProfileHero({ profile }) {
   const clearAvatar = useFinanceStore((s) => s.clearAvatar);
   const alert = useAlert();
   const fileRef = useRef(null);
-  const [busy, setBusy] = useState(false);
 
   const onPick = () => fileRef.current?.click();
 
@@ -89,31 +88,11 @@ function ProfileHero({ profile }) {
       });
       return;
     }
-    setBusy(true);
-    try {
-      await setAvatar(file);
-    } catch (err) {
-      await alert({
-        title: t('profile.avatar.errorUpload.title'),
-        description: err?.message || t('profile.avatar.errorUpload.description'),
-      });
-    } finally {
-      setBusy(false);
-    }
+    setAvatar(file).catch(() => {});
   };
 
-  const onRemove = async () => {
-    setBusy(true);
-    try {
-      await clearAvatar();
-    } catch (err) {
-      await alert({
-        title: t('profile.avatar.errorRemove.title'),
-        description: err?.message || t('profile.avatar.errorRemove.description'),
-      });
-    } finally {
-      setBusy(false);
-    }
+  const onRemove = () => {
+    clearAvatar().catch(() => {});
   };
 
   const displayName = profile?.display_name?.trim() || profile?.username || '—';
@@ -123,7 +102,6 @@ function ProfileHero({ profile }) {
       <button
         type="button"
         onClick={onPick}
-        disabled={busy}
         aria-label={t('profile.avatar.ariaChange')}
         className="group relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60"
       >
@@ -143,11 +121,11 @@ function ProfileHero({ profile }) {
           <p className="mt-3 text-sm text-ink whitespace-pre-wrap break-words">{profile.bio}</p>
         ) : null}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-          <Button variant="secondary" size="sm" onClick={onPick} loading={busy}>
+          <Button variant="secondary" size="sm" onClick={onPick}>
             {profile?.avatar_url ? t('profile.avatar.replacePhoto') : t('profile.avatar.uploadPhoto')}
           </Button>
           {profile?.avatar_url ? (
-            <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>
+            <Button variant="ghost" size="sm" onClick={onRemove}>
               {t('profile.avatar.remove')}
             </Button>
           ) : null}

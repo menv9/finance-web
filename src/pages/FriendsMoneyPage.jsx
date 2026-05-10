@@ -44,22 +44,15 @@ function SettleModal({ entry, currentUserId, open, onClose }) {
   const counterpart = entry ? (isDebtor ? entry.creditor : entry.debtor) : null;
 
   const [bankAccountId, setBankAccountId] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  function reset() { setBankAccountId(''); setError(''); setBusy(false); }
+  function reset() { setBankAccountId(''); setError(''); }
   function handleClose() { reset(); onClose(); }
 
-  async function handleConfirm() {
+  function handleConfirm() {
     if (isDebtor && !bankAccountId) { setError(t('friendsMoney.settle.errorAccount')); return; }
-    setBusy(true);
-    try {
-      await settleLedgerEntry(entry.id, isDebtor ? { bankAccountId } : {});
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+    settleLedgerEntry(entry.id, isDebtor ? { bankAccountId } : {}).catch(() => {});
+    handleClose();
   }
 
   if (!entry) return null;
@@ -96,10 +89,8 @@ function SettleModal({ entry, currentUserId, open, onClose }) {
 
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button onClick={handleConfirm} disabled={busy}>
-            {busy ? t('common.loading') : t('friendsMoney.settle.confirm')}
-          </Button>
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button onClick={handleConfirm}>{t('friendsMoney.settle.confirm')}</Button>
         </div>
       </div>
     </Modal>
@@ -116,33 +107,20 @@ function AcceptPaymentModal({ entry, open, onClose }) {
 
   const sender = entry?.debtor;
   const [bankAccountId, setBankAccountId] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  function reset() { setBankAccountId(''); setError(''); setBusy(false); }
+  function reset() { setBankAccountId(''); setError(''); }
   function handleClose() { reset(); onClose(); }
 
-  async function handleAccept() {
+  function handleAccept() {
     if (!bankAccountId) { setError(t('friendsMoney.payment.errorAccount')); return; }
-    setBusy(true);
-    try {
-      await acceptPayment(entry.id, { bankAccountId, senderName: displayName(sender) });
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+    acceptPayment(entry.id, { bankAccountId, senderName: displayName(sender) }).catch(() => {});
+    handleClose();
   }
 
-  async function handleDecline() {
-    setBusy(true);
-    try {
-      await declinePayment(entry.id);
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+  function handleDecline() {
+    declinePayment(entry.id).catch(() => {});
+    handleClose();
   }
 
   if (!entry) return null;
@@ -183,12 +161,10 @@ function AcceptPaymentModal({ entry, open, onClose }) {
         {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={handleDecline} disabled={busy}>
+          <Button type="button" variant="ghost" onClick={handleDecline}>
             {t('friendsMoney.payment.decline')}
           </Button>
-          <Button onClick={handleAccept} disabled={busy}>
-            {busy ? t('common.loading') : t('friendsMoney.payment.accept')}
-          </Button>
+          <Button onClick={handleAccept}>{t('friendsMoney.payment.accept')}</Button>
         </div>
       </div>
     </Modal>
@@ -209,7 +185,6 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
   const [amount, setAmount] = useState(prefillAmountCents ? (prefillAmountCents / 100).toFixed(2) : '');
   const [bankAccountId, setBankAccountId] = useState('');
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -219,28 +194,21 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
       setBankAccountId('');
       setNote('');
       setError('');
-      setBusy(false);
     }
   }, [open, prefillFriendId, prefillAmountCents]);
 
-  function reset() { setFriendId(''); setAmount(''); setBankAccountId(''); setNote(''); setError(''); setBusy(false); }
+  function reset() { setFriendId(''); setAmount(''); setBankAccountId(''); setNote(''); setError(''); }
   function handleClose() { reset(); onClose(); }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
     if (!bankAccountId) { setError(t('friendsMoney.settle.errorAccount')); return; }
-    setBusy(true);
-    try {
-      await sendPayment({ friendId, amountCents: cents, currency, note: note.trim(), parentIouId: prefillParentIouId, bankAccountId });
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+    sendPayment({ friendId, amountCents: cents, currency, note: note.trim(), parentIouId: prefillParentIouId, bankAccountId }).catch(() => {});
+    handleClose();
   }
 
   return (
@@ -296,10 +264,8 @@ function SendPaymentModal({ open, onClose, prefillFriendId = '', prefillAmountCe
 
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? t('common.loading') : t('friendsMoney.payment.sendConfirm')}
-          </Button>
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button type="submit">{t('friendsMoney.payment.sendConfirm')}</Button>
         </div>
       </form>
     </Modal>
@@ -319,26 +285,19 @@ function CreateIOUModal({ open, onClose }) {
   const [amount, setAmount] = useState('');
   const [iOweTheme, setIOweTheme] = useState(false);
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  function reset() { setFriendId(''); setAmount(''); setIOweTheme(false); setNote(''); setError(''); setBusy(false); }
+  function reset() { setFriendId(''); setAmount(''); setIOweTheme(false); setNote(''); setError(''); }
   function handleClose() { reset(); onClose(); }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
-    setBusy(true);
-    try {
-      await createManualIOU({ friendId, amountCents: cents, currency, note: note.trim(), iOweTheme });
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+    createManualIOU({ friendId, amountCents: cents, currency, note: note.trim(), iOweTheme }).catch(() => {});
+    handleClose();
   }
 
   return (
@@ -384,10 +343,8 @@ function CreateIOUModal({ open, onClose }) {
 
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? t('common.loading') : t('friendsMoney.form.submit')}
-          </Button>
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button type="submit">{t('friendsMoney.form.submit')}</Button>
         </div>
       </form>
     </Modal>
@@ -406,7 +363,6 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
   const [friendId, setFriendId] = useState(prefillFriendId);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -415,26 +371,19 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
       setAmount('');
       setNote('');
       setError('');
-      setBusy(false);
     }
   }, [open, prefillFriendId]);
 
   function handleClose() { onClose(); }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const cents = parseMoneyCents(amount);
     if (!friendId) { setError(t('friendsMoney.form.errorFriend')); return; }
     if (!cents || cents <= 0) { setError(t('friendsMoney.form.errorAmount')); return; }
-    setBusy(true);
-    try {
-      await createMoneyRequest({ friendId, amountCents: cents, currency, note: note.trim() });
-      handleClose();
-    } catch (err) {
-      setError(err.message || 'Something went wrong.');
-      setBusy(false);
-    }
+    createMoneyRequest({ friendId, amountCents: cents, currency, note: note.trim() }).catch(() => {});
+    handleClose();
   }
 
   return (
@@ -471,10 +420,8 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
 
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? t('common.loading') : t('friendsMoney.request.send')}
-          </Button>
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button type="submit">{t('friendsMoney.request.send')}</Button>
         </div>
       </form>
     </Modal>
@@ -485,7 +432,6 @@ function CreateRequestModal({ open, onClose, prefillFriendId = '' }) {
 
 function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCancel, onReject, onAccept }) {
   const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
   const iAmCreditor = entry.creditor_id === currentUserId;
   const counterpart = iAmCreditor ? entry.debtor : entry.creditor;
   const isAccepted = entry.status === 'accepted';
@@ -495,20 +441,9 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
   const isRequest = entry.kind === 'request';
   const date = new Date(entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-  async function handleCancel() {
-    setBusy(true);
-    try { await onCancel(entry.id); } finally { setBusy(false); }
-  }
-
-  async function handleReject() {
-    setBusy(true);
-    try { await onReject(entry.id); } finally { setBusy(false); }
-  }
-
-  async function handleAccept() {
-    setBusy(true);
-    try { await onAccept(entry.id); } finally { setBusy(false); }
-  }
+  function handleCancel() { onCancel(entry.id)?.catch?.(() => {}); }
+  function handleReject() { onReject(entry.id)?.catch?.(() => {}); }
+  function handleAccept() { onAccept(entry.id)?.catch?.(() => {}); }
 
   return (
     <li className="flex items-start gap-3 py-3 border-b border-rule last:border-0">
@@ -541,31 +476,31 @@ function LedgerRow({ entry, currentUserId, onSettleClick, onSendPayment, onCance
         )}
         {needsMyAcceptance && (
           <div className="flex gap-1.5">
-            <Button size="xs" variant="ghost" onClick={handleAccept} disabled={busy} title={t('friendsMoney.accept')}>
+            <Button size="xs" variant="ghost" onClick={handleAccept} title={t('friendsMoney.accept')}>
               <Check size={13} />
             </Button>
-            <Button size="xs" variant="ghost" onClick={handleReject} disabled={busy} title={t('friendsMoney.request.decline')}>
+            <Button size="xs" variant="ghost" onClick={handleReject} title={t('friendsMoney.request.decline')}>
               <X size={13} />
             </Button>
           </div>
         )}
         {isAwaitingAcceptance && isCreator && (
-          <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
+          <Button size="xs" variant="ghost" onClick={handleCancel} title={t('friendsMoney.cancel')}>
             <X size={13} />
           </Button>
         )}
         {isAccepted && entry.kind !== 'payment' && (
           <div className="flex gap-1.5">
             {!iAmCreditor && (
-              <Button size="xs" variant="ghost" onClick={() => onSendPayment(entry)} disabled={busy} title={t('friendsMoney.payment.sendTitle')}>
+              <Button size="xs" variant="ghost" onClick={() => onSendPayment(entry)} title={t('friendsMoney.payment.sendTitle')}>
                 <SendHorizonal size={13} />
               </Button>
             )}
-            <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} disabled={busy} title={t('friendsMoney.settle.title')}>
+            <Button size="xs" variant="ghost" onClick={() => onSettleClick(entry)} title={t('friendsMoney.settle.title')}>
               <Check size={13} />
             </Button>
             {isCreator && (
-              <Button size="xs" variant="ghost" onClick={handleCancel} disabled={busy} title={t('friendsMoney.cancel')}>
+              <Button size="xs" variant="ghost" onClick={handleCancel} title={t('friendsMoney.cancel')}>
                 <X size={13} />
               </Button>
             )}

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import CoingameShell from './components/coingame/CoingameShell';
 import { ConfirmProvider } from './components/ConfirmContext';
+import { ToastViewport } from './components/ToastViewport';
 import { LoadingScreen } from './components/LoadingScreen';
 import { RouteLoader } from './components/RouteLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -186,6 +187,7 @@ export default function App() {
           />
         </Routes>
       </Suspense>
+      <ToastViewport />
     </ConfirmProvider>
   );
 }

@@ -133,21 +133,16 @@ function ReactionBar({ activity, currentUserId, onAdd, onRemove }) {
 function CommentThread({ activity, currentUserId, onAdd, onDelete }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef(null);
   const comments = activity.activity_comments || [];
   const count = comments.length;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
-    setSubmitting(true);
-    try {
-      await onAdd(activity.id, text.trim());
-      setText('');
-    } finally {
-      setSubmitting(false);
-    }
+    const body = text.trim();
+    if (!body) return;
+    setText('');
+    onAdd(activity.id, body)?.catch?.(() => {});
   };
 
   return (
@@ -189,7 +184,7 @@ function CommentThread({ activity, currentUserId, onAdd, onDelete }) {
               placeholder="Write a comment…"
               className="flex-1 text-xs bg-surface-sunken border border-rule rounded-lg px-3 py-1.5 text-ink placeholder:text-ink-faint focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <Button size="sm" type="submit" disabled={!text.trim() || submitting}>
+            <Button size="sm" type="submit" disabled={!text.trim()}>
               Send
             </Button>
           </form>

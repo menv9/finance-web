@@ -100,7 +100,6 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
   const [desc, setDesc] = useState('');
   const [emoji, setEmoji] = useState(GOAL_ICONS[0].key);
   const [inviteIds, setInviteIds] = useState([]);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -121,19 +120,12 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
   const toggleFriend = (id) =>
     setInviteIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const targetCents = parseMoneyCents(target || '0');
     if (!name.trim()) return alert({ title: 'Name required', description: 'Please enter a goal name.' });
     if (targetCents <= 0) return alert({ title: 'Invalid target', description: 'Target must be greater than zero.' });
-    setSaving(true);
-    try {
-      await onSave({ name: name.trim(), targetCents, currency, description: desc.trim() || null, emoji: emoji.trim() || null, inviteIds });
-      onClose();
-    } catch (err) {
-      await alert({ title: 'Error', description: err.message || 'Could not save goal.' });
-    } finally {
-      setSaving(false);
-    }
+    onSave({ name: name.trim(), targetCents, currency, description: desc.trim() || null, emoji: emoji.trim() || null, inviteIds })?.catch?.(() => {});
+    onClose();
   };
 
   return (
@@ -180,7 +172,7 @@ function GoalFormModal({ open, onClose, goal, friends, currency, onSave }) {
         )}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button onClick={handleSave} disabled={saving}>{t('common.save')}</Button>
+          <Button onClick={handleSave}>{t('common.save')}</Button>
         </div>
       </div>
     </Modal>
@@ -194,22 +186,14 @@ function ContributionModal({ open, onClose, goal, currency, onAdd }) {
   const alert = useAlert();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (open) { setAmount(''); setNote(''); } }, [open]);
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     const amountCents = parseMoneyCents(amount || '0');
     if (amountCents <= 0) return alert({ title: 'Invalid amount', description: 'Enter an amount greater than zero.' });
-    setSaving(true);
-    try {
-      await onAdd(goal.id, amountCents, note.trim());
-      onClose();
-    } catch (err) {
-      await alert({ title: 'Error', description: err.message || 'Could not add contribution.' });
-    } finally {
-      setSaving(false);
-    }
+    onAdd(goal.id, amountCents, note.trim())?.catch?.(() => {});
+    onClose();
   };
 
   return (
@@ -231,7 +215,7 @@ function ContributionModal({ open, onClose, goal, currency, onAdd }) {
         </FormField>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button onClick={handleAdd} disabled={saving}>{t('common.add')}</Button>
+          <Button onClick={handleAdd}>{t('common.add')}</Button>
         </div>
       </div>
     </Modal>

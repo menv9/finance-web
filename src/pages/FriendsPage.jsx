@@ -52,7 +52,6 @@ function FriendsList() {
   const friends = useFinanceStore((s) => s.friends);
   const removeFriend = useFinanceStore((s) => s.removeFriend);
   const navigate = useNavigate();
-  const [busyId, setBusyId] = useState(null);
 
   if (!friends.length) {
     return <EmptyState title={t('profile.friends.empty')} description={t('profile.friends.emptyDescription')} />;
@@ -76,11 +75,7 @@ function FriendsList() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  loading={busyId === f.otherId}
-                  onClick={async () => {
-                    setBusyId(f.otherId);
-                    try { await removeFriend(f.otherId); } finally { setBusyId(null); }
-                  }}
+                  onClick={() => removeFriend(f.otherId).catch(() => {})}
                 >
                   {t('profile.friends.remove')}
                 </Button>
@@ -100,16 +95,12 @@ function PendingRequests() {
   const accept = useFinanceStore((s) => s.acceptFriendRequest);
   const decline = useFinanceStore((s) => s.declineFriendRequest);
   const cancel = useFinanceStore((s) => s.cancelFriendRequest);
-  const [busyId, setBusyId] = useState(null);
 
   if (!incoming.length && !outgoing.length) {
     return <p className="text-sm text-ink-muted">{t('profile.pending.none')}</p>;
   }
 
-  const guarded = (id, fn) => async () => {
-    setBusyId(id);
-    try { await fn(); } finally { setBusyId(null); }
-  };
+  const guarded = (_id, fn) => () => { fn()?.catch?.(() => {}); };
 
   return (
     <div className="grid gap-5">
@@ -123,10 +114,10 @@ function PendingRequests() {
                   profile={r.profile}
                   trailing={
                     <>
-                      <Button size="sm" loading={busyId === r.requesterId} onClick={guarded(r.requesterId, () => accept(r.requesterId))}>
+                      <Button size="sm" onClick={guarded(r.requesterId, () => accept(r.requesterId))}>
                         {t('profile.pending.accept')}
                       </Button>
-                      <Button variant="ghost" size="sm" loading={busyId === r.requesterId} onClick={guarded(r.requesterId, () => decline(r.requesterId))}>
+                      <Button variant="ghost" size="sm" onClick={guarded(r.requesterId, () => decline(r.requesterId))}>
                         {t('profile.pending.decline')}
                       </Button>
                     </>
@@ -146,7 +137,7 @@ function PendingRequests() {
                 <ProfileLine
                   profile={r.profile}
                   trailing={
-                    <Button variant="ghost" size="sm" loading={busyId === r.addresseeId} onClick={guarded(r.addresseeId, () => cancel(r.addresseeId))}>
+                    <Button variant="ghost" size="sm" onClick={guarded(r.addresseeId, () => cancel(r.addresseeId))}>
                       {t('profile.pending.cancel')}
                     </Button>
                   }
@@ -175,7 +166,6 @@ function FindFriends() {
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState(null);
 
   const relationStatus = useMemo(() => {
     const map = new Map();
@@ -211,15 +201,8 @@ function FindFriends() {
     }
   };
 
-  const sendTo = async (userId) => {
-    setBusyId(userId);
-    try {
-      await sendRequest(userId);
-    } catch (err) {
-      setError(err?.message || t('profile.findFriends.errorSend'));
-    } finally {
-      setBusyId(null);
-    }
+  const sendTo = (userId) => {
+    sendRequest(userId).catch(() => {});
   };
 
   return (
@@ -265,7 +248,7 @@ function FindFriends() {
                       ) : rel === 'incoming' ? (
                         <span className="text-xs text-ink-muted">{t('profile.findFriends.statusIncoming')}</span>
                       ) : (
-                        <Button size="sm" loading={busyId === profile.user_id} onClick={() => sendTo(profile.user_id)}>
+                        <Button size="sm" onClick={() => sendTo(profile.user_id)}>
                           {t('profile.findFriends.addFriend')}
                         </Button>
                       )
