@@ -3,10 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { Check, HandCoins, SendHorizonal, X, BellDot } from 'lucide-react';
 
 import { PageHeader } from '../components/PageHeader';
-import { Button, Card, EmptyState, FormField, Input, Modal, Skeleton } from '../components/ui';
+import { Button, Card, EmptyState, FormField, Input, Modal, SectionDivider, Skeleton } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { formatCurrency, parseMoneyCents } from '../utils/formatters';
 import { useTranslation } from '../i18n/useTranslation';
+import { SharedGoalsSection } from './SharedGoalsPage';
 
 function Avatar({ profile, size = 32 }) {
   const initials = (profile?.display_name || profile?.username || '?')
@@ -690,6 +691,12 @@ export default function FriendsMoneyPage() {
           </ul>
         </Card>
       )}
+
+      <div className="mt-10 mb-4">
+        <SectionDivider />
+        <h2 className="font-display text-xl text-ink mt-6 mb-3">{t('nav.sharedGoals')}</h2>
+      </div>
+      <div data-tour="shared-goals-list"><SharedGoalsSection /></div>
 
       <CreateIOUModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <CreateRequestModal open={requestOpen} onClose={() => { setRequestOpen(false); setRequestPrefillFriend(''); }} prefillFriendId={requestPrefillFriend} />

@@ -239,16 +239,11 @@ export const TOUR_STEPS = [
         label: 'Your profile',
         desc: 'Set your username, display name, bio, and avatar. Your username is how friends find and recognise you across the app.',
       },
-      {
-        tourId: 'profile-shared-goals',
-        label: 'Shared goals',
-        desc: 'Savings goals you\'re working on together with friends. Contributions from all participants roll up into a shared progress bar.',
-      },
     ],
   },
   {
-    route: '/shared-goals',
-    page: 'Shared goals',
+    route: '/friends/money',
+    page: 'Money with friends',
     stops: [
       {
         tourId: 'shared-goals-list',

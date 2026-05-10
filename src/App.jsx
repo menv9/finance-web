@@ -43,7 +43,6 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'));
-const SharedGoalsPage = lazy(() => import('./pages/SharedGoalsPage'));
 const FriendsPage = lazy(() => import('./pages/FriendsPage'));
 const FriendsMoneyPage = lazy(() => import('./pages/FriendsMoneyPage'));
 const CoingamePage = lazy(() => import('./pages/CoingamePage'));
@@ -174,7 +173,7 @@ export default function App() {
                       />
                       <Route path="/profile" element={socialEnabled ? <ProfilePage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/activity" element={socialEnabled ? <ActivityFeedPage /> : <Navigate to="/dashboard" replace />} />
-                      <Route path="/shared-goals" element={socialEnabled ? <SharedGoalsPage /> : <Navigate to="/dashboard" replace />} />
+                      <Route path="/shared-goals" element={<Navigate to="/friends/money" replace />} />
                       <Route path="/friends" element={socialEnabled ? <FriendsPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/friends/money" element={socialEnabled ? <FriendsMoneyPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/settings" element={<SettingsPage />} />
