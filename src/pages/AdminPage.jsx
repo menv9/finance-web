@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, Card, FormField, Input, Select, Textarea } from '../components/ui';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { toast } from '../store/useToastStore';
+import { formatCurrency } from '../utils/formatters';
 
 const PLANNER_URL = 'https://planner.finges.xyz';
 
@@ -115,29 +116,65 @@ function ImportJsonCard() {
   );
 }
 
+function describeRecord(storeName, r) {
+  const date = r.date || '????-??-??';
+  const money = r.amountCents != null
+    ? formatCurrency(r.amountCents, r.currency || 'EUR')
+    : '';
+  const tail = (() => {
+    switch (storeName) {
+      case 'expenses':           return r.description || r.category || '';
+      case 'incomes':            return r.source || r.category || '';
+      case 'savingsEntries':     return r.note || r.kind || '';
+      case 'dividends':          return r.ticker || r.note || '';
+      case 'portfolioCashflows': return `${r.source || ''} ${r.holdingId ? `· ${r.holdingId}` : ''}`.trim();
+      case 'portfolioSales':     return r.holdingId || r.note || '';
+      default:                   return '';
+    }
+  })();
+  return [date, money, tail].filter(Boolean).join(' · ');
+}
+
 function ChangeDateCard() {
   const saveEntity = useFinanceStore((s) => s.saveEntity);
-  const stores = useFinanceStore((s) => s);
+  const allState = useFinanceStore((s) => s);
   const [storeName, setStoreName] = useState(DATE_BEARING_STORES[0]);
   const [recordId, setRecordId] = useState('');
   const [newDate, setNewDate] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const list = allState[storeName] || [];
+  const sortedRecords = useMemo(() => {
+    return [...list].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [list]);
+
+  const selectedRecord = sortedRecords.find((r) => r.id === recordId);
+
+  const handleStoreChange = (next) => {
+    setStoreName(next);
+    setRecordId('');
+    setNewDate('');
+  };
+
+  const handleRecordChange = (nextId) => {
+    setRecordId(nextId);
+    const found = (allState[storeName] || []).find((r) => r.id === nextId);
+    setNewDate(found?.date || '');
+  };
+
   const handleUpdate = async () => {
-    if (!recordId.trim() || !newDate) {
-      toast.error('Record id and new date are required');
+    if (!selectedRecord) {
+      toast.error('Pick a record first');
       return;
     }
-    const list = stores[storeName] || [];
-    const record = list.find((r) => r.id === recordId.trim());
-    if (!record) {
-      toast.error(`No ${storeName} record found with id ${recordId.trim()}`);
+    if (!newDate) {
+      toast.error('New date is required');
       return;
     }
     setBusy(true);
     try {
-      await saveEntity(storeName, { ...record, date: newDate });
-      toast.success(`Updated ${storeName}/${recordId.trim()}`);
+      await saveEntity(storeName, { ...selectedRecord, date: newDate });
+      toast.success(`Updated ${storeName}/${selectedRecord.id}`);
       setRecordId('');
       setNewDate('');
     } catch (err) {
@@ -157,29 +194,38 @@ function ChangeDateCard() {
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Store">
-            <Select value={storeName} onChange={(e) => setStoreName(e.target.value)}>
+            <Select value={storeName} onChange={(e) => handleStoreChange(e.target.value)}>
               {DATE_BEARING_STORES.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </Select>
           </FormField>
-          <FormField label="Record id">
-            <Input
-              value={recordId}
-              onChange={(e) => setRecordId(e.target.value)}
-              placeholder="exp-…"
-            />
+          <FormField label={`Record (${sortedRecords.length})`}>
+            <Select value={recordId} onChange={(e) => handleRecordChange(e.target.value)}>
+              <option value="">— pick one —</option>
+              {sortedRecords.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {describeRecord(storeName, r)}
+                </option>
+              ))}
+            </Select>
           </FormField>
           <FormField label="New date">
             <Input
               type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
+              disabled={!selectedRecord}
             />
           </FormField>
         </div>
+        {selectedRecord && (
+          <p className="text-xs text-ink-faint">
+            Currently <code>{selectedRecord.date}</code> → <code>{newDate || '…'}</code>
+          </p>
+        )}
         <div>
-          <Button onClick={handleUpdate} disabled={busy}>
+          <Button onClick={handleUpdate} disabled={busy || !selectedRecord || !newDate}>
             {busy ? 'Updating…' : 'Update'}
           </Button>
         </div>
