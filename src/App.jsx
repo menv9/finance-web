@@ -58,6 +58,7 @@ const CoingameProfilePage = lazy(() => import('./pages/CoingameProfilePage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 export default function App() {
   const bootstrap = useFinanceStore((state) => state.bootstrap);
@@ -177,6 +178,7 @@ export default function App() {
                       <Route path="/friends" element={socialEnabled ? <FriendsPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/friends/money" element={socialEnabled ? <FriendsMoneyPage /> : <Navigate to="/dashboard" replace />} />
                       <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                     </LiteGuard>

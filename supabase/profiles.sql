@@ -12,10 +12,15 @@ create table if not exists public.profiles (
   bio text,
   avatar_url text,
   social_enabled boolean not null default true,
+  is_admin boolean not null default false,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint username_format check (username ~ '^[a-z0-9_]{3,20}$')
 );
+
+-- For environments where the table predates is_admin
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
 
 create index if not exists profiles_username_idx on public.profiles (username);
 
@@ -34,6 +39,10 @@ drop policy if exists "profiles update own" on public.profiles;
 create policy "profiles update own"
   on public.profiles for update to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Column-level lock: users may update their row, but never the is_admin flag.
+-- Flip via service role (dashboard/SQL editor) only.
+revoke update (is_admin) on public.profiles from authenticated;
 
 -- Auto-bump updated_at on row update
 create or replace function public.set_updated_at()
