@@ -137,9 +137,9 @@ function MenuIcon({ open }) {
   );
 }
 
-function Logo() {
+function Logo({ to = '/dashboard' }) {
   return (
-    <NavLink to="/dashboard" className="flex items-center group" aria-label="FinGes">
+    <NavLink to={to} className="flex items-center group" aria-label="FinGes">
       <Wordmark size="md" />
     </NavLink>
   );
@@ -311,9 +311,9 @@ export function AppShell({ children }) {
     () => {
       if (isLite) {
         return [
-          { kind: 'link', to: '/this-month', labelKey: 'nav.month' },
-          { kind: 'link', to: '/expenses',   labelKey: 'nav.expenses' },
-          { kind: 'link', to: '/income',     labelKey: 'nav.income' },
+          { kind: 'link', to: '/today',    labelKey: 'nav.today' },
+          { kind: 'link', to: '/expenses', labelKey: 'nav.expenses' },
+          { kind: 'link', to: '/income',   labelKey: 'nav.income' },
         ].filter(moduleVisible);
       }
       return NAV_GROUPS
@@ -512,7 +512,7 @@ export function AppShell({ children }) {
       <header className="sticky top-0 z-30 border-b border-rule bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto grid h-14 max-w-wide grid-cols-[1fr_auto_1fr] items-center gap-6 pl-4 pr-5 lg:px-10">
           <div className="col-start-1 flex min-w-0 items-center justify-start gap-6">
-            <Logo />
+            <Logo to={isLite ? '/today' : '/dashboard'} />
           </div>
 
           <nav aria-label={t('nav.primary')} className="col-start-2 hidden justify-center lg:flex items-center gap-1">
@@ -920,7 +920,7 @@ export function AppShell({ children }) {
       >
         {/* Panel header row */}
         <div className="flex items-center justify-between border-b border-rule px-4 py-3">
-          <Logo />
+          <Logo to={isLite ? '/today' : '/dashboard'} />
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
@@ -1023,7 +1023,7 @@ export function AppShell({ children }) {
           {isLite ? (
             <>
               <NavLink
-                to="/this-month"
+                to="/today"
                 className={({ isActive }) =>
                   cn(
                     'flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[0.65rem] transition-colors duration-150',
@@ -1031,8 +1031,8 @@ export function AppShell({ children }) {
                   )
                 }
               >
-                <CalendarIcon />
-                <span>{t('nav.month')}</span>
+                <DashboardIcon />
+                <span>{t('nav.today')}</span>
               </NavLink>
               <NavLink
                 to="/expenses"

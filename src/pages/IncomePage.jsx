@@ -227,6 +227,8 @@ export default function IncomePage() {
   const dividends = useFinanceStore((state) => state.dividends);
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const settings = useFinanceStore((state) => state.settings);
+  const appMode = useFinanceStore((state) => state.appMode);
+  const isLite = appMode === 'lite';
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const markFixedIncomeReceived = useFinanceStore((state) => state.markFixedIncomeReceived);
@@ -442,21 +444,28 @@ export default function IncomePage() {
         title={t('income.title')}
         description={t('income.description')}
         actions={
-          <>
+          isLite ? (
             <Button variant="primary" size="sm" onClick={openNew}>
               <PlusIcon /> {t('income.newIncome')}
             </Button>
-            <MonthSelector
-              id="income-view-month"
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-              className="mt-8 w-full"
-            />
-          </>
+          ) : (
+            <>
+              <Button variant="primary" size="sm" onClick={openNew}>
+                <PlusIcon /> {t('income.newIncome')}
+              </Button>
+              <MonthSelector
+                id="income-view-month"
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                className="mt-8 w-full"
+              />
+            </>
+          )
         }
       />
 
       {/* KPIs */}
+      {!isLite && (
       <section data-tour="income-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
@@ -490,8 +499,10 @@ export default function IncomePage() {
           />
         </div>
       </section>
+      )}
 
       {/* split + trend — same grid pattern as portfolio */}
+      {!isLite && (
       <section className={'grid gap-6 lg:grid-cols-12 ' + rise(3)}>
         <Card data-tour="income-chart" eyebrow={t('income.chartCard.eyebrow')} title={t('income.chartCard.title')} variant="chart" className="lg:col-span-8">
           <LWHistogram
@@ -555,6 +566,7 @@ export default function IncomePage() {
           )}
         </Card>
       </section>
+      )}
 
       {/* ledgers */}
       <section className="grid gap-6 lg:grid-cols-12">
@@ -565,7 +577,7 @@ export default function IncomePage() {
         description={t('income.ledgerCard.description')}
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            {!batchSelect.selecting && sortedIncomeRows.some((row) => row.ledgerType === 'income') && (
+            {!isLite && !batchSelect.selecting && sortedIncomeRows.some((row) => row.ledgerType === 'income') && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 {t('income.select')}
               </Button>
@@ -575,8 +587,9 @@ export default function IncomePage() {
             </Button>
           </div>
         }
-        className={'lg:col-span-8 ' + rise(5)}
+        className={(isLite ? 'lg:col-span-12 ' : 'lg:col-span-8 ') + rise(5)}
       >
+        {!isLite && (
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label={t('income.ledgerCard.kindLabel')} htmlFor="income-kind">
             <Select id="income-kind" value={filterKind} onChange={(e) => setFilterKind(e.target.value)}>
@@ -596,6 +609,7 @@ export default function IncomePage() {
             />
           </FormField>
         </div>
+        )}
         <BatchDeleteBar
           selecting={batchSelect.selecting}
           selectedCount={batchSelect.selectedIds.size}
@@ -642,6 +656,7 @@ export default function IncomePage() {
         )}
       </Card>
 
+      {!isLite && (
       <Card
         data-tour="income-fixed"
         eyebrow={t('income.fixedCard.eyebrow')}
@@ -689,6 +704,7 @@ export default function IncomePage() {
           </>
         )}
       </Card>
+      )}
       </section>
 
       <Modal

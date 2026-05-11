@@ -18,7 +18,7 @@ export function saveAppMode(mode) {
 }
 
 export const LITE_PATHS = new Set([
-  '/this-month',
+  '/today',
   '/expenses',
   '/income',
   '/profile',

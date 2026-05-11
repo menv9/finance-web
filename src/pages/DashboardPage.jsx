@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import LWAreaChart from '../components/charts/LWAreaChart';
 import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
-import { buildDividendIncomeRows } from '../utils/finance';
+import { buildRecentActivity } from '../utils/finance';
+import RecentActivity from '../components/RecentActivity';
 import { exportElementToPdf } from '../utils/pdf';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
 import { Card, Stat, Button, EmptyState } from '../components/ui';
@@ -83,53 +84,6 @@ const NET_WORTH_PERIODS = [
   { key: '1y', label: '1Y', months: 12 },
 ];
 
-function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription }) {
-  if (!items.length) {
-    return (
-      <EmptyState
-        title={emptyTitle}
-        description={emptyDescription}
-      />
-    );
-  }
-  return (
-    <ul className="divide-y divide-rule">
-      {items.map((item) => {
-        const isPortfolioSaleLoss = item.incomeKind === 'portfolio_sale' && (item.realizedPnlCents || 0) < 0;
-        const visualAmountCents = isPortfolioSaleLoss ? item.realizedPnlCents : item.amountCents;
-        const amountClass = isPortfolioSaleLoss
-          ? 'text-danger'
-          : item.direction === 'in'
-            ? 'text-positive'
-            : 'text-danger';
-        return (
-        <li key={`${item.type}-${item.id}`} className="flex items-baseline justify-between gap-4 py-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-ink">{item.label}</p>
-            <p className="eyebrow mt-1">
-              {item.type} · {new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short' }).format(new Date(item.date))}
-            </p>
-          </div>
-          <span
-            className={
-              'numeric text-sm tabular rounded px-1.5 py-0.5 ' +
-              (amountClass === 'text-danger'
-                ? 'text-danger bg-danger-soft'
-                : amountClass === 'text-positive'
-                  ? 'text-positive bg-positive-soft'
-                  : amountClass)
-            }
-          >
-            {isPortfolioSaleLoss ? '−' : item.direction === 'in' ? '+' : '−'}
-            {formatCurrency(Math.abs(visualAmountCents), currency, locale).replace(/^[−-]/, '')}
-          </span>
-        </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 export default function DashboardPage() {
   const { t, locale } = useTranslation();
   const reportRef = useRef(null);
@@ -207,31 +161,10 @@ export default function DashboardPage() {
     })),
   [dashboard.cashflowSeries]);
 
-  const recentActivity = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const expenseRows = expenses.map((e) => ({
-      id: e.id,
-      type: 'expense',
-      label: e.description || e.category || 'Expense',
-      amountCents: e.amountCents,
-      date: e.date,
-      direction: 'out',
-    }));
-    const incomeRows = [...incomes, ...buildDividendIncomeRows(dividends)].map((i) => ({
-      id: i.id,
-      type: 'income',
-      label: i.source || 'Income',
-      amountCents: i.amountCents,
-      date: i.date,
-      direction: 'in',
-      incomeKind: i.incomeKind,
-      realizedPnlCents: i.realizedPnlCents,
-    }));
-    return [...expenseRows, ...incomeRows]
-      .filter((item) => item.date <= today)
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 8);
-  }, [dividends, expenses, incomes]);
+  const recentActivity = useMemo(
+    () => buildRecentActivity({ expenses, incomes, dividends, limit: 8 }),
+    [dividends, expenses, incomes],
+  );
 
   const upcoming = dashboard.upcomingEvents || [];
 

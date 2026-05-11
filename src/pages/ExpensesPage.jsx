@@ -296,6 +296,8 @@ export default function ExpensesPage() {
   const bankAccounts = useFinanceStore((state) => state.bankAccounts || []);
   const debts = useFinanceStore((state) => state.debts || []);
   const settings = useFinanceStore((state) => state.settings);
+  const appMode = useFinanceStore((state) => state.appMode);
+  const isLite = appMode === 'lite';
   const saveEntity = useFinanceStore((state) => state.saveEntity);
   const removeEntity = useFinanceStore((state) => state.removeEntity);
   const saveFixedExpense = useFinanceStore((state) => state.saveFixedExpense);
@@ -512,24 +514,31 @@ export default function ExpensesPage() {
         title={t('expenses.title')}
         description={t('expenses.description')}
         actions={
-          <>
-            <Button variant="secondary" size="sm" onClick={exportCsv}>
-              {t('expenses.exportCsv')}
-            </Button>
+          isLite ? (
             <Button variant="primary" size="sm" onClick={openNewExpense}>
               <PlusIcon /> {t('expenses.newExpense')}
             </Button>
-            <MonthSelector
-              id="expenses-view-month"
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-              className="mt-8 w-full"
-            />
-          </>
+          ) : (
+            <>
+              <Button variant="secondary" size="sm" onClick={exportCsv}>
+                {t('expenses.exportCsv')}
+              </Button>
+              <Button variant="primary" size="sm" onClick={openNewExpense}>
+                <PlusIcon /> {t('expenses.newExpense')}
+              </Button>
+              <MonthSelector
+                id="expenses-view-month"
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                className="mt-8 w-full"
+              />
+            </>
+          )
         }
       />
 
       {/* summary stats */}
+      {!isLite && (
       <section data-tour="expenses-stats" className="grid gap-px border border-rule rounded-lg overflow-hidden bg-rule sm:grid-cols-3">
         <div className={'min-w-0 bg-surface p-6 ' + rise(1)}>
           <Stat
@@ -564,8 +573,10 @@ export default function ExpensesPage() {
           />
         </div>
       </section>
+      )}
 
       {/* charts */}
+      {!isLite && (
       <section className="grid gap-6 lg:grid-cols-12">
         <Card eyebrow={t('expenses.spendChart.eyebrow')} title={t('expenses.spendChart.title')} variant="chart" className={'lg:col-span-8 ' + rise(2)}>
           <LWHistogram
@@ -632,6 +643,7 @@ export default function ExpensesPage() {
           )}
         </Card>
       </section>
+      )}
 
       {/* ledgers */}
       <section className="grid gap-6 lg:grid-cols-12">
@@ -642,7 +654,7 @@ export default function ExpensesPage() {
         description={t('expenses.ledgerCard.description')}
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            {!batchSelect.selecting && (
+            {!isLite && !batchSelect.selecting && (
               <Button variant="secondary" size="sm" onClick={batchSelect.start}>
                 {t('expenses.select')}
               </Button>
@@ -652,8 +664,10 @@ export default function ExpensesPage() {
             </Button>
           </div>
         }
-        className={'lg:col-span-8 ' + rise(3)}
+        className={(isLite ? 'lg:col-span-12 ' : 'lg:col-span-8 ') + rise(3)}
       >
+        {!isLite && (
+        <>
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <FormField label={t('expenses.ledgerCard.categoryLabel')} htmlFor="expenses-category">
             <Select
@@ -688,6 +702,8 @@ export default function ExpensesPage() {
             {t('expenses.manageCategories')}
           </button>
         </div>
+        </>
+        )}
 
         <BatchDeleteBar
           selecting={batchSelect.selecting}
@@ -736,6 +752,7 @@ export default function ExpensesPage() {
       </Card>
 
       {/* fixed expenses */}
+      {!isLite && (
         <Card
         data-tour="expenses-recurring"
         eyebrow={t('expenses.recurringCard.eyebrow')}
@@ -782,6 +799,7 @@ export default function ExpensesPage() {
           </>
         )}
         </Card>
+      )}
       </section>
 
       <ManageCategoriesModal open={catModalOpen} onClose={() => setCatModalOpen(false)} />

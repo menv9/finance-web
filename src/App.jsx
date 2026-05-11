@@ -12,7 +12,9 @@ import { LITE_PATHS } from './utils/appMode';
 
 function RootRedirect() {
   const supabaseUser = useFinanceStore((s) => s.supabaseUser);
-  return <Navigate to={supabaseUser ? '/dashboard' : '/landing'} replace />;
+  const appMode = useFinanceStore((s) => s.appMode);
+  if (!supabaseUser) return <Navigate to="/landing" replace />;
+  return <Navigate to={appMode === 'lite' ? '/today' : '/dashboard'} replace />;
 }
 
 function LiteGuard({ children }) {
@@ -20,7 +22,7 @@ function LiteGuard({ children }) {
   const tourActive = useFinanceStore((s) => s.tourActive);
   const { pathname } = useLocation();
   if (appMode === 'lite' && !tourActive && !LITE_PATHS.has(pathname)) {
-    return <Navigate to="/this-month" replace />;
+    return <Navigate to="/today" replace />;
   }
   return children;
 }
@@ -37,6 +39,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const ThisMonthPage = lazy(() => import('./pages/ThisMonthPage'));
+const LiteHomePage = lazy(() => import('./pages/LiteHomePage'));
 const AccountsPage = lazy(() => import('./pages/AccountsPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
@@ -144,6 +147,7 @@ export default function App() {
                     <LiteGuard>
                     <Routes>
                       <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/today" element={<LiteHomePage />} />
                       <Route path="/this-month" element={<ThisMonthPage />} />
                       <Route path="/accounts" element={<AccountsPage />} />
                       <Route path="/debts" element={<DebtsPage />} />

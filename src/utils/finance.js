@@ -34,6 +34,32 @@ export function buildDividendIncomeRows(dividends = []) {
   }));
 }
 
+export function buildRecentActivity({ expenses = [], incomes = [], dividends = [], limit = 8 } = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const expenseRows = expenses.map((e) => ({
+    id: e.id,
+    type: 'expense',
+    label: e.description || e.category || 'Expense',
+    amountCents: e.amountCents,
+    date: e.date,
+    direction: 'out',
+  }));
+  const incomeRows = [...incomes, ...buildDividendIncomeRows(dividends)].map((i) => ({
+    id: i.id,
+    type: 'income',
+    label: i.source || 'Income',
+    amountCents: i.amountCents,
+    date: i.date,
+    direction: 'in',
+    incomeKind: i.incomeKind,
+    realizedPnlCents: i.realizedPnlCents,
+  }));
+  return [...expenseRows, ...incomeRows]
+    .filter((item) => item.date <= today)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, limit);
+}
+
 export function computeExpenseSeries(expenses) {
   const today = todayLocalIso();
   return lastTwelveMonths().map((month) => ({
