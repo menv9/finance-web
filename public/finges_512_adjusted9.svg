@@ -1,0 +1,20 @@
+<svg width="100%" viewBox="0 0 710 680" role="img" style="" xmlns="http://www.w3.org/2000/svg">
+  <title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">FinGes 512px icon</title>
+  <desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">FinGes monogram with G shifted up 25</desc>
+
+  <defs>
+    <clipPath id="card"><rect x="90" y="90" width="500" height="500" rx="110"/></clipPath>
+  </defs>
+
+  <rect x="90" y="90" width="500" height="500" rx="110" fill="#1B2434" style="fill:rgb(27, 36, 52);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <g clip-path="url(#card)" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
+    <ellipse cx="340" cy="90" rx="360" ry="90" fill="#FFFFFF" opacity="0.03" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.03;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  </g>
+
+  <!-- G: y=334-25=309 -->
+  <text x="332" y="309" font-family="'Fraunces', Georgia, serif" font-size="190" font-weight="300" fill="none" stroke="#7C9CC0" stroke-width="4.5" paint-order="stroke" style="fill:none;stroke:rgb(124, 156, 192);color:rgb(255, 255, 255);stroke-width:4.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Fraunces, Georgia, serif;font-size:190px;font-weight:300;text-anchor:start;dominant-baseline:auto">G</text>
+
+  <!-- F -->
+  <text x="175" y="495" font-family="'Fraunces', Georgia, serif" font-size="400" font-weight="300" fill="#FFFFFF" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Fraunces, Georgia, serif;font-size:400px;font-weight:300;text-anchor:start;dominant-baseline:auto">F</text>
+
+</svg>
