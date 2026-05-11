@@ -54,7 +54,7 @@ export default function LiteHomePage() {
         <button
           type="button"
           onClick={() => openEntryModal('expense')}
-          className="group flex flex-col items-start gap-3 rounded-2xl border border-rule bg-surface-raised p-5 text-left transition-all hover:border-accent hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="group flex flex-col items-center gap-3 rounded-2xl border border-rule bg-surface-raised p-5 text-center transition-all hover:border-accent hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-danger-soft text-danger transition-transform group-hover:scale-105">
             <PlusBig />
@@ -66,7 +66,7 @@ export default function LiteHomePage() {
         <button
           type="button"
           onClick={() => openEntryModal('income')}
-          className="group flex flex-col items-start gap-3 rounded-2xl border border-rule bg-surface-raised p-5 text-left transition-all hover:border-accent hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="group flex flex-col items-center gap-3 rounded-2xl border border-rule bg-surface-raised p-5 text-center transition-all hover:border-accent hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-positive-soft text-positive transition-transform group-hover:scale-105">
             <PlusBig />
