@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { UserCircle } from 'lucide-react';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -270,6 +270,7 @@ function MonthOverview({ metrics, baseCurrency, locale, t }) {
 
 export function AppShell({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const theme = useFinanceStore((state) => state.settings.theme);
   const settings = useFinanceStore((state) => state.settings);
   const toggleTheme = useFinanceStore((state) => state.toggleTheme);
@@ -307,6 +308,12 @@ export function AppShell({ children }) {
     [settings.modules?.portfolio, settings.modules?.social],
   );
   const isLite = appMode === 'lite';
+  const handleAppModeChange = (mode) => {
+    if (mode === appMode) return;
+    setAppMode(mode);
+    if (mode === 'pro') navigate('/dashboard');
+    else navigate('/today');
+  };
   const navGroups = useMemo(
     () => {
       if (isLite) {
@@ -638,7 +645,7 @@ export function AppShell({ children }) {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setAppMode(opt.id)}
+                    onClick={() => handleAppModeChange(opt.id)}
                     aria-pressed={active}
                     title={opt.hint}
                     className={cn(
@@ -972,7 +979,7 @@ export function AppShell({ children }) {
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setAppMode(opt.id)}
+                  onClick={() => handleAppModeChange(opt.id)}
                   aria-pressed={active}
                   className={cn(
                     'inline-flex h-7 items-center px-3 rounded-full transition-colors duration-150',
