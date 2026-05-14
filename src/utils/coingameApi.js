@@ -373,6 +373,11 @@ export async function fetchCoinRewards(coinId) {
   return data ?? [];
 }
 
+/** Claim 1 FC from a room bucket — once per UTC day per coin. */
+export async function claimRoomFc(coinId) {
+  return rpc('cg_claim_room_fc', { p_coin_id: coinId });
+}
+
 /** Save furniture position + rotation for a coin owner. */
 export async function updateFurniturePosition(coinId, collectableId, x, z, rotY) {
   await rpc('cg_update_furniture_position', { p_coin_id: coinId, p_collectable: collectableId, p_x: x, p_z: z, p_rot_y: rotY ?? null });

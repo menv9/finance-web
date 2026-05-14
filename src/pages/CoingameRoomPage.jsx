@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import * as THREE from 'three';
 import * as LucideIcons from 'lucide-react';
-import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition } from '../utils/coingameApi';
+import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition, claimRoomFc } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 
 const ROOM = { w: 22, d: 22, h: 9 };
@@ -168,6 +168,27 @@ function buildCandleChart() {
   return g;
 }
 
+function buildFCBucket() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.2, metalness: 0.9, emissive: 0x22c55e, emissiveIntensity: 0.3 });
+  const glow = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 2.2, roughness: 0.4 });
+  g.add(mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.55, 20), mat, 0, 0.275, 0));
+  g.add(mesh(new THREE.TorusGeometry(0.38, 0.035, 8, 32), mat, 0, 0.55, 0));
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.028, 8, 32, Math.PI), mat);
+  handle.rotation.z = Math.PI / 2; handle.position.set(0, 0.88, 0); g.add(handle);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 14), glow);
+    coin.position.set(Math.cos(a) * 0.16, 0.56 + (i % 2) * 0.04, Math.sin(a) * 0.1);
+    coin.rotation.set(0.3, a, 0); g.add(coin);
+  }
+  const pl = new THREE.PointLight(0x22c55e, 2.5, 4);
+  pl.position.set(0, 0.7, 0); g.add(pl);
+  g.userData.emissiveMats = [mat, glow];
+  g.userData.isBucket = true;
+  return g;
+}
+
 const FURNITURE_BUILDERS = {
   throne:   buildThrone,
   gold:     buildGoldPile,
@@ -196,6 +217,8 @@ export default function CoingameRoomPage() {
   const [rewards, setRewards] = useState([]);
   const [tooltip, setTooltip] = useState(null);
   const [ambientColor, setAmbientColor] = useState(() => localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e');
+  const [bucketToast, setBucketToast] = useState(null); // null | 'ok' | 'cooldown'
+  const bucketCallbackRef = useRef(null);
 
   const isOwner = ownCoin?.coin_id === coinId;
 
@@ -423,6 +446,13 @@ export default function CoingameRoomPage() {
     placeStatic(tableGroup, 6.2, -8.2);
     scene.add(tableGroup);
 
+    // ── FC Bucket (clickable, grants 1 FC/day) ────────────────────────────────
+    const bucket = buildFCBucket();
+    bucket.position.set(-4, 0, 4);
+    bucket.scale.setScalar(1.6);
+    scene.add(bucket);
+    let bucketBounceEnd = 0;
+
     // ── Central coin display ──────────────────────────────────────────────────
     const cg = new THREE.Group();
     cg.position.set(0, 2.6, 0);
@@ -498,7 +528,7 @@ export default function CoingameRoomPage() {
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
     const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup };
-    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY, lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat };
+    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY, lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
@@ -526,11 +556,21 @@ export default function CoingameRoomPage() {
       return null;
     }
 
+    let bucketDownHit = false;
+
     function onMDown(e) {
       const rect = wrap.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
+      bucketDownHit = false;
+
+      // Bucket click (anyone, not owner-only)
+      if (raycaster.intersectObject(bucket, true).length > 0) {
+        bucketDownHit = true;
+        autoRot = false;
+        return;
+      }
 
       if (sceneRef.current?.isOwner) {
         const hits = raycaster.intersectObjects(getPickables(), true);
@@ -588,6 +628,12 @@ export default function CoingameRoomPage() {
         dragging = null;
         return;
       }
+      if (bucketDownHit) {
+        bucketDownHit = false;
+        bucketBounceEnd = clock.getElapsedTime() + 0.7;
+        bucketCallbackRef.current?.();
+        return;
+      }
       isDrag = false;
     }
 
@@ -640,6 +686,15 @@ export default function CoingameRoomPage() {
       cg.rotation.y = t * 0.65;
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
       gem.rotation.y = t * 2.0;
+
+      // Bucket idle bob + click bounce
+      bucket.rotation.y = t * 0.4;
+      if (t < bucketBounceEnd) {
+        const p = 1 - (bucketBounceEnd - t) / 0.7;
+        bucket.scale.setScalar(1.6 + Math.sin(p * Math.PI * 4) * 0.28);
+      } else {
+        bucket.scale.setScalar(1.6 + Math.sin(t * 1.8) * 0.06);
+      }
 
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
       ceilLight.intensity = 40 + Math.sin(t * 1.4) * 4.0;
@@ -761,6 +816,19 @@ export default function CoingameRoomPage() {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
 
+  // Bucket claim callback — always up to date in the ref
+  useEffect(() => {
+    bucketCallbackRef.current = async () => {
+      try {
+        const result = await claimRoomFc(coinId);
+        setBucketToast(result?.ok ? 'ok' : 'cooldown');
+      } catch {
+        setBucketToast('cooldown');
+      }
+      setTimeout(() => setBucketToast(null), 2500);
+    };
+  }, [coinId]);
+
   // Update room lighting + furniture colors when ambient color changes
   useEffect(() => {
     const ref = sceneRef.current;
@@ -777,6 +845,7 @@ export default function CoingameRoomPage() {
     const allGroups = [
       ...Object.values(ref.furnitureMap).map((f) => f.group),
       ...Object.values(ref.staticMap),
+      ...(ref.bucket ? [ref.bucket] : []),
     ];
     allGroups.forEach((group) => {
       (group.userData.emissiveMats || []).forEach((m) => {
@@ -880,6 +949,14 @@ export default function CoingameRoomPage() {
           {!isOwner && (
             <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#1e3a1e', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
               drag to orbit · scroll to zoom
+            </div>
+          )}
+          {bucketToast && (
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: bucketToast === 'ok' ? 'rgba(6,20,6,0.95)' : 'rgba(20,10,6,0.95)', border: `1px solid ${bucketToast === 'ok' ? '#22c55e' : '#6b7280'}`, borderRadius: 10, padding: '14px 22px', textAlign: 'center', pointerEvents: 'none' }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: bucketToast === 'ok' ? '#4ade80' : '#6b7280', letterSpacing: '-0.01em' }}>
+                {bucketToast === 'ok' ? '+1 FC' : 'Come back tomorrow'}
+              </div>
+              {bucketToast === 'ok' && <div style={{ color: '#4b5563', fontSize: 9, marginTop: 4, letterSpacing: '0.06em' }}>ADDED TO YOUR WALLET</div>}
             </div>
           )}
         </div>
