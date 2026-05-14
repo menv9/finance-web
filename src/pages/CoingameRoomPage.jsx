@@ -168,23 +168,20 @@ function buildCandleChart() {
   return g;
 }
 
-function buildFCBucket() {
+function buildFCCube() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.2, metalness: 0.9, emissive: 0x22c55e, emissiveIntensity: 0.3 });
-  const glow = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 2.2, roughness: 0.4 });
-  g.add(mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.55, 20), mat, 0, 0.275, 0));
-  g.add(mesh(new THREE.TorusGeometry(0.38, 0.035, 8, 32), mat, 0, 0.55, 0));
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.028, 8, 32, Math.PI), mat);
-  handle.rotation.z = Math.PI / 2; handle.position.set(0, 0.88, 0); g.add(handle);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 14), glow);
-    coin.position.set(Math.cos(a) * 0.16, 0.56 + (i % 2) * 0.04, Math.sin(a) * 0.1);
-    coin.rotation.set(0.3, a, 0); g.add(coin);
-  }
-  const pl = new THREE.PointLight(0x22c55e, 2.5, 4);
-  pl.position.set(0, 0.7, 0); g.add(pl);
-  g.userData.emissiveMats = [mat, glow];
+  const mat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.08, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.5 });
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 3.0, roughness: 0.1, metalness: 0.5 });
+  g.add(mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mat));
+  // glowing edge strips
+  [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([a,b]) => {
+    g.add(mesh(new THREE.BoxGeometry(0.72, 0.04, 0.04), edgeMat, 0, a*0.35, b*0.35));
+    g.add(mesh(new THREE.BoxGeometry(0.04, 0.72, 0.04), edgeMat, a*0.35, 0, b*0.35));
+    g.add(mesh(new THREE.BoxGeometry(0.04, 0.04, 0.72), edgeMat, a*0.35, b*0.35, 0));
+  });
+  const pl = new THREE.PointLight(0x22c55e, 3, 5);
+  g.add(pl);
+  g.userData.emissiveMats = [mat, edgeMat];
   g.userData.isBucket = true;
   return g;
 }
@@ -446,8 +443,8 @@ export default function CoingameRoomPage() {
     placeStatic(tableGroup, 6.2, -8.2);
     scene.add(tableGroup);
 
-    // ── FC Bucket (clickable, grants 1 FC/day) ────────────────────────────────
-    const bucket = buildFCBucket();
+    // ── FC Cube (clicker, grants 1 FC per click) ─────────────────────────────
+    const bucket = buildFCCube();
     bucket.position.set(-4, 0, 4);
     bucket.scale.setScalar(1.6);
     scene.add(bucket);
@@ -630,7 +627,7 @@ export default function CoingameRoomPage() {
       }
       if (bucketDownHit) {
         bucketDownHit = false;
-        bucketBounceEnd = clock.getElapsedTime() + 0.7;
+        bucketBounceEnd = clock.getElapsedTime() + 0.25;
         bucketCallbackRef.current?.();
         return;
       }
@@ -687,13 +684,15 @@ export default function CoingameRoomPage() {
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
       gem.rotation.y = t * 2.0;
 
-      // Bucket idle bob + click bounce
-      bucket.rotation.y = t * 0.4;
+      // Cube idle spin + click squish
+      bucket.rotation.y = t * 0.8;
+      bucket.rotation.x = t * 0.3;
       if (t < bucketBounceEnd) {
-        const p = 1 - (bucketBounceEnd - t) / 0.7;
-        bucket.scale.setScalar(1.6 + Math.sin(p * Math.PI * 4) * 0.28);
+        const p = (bucketBounceEnd - t) / 0.25;
+        const squish = Math.sin(p * Math.PI);
+        bucket.scale.set(1.6 * (1 + squish * 0.22), 1.6 * (1 - squish * 0.28), 1.6 * (1 + squish * 0.22));
       } else {
-        bucket.scale.setScalar(1.6 + Math.sin(t * 1.8) * 0.06);
+        bucket.scale.setScalar(1.6);
       }
 
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
@@ -819,13 +818,9 @@ export default function CoingameRoomPage() {
   // Bucket claim callback — always up to date in the ref
   useEffect(() => {
     bucketCallbackRef.current = async () => {
-      try {
-        const result = await claimRoomFc(coinId);
-        setBucketToast(result?.ok ? 'ok' : 'cooldown');
-      } catch {
-        setBucketToast('cooldown');
-      }
-      setTimeout(() => setBucketToast(null), 2500);
+      setBucketToast('ok');
+      setTimeout(() => setBucketToast(null), 700);
+      try { await claimRoomFc(coinId); } catch {}
     };
   }, [coinId]);
 
@@ -952,11 +947,8 @@ export default function CoingameRoomPage() {
             </div>
           )}
           {bucketToast && (
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: bucketToast === 'ok' ? 'rgba(6,20,6,0.95)' : 'rgba(20,10,6,0.95)', border: `1px solid ${bucketToast === 'ok' ? '#22c55e' : '#6b7280'}`, borderRadius: 10, padding: '14px 22px', textAlign: 'center', pointerEvents: 'none' }}>
-              <div style={{ fontSize: 28, fontWeight: 900, color: bucketToast === 'ok' ? '#4ade80' : '#6b7280', letterSpacing: '-0.01em' }}>
-                {bucketToast === 'ok' ? '+1 FC' : 'Come back tomorrow'}
-              </div>
-              {bucketToast === 'ok' && <div style={{ color: '#4b5563', fontSize: 9, marginTop: 4, letterSpacing: '0.06em' }}>ADDED TO YOUR WALLET</div>}
+            <div style={{ position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,20,6,0.9)', border: '1px solid #22c55e', borderRadius: 8, padding: '8px 18px', pointerEvents: 'none' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', letterSpacing: '0.02em' }}>+1 FC</div>
             </div>
           )}
         </div>
