@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'finges-v2';
+const CACHE_VERSION = 'finges-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const APP_SHELL = [
   '/',
