@@ -173,7 +173,6 @@ function buildFCCube() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.08, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.5 });
   const edgeMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 3.0, roughness: 0.1, metalness: 0.5 });
   g.add(mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mat));
-  // glowing edge strips
   [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([a,b]) => {
     g.add(mesh(new THREE.BoxGeometry(0.72, 0.04, 0.04), edgeMat, 0, a*0.35, b*0.35));
     g.add(mesh(new THREE.BoxGeometry(0.04, 0.72, 0.04), edgeMat, a*0.35, 0, b*0.35));
@@ -183,6 +182,8 @@ function buildFCCube() {
   g.add(pl);
   g.userData.emissiveMats = [mat, edgeMat];
   g.userData.isBucket = true;
+  g.userData.furnitureId = 'fc_cube';
+  g.traverse((c) => { c.userData.furnitureId = 'fc_cube'; });
   return g;
 }
 
@@ -443,11 +444,13 @@ export default function CoingameRoomPage() {
     placeStatic(tableGroup, 6.2, -8.2);
     scene.add(tableGroup);
 
-    // ── FC Cube (clicker, grants 1 FC per click) ─────────────────────────────
+    // ── FC Cube (clicker, grants 1 FC per click, floats + draggable) ─────────
     const bucket = buildFCCube();
-    bucket.position.set(-4, 0, 4);
+    const savedCube = savedStatic['fc_cube'];
+    bucket.position.set(savedCube ? savedCube.x : -4, 1.5, savedCube ? savedCube.z : 4);
     bucket.scale.setScalar(1.6);
     scene.add(bucket);
+    staticMap['fc_cube'] = bucket;
     let bucketBounceEnd = 0;
 
     // ── Central coin display ──────────────────────────────────────────────────
@@ -553,19 +556,20 @@ export default function CoingameRoomPage() {
       return null;
     }
 
-    let bucketDownHit = false;
-
     function onMDown(e) {
       const rect = wrap.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      bucketDownHit = false;
 
-      // Bucket click (anyone, not owner-only)
+      // Cube click (anyone can click, owner can also drag)
       if (raycaster.intersectObject(bucket, true).length > 0) {
-        bucketDownHit = true;
         autoRot = false;
+        if (sceneRef.current?.isOwner) {
+          dragging = { id: 'fc_cube', group: bucket, isStatic: true, isCube: true, moved: false, startX: bucket.position.x, startZ: bucket.position.z };
+        } else {
+          dragging = { id: 'fc_cube', group: bucket, isStatic: false, isCube: true, moved: false, startX: bucket.position.x, startZ: bucket.position.z };
+        }
         return;
       }
 
@@ -577,7 +581,7 @@ export default function CoingameRoomPage() {
           const id = obj.userData.furnitureId;
           const group = id ? findGroup(id) : null;
           if (group) {
-            dragging = { id, group, isStatic: id.startsWith('static_') };
+            dragging = { id, group, isStatic: id.startsWith('static_') || id === 'fc_cube' };
             autoRot = false;
             return;
           }
@@ -598,8 +602,16 @@ export default function CoingameRoomPage() {
         const hd = ROOM.d / 2 - 1.2;
         const nx = Math.max(-hw, Math.min(hw, intersectPt.x));
         const nz = Math.max(-hd, Math.min(hd, intersectPt.z));
-        dragging.group.position.set(nx, FLOOR_Y, nz);
-        dragging.group.position.y = 0.08;
+        if (dragging.isCube) {
+          // y is handled by animate loop; just move x/z
+          dragging.group.position.x = nx;
+          dragging.group.position.z = nz;
+          const dx = nx - dragging.startX;
+          const dz = nz - dragging.startZ;
+          if (Math.sqrt(dx * dx + dz * dz) > 0.4) dragging.moved = true;
+        } else {
+          dragging.group.position.set(nx, 0.08, nz);
+        }
         return;
       }
       if (!isDrag) return;
@@ -610,9 +622,25 @@ export default function CoingameRoomPage() {
 
     function onMUp() {
       if (dragging) {
-        const { id, group, isStatic } = dragging;
+        const { id, group, isStatic, isCube } = dragging;
         const x = parseFloat(group.position.x.toFixed(3));
         const z = parseFloat(group.position.z.toFixed(3));
+
+        if (isCube) {
+          if (!dragging.moved) {
+            // treat as click — fire FC reward
+            bucketBounceEnd = clock.getElapsedTime() + 0.25;
+            bucketCallbackRef.current?.();
+          } else if (sceneRef.current?.isOwner) {
+            // save cube position
+            const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+            cur['fc_cube'] = { x, z };
+            localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+          }
+          dragging = null;
+          return;
+        }
+
         group.position.y = FLOOR_Y;
         if (isStatic) {
           const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
@@ -623,12 +651,6 @@ export default function CoingameRoomPage() {
           savePosition(id, x, z, parseFloat(group.rotation.y.toFixed(4)));
         }
         dragging = null;
-        return;
-      }
-      if (bucketDownHit) {
-        bucketDownHit = false;
-        bucketBounceEnd = clock.getElapsedTime() + 0.25;
-        bucketCallbackRef.current?.();
         return;
       }
       isDrag = false;
@@ -684,7 +706,8 @@ export default function CoingameRoomPage() {
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
       gem.rotation.y = t * 2.0;
 
-      // Cube idle spin + click squish
+      // Cube float + spin + click squish
+      if (!dragging?.isCube) bucket.position.y = 1.5 + Math.sin(t * 1.2) * 0.15;
       bucket.rotation.y = t * 0.8;
       bucket.rotation.x = t * 0.3;
       if (t < bucketBounceEnd) {
