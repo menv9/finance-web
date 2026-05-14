@@ -24,50 +24,42 @@ function FC({ amount, decimals = 4 }) {
 
 // ── Furniture mesh builders ──────────────────────────────────────────────────
 
+function mesh(geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  if (rx || ry || rz) m.rotation.set(rx, ry, rz);
+  return m;
+}
+
 function buildThrone() {
   const g = new THREE.Group();
   const gold = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.08, metalness: 1, emissive: 0xb45309, emissiveIntensity: 0.25 });
   const velvet = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9, metalness: 0 });
-  // seat
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.0), gold), { position: new THREE.Vector3(0, 0.5, 0) }));
-  // seat cushion
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.85), velvet), { position: new THREE.Vector3(0, 0.63, 0) }));
-  // back
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.6, 0.1), gold), { position: new THREE.Vector3(0, 1.4, -0.45) }));
-  // back cushion
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.2, 0.08), velvet), { position: new THREE.Vector3(0, 1.4, -0.38) }));
-  // legs
+  g.add(mesh(new THREE.BoxGeometry(1.1, 0.12, 1.0), gold, 0, 0.5, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.9, 0.12, 0.85), velvet, 0, 0.63, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.1, 1.6, 0.1), gold, 0, 1.4, -0.45));
+  g.add(mesh(new THREE.BoxGeometry(0.85, 1.2, 0.08), velvet, 0, 1.4, -0.38));
   [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.38], [0.45, 0.38]].forEach(([x, z]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8), gold);
-    leg.position.set(x, 0.25, z); g.add(leg);
+    g.add(mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8), gold, x, 0.25, z));
   });
-  // armrests
   [-0.55, 0.55].forEach((x) => {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.8), gold);
-    arm.position.set(x, 0.85, 0); g.add(arm);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 8), gold);
-    post.position.set(x, 0.68, -0.3); g.add(post);
+    g.add(mesh(new THREE.BoxGeometry(0.1, 0.08, 0.8), gold, x, 0.85, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 8), gold, x, 0.68, -0.3));
   });
-  // crown finial on top of back
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 5), gold);
-  crown.position.set(0, 2.25, -0.45); g.add(crown);
+  g.add(mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 5), gold, 0, 2.25, -0.45));
   return g;
 }
 
 function buildGoldPile() {
   const g = new THREE.Group();
   const gold = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.12, metalness: 1, emissive: 0x92400e, emissiveIntensity: 0.2 });
-  const positions = [
-    [0,0.12,0],[0.22,0.12,0.1],[-.2,0.12,0.15],[0.1,0.12,-.22],[-.15,0.12,-.2],
-    [0.05,0.36,0.05],[-.1,0.36,-.05],[0.15,0.36,-.1],
-    [0,0.58,0],
-  ];
-  positions.forEach(([x,y,z], i) => {
+  [[0,0.12,0],[0.22,0.12,0.1],[-.2,0.12,0.15],[0.1,0.12,-.22],[-.15,0.12,-.2],
+   [0.05,0.36,0.05],[-.1,0.36,-.05],[0.15,0.36,-.1],[0,0.58,0]].forEach(([x,y,z], i) => {
     const r = 0.1 + (i % 3) * 0.025;
-    const coin = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.045, 20), gold);
-    coin.position.set(x, y, z);
-    coin.rotation.set(Math.random()*0.3, Math.random()*Math.PI*2, Math.random()*0.2);
-    g.add(coin);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.045, 20), gold);
+    c.position.set(x, y, z);
+    c.rotation.set(0.1 * i, (i * 1.3) % (Math.PI * 2), 0.05 * i);
+    g.add(c);
   });
   return g;
 }
@@ -76,16 +68,11 @@ function buildMoonLamp() {
   const g = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.3, metalness: 0.8 });
   const glow = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x4ade80, emissiveIntensity: 1.2, roughness: 0.5, metalness: 0 });
-  // base
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.06, 16), metal), { position: new THREE.Vector3(0, 0.03, 0) }));
-  // pole
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8), metal), { position: new THREE.Vector3(0, 0.83, 0) }));
-  // arm
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.025, 0.025), metal), { position: new THREE.Vector3(0.2, 1.62, 0) }));
-  // moon globe
+  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.06, 16), metal, 0, 0.03, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8), metal, 0, 0.83, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.5, 0.025, 0.025), metal, 0.2, 1.62, 0));
   const moon = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 20), glow);
   moon.position.set(0.42, 1.62, 0); g.add(moon);
-  // point light inside
   const pl = new THREE.PointLight(0x4ade80, 1.8, 4.5);
   pl.position.set(0.42, 1.62, 0); g.add(pl);
   return g;
@@ -95,24 +82,16 @@ function buildTradingDesk() {
   const g = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
   const screen = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 0.9, roughness: 1 });
-  // desktop
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 0.9), wood), { position: new THREE.Vector3(0, 0.72, 0) }));
-  // legs
+  g.add(mesh(new THREE.BoxGeometry(2.0, 0.08, 0.9), wood, 0, 0.72, 0));
   [[-0.88, -0.36], [0.88, -0.36], [-0.88, 0.34], [0.88, 0.34]].forEach(([x, z]) => {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), wood);
-    leg.position.set(x, 0.36, z); g.add(leg);
+    g.add(mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), wood, x, 0.36, z));
   });
-  // monitors (3)
   [-0.62, 0, 0.62].forEach((x) => {
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.04), wood);
-    stand.position.set(x, 1.08, -0.28); g.add(stand);
-    const mon = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.32, 0.04), wood);
-    mon.position.set(x, 1.4, -0.3); g.add(mon);
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.26), screen);
-    scr.position.set(x, 1.4, -0.27); g.add(scr);
+    g.add(mesh(new THREE.BoxGeometry(0.04, 0.32, 0.04), wood, x, 1.08, -0.28));
+    g.add(mesh(new THREE.BoxGeometry(0.52, 0.32, 0.04), wood, x, 1.4, -0.3));
+    g.add(mesh(new THREE.PlaneGeometry(0.44, 0.26), screen, x, 1.4, -0.27));
   });
-  // keyboard
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.02, 0.22), wood), { position: new THREE.Vector3(0, 0.77, 0.12) }));
+  g.add(mesh(new THREE.BoxGeometry(0.55, 0.02, 0.22), wood, 0, 0.77, 0.12));
   return g;
 }
 
@@ -121,28 +100,12 @@ function buildNftFrame() {
   const metal = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.85 });
   const art = new THREE.MeshStandardMaterial({ color: 0x0a1a0a, emissive: 0x22c55e, emissiveIntensity: 0.55, roughness: 1 });
   const trim = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.1, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.3 });
-  // stand legs
-  [-0.3, 0.3].forEach((x) => {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.38), metal);
-    leg.position.set(x, 0.275, 0); g.add(leg);
-  });
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.04, 0.04), metal);
-  bar.position.set(0, 0.48, 0.16); g.add(bar);
-  // frame back
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.84, 1.1, 0.05), metal);
-  frame.position.set(0, 1.1, 0); g.add(frame);
-  // trim border
-  [[-0.4,1.1,0.03],[0.4,1.1,0.03]].forEach(([x,y,z]) => {
-    const t = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.12, 0.04), trim);
-    t.position.set(x,y,z); g.add(t);
-  });
-  [[0,1.67,0.03],[0,0.54,0.03]].forEach(([x,y,z]) => {
-    const t = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.04), trim);
-    t.position.set(x,y,z); g.add(t);
-  });
-  // artwork
-  const artwork = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.95), art);
-  artwork.position.set(0, 1.1, 0.03); g.add(artwork);
+  [-0.3, 0.3].forEach((x) => g.add(mesh(new THREE.BoxGeometry(0.05, 0.55, 0.38), metal, x, 0.275, 0)));
+  g.add(mesh(new THREE.BoxGeometry(0.65, 0.04, 0.04), metal, 0, 0.48, 0.16));
+  g.add(mesh(new THREE.BoxGeometry(0.84, 1.1, 0.05), metal, 0, 1.1, 0));
+  [[-0.4,1.1,0.03],[0.4,1.1,0.03]].forEach(([x,y,z]) => g.add(mesh(new THREE.BoxGeometry(0.04, 1.12, 0.04), trim, x, y, z)));
+  [[0,1.67,0.03],[0,0.54,0.03]].forEach(([x,y,z]) => g.add(mesh(new THREE.BoxGeometry(0.86, 0.04, 0.04), trim, x, y, z)));
+  g.add(mesh(new THREE.PlaneGeometry(0.72, 0.95), art, 0, 1.1, 0.03));
   return g;
 }
 
@@ -150,14 +113,11 @@ function buildDiamondDisplay() {
   const g = new THREE.Group();
   const pedestal = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.8 });
   const glass = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, transparent: true, opacity: 0.18, roughness: 0, metalness: 0.1 });
-  const gem = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.4, roughness: 0, metalness: 0.5 });
-  // base
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.12, 8), pedestal), { position: new THREE.Vector3(0, 0.06, 0) }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 0.32, 8), pedestal), { position: new THREE.Vector3(0, 0.28, 0) }));
-  // glass dome
-  g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 20, 0, Math.PI*2, 0, Math.PI*0.55), glass), { position: new THREE.Vector3(0, 0.44, 0) }));
-  // diamond
-  const d = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), gem);
+  const gemMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.4, roughness: 0, metalness: 0.5 });
+  g.add(mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.12, 8), pedestal, 0, 0.06, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.2, 0.32, 0.32, 8), pedestal, 0, 0.28, 0));
+  g.add(mesh(new THREE.SphereGeometry(0.28, 20, 20, 0, Math.PI*2, 0, Math.PI*0.55), glass, 0, 0.44, 0));
+  const d = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), gemMat);
   d.position.set(0, 0.6, 0); g.add(d);
   const pl = new THREE.PointLight(0x38bdf8, 1.2, 3);
   pl.position.set(0, 0.65, 0); g.add(pl);
@@ -169,20 +129,16 @@ function buildRocket() {
   const body = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.9 });
   const fin = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.8, emissive: 0x38bdf8, emissiveIntensity: 0.2 });
   const flame = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf97316, emissiveIntensity: 1.5, roughness: 1 });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 8), body);
-  base.position.set(0, 0.07, 0); g.add(base);
-  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 16), body);
-  tube.position.set(0, 0.49, 0); g.add(tube);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 16), body);
-  nose.position.set(0, 1.0, 0); g.add(nose);
+  g.add(mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 8), body, 0, 0.07, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 16), body, 0, 0.49, 0));
+  g.add(mesh(new THREE.ConeGeometry(0.12, 0.32, 16), body, 0, 1.0, 0));
   [0, 1, 2].forEach((i) => {
     const a = (i / 3) * Math.PI * 2;
     const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.18), fin);
     f.position.set(Math.sin(a) * 0.14, 0.22, Math.cos(a) * 0.14);
     f.rotation.y = -a; g.add(f);
   });
-  const fl = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 8), flame);
-  fl.position.set(0, -0.09, 0); fl.rotation.z = Math.PI; g.add(fl);
+  g.add(mesh(new THREE.ConeGeometry(0.07, 0.18, 8), flame, 0, -0.09, 0, Math.PI, 0, 0));
   const pl = new THREE.PointLight(0xf97316, 0.8, 2.5);
   pl.position.set(0, -0.15, 0); g.add(pl);
   return g;
@@ -192,20 +148,14 @@ function buildCandleChart() {
   const g = new THREE.Group();
   const frame = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
   const screenMat = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 0.6, roughness: 1 });
-  // stand
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.06, 12), frame), { position: new THREE.Vector3(0, 0.03, 0) }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), frame), { position: new THREE.Vector3(0, 0.49, 0) }));
-  // screen
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.58, 0.045), frame), { position: new THREE.Vector3(0, 1.12, 0) }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.48), screenMat), { position: new THREE.Vector3(0, 1.12, 0.025) }));
-  // candles on screen (decorative)
   const up = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.5, roughness: 0.4 });
   const dn = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4 });
+  g.add(mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.06, 12), frame, 0, 0.03, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), frame, 0, 0.49, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.82, 0.58, 0.045), frame, 0, 1.12, 0));
+  g.add(mesh(new THREE.PlaneGeometry(0.7, 0.48), screenMat, 0, 1.12, 0.025));
   [0.16,0.22,0.14,0.28,0.18,0.32].forEach((h, i) => {
-    const mat = i % 2 === 0 ? up : dn;
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.055, h * 0.38, 0.02), mat);
-    bar.position.set(-0.26 + i * 0.105, 0.96 + h * 0.19, 0.04);
-    g.add(bar);
+    g.add(mesh(new THREE.BoxGeometry(0.055, h * 0.38, 0.02), i % 2 === 0 ? up : dn, -0.26 + i * 0.105, 0.96 + h * 0.19, 0.04));
   });
   return g;
 }
@@ -381,7 +331,8 @@ export default function CoingameRoomPage() {
     const shelfMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
     const bookshelf = new THREE.Group();
     // frame
-    bookshelf.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.4), shelfMat), { position: new THREE.Vector3(0, 1.6, 0) }));
+    const bsFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.4), shelfMat);
+    bsFrame.position.set(0, 1.6, 0); bookshelf.add(bsFrame);
     // shelves (lighter)
     const shelfInner = new THREE.MeshStandardMaterial({ color: 0x0f2010, roughness: 0.5, metalness: 0.4 });
     [0.5, 1.3, 2.1, 2.9].forEach((y) => {
@@ -414,11 +365,11 @@ export default function CoingameRoomPage() {
     const sofaMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.88, metalness: 0.05 });
     const sofaAccent = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85, metalness: 0 });
     const sofa = new THREE.Group();
-    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.28, 0.95), sofaMat), { position: new THREE.Vector3(0, 0.38, 0) }));
-    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.72, 0.2), sofaMat), { position: new THREE.Vector3(0, 0.72, -0.38) }));
-    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.95), sofaAccent), { position: new THREE.Vector3(0, 0.22, 0) }));
+    [[2.8,0.28,0.95,sofaMat,0,0.38,0],[2.8,0.72,0.2,sofaMat,0,0.72,-0.38],[2.8,0.12,0.95,sofaAccent,0,0.22,0]].forEach(([w,h,d,mat,x,y,z]) => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); p.position.set(x,y,z); sofa.add(p);
+    });
     [-1.3, 1.3].forEach((x) => {
-      sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.95), sofaMat), { position: new THREE.Vector3(x, 0.52, 0) }));
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.95), sofaMat); arm.position.set(x, 0.52, 0); sofa.add(arm);
     });
     // cushions
     [-0.7, 0, 0.7].forEach((x) => {
@@ -430,8 +381,8 @@ export default function CoingameRoomPage() {
 
     // Small side table next to sofa
     const tableGroup = new THREE.Group();
-    tableGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 16), shelfMat), { position: new THREE.Vector3(0, 0.62, 0) }));
-    tableGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.62, 8), shelfMat), { position: new THREE.Vector3(0, 0.31, 0) }));
+    const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 16), shelfMat); tTop.position.set(0, 0.62, 0); tableGroup.add(tTop);
+    const tLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.62, 8), shelfMat); tLeg.position.set(0, 0.31, 0); tableGroup.add(tLeg);
     tableGroup.position.set(6.2, 0, -8.2);
     scene.add(tableGroup);
 
