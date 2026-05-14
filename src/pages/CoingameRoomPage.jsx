@@ -77,6 +77,7 @@ function buildMoonLamp() {
   moon.position.set(0.42, 1.62, 0); g.add(moon);
   const pl = new THREE.PointLight(0x4ade80, 1.8, 4.5);
   pl.position.set(0.42, 1.62, 0); g.add(pl);
+  g.userData.emissiveMats = [glow];
   return g;
 }
 
@@ -94,6 +95,7 @@ function buildTradingDesk() {
     g.add(mesh(new THREE.PlaneGeometry(0.44, 0.26), screen, x, 1.4, -0.27));
   });
   g.add(mesh(new THREE.BoxGeometry(0.55, 0.02, 0.22), wood, 0, 0.77, 0.12));
+  g.userData.emissiveMats = [screen];
   return g;
 }
 
@@ -108,6 +110,7 @@ function buildNftFrame() {
   [[-0.4,1.1,0.03],[0.4,1.1,0.03]].forEach(([x,y,z]) => g.add(mesh(new THREE.BoxGeometry(0.04, 1.12, 0.04), trim, x, y, z)));
   [[0,1.67,0.03],[0,0.54,0.03]].forEach(([x,y,z]) => g.add(mesh(new THREE.BoxGeometry(0.86, 0.04, 0.04), trim, x, y, z)));
   g.add(mesh(new THREE.PlaneGeometry(0.72, 0.95), art, 0, 1.1, 0.03));
+  g.userData.emissiveMats = [trim, art];
   return g;
 }
 
@@ -123,6 +126,7 @@ function buildDiamondDisplay() {
   d.position.set(0, 0.6, 0); g.add(d);
   const pl = new THREE.PointLight(0x38bdf8, 1.2, 3);
   pl.position.set(0, 0.65, 0); g.add(pl);
+  g.userData.emissiveMats = [gemMat];
   return g;
 }
 
@@ -143,6 +147,7 @@ function buildRocket() {
   g.add(mesh(new THREE.ConeGeometry(0.07, 0.18, 8), flame, 0, -0.09, 0, Math.PI, 0, 0));
   const pl = new THREE.PointLight(0xf97316, 0.8, 2.5);
   pl.position.set(0, -0.15, 0); g.add(pl);
+  g.userData.accentMats = [fin];
   return g;
 }
 
@@ -159,6 +164,7 @@ function buildCandleChart() {
   [0.16,0.22,0.14,0.28,0.18,0.32].forEach((h, i) => {
     g.add(mesh(new THREE.BoxGeometry(0.055, h * 0.38, 0.02), i % 2 === 0 ? up : dn, -0.26 + i * 0.105, 0.96 + h * 0.19, 0.04));
   });
+  g.userData.emissiveMats = [screenMat, up];
   return g;
 }
 
@@ -350,6 +356,7 @@ export default function CoingameRoomPage() {
     const rugMesh = new THREE.Mesh(new THREE.PlaneGeometry(11.5, 8.5), new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.95, metalness: 0 }));
     rugMesh.rotation.x = -Math.PI / 2; rugMesh.position.y = 0.005; rugGroup.add(rugMesh);
     tagStatic(rugGroup, 'static_rug');
+    rugGroup.userData.accentMats = [rugBorderMesh.material, rugMesh.material];
     placeStatic(rugGroup, 0, 0);
     scene.add(rugGroup);
 
@@ -382,6 +389,9 @@ export default function CoingameRoomPage() {
     });
     bookshelf.rotation.y = -Math.PI / 2;
     tagStatic(bookshelf, 'static_bookshelf');
+    const bookMats = [];
+    bookshelf.traverse((c) => { if (c.isMesh && c.material.roughness === 0.8) bookMats.push(c.material); });
+    bookshelf.userData.accentMats = bookMats;
     placeStatic(bookshelf, 9.5, -7);
     scene.add(bookshelf);
 
@@ -400,6 +410,7 @@ export default function CoingameRoomPage() {
       cushion.position.set(x, 0.84, 0.15); sofa.add(cushion);
     });
     tagStatic(sofa, 'static_sofa');
+    sofa.userData.accentMats = [sofaAccent];
     placeStatic(sofa, 4, -9);
     scene.add(sofa);
 
@@ -749,7 +760,7 @@ export default function CoingameRoomPage() {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
 
-  // Update room lighting when ambient color changes
+  // Update room lighting + furniture colors when ambient color changes
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref?.lights) return;
@@ -760,6 +771,25 @@ export default function CoingameRoomPage() {
     ref.scene.fog.color.set(new THREE.Color(ambientColor).multiplyScalar(0.06));
     ref.wallMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.22));
     ref.floorMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.16));
+
+    // Update furniture materials + embedded lights
+    const allGroups = [
+      ...Object.values(ref.furnitureMap).map((f) => f.group),
+      ...Object.values(ref.staticMap),
+    ];
+    allGroups.forEach((group) => {
+      (group.userData.emissiveMats || []).forEach((m) => {
+        m.emissive.set(c);
+        m.color.set(c.clone().multiplyScalar(0.3));
+      });
+      (group.userData.accentMats || []).forEach((m) => {
+        m.color.set(c.clone().multiplyScalar(0.28));
+      });
+      group.traverse((obj) => {
+        if (obj.isLight) obj.color.set(c);
+      });
+    });
+
     localStorage.setItem(`cg-room-ambient-${coinId}`, ambientColor);
   }, [ambientColor, coinId]);
 
