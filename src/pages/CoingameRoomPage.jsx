@@ -161,14 +161,14 @@ function buildCandleChart() {
 }
 
 const FURNITURE_BUILDERS = {
-  coin_throne:      buildThrone,
-  gold_pile:        buildGoldPile,
-  moon_lamp:        buildMoonLamp,
-  trading_desk:     buildTradingDesk,
-  nft_frame:        buildNftFrame,
-  diamond_display:  buildDiamondDisplay,
-  rocket_statue:    buildRocket,
-  candle_chart:     buildCandleChart,
+  throne:   buildThrone,
+  gold:     buildGoldPile,
+  moon:     buildMoonLamp,
+  desk:     buildTradingDesk,
+  nft:      buildNftFrame,
+  diamond:  buildDiamondDisplay,
+  rocket:   buildRocket,
+  chart:    buildCandleChart,
 };
 
 // ── Main component ───────────────────────────────────────────────────────────
