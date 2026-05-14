@@ -331,75 +331,85 @@ export default function CoingameRoomPage() {
       scene.add(pl);
     });
 
-    // Rug
-    const rugMat = new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.95, metalness: 0 });
-    const rug = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), rugMat);
-    rug.rotation.x = -Math.PI / 2;
-    rug.position.y = 0.005;
-    scene.add(rug);
-    // rug border
-    const rugBorder = new THREE.Mesh(new THREE.PlaneGeometry(8.3, 6.3), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.9 }));
-    rugBorder.rotation.x = -Math.PI / 2;
-    rugBorder.position.y = 0.004;
-    scene.add(rugBorder);
+    // ── Static furniture (draggable, positions saved to localStorage) ──────────
+    const STATIC_KEY = `cg-room-static-${coinId}`;
+    const savedStatic = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+
+    function tagStatic(group, id) {
+      group.userData.furnitureId = id;
+      group.traverse((c) => { c.userData.furnitureId = id; });
+    }
+    function placeStatic(group, defaultX, defaultZ) {
+      const saved = savedStatic[group.userData.furnitureId];
+      group.position.set(saved ? saved.x : defaultX, 0, saved ? saved.z : defaultZ);
+    }
+
+    // Rug (grouped so it can be dragged)
+    const rugGroup = new THREE.Group();
+    const rugBorderMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 9), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.9 }));
+    rugBorderMesh.rotation.x = -Math.PI / 2; rugBorderMesh.position.y = 0.004; rugGroup.add(rugBorderMesh);
+    const rugMesh = new THREE.Mesh(new THREE.PlaneGeometry(11.5, 8.5), new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.95, metalness: 0 }));
+    rugMesh.rotation.x = -Math.PI / 2; rugMesh.position.y = 0.005; rugGroup.add(rugMesh);
+    tagStatic(rugGroup, 'static_rug');
+    placeStatic(rugGroup, 0, 0);
+    scene.add(rugGroup);
 
     // Bookshelf (right wall)
     const shelfMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
     const bookshelf = new THREE.Group();
-    // frame
-    const bsFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.4), shelfMat);
-    bsFrame.position.set(0, 1.6, 0); bookshelf.add(bsFrame);
-    // shelves (lighter)
+    const bsFrame = new THREE.Mesh(new THREE.BoxGeometry(3.3, 4.8, 0.6), shelfMat);
+    bsFrame.position.set(0, 2.4, 0); bookshelf.add(bsFrame);
     const shelfInner = new THREE.MeshStandardMaterial({ color: 0x0f2010, roughness: 0.5, metalness: 0.4 });
-    [0.5, 1.3, 2.1, 2.9].forEach((y) => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.06, 0.34), shelfInner);
-      s.position.set(0, y, 0.01); bookshelf.add(s);
+    [0.75, 1.95, 3.15, 4.35].forEach((y) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.09, 0.51), shelfInner);
+      s.position.set(0, y, 0.015); bookshelf.add(s);
     });
-    // books (decorative colored spines)
     const bookColors = [0x22c55e, 0x16a34a, 0x4ade80, 0x052e16, 0x15803d, 0x166534];
-    let bx = -0.88;
+    let bx = -1.32;
     bookColors.forEach((col) => {
-      const bw = 0.1 + Math.random() * 0.1;
-      const bh = 0.28 + Math.random() * 0.18;
-      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.28), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      book.position.set(bx + bw/2, 1.3 + bh/2 + 0.03, 0.01); bookshelf.add(book);
+      const bw = 0.15 + Math.random() * 0.15;
+      const bh = 0.42 + Math.random() * 0.27;
+      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.42), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
+      book.position.set(bx + bw/2, 1.95 + bh/2 + 0.045, 0.015); bookshelf.add(book);
+      bx += bw + 0.022;
+    });
+    bx = -1.05;
+    bookColors.slice().reverse().forEach((col) => {
+      const bw = 0.135 + Math.random() * 0.12;
+      const bh = 0.33 + Math.random() * 0.21;
+      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.42), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
+      book.position.set(bx + bw/2, 3.15 + bh/2 + 0.045, 0.015); bookshelf.add(book);
       bx += bw + 0.015;
     });
-    bx = -0.7;
-    bookColors.slice().reverse().forEach((col) => {
-      const bw = 0.09 + Math.random() * 0.08;
-      const bh = 0.22 + Math.random() * 0.14;
-      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.28), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      book.position.set(bx + bw/2, 2.1 + bh/2 + 0.03, 0.01); bookshelf.add(book);
-      bx += bw + 0.01;
-    });
-    bookshelf.position.set(9.5, 0, -7);
     bookshelf.rotation.y = -Math.PI / 2;
+    tagStatic(bookshelf, 'static_bookshelf');
+    placeStatic(bookshelf, 9.5, -7);
     scene.add(bookshelf);
 
-    // Sofa (back-right area)
+    // Sofa
     const sofaMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.88, metalness: 0.05 });
     const sofaAccent = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85, metalness: 0 });
     const sofa = new THREE.Group();
-    [[2.8,0.28,0.95,sofaMat,0,0.38,0],[2.8,0.72,0.2,sofaMat,0,0.72,-0.38],[2.8,0.12,0.95,sofaAccent,0,0.22,0]].forEach(([w,h,d,mat,x,y,z]) => {
+    [[4.2,0.42,1.42,sofaMat,0,0.57,0],[4.2,1.08,0.3,sofaMat,0,1.08,-0.57],[4.2,0.18,1.42,sofaAccent,0,0.33,0]].forEach(([w,h,d,mat,x,y,z]) => {
       const p = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); p.position.set(x,y,z); sofa.add(p);
     });
-    [-1.3, 1.3].forEach((x) => {
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.95), sofaMat); arm.position.set(x, 0.52, 0); sofa.add(arm);
+    [-1.95, 1.95].forEach((x) => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.78, 1.42), sofaMat); arm.position.set(x, 0.78, 0); sofa.add(arm);
     });
-    // cushions
-    [-0.7, 0, 0.7].forEach((x) => {
-      const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.7), sofaAccent);
-      cushion.position.set(x, 0.56, 0.1); sofa.add(cushion);
+    [-1.05, 0, 1.05].forEach((x) => {
+      const cushion = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.24, 1.05), sofaAccent);
+      cushion.position.set(x, 0.84, 0.15); sofa.add(cushion);
     });
-    sofa.position.set(4, 0, -9);
+    tagStatic(sofa, 'static_sofa');
+    placeStatic(sofa, 4, -9);
     scene.add(sofa);
 
-    // Small side table next to sofa
+    // Side table
     const tableGroup = new THREE.Group();
-    const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 16), shelfMat); tTop.position.set(0, 0.62, 0); tableGroup.add(tTop);
-    const tLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.62, 8), shelfMat); tLeg.position.set(0, 0.31, 0); tableGroup.add(tLeg);
-    tableGroup.position.set(6.2, 0, -8.2);
+    const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.09, 16), shelfMat); tTop.position.set(0, 1.0, 0); tableGroup.add(tTop);
+    const tLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.0, 8), shelfMat); tLeg.position.set(0, 0.5, 0); tableGroup.add(tLeg);
+    tagStatic(tableGroup, 'static_table');
+    placeStatic(tableGroup, 6.2, -8.2);
     scene.add(tableGroup);
 
     // ── Central coin display ──────────────────────────────────────────────────
@@ -474,9 +484,10 @@ export default function CoingameRoomPage() {
     nameSprite.position.set(0, 1.55, 0);
     cg.add(nameSprite);
 
-    // ── Furniture map: id → { group, isStaged, highlightRing } ───────────────
+    // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    sceneRef.current = { scene, furnitureMap, isOwner, nameCanvas, nameCtx, nameTex };
+    const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup };
+    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
@@ -492,7 +503,16 @@ export default function CoingameRoomPage() {
     const intersectPt = new THREE.Vector3();
 
     function getPickables() {
-      return Object.values(furnitureMap).map((f) => f.group);
+      return [
+        ...Object.values(furnitureMap).map((f) => f.group),
+        ...Object.values(staticMap),
+      ];
+    }
+
+    function findGroup(id) {
+      if (furnitureMap[id]) return furnitureMap[id].group;
+      if (staticMap[id]) return staticMap[id];
+      return null;
     }
 
     function onMDown(e) {
@@ -507,8 +527,9 @@ export default function CoingameRoomPage() {
           let obj = hits[0].object;
           while (obj.parent && !obj.userData.furnitureId) obj = obj.parent;
           const id = obj.userData.furnitureId;
-          if (id) {
-            dragging = { id, group: furnitureMap[id].group };
+          const group = id ? findGroup(id) : null;
+          if (group) {
+            dragging = { id, group, isStatic: id.startsWith('static_') };
             autoRot = false;
             return;
           }
@@ -541,13 +562,18 @@ export default function CoingameRoomPage() {
 
     function onMUp() {
       if (dragging) {
-        const { id, group } = dragging;
+        const { id, group, isStatic } = dragging;
         const x = parseFloat(group.position.x.toFixed(3));
         const z = parseFloat(group.position.z.toFixed(3));
         group.position.y = FLOOR_Y;
-        // mark as placed (remove from staging)
-        if (furnitureMap[id]) furnitureMap[id].isStaged = false;
-        savePosition(id, x, z);
+        if (isStatic) {
+          const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+          cur[id] = { x, z };
+          localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+        } else {
+          if (furnitureMap[id]) furnitureMap[id].isStaged = false;
+          savePosition(id, x, z);
+        }
         dragging = null;
         return;
       }
@@ -692,6 +718,8 @@ export default function CoingameRoomPage() {
         glowRing.position.y = 0.02;
         group.add(glowRing);
       }
+
+      group.scale.set(2, 2, 2);
 
       const isStaged = item.pos_x == null || item.pos_z == null;
       if (isStaged) {
