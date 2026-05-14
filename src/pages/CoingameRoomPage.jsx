@@ -450,7 +450,6 @@ export default function CoingameRoomPage() {
     bucket.position.set(savedCube ? savedCube.x : -4, 1.5, savedCube ? savedCube.z : 4);
     bucket.scale.setScalar(1.6);
     scene.add(bucket);
-    staticMap['fc_cube'] = bucket;
     let bucketBounceEnd = 0;
 
     // ── Central coin display ──────────────────────────────────────────────────
@@ -527,7 +526,7 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup };
+    const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup, fc_cube: bucket };
     sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY, lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
