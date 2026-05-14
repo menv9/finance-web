@@ -464,9 +464,19 @@ export default function CoingameRoomPage() {
     pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
     scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.045, vertexColors: true, transparent: true, opacity: 0.55 })));
 
+    // ── Coin name sprite ──────────────────────────────────────────────────────
+    const nameCanvas = document.createElement('canvas');
+    nameCanvas.width = 512; nameCanvas.height = 128;
+    const nameCtx = nameCanvas.getContext('2d');
+    const nameTex = new THREE.CanvasTexture(nameCanvas);
+    const nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTex, transparent: true, depthWrite: false }));
+    nameSprite.scale.set(4.0, 1.0, 1);
+    nameSprite.position.set(0, 1.55, 0);
+    cg.add(nameSprite);
+
     // ── Furniture map: id → { group, isStaged, highlightRing } ───────────────
     const furnitureMap = {};
-    sceneRef.current = { scene, furnitureMap, isOwner };
+    sceneRef.current = { scene, furnitureMap, isOwner, nameCanvas, nameCtx, nameTex };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
@@ -697,6 +707,33 @@ export default function CoingameRoomPage() {
       furnitureMap[item.id] = { group, isStaged };
     });
   }, [rewards]);
+
+  // Keep isOwner live in the scene (ownCoin may load after the scene effect)
+  useEffect(() => {
+    if (sceneRef.current) sceneRef.current.isOwner = isOwner;
+  }, [isOwner]);
+
+  // Paint coin name onto the floating sprite canvas
+  useEffect(() => {
+    const ref = sceneRef.current;
+    if (!ref?.nameCtx || !coin) return;
+    const { nameCtx, nameCanvas, nameTex } = ref;
+    const label = `$${(coin.coin_name || '').toUpperCase()}`;
+    nameCtx.clearRect(0, 0, nameCanvas.width, nameCanvas.height);
+    nameCtx.font = 'bold 64px "DM Mono", "Space Mono", monospace';
+    nameCtx.textAlign = 'center';
+    nameCtx.textBaseline = 'middle';
+    // glow
+    nameCtx.shadowColor = '#22c55e';
+    nameCtx.shadowBlur = 18;
+    nameCtx.fillStyle = '#4ade80';
+    nameCtx.fillText(label, 256, 64);
+    // sharp layer on top
+    nameCtx.shadowBlur = 0;
+    nameCtx.fillStyle = '#bbf7d0';
+    nameCtx.fillText(label, 256, 64);
+    nameTex.needsUpdate = true;
+  }, [coin]);
 
   // ── Derived UI values ────────────────────────────────────────────────────
   const price = coin ? spotPrice(Number(coin.tokens_minted), Number(coin.base_price)) : 0;
