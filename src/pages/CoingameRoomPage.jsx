@@ -228,7 +228,7 @@ export default function CoingameRoomPage() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.8;
     renderer.setClearColor(0x060806);
 
     const scene = new THREE.Scene();
@@ -239,38 +239,46 @@ export default function CoingameRoomPage() {
     camera.lookAt(0, 1.5, 0);
 
     // ── Lighting ──────────────────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x1a3a1a, 4.5));
+    scene.add(new THREE.AmbientLight(0x3a6a3a, 8));
 
-    const ceilLight = new THREE.PointLight(0x22c55e, 14, 40);
+    const ceilLight = new THREE.PointLight(0x22c55e, 28, 55);
     ceilLight.position.set(0, 8.5, 0);
     ceilLight.castShadow = true;
     ceilLight.shadow.mapSize.set(1024, 1024);
     scene.add(ceilLight);
 
-    const accent1 = new THREE.PointLight(0x4ade80, 5, 22);
+    const accent1 = new THREE.PointLight(0x4ade80, 10, 28);
     accent1.position.set(-7, 4, -6);
     scene.add(accent1);
 
-    const accent2 = new THREE.PointLight(0x22c55e, 4, 20);
+    const accent2 = new THREE.PointLight(0x22c55e, 8, 26);
     accent2.position.set(7, 3, 4);
     scene.add(accent2);
 
-    const fillLeft = new THREE.PointLight(0x4ade80, 3.5, 18);
+    const fillLeft = new THREE.PointLight(0x4ade80, 8, 24);
     fillLeft.position.set(-9, 3, 2);
     scene.add(fillLeft);
 
-    const fillFront = new THREE.PointLight(0x86efac, 3, 18);
+    const fillFront = new THREE.PointLight(0x86efac, 7, 24);
     fillFront.position.set(0, 2.5, 9);
     scene.add(fillFront);
 
+    const fillBack = new THREE.PointLight(0x4ade80, 6, 22);
+    fillBack.position.set(0, 3, -9);
+    scene.add(fillBack);
+
+    const fillRight = new THREE.PointLight(0x22c55e, 7, 22);
+    fillRight.position.set(9, 3, 0);
+    scene.add(fillRight);
+
     // ── Room shell ────────────────────────────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x060d06, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0d1a0d, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
     const room = new THREE.Mesh(new THREE.BoxGeometry(ROOM.w, ROOM.h, ROOM.d), wallMat);
     room.position.y = ROOM.h / 2;
     scene.add(room);
 
     // Floor
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050a05, roughness: 0.7, metalness: 0.2 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x0c160c, roughness: 0.7, metalness: 0.2 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -580,7 +588,7 @@ export default function CoingameRoomPage() {
       gem.rotation.y = t * 2.0;
 
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
-      ceilLight.intensity = 14 + Math.sin(t * 1.4) * 2.0;
+      ceilLight.intensity = 28 + Math.sin(t * 1.4) * 3.0;
       ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
       bulb.material.emissiveIntensity = 1.8 + Math.sin(t * 1.4) * 0.5;
 
