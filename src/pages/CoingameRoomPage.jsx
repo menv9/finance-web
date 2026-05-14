@@ -285,6 +285,7 @@ export default function CoingameRoomPage() {
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a301a, roughness: 0.7, metalness: 0.2 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.005;
     floor.receiveShadow = true;
     scene.add(floor);
 
