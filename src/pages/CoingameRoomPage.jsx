@@ -7,9 +7,9 @@ import { useFinanceStore } from '../store/useFinanceStore';
 
 const ROOM = { w: 22, d: 22, h: 9 };
 const FLOOR_Y = 0;
-const STAGE_X = -13;
-const STAGE_Z_START = -7;
-const STAGE_Z_STEP = 2.4;
+const STAGE_X = -9;
+const STAGE_Z_START = -8;
+const STAGE_Z_STEP = 2.6;
 
 const RARITY_HEX = { legendary: 0xf59e0b, epic: 0xc084fc, rare: 0x38bdf8, uncommon: 0x4ade80, common: 0x6b7280 };
 
@@ -239,21 +239,29 @@ export default function CoingameRoomPage() {
     camera.lookAt(0, 1.5, 0);
 
     // ── Lighting ──────────────────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x0d1a0d, 1.8));
+    scene.add(new THREE.AmbientLight(0x1a3a1a, 4.5));
 
-    const ceilLight = new THREE.PointLight(0x22c55e, 5.5, 30);
+    const ceilLight = new THREE.PointLight(0x22c55e, 14, 40);
     ceilLight.position.set(0, 8.5, 0);
     ceilLight.castShadow = true;
     ceilLight.shadow.mapSize.set(1024, 1024);
     scene.add(ceilLight);
 
-    const accent1 = new THREE.PointLight(0x4ade80, 1.4, 16);
-    accent1.position.set(-8, 4, -8);
+    const accent1 = new THREE.PointLight(0x4ade80, 5, 22);
+    accent1.position.set(-7, 4, -6);
     scene.add(accent1);
 
-    const accent2 = new THREE.PointLight(0x166534, 0.8, 16);
-    accent2.position.set(8, 3, 6);
+    const accent2 = new THREE.PointLight(0x22c55e, 4, 20);
+    accent2.position.set(7, 3, 4);
     scene.add(accent2);
+
+    const fillLeft = new THREE.PointLight(0x4ade80, 3.5, 18);
+    fillLeft.position.set(-9, 3, 2);
+    scene.add(fillLeft);
+
+    const fillFront = new THREE.PointLight(0x86efac, 3, 18);
+    fillFront.position.set(0, 2.5, 9);
+    scene.add(fillFront);
 
     // ── Room shell ────────────────────────────────────────────────────────────
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x060d06, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
@@ -572,7 +580,7 @@ export default function CoingameRoomPage() {
       gem.rotation.y = t * 2.0;
 
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
-      ceilLight.intensity = 5.5 + Math.sin(t * 1.4) * 1.0;
+      ceilLight.intensity = 14 + Math.sin(t * 1.4) * 2.0;
       ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
       bulb.material.emissiveIntensity = 1.8 + Math.sin(t * 1.4) * 0.5;
 
