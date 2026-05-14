@@ -108,7 +108,9 @@ export default function CoingameRoomPage() {
     const acc = new THREE.PointLight(0x4ade80, 1.3, 18);
     acc.position.set(-8, 4, -5);
     scene.add(acc);
-    scene.add(Object.assign(new THREE.PointLight(0x052e16, 0.7, 22), { position: { x: 7, y: 3, z: 6 } }));
+    const fill = new THREE.PointLight(0x052e16, 0.7, 22);
+    fill.position.set(7, 3, 6);
+    scene.add(fill);
 
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x050d05, roughness: 0.85, metalness: 0.3 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 28), floorMat);
@@ -192,8 +194,12 @@ export default function CoingameRoomPage() {
 
     // Trophy shelf
     const shMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.75 });
-    scene.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 0.42), shMat), { position: { x: 7, y: 3.0, z: -8.5 } }));
-    scene.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.4, roughness: 0.1, metalness: 1 })), { position: { x: 7, y: 3.06, z: -12.75 } }));
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 0.42), shMat);
+    shelf.position.set(7, 3.0, -8.5);
+    scene.add(shelf);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.4, roughness: 0.1, metalness: 1 }));
+    strip.position.set(7, 3.06, -12.75);
+    scene.add(strip);
     [0xf59e0b, 0xc084fc, 0x22c55e, 0x38bdf8].forEach((col, i) => {
       const tMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.08, metalness: 1, emissive: col, emissiveIntensity: 0.35 });
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.36, 8), tMat);
