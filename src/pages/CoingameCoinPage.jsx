@@ -349,7 +349,7 @@ function CoinHeader({ coin }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <Link className="cg-btn cg-btn-secondary" to={`/coingame/coin/${coin.coin_id}/room`}>🏠 Room</Link>
+        <Link className="cg-btn cg-btn-secondary" to={`/coingame/coin/${coin.coin_id}/room`}>Room</Link>
         <Link className="cg-btn cg-btn-secondary cg-coin-market-link" to="/coingame/market">Market</Link>
       </div>
     </section>
