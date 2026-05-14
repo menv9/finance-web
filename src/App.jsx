@@ -57,6 +57,7 @@ const CoingameLeaderboardPage = lazy(() => import('./pages/CoingameLeaderboardPa
 const CoingameInfoPage = lazy(() => import('./pages/CoingameInfoPage'));
 const CoingameAdminPage = lazy(() => import('./pages/CoingameAdminPage'));
 const CoingameProfilePage = lazy(() => import('./pages/CoingameProfilePage'));
+const CoingameRoomPage = lazy(() => import('./pages/CoingameRoomPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
@@ -110,6 +111,7 @@ export default function App() {
                         <Route path="/" element={<CoingamePage />} />
                         <Route path="/market" element={<CoingameMarketPage />} />
                         <Route path="/coin/:coinId" element={<CoingameCoinPage />} />
+                        <Route path="/coin/:coinId/room" element={<CoingameRoomPage />} />
                         <Route path="/casino" element={<CoingameCasinoPage />} />
                         <Route path="/history" element={<CoingameTransactionsPage />} />
                         <Route path="/leaderboard" element={<CoingameLeaderboardPage />} />

@@ -366,3 +366,9 @@ export function bondingCurvePoints(maxTokens, basePrice = 1, steps = 100) {
     return { tokens: t, price: spotPrice(t, basePrice) };
   });
 }
+
+/** Checks and grants any new rewards for a coin, returns full collectable list with unlocked status. */
+export async function fetchCoinRewards(coinId) {
+  const data = await rpc('cg_check_rewards', { p_coin_id: coinId });
+  return data ?? [];
+}

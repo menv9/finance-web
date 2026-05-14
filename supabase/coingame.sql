@@ -1916,3 +1916,439 @@ end;
 $$;
 
 grant execute on function public.cg_gamble_dice(integer, numeric) to authenticated;
+
+-- ── Collectables & Rewards ─────────────────────────────────────────────────────
+
+create table if not exists public.coingame_collectables (
+  id                    text primary key,
+  label                 text not null,
+  icon                  text not null,
+  rarity                text not null check (rarity in ('legendary', 'epic', 'rare', 'uncommon', 'common')),
+  color                 text not null,
+  rbg                   text not null,
+  rb                    text not null,
+  unlock_description    text not null,
+  min_tokens_minted     numeric,
+  require_strong_status boolean not null default false,
+  owner_min_streak      integer,
+  owner_min_casino_bets integer,
+  sort_order            integer not null default 0
+);
+
+alter table public.coingame_collectables enable row level security;
+
+drop policy if exists "collectables readable by all" on public.coingame_collectables;
+create policy "collectables readable by all"
+  on public.coingame_collectables for select to authenticated using (true);
+
+insert into public.coingame_collectables
+  (id, label, icon, rarity, color, rbg, rb, unlock_description, min_tokens_minted, require_strong_status, owner_min_streak, owner_min_casino_bets, sort_order)
+values
+  ('chart',   'Candle Chart',    'TrendingUp', 'common',    '#22c55e', 'rgba(34,197,94,0.08)',   'rgba(34,197,94,0.25)',   'First buy happens on this coin',                    1,     false, null, null, 70),
+  ('moon',    'Moon Lamp',       'Moon',       'common',    '#94a3b8', 'rgba(148,163,184,0.08)', 'rgba(148,163,184,0.25)', 'Owner logs in 3 days in a row',                     null,  false, 3,    null, 60),
+  ('desk',    'Trading Desk',    'Monitor',    'uncommon',  '#22c55e', 'rgba(34,197,94,0.1)',    'rgba(34,197,94,0.3)',    'Coin reaches 100 tokens minted',                    100,   false, null, null, 50),
+  ('nft',     'NFT Frame',       'Frame',      'uncommon',  '#34d399', 'rgba(52,211,153,0.1)',   'rgba(52,211,153,0.3)',   'Owner makes 3 casino bets',                         null,  false, null, 3,   40),
+  ('diamond', 'Diamond Display', 'Gem',        'rare',      '#38bdf8', 'rgba(56,189,248,0.1)',   'rgba(56,189,248,0.3)',   'Coin reaches 1,000 tokens minted',                  1000,  false, null, null, 30),
+  ('rocket',  'Rocket Statue',   'Rocket',     'rare',      '#818cf8', 'rgba(129,140,248,0.1)',  'rgba(129,140,248,0.3)',  'Coin reaches 5,000 tokens minted',                  5000,  false, null, null, 20),
+  ('gold',    'Gold Pile',       'Coins',      'epic',      '#c084fc', 'rgba(192,132,252,0.12)', 'rgba(192,132,252,0.35)', 'Coin reaches 10,000 tokens minted',                 10000, false, null, null, 10),
+  ('throne',  'Coin Throne',     'Crown',      'legendary', '#f59e0b', 'rgba(245,158,11,0.12)',  'rgba(245,158,11,0.35)',  'Coin reaches Strong status (market cap >= 75k FC)', null,  true,  null, null, 0)
+on conflict (id) do update set
+  label = excluded.label, icon = excluded.icon, rarity = excluded.rarity,
+  color = excluded.color, rbg = excluded.rbg, rb = excluded.rb,
+  unlock_description = excluded.unlock_description,
+  min_tokens_minted = excluded.min_tokens_minted,
+  require_strong_status = excluded.require_strong_status,
+  owner_min_streak = excluded.owner_min_streak,
+  owner_min_casino_bets = excluded.owner_min_casino_bets,
+  sort_order = excluded.sort_order;
+
+create table if not exists public.coingame_coin_rewards (
+  coin_id        uuid not null references public.coingame_coins(coin_id) on delete cascade,
+  collectable_id text not null references public.coingame_collectables(id) on delete cascade,
+  unlocked_at    timestamptz not null default timezone('utc', now()),
+  primary key (coin_id, collectable_id)
+);
+
+alter table public.coingame_coin_rewards enable row level security;
+
+drop policy if exists "coin rewards readable by all" on public.coingame_coin_rewards;
+create policy "coin rewards readable by all"
+  on public.coingame_coin_rewards for select to authenticated using (true);
+
+-- Internal helper: evaluate all unlock conditions for a coin and insert any
+-- newly earned rewards. Called by buy, daily claim, and gamble RPCs.
+create or replace function public.cg_grant_rewards_for_coin(p_coin_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_coin        public.coingame_coins%rowtype;
+  v_wallet      public.coingame_wallets%rowtype;
+  v_casino_bets integer;
+  v_col         record;
+  v_met         boolean;
+begin
+  select * into v_coin from public.coingame_coins where coin_id = p_coin_id;
+  if not found then return; end if;
+
+  select * into v_wallet from public.coingame_wallets where user_id = v_coin.owner_user_id;
+
+  select count(*) into v_casino_bets
+    from public.coingame_gambling_bets where user_id = v_coin.owner_user_id;
+
+  for v_col in select * from public.coingame_collectables loop
+    v_met := true;
+
+    if v_col.min_tokens_minted is not null and v_coin.tokens_minted < v_col.min_tokens_minted then
+      v_met := false;
+    end if;
+    if v_col.require_strong_status and coalesce(v_coin.status, 'starter') <> 'strong' then
+      v_met := false;
+    end if;
+    if v_col.owner_min_streak is not null and coalesce(v_wallet.login_streak, 0) < v_col.owner_min_streak then
+      v_met := false;
+    end if;
+    if v_col.owner_min_casino_bets is not null and v_casino_bets < v_col.owner_min_casino_bets then
+      v_met := false;
+    end if;
+
+    if v_met then
+      insert into public.coingame_coin_rewards (coin_id, collectable_id)
+      values (p_coin_id, v_col.id)
+      on conflict do nothing;
+    end if;
+  end loop;
+end;
+$$;
+
+-- Public-facing: grants any new rewards then returns the full collectable list
+-- with unlocked status. Called by the room page on open.
+create or replace function public.cg_check_rewards(p_coin_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  perform public.cg_grant_rewards_for_coin(p_coin_id);
+
+  return (
+    select jsonb_agg(
+      jsonb_build_object(
+        'id',                 c.id,
+        'label',              c.label,
+        'icon',               c.icon,
+        'rarity',             c.rarity,
+        'color',              c.color,
+        'rbg',                c.rbg,
+        'rb',                 c.rb,
+        'unlock_description', c.unlock_description,
+        'unlocked',           (r.coin_id is not null),
+        'unlocked_at',        r.unlocked_at
+      ) order by c.sort_order
+    )
+    from public.coingame_collectables c
+    left join public.coingame_coin_rewards r
+      on r.coin_id = p_coin_id and r.collectable_id = c.id
+  );
+end;
+$$;
+
+grant execute on function public.cg_check_rewards(uuid) to authenticated;
+
+-- Updated cg_buy_coin: grants rewards after every buy (tokens milestone)
+create or replace function public.cg_buy_coin(p_coin_id uuid, p_tokens numeric)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid             uuid := auth.uid();
+  c               record;
+  cost            numeric;
+  fee             numeric;
+  burn_amt        numeric;
+  pool_amt        numeric;
+  total_charge    numeric;
+  current_balance numeric;
+  spot            numeric;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if p_tokens is null or p_tokens <= 0 then raise exception 'tokens must be positive'; end if;
+
+  select coin.coin_id, coin.owner_user_id, coin.base_price, coin.tokens_minted, coin.created_at
+    into c
+    from public.coingame_coins coin where coin.coin_id = p_coin_id for update;
+  if not found then raise exception 'coin not found'; end if;
+  if c.owner_user_id = uid then raise exception 'cannot buy your own coin'; end if;
+
+  if c.tokens_minted + p_tokens > public.cg_const_total_supply_cap() then
+    raise exception 'would exceed total supply cap';
+  end if;
+
+  cost := public.cg_curve_integral(c.tokens_minted, c.tokens_minted + p_tokens, c.base_price);
+  if cost < public.cg_const_min_trade_fc() then
+    raise exception 'trade below minimum (%)', public.cg_const_min_trade_fc();
+  end if;
+  fee      := cost * 0.01;
+  burn_amt := fee * 0.5;
+  pool_amt := fee * 0.5;
+  total_charge := cost + fee;
+
+  select fc_balance into current_balance
+    from public.coingame_wallets w where w.user_id = uid for update;
+  if not found then raise exception 'wallet not initialized — call cg_ensure_wallet first'; end if;
+  if current_balance < total_charge then
+    raise exception 'insufficient balance (need %, have %)', total_charge, current_balance;
+  end if;
+
+  update public.coingame_wallets w set fc_balance = fc_balance - total_charge where w.user_id = uid;
+
+  update public.coingame_coins set tokens_minted = tokens_minted + p_tokens where coin_id = p_coin_id;
+
+  insert into public.coingame_holdings (holder_user_id, coin_id, tokens_held, avg_buy_price, last_buy_at)
+    values (uid, p_coin_id, p_tokens, cost / nullif(p_tokens, 0), timezone('utc', now()))
+    on conflict (holder_user_id, coin_id) do update
+      set tokens_held   = public.coingame_holdings.tokens_held + p_tokens,
+          avg_buy_price = (
+            (public.coingame_holdings.tokens_held * public.coingame_holdings.avg_buy_price) + cost
+          ) / (public.coingame_holdings.tokens_held + p_tokens),
+          last_buy_at   = timezone('utc', now());
+
+  update public.coingame_economy
+    set total_supply_minted = total_supply_minted + p_tokens,
+        total_burned        = total_burned + burn_amt,
+        prize_pool_fc       = prize_pool_fc + pool_amt,
+        updated_at          = timezone('utc', now())
+    where id = 1;
+
+  spot := public.cg_spot_price(c.tokens_minted + p_tokens, c.base_price);
+
+  insert into public.coingame_transactions
+    (tx_type, from_user_id, to_user_id, coin_id, tokens, fc_amount, spot_price, metadata)
+  values ('buy', uid, c.owner_user_id, p_coin_id, p_tokens, cost, spot,
+          jsonb_build_object('fee', fee, 'burn', burn_amt, 'pool', pool_amt));
+  insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, coin_id, metadata)
+    values ('fee_burn', uid, burn_amt, p_coin_id, null);
+  insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, coin_id, metadata)
+    values ('fee_pool', uid, pool_amt, p_coin_id, null);
+
+  perform public.cg_recompute_status(p_coin_id);
+  perform public.cg_record_leaderboard(uid, total_charge, -fee);
+  perform public.cg_grant_rewards_for_coin(p_coin_id);
+
+  return jsonb_build_object(
+    'tokens', p_tokens, 'cost', cost, 'fee', fee,
+    'total_charge', total_charge, 'spot_price', spot,
+    'new_balance', current_balance - total_charge
+  );
+end;
+$$;
+
+grant execute on function public.cg_buy_coin(uuid, numeric) to authenticated;
+
+-- Updated cg_claim_daily: grants rewards after streak update
+create or replace function public.cg_claim_daily()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid           uuid := auth.uid();
+  w             record;
+  today         date := (timezone('utc', now()))::date;
+  last_day      date;
+  reward        numeric;
+  new_streak    integer;
+  v_own_coin_id uuid;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+
+  select wallet.user_id, wallet.fc_balance, wallet.login_streak, wallet.last_daily_claim_at into w
+    from public.coingame_wallets wallet where wallet.user_id = uid for update;
+  if not found then raise exception 'wallet not initialized'; end if;
+
+  last_day := (w.last_daily_claim_at at time zone 'UTC')::date;
+  if last_day = today then raise exception 'already claimed today'; end if;
+
+  new_streak := case when last_day = today - 1 then w.login_streak + 1 else 1 end;
+  reward     := 50 + 10 * least(new_streak, 30);
+
+  update public.coingame_wallets wallet
+    set fc_balance          = fc_balance + reward,
+        login_streak        = new_streak,
+        last_daily_claim_at = timezone('utc', now()),
+        last_login_at       = timezone('utc', now())
+    where wallet.user_id = uid;
+
+  insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
+    values ('reward', uid, reward, jsonb_build_object('reason', 'daily_claim', 'streak', new_streak));
+
+  select coin_id into v_own_coin_id from public.coingame_coins where owner_user_id = uid;
+  if v_own_coin_id is not null then
+    perform public.cg_grant_rewards_for_coin(v_own_coin_id);
+  end if;
+
+  return jsonb_build_object('reward', reward, 'streak', new_streak, 'new_balance', w.fc_balance + reward);
+end;
+$$;
+
+grant execute on function public.cg_claim_daily() to authenticated;
+
+-- Updated cg_gamble_coinflip: grants rewards after each bet (casino milestone)
+create or replace function public.cg_gamble_coinflip(p_choice text, p_wager numeric)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid           uuid := auth.uid();
+  wallet        public.coingame_wallets%rowtype;
+  casino        public.coingame_casino%rowtype;
+  clean_choice  text := lower(trim(coalesce(p_choice, '')));
+  roll          integer;
+  outcome       text;
+  won           boolean;
+  multiplier    numeric;
+  payout        numeric;
+  house_risk    numeric;
+  bet_id        uuid;
+  v_own_coin_id uuid;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if clean_choice not in ('heads', 'tails') then raise exception 'choice must be heads or tails'; end if;
+  if p_wager is null or p_wager <= 0 then raise exception 'wager must be positive'; end if;
+
+  insert into public.coingame_casino (id) values (1) on conflict (id) do nothing;
+  select * into casino from public.coingame_casino where id = 1 for update;
+  if not casino.enabled then raise exception 'casino is disabled'; end if;
+
+  multiplier := 2 * (1 - casino.house_edge);
+  payout     := p_wager * multiplier;
+  house_risk := payout - p_wager;
+  if casino.house_balance_fc < house_risk then raise exception 'casino reserve cannot cover this payout'; end if;
+
+  select * into wallet from public.coingame_wallets where user_id = uid for update;
+  if not found then raise exception 'wallet not found'; end if;
+  if wallet.fc_balance < p_wager then raise exception 'insufficient FC balance'; end if;
+
+  roll    := floor(random() * 2)::integer + 1;
+  outcome := case when roll = 1 then 'heads' else 'tails' end;
+  won     := outcome = clean_choice;
+
+  update public.coingame_wallets
+     set fc_balance = fc_balance - p_wager + case when won then payout else 0 end,
+         updated_at = timezone('utc', now())
+   where user_id = uid;
+
+  update public.coingame_casino
+     set house_balance_fc = house_balance_fc + p_wager - case when won then payout else 0 end,
+         updated_at = timezone('utc', now())
+   where id = 1;
+
+  insert into public.coingame_gambling_bets
+    (user_id, game, wager_fc, choice, roll, result, multiplier, payout_fc, net_fc, metadata)
+  values (uid, 'coinflip', p_wager, clean_choice, roll,
+          case when won then 'win' else 'loss' end,
+          multiplier, case when won then payout else 0 end,
+          case when won then payout - p_wager else -p_wager end,
+          jsonb_build_object('outcome', outcome, 'house_edge', casino.house_edge))
+  returning id into bet_id;
+
+  insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, metadata)
+    values ('gamble_bet', uid, p_wager, jsonb_build_object('game', 'coinflip', 'bet_id', bet_id, 'choice', clean_choice));
+
+  if won then
+    insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
+      values ('gamble_win', uid, payout, jsonb_build_object('game', 'coinflip', 'bet_id', bet_id, 'roll', outcome));
+  else
+    insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, metadata)
+      values ('gamble_loss', uid, 0, jsonb_build_object('game', 'coinflip', 'bet_id', bet_id, 'roll', outcome, 'lost_wager', p_wager));
+  end if;
+
+  select coin_id into v_own_coin_id from public.coingame_coins where owner_user_id = uid;
+  if v_own_coin_id is not null then
+    perform public.cg_grant_rewards_for_coin(v_own_coin_id);
+  end if;
+
+  return jsonb_build_object(
+    'id', bet_id, 'game', 'coinflip', 'wager_fc', p_wager,
+    'choice', clean_choice, 'roll', outcome,
+    'result', case when won then 'win' else 'loss' end,
+    'multiplier', multiplier,
+    'payout_fc', case when won then payout else 0 end,
+    'net_fc', case when won then payout - p_wager else -p_wager end,
+    'new_balance', wallet.fc_balance - p_wager + case when won then payout else 0 end
+  );
+end;
+$$;
+
+grant execute on function public.cg_gamble_coinflip(text, numeric) to authenticated;
+
+-- Updated cg_gamble_dice: grants rewards after each bet (casino milestone)
+create or replace function public.cg_gamble_dice(p_target integer, p_wager numeric)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid           uuid := auth.uid();
+  wallet        public.coingame_wallets%rowtype;
+  casino        public.coingame_casino%rowtype;
+  roll          integer;
+  won           boolean;
+  multiplier    numeric;
+  payout        numeric;
+  house_risk    numeric;
+  bet_id        uuid;
+  v_own_coin_id uuid;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  if p_target is null or p_target < 1 or p_target > 95 then raise exception 'target must be between 1 and 95'; end if;
+  if p_wager is null or p_wager <= 0 then raise exception 'wager must be positive'; end if;
+
+  insert into public.coingame_casino (id) values (1) on conflict (id) do nothing;
+  select * into casino from public.coingame_casino where id = 1 for update;
+  if not casino.enabled then raise exception 'casino is disabled'; end if;
+
+  multiplier := (100.0 / p_target) * (1 - casino.house_edge);
+  payout     := p_wager * multiplier;
+  house_risk := payout - p_wager;
+  if casino.house_balance_fc < house_risk then raise exception 'casino reserve cannot cover this payout'; end if;
+
+  select * into wallet from public.coingame_wallets where user_id = uid for update;
+  if not found then raise exception 'wallet not found'; end if;
+  if wallet.fc_balance < p_wager then raise exception 'insufficient FC balance'; end if;
+
+  roll := floor(random() * 100)::integer + 1;
+  won  := roll <= p_target;
+
+  update public.coingame_wallets
+     set fc_balance = fc_balance - p_wager + case when won then payout else 0 end,
+         updated_at = timezone('utc', now())
+   where user_id = uid;
+
+  update public.coingame_casino
+     set house_balance_fc = house_balance_fc + p_wager - case when won then payout else 0 end,
+         updated_at = timezone('utc', now())
+   where id = 1;
+
+  insert into public.coingame_gambling_bets
+    (user_id, game, wager_fc, target, roll, result, multiplier, payout_fc, net_fc, metadata)
+  values (uid, 'dice', p_wager, p_target, roll,
+          case when won then 'win' else 'loss' end,
+          multiplier, case when won then payout else 0 end,
+          case when won then payout - p_wager else -p_wager end,
+          jsonb_build_object('house_edge', casino.house_edge))
+  returning id into bet_id;
+
+  insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, metadata)
+    values ('gamble_bet', uid, p_wager, jsonb_build_object('game', 'dice', 'bet_id', bet_id, 'target', p_target));
+
+  if won then
+    insert into public.coingame_transactions (tx_type, to_user_id, fc_amount, metadata)
+      values ('gamble_win', uid, payout, jsonb_build_object('game', 'dice', 'bet_id', bet_id, 'roll', roll, 'target', p_target));
+  else
+    insert into public.coingame_transactions (tx_type, from_user_id, fc_amount, metadata)
+      values ('gamble_loss', uid, 0, jsonb_build_object('game', 'dice', 'bet_id', bet_id, 'roll', roll, 'target', p_target, 'lost_wager', p_wager));
+  end if;
+
+  select coin_id into v_own_coin_id from public.coingame_coins where owner_user_id = uid;
+  if v_own_coin_id is not null then
+    perform public.cg_grant_rewards_for_coin(v_own_coin_id);
+  end if;
+
+  return jsonb_build_object(
+    'id', bet_id, 'game', 'dice', 'wager_fc', p_wager, 'target', p_target, 'roll', roll,
+    'result', case when won then 'win' else 'loss' end,
+    'multiplier', multiplier,
+    'payout_fc', case when won then payout else 0 end,
+    'net_fc', case when won then payout - p_wager else -p_wager end,
+    'new_balance', wallet.fc_balance - p_wager + case when won then payout else 0 end
+  );
+end;
+$$;
+
+grant execute on function public.cg_gamble_dice(integer, numeric) to authenticated;
