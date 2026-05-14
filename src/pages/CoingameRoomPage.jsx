@@ -13,6 +13,8 @@ const STAGE_Z_STEP = 2.6;
 
 const RARITY_HEX = { legendary: 0xf59e0b, epic: 0xc084fc, rare: 0x38bdf8, uncommon: 0x4ade80, common: 0x6b7280 };
 
+const AMBIENT_PRESETS = ['#22c55e','#a855f7','#3b82f6','#06b6d4','#f97316','#ef4444','#ec4899','#94a3b8'];
+
 function FC({ amount, decimals = 4 }) {
   return (
     <span>
@@ -187,6 +189,7 @@ export default function CoingameRoomPage() {
   const [loading, setLoading] = useState(true);
   const [rewards, setRewards] = useState([]);
   const [tooltip, setTooltip] = useState(null);
+  const [ambientColor, setAmbientColor] = useState(() => localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e');
 
   const isOwner = ownCoin?.coin_id === coinId;
 
@@ -239,46 +242,41 @@ export default function CoingameRoomPage() {
     camera.lookAt(0, 1.5, 0);
 
     // ── Lighting ──────────────────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x3a6a3a, 8));
+    const initAmbient = localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e';
+    const ic = new THREE.Color(initAmbient);
 
-    const ceilLight = new THREE.PointLight(0x22c55e, 28, 55);
+    const hemi = new THREE.HemisphereLight(ic, new THREE.Color().setScalar(0.08), 14);
+    scene.add(hemi);
+
+    const ceilLight = new THREE.PointLight(ic, 40, 65);
     ceilLight.position.set(0, 8.5, 0);
     ceilLight.castShadow = true;
     ceilLight.shadow.mapSize.set(1024, 1024);
     scene.add(ceilLight);
 
-    const accent1 = new THREE.PointLight(0x4ade80, 10, 28);
-    accent1.position.set(-7, 4, -6);
-    scene.add(accent1);
-
-    const accent2 = new THREE.PointLight(0x22c55e, 8, 26);
-    accent2.position.set(7, 3, 4);
-    scene.add(accent2);
-
-    const fillLeft = new THREE.PointLight(0x4ade80, 8, 24);
-    fillLeft.position.set(-9, 3, 2);
-    scene.add(fillLeft);
-
-    const fillFront = new THREE.PointLight(0x86efac, 7, 24);
-    fillFront.position.set(0, 2.5, 9);
-    scene.add(fillFront);
-
-    const fillBack = new THREE.PointLight(0x4ade80, 6, 22);
-    fillBack.position.set(0, 3, -9);
-    scene.add(fillBack);
-
-    const fillRight = new THREE.PointLight(0x22c55e, 7, 22);
-    fillRight.position.set(9, 3, 0);
-    scene.add(fillRight);
+    const fillLights = [
+      new THREE.PointLight(ic, 14, 32), // front
+      new THREE.PointLight(ic, 14, 32), // back
+      new THREE.PointLight(ic, 14, 32), // left
+      new THREE.PointLight(ic, 14, 32), // right
+      new THREE.PointLight(ic, 10, 28), // corner fl
+      new THREE.PointLight(ic, 10, 28), // corner fr
+      new THREE.PointLight(ic, 10, 28), // corner bl
+      new THREE.PointLight(ic, 10, 28), // corner br
+    ];
+    [[0,4,9],[0,4,-9],[-9,4,0],[9,4,0],[-8,3,8],[8,3,8],[-8,3,-8],[8,3,-8]].forEach(([x,y,z], i) => {
+      fillLights[i].position.set(x, y, z);
+      scene.add(fillLights[i]);
+    });
 
     // ── Room shell ────────────────────────────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0d1a0d, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
     const room = new THREE.Mesh(new THREE.BoxGeometry(ROOM.w, ROOM.h, ROOM.d), wallMat);
     room.position.y = ROOM.h / 2;
     scene.add(room);
 
     // Floor
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x0c160c, roughness: 0.7, metalness: 0.2 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a301a, roughness: 0.7, metalness: 0.2 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -488,7 +486,7 @@ export default function CoingameRoomPage() {
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
     const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup };
-    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY };
+    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY, lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
@@ -632,7 +630,7 @@ export default function CoingameRoomPage() {
       gem.rotation.y = t * 2.0;
 
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
-      ceilLight.intensity = 28 + Math.sin(t * 1.4) * 3.0;
+      ceilLight.intensity = 40 + Math.sin(t * 1.4) * 4.0;
       ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
       bulb.material.emissiveIntensity = 1.8 + Math.sin(t * 1.4) * 0.5;
 
@@ -751,6 +749,20 @@ export default function CoingameRoomPage() {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
 
+  // Update room lighting when ambient color changes
+  useEffect(() => {
+    const ref = sceneRef.current;
+    if (!ref?.lights) return;
+    const c = new THREE.Color(ambientColor);
+    ref.lights.hemi.color.set(c);
+    ref.lights.ceil.color.set(c);
+    ref.lights.fills.forEach((l) => l.color.set(c));
+    ref.scene.fog.color.set(new THREE.Color(ambientColor).multiplyScalar(0.06));
+    ref.wallMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.22));
+    ref.floorMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.16));
+    localStorage.setItem(`cg-room-ambient-${coinId}`, ambientColor);
+  }, [ambientColor, coinId]);
+
   // Paint coin name onto the floating sprite canvas
   useEffect(() => {
     const ref = sceneRef.current;
@@ -810,9 +822,29 @@ export default function CoingameRoomPage() {
           </div>
 
           {isOwner && (
-            <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: '1px solid #1a2e1a', borderRadius: 6, padding: '5px 12px', color: '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-              drag items to place them · scroll to zoom
-            </div>
+            <>
+              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: '1px solid #1a2e1a', borderRadius: 6, padding: '5px 12px', color: '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                drag to place · R to rotate · scroll to zoom
+              </div>
+              <div style={{ position: 'absolute', bottom: 46, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(6,8,6,0.88)', border: '1px solid #1a2e1a', borderRadius: 20, padding: '5px 10px', pointerEvents: 'all' }}>
+                {AMBIENT_PRESETS.map((hex) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => setAmbientColor(hex)}
+                    style={{ width: 16, height: 16, borderRadius: '50%', background: hex, border: ambientColor === hex ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                  />
+                ))}
+                <div style={{ width: 1, height: 12, background: '#1a2e1a', margin: '0 2px' }} />
+                <input
+                  type="color"
+                  value={ambientColor}
+                  onChange={(e) => setAmbientColor(e.target.value)}
+                  style={{ width: 16, height: 16, padding: 0, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none', flexShrink: 0 }}
+                  title="Custom color"
+                />
+              </div>
+            </>
           )}
           {!isOwner && (
             <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#1e3a1e', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
