@@ -1966,6 +1966,8 @@ create table if not exists public.coingame_coin_rewards (
   coin_id        uuid not null references public.coingame_coins(coin_id) on delete cascade,
   collectable_id text not null references public.coingame_collectables(id) on delete cascade,
   unlocked_at    timestamptz not null default timezone('utc', now()),
+  pos_x          float8,
+  pos_z          float8,
   primary key (coin_id, collectable_id)
 );
 
@@ -2020,7 +2022,7 @@ end;
 $$;
 
 -- Public-facing: grants any new rewards then returns the full collectable list
--- with unlocked status. Called by the room page on open.
+-- with unlocked status and saved furniture position. Called by the room page on open.
 create or replace function public.cg_check_rewards(p_coin_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
@@ -2038,7 +2040,9 @@ begin
         'rb',                 c.rb,
         'unlock_description', c.unlock_description,
         'unlocked',           (r.coin_id is not null),
-        'unlocked_at',        r.unlocked_at
+        'unlocked_at',        r.unlocked_at,
+        'pos_x',              r.pos_x,
+        'pos_z',              r.pos_z
       ) order by c.sort_order
     )
     from public.coingame_collectables c
@@ -2049,6 +2053,29 @@ end;
 $$;
 
 grant execute on function public.cg_check_rewards(uuid) to authenticated;
+
+-- Owner-only: save furniture position in the room
+create or replace function public.cg_update_furniture_position(
+  p_coin_id      uuid,
+  p_collectable  text,
+  p_x            float8,
+  p_z            float8
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.coingame_coins
+    where coin_id = p_coin_id and owner_user_id = auth.uid()
+  ) then
+    raise exception 'not authorized';
+  end if;
+
+  update public.coingame_coin_rewards
+  set pos_x = p_x, pos_z = p_z
+  where coin_id = p_coin_id and collectable_id = p_collectable;
+end;
+$$;
+
+grant execute on function public.cg_update_furniture_position(uuid, text, float8, float8) to authenticated;
 
 -- Updated cg_buy_coin: grants rewards after every buy (tokens milestone)
 create or replace function public.cg_buy_coin(p_coin_id uuid, p_tokens numeric)

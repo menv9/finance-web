@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import * as THREE from 'three';
 import * as LucideIcons from 'lucide-react';
-import { fetchCoinById, fetchCoinRewards, spotPrice } from '../utils/coingameApi';
+import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 
-const RARITY_ORDER = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+const ROOM = { w: 22, d: 22, h: 9 };
+const FLOOR_Y = 0;
+const STAGE_X = -13;
+const STAGE_Z_START = -7;
+const STAGE_Z_STEP = 2.4;
 
-function CoinIcon({ name, size = 16, color = 'currentColor' }) {
-  const Icon = LucideIcons[name];
-  if (!Icon) return null;
-  return <Icon size={size} color={color} strokeWidth={1.5} />;
-}
+const RARITY_HEX = { legendary: 0xf59e0b, epic: 0xc084fc, rare: 0x38bdf8, uncommon: 0x4ade80, common: 0x6b7280 };
 
 function FC({ amount, decimals = 4 }) {
   return (
@@ -22,58 +22,248 @@ function FC({ amount, decimals = 4 }) {
   );
 }
 
-function RewardRow({ item }) {
-  const locked = !item.unlocked;
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 9,
-      padding: '8px 10px', borderRadius: 7, marginBottom: 6,
-      background: locked ? 'rgba(255,255,255,0.02)' : item.rbg,
-      border: `1px solid ${locked ? 'rgba(255,255,255,0.06)' : item.rb}`,
-      opacity: locked ? 0.5 : 1,
-    }}>
-      <span style={{ color: locked ? '#374151' : item.color, flexShrink: 0 }}>
-        <CoinIcon name={item.icon} size={18} color={locked ? '#374151' : item.color} />
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: locked ? '#4b5563' : '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
-        <div style={{ color: locked ? '#374151' : item.color, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-          {locked ? item.unlock_description : item.rarity}
-        </div>
-      </div>
-      {!locked && (
-        <span style={{ fontSize: 9, color: '#22c55e', opacity: 0.6 }}>
-          <LucideIcons.Check size={12} />
-        </span>
-      )}
-    </div>
-  );
+// ── Furniture mesh builders ──────────────────────────────────────────────────
+
+function buildThrone() {
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.08, metalness: 1, emissive: 0xb45309, emissiveIntensity: 0.25 });
+  const velvet = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9, metalness: 0 });
+  // seat
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.0), gold), { position: new THREE.Vector3(0, 0.5, 0) }));
+  // seat cushion
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.85), velvet), { position: new THREE.Vector3(0, 0.63, 0) }));
+  // back
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.6, 0.1), gold), { position: new THREE.Vector3(0, 1.4, -0.45) }));
+  // back cushion
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.2, 0.08), velvet), { position: new THREE.Vector3(0, 1.4, -0.38) }));
+  // legs
+  [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.38], [0.45, 0.38]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8), gold);
+    leg.position.set(x, 0.25, z); g.add(leg);
+  });
+  // armrests
+  [-0.55, 0.55].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.8), gold);
+    arm.position.set(x, 0.85, 0); g.add(arm);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 8), gold);
+    post.position.set(x, 0.68, -0.3); g.add(post);
+  });
+  // crown finial on top of back
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 5), gold);
+  crown.position.set(0, 2.25, -0.45); g.add(crown);
+  return g;
 }
+
+function buildGoldPile() {
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.12, metalness: 1, emissive: 0x92400e, emissiveIntensity: 0.2 });
+  const positions = [
+    [0,0.12,0],[0.22,0.12,0.1],[-.2,0.12,0.15],[0.1,0.12,-.22],[-.15,0.12,-.2],
+    [0.05,0.36,0.05],[-.1,0.36,-.05],[0.15,0.36,-.1],
+    [0,0.58,0],
+  ];
+  positions.forEach(([x,y,z], i) => {
+    const r = 0.1 + (i % 3) * 0.025;
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.045, 20), gold);
+    coin.position.set(x, y, z);
+    coin.rotation.set(Math.random()*0.3, Math.random()*Math.PI*2, Math.random()*0.2);
+    g.add(coin);
+  });
+  return g;
+}
+
+function buildMoonLamp() {
+  const g = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.3, metalness: 0.8 });
+  const glow = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x4ade80, emissiveIntensity: 1.2, roughness: 0.5, metalness: 0 });
+  // base
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.06, 16), metal), { position: new THREE.Vector3(0, 0.03, 0) }));
+  // pole
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8), metal), { position: new THREE.Vector3(0, 0.83, 0) }));
+  // arm
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.025, 0.025), metal), { position: new THREE.Vector3(0.2, 1.62, 0) }));
+  // moon globe
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 20), glow);
+  moon.position.set(0.42, 1.62, 0); g.add(moon);
+  // point light inside
+  const pl = new THREE.PointLight(0x4ade80, 1.8, 4.5);
+  pl.position.set(0.42, 1.62, 0); g.add(pl);
+  return g;
+}
+
+function buildTradingDesk() {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
+  const screen = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 0.9, roughness: 1 });
+  // desktop
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 0.9), wood), { position: new THREE.Vector3(0, 0.72, 0) }));
+  // legs
+  [[-0.88, -0.36], [0.88, -0.36], [-0.88, 0.34], [0.88, 0.34]].forEach(([x, z]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), wood);
+    leg.position.set(x, 0.36, z); g.add(leg);
+  });
+  // monitors (3)
+  [-0.62, 0, 0.62].forEach((x) => {
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.04), wood);
+    stand.position.set(x, 1.08, -0.28); g.add(stand);
+    const mon = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.32, 0.04), wood);
+    mon.position.set(x, 1.4, -0.3); g.add(mon);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.26), screen);
+    scr.position.set(x, 1.4, -0.27); g.add(scr);
+  });
+  // keyboard
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.02, 0.22), wood), { position: new THREE.Vector3(0, 0.77, 0.12) }));
+  return g;
+}
+
+function buildNftFrame() {
+  const g = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.85 });
+  const art = new THREE.MeshStandardMaterial({ color: 0x0a1a0a, emissive: 0x22c55e, emissiveIntensity: 0.55, roughness: 1 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.1, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.3 });
+  // stand legs
+  [-0.3, 0.3].forEach((x) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.38), metal);
+    leg.position.set(x, 0.275, 0); g.add(leg);
+  });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.04, 0.04), metal);
+  bar.position.set(0, 0.48, 0.16); g.add(bar);
+  // frame back
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.84, 1.1, 0.05), metal);
+  frame.position.set(0, 1.1, 0); g.add(frame);
+  // trim border
+  [[-0.4,1.1,0.03],[0.4,1.1,0.03]].forEach(([x,y,z]) => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.12, 0.04), trim);
+    t.position.set(x,y,z); g.add(t);
+  });
+  [[0,1.67,0.03],[0,0.54,0.03]].forEach(([x,y,z]) => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.04), trim);
+    t.position.set(x,y,z); g.add(t);
+  });
+  // artwork
+  const artwork = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.95), art);
+  artwork.position.set(0, 1.1, 0.03); g.add(artwork);
+  return g;
+}
+
+function buildDiamondDisplay() {
+  const g = new THREE.Group();
+  const pedestal = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.8 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, transparent: true, opacity: 0.18, roughness: 0, metalness: 0.1 });
+  const gem = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.4, roughness: 0, metalness: 0.5 });
+  // base
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.12, 8), pedestal), { position: new THREE.Vector3(0, 0.06, 0) }));
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 0.32, 8), pedestal), { position: new THREE.Vector3(0, 0.28, 0) }));
+  // glass dome
+  g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 20, 0, Math.PI*2, 0, Math.PI*0.55), glass), { position: new THREE.Vector3(0, 0.44, 0) }));
+  // diamond
+  const d = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), gem);
+  d.position.set(0, 0.6, 0); g.add(d);
+  const pl = new THREE.PointLight(0x38bdf8, 1.2, 3);
+  pl.position.set(0, 0.65, 0); g.add(pl);
+  return g;
+}
+
+function buildRocket() {
+  const g = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.9 });
+  const fin = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.8, emissive: 0x38bdf8, emissiveIntensity: 0.2 });
+  const flame = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf97316, emissiveIntensity: 1.5, roughness: 1 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 8), body);
+  base.position.set(0, 0.07, 0); g.add(base);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 16), body);
+  tube.position.set(0, 0.49, 0); g.add(tube);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 16), body);
+  nose.position.set(0, 1.0, 0); g.add(nose);
+  [0, 1, 2].forEach((i) => {
+    const a = (i / 3) * Math.PI * 2;
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.18), fin);
+    f.position.set(Math.sin(a) * 0.14, 0.22, Math.cos(a) * 0.14);
+    f.rotation.y = -a; g.add(f);
+  });
+  const fl = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 8), flame);
+  fl.position.set(0, -0.09, 0); fl.rotation.z = Math.PI; g.add(fl);
+  const pl = new THREE.PointLight(0xf97316, 0.8, 2.5);
+  pl.position.set(0, -0.15, 0); g.add(pl);
+  return g;
+}
+
+function buildCandleChart() {
+  const g = new THREE.Group();
+  const frame = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
+  const screenMat = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 0.6, roughness: 1 });
+  // stand
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.06, 12), frame), { position: new THREE.Vector3(0, 0.03, 0) }));
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), frame), { position: new THREE.Vector3(0, 0.49, 0) }));
+  // screen
+  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.58, 0.045), frame), { position: new THREE.Vector3(0, 1.12, 0) }));
+  g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.48), screenMat), { position: new THREE.Vector3(0, 1.12, 0.025) }));
+  // candles on screen (decorative)
+  const up = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.5, roughness: 0.4 });
+  const dn = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5, roughness: 0.4 });
+  [0.16,0.22,0.14,0.28,0.18,0.32].forEach((h, i) => {
+    const mat = i % 2 === 0 ? up : dn;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.055, h * 0.38, 0.02), mat);
+    bar.position.set(-0.26 + i * 0.105, 0.96 + h * 0.19, 0.04);
+    g.add(bar);
+  });
+  return g;
+}
+
+const FURNITURE_BUILDERS = {
+  coin_throne:      buildThrone,
+  gold_pile:        buildGoldPile,
+  moon_lamp:        buildMoonLamp,
+  trading_desk:     buildTradingDesk,
+  nft_frame:        buildNftFrame,
+  diamond_display:  buildDiamondDisplay,
+  rocket_statue:    buildRocket,
+  candle_chart:     buildCandleChart,
+};
+
+// ── Main component ───────────────────────────────────────────────────────────
 
 export default function CoingameRoomPage() {
   const { coinId } = useParams();
+  const ownCoin = useFinanceStore((s) => s.coingameOwnCoin);
   const holdings = useFinanceStore((s) => s.coingameHoldings);
 
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
+  const sceneRef = useRef(null);
 
   const [coin, setCoin] = useState(null);
-  const [rewards, setRewards] = useState([]);
-  const [tab, setTab] = useState('r');
-  const [tooltip, setTooltip] = useState(null);
+  const [tab, setTab] = useState('i');
   const [loading, setLoading] = useState(true);
+  const [rewards, setRewards] = useState([]);
+  const [tooltip, setTooltip] = useState(null);
+
+  const isOwner = ownCoin?.coin_id === coinId;
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchCoinById(coinId), fetchCoinRewards(coinId)]).then(([c, r]) => {
-      if (!cancelled) { setCoin(c); setRewards(r); setLoading(false); }
-    }).catch(() => {
-      if (!cancelled) setLoading(false);
-    });
+    fetchCoinById(coinId).then((c) => {
+      if (!cancelled) { setCoin(c); setLoading(false); }
+    }).catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [coinId]);
 
-  // Three.js scene
+  useEffect(() => {
+    let cancelled = false;
+    fetchCoinRewards(coinId).then((r) => {
+      if (!cancelled) setRewards(r);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [coinId]);
+
+  const savePosition = useCallback(async (collectableId, x, z) => {
+    try {
+      await updateFurniturePosition(coinId, collectableId, x, z);
+      setRewards((prev) => prev.map((r) => r.id === collectableId ? { ...r, pos_x: x, pos_z: z } : r));
+    } catch {}
+  }, [coinId]);
+
+  // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
     const wrap = wrapRef.current;
     const cvs = canvasRef.current;
@@ -88,222 +278,316 @@ export default function CoingameRoomPage() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
-    renderer.setClearColor(0x080808);
+    renderer.toneMappingExposure = 1.1;
+    renderer.setClearColor(0x060806);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x060d06, 0.022);
+    scene.fog = new THREE.FogExp2(0x060806, 0.016);
 
-    const camera = new THREE.PerspectiveCamera(52, W / H, 0.1, 120);
-    camera.position.set(0, 6, 13);
-    camera.lookAt(0, 1.8, 0);
+    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 120);
+    camera.position.set(0, 8, 15);
+    camera.lookAt(0, 1.5, 0);
 
-    const amb = new THREE.AmbientLight(0x0d1a0d, 2.0);
-    scene.add(amb);
-    const mainG = new THREE.PointLight(0x22c55e, 6.5, 28);
-    mainG.position.set(0, 8, 0);
-    mainG.castShadow = true;
-    mainG.shadow.mapSize.set(1024, 1024);
-    scene.add(mainG);
-    const acc = new THREE.PointLight(0x4ade80, 1.3, 18);
-    acc.position.set(-8, 4, -5);
-    scene.add(acc);
-    const fill = new THREE.PointLight(0x052e16, 0.7, 22);
-    fill.position.set(7, 3, 6);
-    scene.add(fill);
+    // ── Lighting ──────────────────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x0d1a0d, 1.8));
 
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050d05, roughness: 0.85, metalness: 0.3 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 28), floorMat);
+    const ceilLight = new THREE.PointLight(0x22c55e, 5.5, 30);
+    ceilLight.position.set(0, 8.5, 0);
+    ceilLight.castShadow = true;
+    ceilLight.shadow.mapSize.set(1024, 1024);
+    scene.add(ceilLight);
+
+    const accent1 = new THREE.PointLight(0x4ade80, 1.4, 16);
+    accent1.position.set(-8, 4, -8);
+    scene.add(accent1);
+
+    const accent2 = new THREE.PointLight(0x166534, 0.8, 16);
+    accent2.position.set(8, 3, 6);
+    scene.add(accent2);
+
+    // ── Room shell ────────────────────────────────────────────────────────────
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x060d06, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
+    const room = new THREE.Mesh(new THREE.BoxGeometry(ROOM.w, ROOM.h, ROOM.d), wallMat);
+    room.position.y = ROOM.h / 2;
+    scene.add(room);
+
+    // Floor
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050a05, roughness: 0.7, metalness: 0.2 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
-    scene.add(new THREE.GridHelper(26, 26, 0x0d2b0d, 0x0a1e0a));
 
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x060d06, roughness: 0.9, metalness: 0.1, side: THREE.BackSide });
-    const room = new THREE.Mesh(new THREE.BoxGeometry(28, 16, 28), wallMat);
-    room.position.y = 7;
-    scene.add(room);
+    // Floor grid
+    scene.add(new THREE.GridHelper(ROOM.w, ROOM.w, 0x0d2b0d, 0x0a1a0a));
+
+    // Baseboard trim on walls
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
+    const bH = 0.12;
+    [
+      [0, 0, -(ROOM.d/2 - 0.05), 0,         ROOM.w],
+      [0, 0,  (ROOM.d/2 - 0.05), 0,         ROOM.w],
+      [-(ROOM.w/2 - 0.05), 0, 0, Math.PI/2, ROOM.d],
+      [ (ROOM.w/2 - 0.05), 0, 0, Math.PI/2, ROOM.d],
+    ].forEach(([x, , z, ry, len]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(len, bH, 0.06), baseMat);
+      b.position.set(x, bH / 2, z);
+      b.rotation.y = ry;
+      scene.add(b);
+    });
+
+    // Ceiling light fixture
+    const fixtMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.9 });
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 1.8, roughness: 1 });
+    const fixtBase = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.06, 24), fixtMat);
+    fixtBase.position.set(0, ROOM.h - 0.04, 0);
+    scene.add(fixtBase);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), glowMat);
+    bulb.position.set(0, ROOM.h - 0.22, 0);
+    scene.add(bulb);
+    const chord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), fixtMat);
+    chord.position.set(0, ROOM.h - 0.55, 0);
+    scene.add(chord);
+
+    // Wall sconce lights (left & right walls)
+    [-1, 1].forEach((side) => {
+      const x = side * (ROOM.w / 2 - 0.12);
+      const sconceMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.85 });
+      const sconceGlow = new THREE.MeshStandardMaterial({ color: 0x86efac, emissive: 0x4ade80, emissiveIntensity: 0.9, roughness: 1 });
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.22), sconceMat);
+      plate.position.set(x, 5, -3);
+      scene.add(plate);
+      const globe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), sconceGlow);
+      globe.position.set(x - side * 0.12, 5, -3);
+      scene.add(globe);
+      const pl = new THREE.PointLight(0x4ade80, 1.1, 8);
+      pl.position.set(x - side * 0.2, 5, -3);
+      scene.add(pl);
+    });
+
+    // Rug
+    const rugMat = new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.95, metalness: 0 });
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), rugMat);
+    rug.rotation.x = -Math.PI / 2;
+    rug.position.y = 0.005;
+    scene.add(rug);
+    // rug border
+    const rugBorder = new THREE.Mesh(new THREE.PlaneGeometry(8.3, 6.3), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.9 }));
+    rugBorder.rotation.x = -Math.PI / 2;
+    rugBorder.position.y = 0.004;
+    scene.add(rugBorder);
+
+    // Bookshelf (right wall)
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
+    const bookshelf = new THREE.Group();
+    // frame
+    bookshelf.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.4), shelfMat), { position: new THREE.Vector3(0, 1.6, 0) }));
+    // shelves (lighter)
+    const shelfInner = new THREE.MeshStandardMaterial({ color: 0x0f2010, roughness: 0.5, metalness: 0.4 });
+    [0.5, 1.3, 2.1, 2.9].forEach((y) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.06, 0.34), shelfInner);
+      s.position.set(0, y, 0.01); bookshelf.add(s);
+    });
+    // books (decorative colored spines)
+    const bookColors = [0x22c55e, 0x16a34a, 0x4ade80, 0x052e16, 0x15803d, 0x166534];
+    let bx = -0.88;
+    bookColors.forEach((col) => {
+      const bw = 0.1 + Math.random() * 0.1;
+      const bh = 0.28 + Math.random() * 0.18;
+      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.28), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
+      book.position.set(bx + bw/2, 1.3 + bh/2 + 0.03, 0.01); bookshelf.add(book);
+      bx += bw + 0.015;
+    });
+    bx = -0.7;
+    bookColors.slice().reverse().forEach((col) => {
+      const bw = 0.09 + Math.random() * 0.08;
+      const bh = 0.22 + Math.random() * 0.14;
+      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.28), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
+      book.position.set(bx + bw/2, 2.1 + bh/2 + 0.03, 0.01); bookshelf.add(book);
+      bx += bw + 0.01;
+    });
+    bookshelf.position.set(9.5, 0, -7);
+    bookshelf.rotation.y = -Math.PI / 2;
+    scene.add(bookshelf);
+
+    // Sofa (back-right area)
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.88, metalness: 0.05 });
+    const sofaAccent = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85, metalness: 0 });
+    const sofa = new THREE.Group();
+    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.28, 0.95), sofaMat), { position: new THREE.Vector3(0, 0.38, 0) }));
+    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.72, 0.2), sofaMat), { position: new THREE.Vector3(0, 0.72, -0.38) }));
+    sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.95), sofaAccent), { position: new THREE.Vector3(0, 0.22, 0) }));
+    [-1.3, 1.3].forEach((x) => {
+      sofa.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.95), sofaMat), { position: new THREE.Vector3(x, 0.52, 0) }));
+    });
+    // cushions
+    [-0.7, 0, 0.7].forEach((x) => {
+      const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.7), sofaAccent);
+      cushion.position.set(x, 0.56, 0.1); sofa.add(cushion);
+    });
+    sofa.position.set(4, 0, -9);
+    scene.add(sofa);
+
+    // Small side table next to sofa
+    const tableGroup = new THREE.Group();
+    tableGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 16), shelfMat), { position: new THREE.Vector3(0, 0.62, 0) }));
+    tableGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.62, 8), shelfMat), { position: new THREE.Vector3(0, 0.31, 0) }));
+    tableGroup.position.set(6.2, 0, -8.2);
+    scene.add(tableGroup);
+
+    // ── Central coin display ──────────────────────────────────────────────────
+    const cg = new THREE.Group();
+    cg.position.set(0, 2.6, 0);
+    scene.add(cg);
+
+    const coinMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.0, 0.14, 80),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.03, metalness: 1, emissive: 0x15803d, emissiveIntensity: 0.35 })
+    );
+    coinMesh.castShadow = true; cg.add(coinMesh);
+
+    const bev = new THREE.Mesh(
+      new THREE.TorusGeometry(1.0, 0.07, 8, 80),
+      new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.02, metalness: 1 })
+    );
+    bev.rotation.x = Math.PI / 2; cg.add(bev);
+
+    const gemMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 1.6, roughness: 0, metalness: 1 });
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), gemMat);
+    gem.position.y = 0.072; cg.add(gem);
 
     const ringMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.5, roughness: 0.1, metalness: 1 });
     const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.025, 8, 80), ringMat);
     ring.position.y = 0.38; ring.rotation.x = Math.PI / 2;
     scene.add(ring);
 
-    const innerRingMat = new THREE.MeshStandardMaterial({ color: 0x15803d, emissive: 0x15803d, emissiveIntensity: 0.25, roughness: 0.2, metalness: 0.9 });
-    const innerRing = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.018, 8, 64), innerRingMat);
-    innerRing.position.y = 0.39; innerRing.rotation.x = Math.PI / 2;
-    scene.add(innerRing);
+    // ── Staging area (left wall) ───────────────────────────────────────────────
+    const stageMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.6 });
+    const stageGlow = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.3, roughness: 0.1, metalness: 1 });
 
-    // Central coin
-    const cg = new THREE.Group();
-    cg.position.set(0, 2.6, 0);
-    scene.add(cg);
-    const coinMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.03, metalness: 1, emissive: 0x15803d, emissiveIntensity: 0.35 });
-    const coinMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.14, 80), coinMat);
-    coinMesh.castShadow = true; cg.add(coinMesh);
-    const bevMesh = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 8, 80), new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.02, metalness: 1 }));
-    bevMesh.rotation.x = Math.PI / 2; cg.add(bevMesh);
-    const faceRing = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.025, 8, 64), new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.3, metalness: 0.5 }));
-    faceRing.rotation.x = Math.PI / 2; faceRing.position.y = 0.072; cg.add(faceRing);
-    const gemMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 1.6, roughness: 0, metalness: 1 });
-    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), gemMat);
-    gem.position.y = 0.072; cg.add(gem);
+    const stageShelf = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, ROOM.d * 0.55), stageMat);
+    stageShelf.position.set(-(ROOM.w / 2 - 0.22), 0.5, 0);
+    scene.add(stageShelf);
+    const stageStrip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, ROOM.d * 0.55), stageGlow);
+    stageStrip.position.set(-(ROOM.w / 2 - 0.08), 0.54, 0);
+    scene.add(stageStrip);
 
-    const orbits = [[2.0, 0x22c55e, 0.70, 0.40], [2.8, 0x16a34a, 0.46, 0.72], [3.6, 0x4ade80, 0.29, 0.22]].map(([r, col, spd, tlt]) => {
-      const m = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5, transparent: true, opacity: 0.32, roughness: 0.1, metalness: 1 });
-      const mesh = new THREE.Mesh(new THREE.TorusGeometry(r, 0.017, 8, 100), m);
-      mesh.rotation.x = Math.PI / 2; cg.add(mesh);
-      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 2.0, roughness: 0.1, metalness: 0.5 }));
-      cg.add(orb);
-      return { mesh, orb, r, spd, tlt, angle: Math.random() * Math.PI * 2 };
-    });
+    // Label plane for staging area
+    const stageLabelMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.15, roughness: 1 });
+    const stageLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 1.8), stageLabelMat);
+    stageLabel.position.set(-(ROOM.w / 2 - 0.05), 1.5, 0);
+    stageLabel.rotation.y = Math.PI / 2;
+    scene.add(stageLabel);
 
-    const miniCoins = Array.from({ length: 12 }, (_, i) => {
-      const a = (i / 12) * Math.PI * 2;
-      const rad = 4.5 + Math.random() * 2.5;
-      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.034, 32), new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.1, metalness: 0.9, emissive: 0x15803d, emissiveIntensity: 0.2 }));
-      mesh.position.set(Math.cos(a) * rad, 1 + Math.random() * 2.5, Math.sin(a) * rad);
-      scene.add(mesh);
-      return { mesh, angle: a, r: rad, spd: 0.18 + Math.random() * 0.28, bob: Math.random() * Math.PI * 2 };
-    });
-
-    // Candle chart on back wall
-    const bars = [0.4, 0.9, 0.6, 1.4, 0.7, 1.8, 1.0, 2.0, 1.3, 2.5, 1.6, 1.1, 2.0, 2.4, 1.7, 2.9, 2.1, 1.4];
-    bars.forEach((h, i) => {
-      const up = i === 0 || h > bars[i - 1];
-      const bmat = new THREE.MeshStandardMaterial({ color: up ? 0x22c55e : 0xef4444, emissive: up ? 0x22c55e : 0xef4444, emissiveIntensity: 0.14, roughness: 0.4, metalness: 0.3 });
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.21, h, 0.04), bmat);
-      bar.position.set(-5 + i * 0.6, h / 2 + 0.08, -12.8); scene.add(bar);
-      const wick = new THREE.Mesh(new THREE.BoxGeometry(0.025, h * 0.45, 0.04), bmat);
-      wick.position.set(-5 + i * 0.6, h + h * 0.23, -12.8); scene.add(wick);
-    });
-
-    // Desk
-    const deskMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.75 });
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 1.5), deskMat);
-    desk.position.set(-6, 0.94, -4); desk.castShadow = true; desk.receiveShadow = true; scene.add(desk);
-    [[-1.4, -0.6], [1.4, -0.6], [-1.4, 0.6], [1.4, 0.6]].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.94, 0.1), deskMat);
-      leg.position.set(-6 + lx, 0.47, -4 + lz); scene.add(leg);
-    });
-    const mon = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.95, 0.065), new THREE.MeshStandardMaterial({ color: 0x080d08, roughness: 0.5, metalness: 0.9 }));
-    mon.position.set(-6, 1.97, -4.58); scene.add(mon);
-    const scrMat = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 0.6, roughness: 1 });
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.82), scrMat);
-    scr.position.set(-6, 1.97, -4.54); scene.add(scr);
-
-    // Trophy shelf
-    const shMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.75 });
-    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 0.42), shMat);
-    shelf.position.set(7, 3.0, -8.5);
-    scene.add(shelf);
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.4, roughness: 0.1, metalness: 1 }));
-    strip.position.set(7, 3.06, -12.75);
-    scene.add(strip);
-    [0xf59e0b, 0xc084fc, 0x22c55e, 0x38bdf8].forEach((col, i) => {
-      const tMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.08, metalness: 1, emissive: col, emissiveIntensity: 0.35 });
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.36, 8), tMat);
-      base.position.set(6.0 + i * 0.68, 3.22, -8.5); scene.add(base);
-      const cup = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), tMat);
-      cup.position.set(6.0 + i * 0.68, 3.41, -8.5); scene.add(cup);
-    });
-
-    // Reward collectables — will be rebuilt when rewards load
-    const itemPositions = [[-3.5, 2], [-1.5, -4.5], [2.5, 3.5], [4.5, -2.5], [-5.5, 4], [-4, -2.5], [3.5, -5], [2.5, 2.5]];
-    let itemMeshes = [];
-    let spheres = [];
-
-    function buildItems(rewardList) {
-      // Remove old meshes
-      itemMeshes.forEach(({ sp, gr, plat }) => { scene.remove(sp); scene.remove(gr); scene.remove(plat); });
-      itemMeshes = [];
-      spheres = [];
-
-      rewardList.forEach((item, i) => {
-        const [x, z] = itemPositions[i % itemPositions.length];
-        const unlocked = item.unlocked;
-        const col = new THREE.Color(item.color);
-        const dimCol = new THREE.Color('#1a2e1a');
-
-        const platMat = new THREE.MeshStandardMaterial({ color: 0x0a1a0a, roughness: 0.3, metalness: 0.85 });
-        const plat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 0.07, 16), platMat);
-        plat.position.set(x, 0.035, z); scene.add(plat);
-
-        const gMat = new THREE.MeshStandardMaterial({ color: unlocked ? col : dimCol, emissive: unlocked ? col : dimCol, emissiveIntensity: unlocked ? 0.9 : 0.15, transparent: true, opacity: unlocked ? 0.42 : 0.18, roughness: 0.1, metalness: 1 });
-        const gr = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.02, 6, 32), gMat);
-        gr.position.set(x, 0.085, z); gr.rotation.x = Math.PI / 2; scene.add(gr);
-
-        const sMat = new THREE.MeshStandardMaterial({ color: unlocked ? col : dimCol, roughness: unlocked ? 0.08 : 0.6, metalness: unlocked ? 0.85 : 0.2, emissive: unlocked ? col : dimCol, emissiveIntensity: unlocked ? 0.5 : 0.05 });
-        const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 1), sMat);
-        sp.position.set(x, 0.65, z); sp.castShadow = true; scene.add(sp);
-
-        itemMeshes.push({ sp, gr, plat, item, bob: Math.random() * Math.PI * 2 });
-        spheres.push(sp);
-      });
-    }
-
-    // Build with whatever rewards are loaded so far (may be empty on first render)
-    buildItems(rewards);
-
-    // Particles
-    const N = 800;
+    // ── Particles ─────────────────────────────────────────────────────────────
+    const N = 600;
     const pPos = new Float32Array(N * 3);
     const pCol = new Float32Array(N * 3);
     const pVel = [];
     for (let i = 0; i < N; i++) {
-      pPos[i * 3] = (Math.random() - 0.5) * 26;
-      pPos[i * 3 + 1] = Math.random() * 14;
-      pPos[i * 3 + 2] = (Math.random() - 0.5) * 26;
+      pPos[i*3]   = (Math.random() - 0.5) * ROOM.w;
+      pPos[i*3+1] = Math.random() * ROOM.h;
+      pPos[i*3+2] = (Math.random() - 0.5) * ROOM.d;
       const v = Math.random();
-      pCol[i * 3] = 0; pCol[i * 3 + 1] = 0.15 + v * 0.85; pCol[i * 3 + 2] = 0;
-      pVel.push(0.011 + Math.random() * 0.022);
+      pCol[i*3] = 0; pCol[i*3+1] = 0.12 + v * 0.7; pCol[i*3+2] = 0;
+      pVel.push(0.009 + Math.random() * 0.018);
     }
     const pGeo = new THREE.BufferGeometry();
     pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
     pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
-    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.05, vertexColors: true, transparent: true, opacity: 0.65 })));
+    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.045, vertexColors: true, transparent: true, opacity: 0.55 })));
 
-    // Raycaster
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    // ── Furniture map: id → { group, isStaged, highlightRing } ───────────────
+    const furnitureMap = {};
+    sceneRef.current = { scene, furnitureMap, isOwner };
 
-    function onMouseMove(e) {
-      const rect = cvs.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(spheres);
-      if (hits.length > 0) {
-        const it = itemMeshes[spheres.indexOf(hits[0].object)].item;
-        setTooltip({ item: it, x: e.clientX, y: e.clientY });
-      } else {
-        setTooltip(null);
-      }
-    }
-    wrap.addEventListener('mousemove', onMouseMove);
-
-    // Orbit controls
+    // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
     let theta = 0.12; let phi = 0.40;
     let tTheta = 0.12; let tPhi = 0.40;
-    let tRad = 13; let autoRot = true;
+    let tRad = 15; let autoRot = true;
 
-    const onMDown = (e) => { isDrag = true; autoRot = false; px = e.clientX; py = e.clientY; };
-    const onMUp = () => { isDrag = false; };
-    const onMDrag = (e) => {
+    // ── Drag-to-place state ────────────────────────────────────────────────────
+    let dragging = null; // { id, group, origX, origZ }
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const intersectPt = new THREE.Vector3();
+
+    function getPickables() {
+      return Object.values(furnitureMap).map((f) => f.group);
+    }
+
+    function onMDown(e) {
+      const rect = wrap.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      if (sceneRef.current?.isOwner) {
+        const hits = raycaster.intersectObjects(getPickables(), true);
+        if (hits.length > 0) {
+          let obj = hits[0].object;
+          while (obj.parent && !obj.userData.furnitureId) obj = obj.parent;
+          const id = obj.userData.furnitureId;
+          if (id) {
+            dragging = { id, group: furnitureMap[id].group };
+            autoRot = false;
+            return;
+          }
+        }
+      }
+
+      isDrag = true; autoRot = false; px = e.clientX; py = e.clientY;
+    }
+
+    function onMMove(e) {
+      if (dragging) {
+        const rect = wrap.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        raycaster.ray.intersectPlane(floorPlane, intersectPt);
+        const hw = ROOM.w / 2 - 1.2;
+        const hd = ROOM.d / 2 - 1.2;
+        const nx = Math.max(-hw, Math.min(hw, intersectPt.x));
+        const nz = Math.max(-hd, Math.min(hd, intersectPt.z));
+        dragging.group.position.set(nx, FLOOR_Y, nz);
+        dragging.group.position.y = 0.08;
+        return;
+      }
       if (!isDrag) return;
       tTheta -= (e.clientX - px) * 0.007;
       tPhi = Math.max(0.1, Math.min(1.25, tPhi + (e.clientY - py) * 0.005));
       px = e.clientX; py = e.clientY;
-    };
-    const onWheel = (e) => { tRad = Math.max(4, Math.min(20, tRad + e.deltaY * 0.013)); e.preventDefault(); };
+    }
+
+    function onMUp() {
+      if (dragging) {
+        const { id, group } = dragging;
+        const x = parseFloat(group.position.x.toFixed(3));
+        const z = parseFloat(group.position.z.toFixed(3));
+        group.position.y = FLOOR_Y;
+        // mark as placed (remove from staging)
+        if (furnitureMap[id]) furnitureMap[id].isStaged = false;
+        savePosition(id, x, z);
+        dragging = null;
+        return;
+      }
+      isDrag = false;
+    }
+
+    const onWheel = (e) => { tRad = Math.max(5, Math.min(22, tRad + e.deltaY * 0.013)); e.preventDefault(); };
+
     wrap.addEventListener('mousedown', onMDown);
+    window.addEventListener('mousemove', onMMove);
     window.addEventListener('mouseup', onMUp);
-    window.addEventListener('mousemove', onMDrag);
     wrap.addEventListener('wheel', onWheel, { passive: false });
 
     let touchStart = null;
-    const onTStart = (e) => { if (e.touches.length === 1) { autoRot = false; touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
+    const onTStart = (e) => {
+      if (e.touches.length === 1) { autoRot = false; touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+    };
     const onTMove = (e) => {
       if (!touchStart || e.touches.length !== 1) return;
       tTheta -= (e.touches[0].clientX - touchStart.x) * 0.007;
@@ -314,60 +598,49 @@ export default function CoingameRoomPage() {
     wrap.addEventListener('touchstart', onTStart, { passive: true });
     wrap.addEventListener('touchmove', onTMove, { passive: false });
 
+    // ── Animate ────────────────────────────────────────────────────────────────
     const clock = new THREE.Clock();
     let animId;
+
     function animate() {
       animId = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
-      if (autoRot) tTheta += 0.0022;
+
+      if (autoRot) tTheta += 0.0018;
       theta += (tTheta - theta) * 0.06;
       phi += (tPhi - phi) * 0.06;
-      camera.position.set(Math.sin(theta) * Math.cos(phi) * tRad, Math.sin(phi) * tRad + 1, Math.cos(theta) * Math.cos(phi) * tRad);
-      camera.lookAt(0, 1.8, 0);
+      camera.position.set(
+        Math.sin(theta) * Math.cos(phi) * tRad,
+        Math.sin(phi) * tRad + 1,
+        Math.cos(theta) * Math.cos(phi) * tRad
+      );
+      camera.lookAt(0, 1.5, 0);
 
-      cg.rotation.y = t * 0.72; cg.position.y = 2.6 + Math.sin(t * 1.1) * 0.2;
-      gem.rotation.y = t * 2.2; gem.rotation.x = Math.sin(t * 0.75) * 0.5;
+      cg.rotation.y = t * 0.65;
+      cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
+      gem.rotation.y = t * 2.0;
 
-      orbits.forEach((o, i) => {
-        o.angle += o.spd * 0.016;
-        o.mesh.rotation.x = Math.PI / 2 + Math.sin(t * 0.4 + i) * o.tlt;
-        o.mesh.rotation.z = Math.cos(t * 0.3 + i) * 0.22;
-        o.orb.position.set(Math.cos(o.angle) * o.r, Math.sin(t * 0.6 + i * 2) * 0.18, Math.sin(o.angle) * o.r);
-      });
-
-      miniCoins.forEach((mc) => {
-        mc.angle += mc.spd * 0.01;
-        mc.mesh.position.x = Math.cos(mc.angle) * mc.r;
-        mc.mesh.position.z = Math.sin(mc.angle) * mc.r;
-        mc.mesh.position.y = 1 + Math.sin(t * 1.3 + mc.bob) * 0.38;
-        mc.mesh.rotation.y += 0.055; mc.mesh.rotation.z += 0.018;
-      });
-
-      itemMeshes.forEach((im) => {
-        if (im.item.unlocked) {
-          im.sp.position.y = 0.65 + Math.sin(t * 1.4 + im.bob) * 0.13;
-          im.sp.rotation.y += 0.022;
-          im.gr.material.opacity = 0.3 + Math.sin(t * 2 + im.bob) * 0.14;
-        }
-      });
-
-      ringMat.emissiveIntensity = 0.5 + Math.sin(t * 3.0) * 0.3;
-      innerRingMat.emissiveIntensity = 0.25 + Math.sin(t * 2.5 + 1) * 0.15;
-      scrMat.emissiveIntensity = 0.45 + Math.sin(t * 2.2) * 0.2;
-      mainG.intensity = 6.5 + Math.sin(t * 1.6) * 1.2;
-      mainG.position.x = Math.sin(t * 0.28) * 3.5;
-      acc.intensity = 1.3 + Math.sin(t * 2.1 + 1) * 0.4;
+      ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
+      ceilLight.intensity = 5.5 + Math.sin(t * 1.4) * 1.0;
+      ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
+      bulb.material.emissiveIntensity = 1.8 + Math.sin(t * 1.4) * 0.5;
 
       const pp = pGeo.attributes.position;
       for (let i = 0; i < N; i++) {
-        pp.array[i * 3 + 1] -= pVel[i];
-        if (pp.array[i * 3 + 1] < 0) {
-          pp.array[i * 3 + 1] = 14;
-          pp.array[i * 3] = (Math.random() - 0.5) * 26;
-          pp.array[i * 3 + 2] = (Math.random() - 0.5) * 26;
+        pp.array[i*3+1] -= pVel[i];
+        if (pp.array[i*3+1] < 0) {
+          pp.array[i*3+1] = ROOM.h;
+          pp.array[i*3]   = (Math.random() - 0.5) * ROOM.w;
+          pp.array[i*3+2] = (Math.random() - 0.5) * ROOM.d;
         }
       }
       pp.needsUpdate = true;
+
+      // bob staged furniture
+      Object.values(furnitureMap).forEach(({ group, isStaged }) => {
+        if (isStaged) group.position.y = 0.53 + Math.sin(t * 1.8 + group.userData.bobOffset) * 0.06;
+      });
+
       renderer.render(scene, camera);
     }
     animate();
@@ -379,53 +652,100 @@ export default function CoingameRoomPage() {
     });
     ro.observe(wrap);
 
-    // Expose buildItems so the rewards-load effect can call it
-    wrap._buildItems = buildItems;
-
     return () => {
       cancelAnimationFrame(animId);
       ro.disconnect();
-      wrap.removeEventListener('mousemove', onMouseMove);
       wrap.removeEventListener('mousedown', onMDown);
+      window.removeEventListener('mousemove', onMMove);
       window.removeEventListener('mouseup', onMUp);
-      window.removeEventListener('mousemove', onMDrag);
       wrap.removeEventListener('wheel', onWheel);
       wrap.removeEventListener('touchstart', onTStart);
       wrap.removeEventListener('touchmove', onTMove);
       renderer.dispose();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Rebuild 3D items when rewards arrive from the API
+  // ── Sync furniture into scene when rewards load ───────────────────────────
   useEffect(() => {
-    if (rewards.length > 0 && wrapRef.current?._buildItems) {
-      wrapRef.current._buildItems(rewards);
-    }
+    const ref = sceneRef.current;
+    if (!ref || rewards.length === 0) return;
+    const { scene, furnitureMap } = ref;
+
+    // Remove furniture that's no longer in rewards (shouldn't happen but safe)
+    Object.keys(furnitureMap).forEach((id) => {
+      if (!rewards.find((r) => r.id === id)) {
+        scene.remove(furnitureMap[id].group);
+        delete furnitureMap[id];
+      }
+    });
+
+    let stageSlot = 0;
+    rewards.forEach((item) => {
+      if (!item.unlocked) return;
+
+      if (furnitureMap[item.id]) {
+        // Update position if it changed (e.g. after save)
+        const { group } = furnitureMap[item.id];
+        if (item.pos_x != null && item.pos_z != null) {
+          group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
+          furnitureMap[item.id].isStaged = false;
+        }
+        return;
+      }
+
+      const builder = FURNITURE_BUILDERS[item.id];
+      if (!builder) return;
+
+      const group = builder();
+      group.userData.furnitureId = item.id;
+      group.userData.bobOffset = Math.random() * Math.PI * 2;
+
+      // Tag all children so raycaster can walk up to find the id
+      group.traverse((child) => { child.userData.furnitureId = item.id; });
+
+      const col = RARITY_HEX[item.rarity] ?? 0x22c55e;
+
+      // Glow ring under item (owner drag affordance)
+      if (ref.isOwner) {
+        const ringGeo = new THREE.TorusGeometry(0.45, 0.018, 8, 48);
+        const ringMat2 = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.1, metalness: 1 });
+        const glowRing = new THREE.Mesh(ringGeo, ringMat2);
+        glowRing.rotation.x = Math.PI / 2;
+        glowRing.position.y = 0.02;
+        group.add(glowRing);
+      }
+
+      const isStaged = item.pos_x == null || item.pos_z == null;
+      if (isStaged) {
+        const sx = STAGE_X;
+        const sz = STAGE_Z_START + stageSlot * STAGE_Z_STEP;
+        group.position.set(sx, 0.53, sz);
+        stageSlot++;
+      } else {
+        group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
+      }
+
+      scene.add(group);
+      furnitureMap[item.id] = { group, isStaged };
+    });
   }, [rewards]);
 
+  // ── Derived UI values ────────────────────────────────────────────────────
   const price = coin ? spotPrice(Number(coin.tokens_minted), Number(coin.base_price)) : 0;
   const holding = holdings.find((h) => h.coin_id === coinId);
   const coinName = coin?.coin_name || coin?.profiles?.username || '?';
   const initial = (coinName[0] || '?').toUpperCase();
   const unlockedCount = rewards.filter((r) => r.unlocked).length;
-  const sortedRewards = [...rewards].sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
-
-  const infoRows = [
-    ['Items unlocked', `${unlockedCount} / ${rewards.length}`],
-    ['Supply', loading ? '—' : Number(coin?.tokens_minted ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })],
-    ['Status', coin?.status ?? '—'],
-    ['Your hold', holding ? `${Number(holding.tokens_held).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${coinName}` : '—'],
-  ];
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', background: '#080808', fontFamily: "'DM Mono', 'Space Mono', monospace", overflow: 'hidden', position: 'relative' }}>
-      {/* Three.js canvas */}
+    <div style={{ display: 'flex', width: '100%', height: '100%', background: '#060806', fontFamily: "'DM Mono', 'Space Mono', monospace", overflow: 'hidden', position: 'relative' }}>
       <div ref={wrapRef} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 
         {/* HUD */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
-          <div style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(8,8,8,0.92)', border: '1px solid #1a2e1a', borderRadius: 10, padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 200 }}>
+          <div style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(6,8,6,0.92)', border: '1px solid #1a2e1a', borderRadius: 10, padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 200 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#052e16', border: '1.5px solid #22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#22c55e', flexShrink: 0 }}>
                 {loading ? '?' : initial}
@@ -441,36 +761,27 @@ export default function CoingameRoomPage() {
                 <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700, marginTop: 2 }}>{loading ? '—' : <FC amount={price} />}</div>
               </div>
               <div style={{ background: '#0d0d0d', border: '1px solid #1a2e1a', borderRadius: 6, padding: '6px 8px' }}>
-                <div style={{ color: '#4b5563', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Rewards</div>
-                <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700, marginTop: 2 }}>{loading ? '—' : `${unlockedCount}/${rewards.length}`}</div>
+                <div style={{ color: '#4b5563', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Supply</div>
+                <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700, marginTop: 2 }}>{loading ? '—' : Number(coin?.tokens_minted ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
               </div>
             </div>
           </div>
-          <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#1e3a1e', fontSize: 10, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-            drag to orbit · scroll to zoom
-          </div>
-        </div>
 
-        {/* Tooltip */}
-        {tooltip && (
-          <div style={{ position: 'fixed', left: tooltip.x + 14, top: tooltip.y - 10, background: 'rgba(6,6,6,0.97)', border: `1px solid ${tooltip.item.unlocked ? tooltip.item.rb : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, padding: '10px 14px', pointerEvents: 'none', zIndex: 9999, backdropFilter: 'blur(10px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <CoinIcon name={tooltip.item.icon} size={18} color={tooltip.item.unlocked ? tooltip.item.color : '#4b5563'} />
-              <span style={{ color: tooltip.item.unlocked ? '#e2e8f0' : '#6b7280', fontSize: 12, fontWeight: 700 }}>{tooltip.item.label}</span>
+          {isOwner && (
+            <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: '1px solid #1a2e1a', borderRadius: 6, padding: '5px 12px', color: '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+              drag items to place them · scroll to zoom
             </div>
-            {tooltip.item.unlocked ? (
-              <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 9999, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: tooltip.item.rbg, border: `1px solid ${tooltip.item.rb}`, color: tooltip.item.color }}>
-                {tooltip.item.rarity}
-              </span>
-            ) : (
-              <span style={{ fontSize: 9, color: '#4b5563' }}>{tooltip.item.unlock_description}</span>
-            )}
-          </div>
-        )}
+          )}
+          {!isOwner && (
+            <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#1e3a1e', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+              drag to orbit · scroll to zoom
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Sidebar */}
-      <div style={{ width: 250, flexShrink: 0, background: '#111111', borderLeft: '1px solid #1a2e1a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ width: 260, flexShrink: 0, background: '#111111', borderLeft: '1px solid #1a2e1a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '18px 16px 13px', borderBottom: '1px solid #1a2e1a' }}>
           <div style={{ color: '#22c55e', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
             <LucideIcons.Home size={13} /> {loading ? '...' : `${coinName}'s room`}
@@ -478,31 +789,79 @@ export default function CoingameRoomPage() {
           <div style={{ color: '#4b5563', fontSize: 9 }}>Virtual meme coin lair</div>
         </div>
 
+        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #1a2e1a' }}>
-          {[['r', LucideIcons.Trophy, 'Rewards'], ['i', LucideIcons.Info, 'Info']].map(([key, Icon, label]) => (
-            <button key={key} onClick={() => setTab(key)} style={{ flex: 1, padding: '11px 4px', fontSize: 10, fontFamily: 'inherit', background: 'transparent', border: 'none', borderBottom: tab === key ? '2px solid #22c55e' : '2px solid transparent', color: tab === key ? '#22c55e' : '#4b5563', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              <Icon size={11} /> {label}
+          {[['i', 'Info'], ['r', 'Rewards']].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              style={{ flex: 1, padding: '9px 0', background: 'none', border: 'none', borderBottom: tab === key ? '2px solid #22c55e' : '2px solid transparent', color: tab === key ? '#22c55e' : '#4b5563', fontSize: 10, fontFamily: 'inherit', fontWeight: 700, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase' }}
+            >
+              {label}{key === 'r' && rewards.length > 0 ? ` ${unlockedCount}/${rewards.length}` : ''}
             </button>
           ))}
         </div>
 
         <div style={{ padding: 14, flex: 1, overflowY: 'auto' }}>
-          {tab === 'r' ? (
-            <>
-              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                {loading ? 'Loading...' : `${unlockedCount} of ${rewards.length} unlocked`}
-              </div>
-              {sortedRewards.map((item) => <RewardRow key={item.id} item={item} />)}
-            </>
-          ) : (
+          {tab === 'i' && (
             <>
               <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Coin info</div>
-              {infoRows.map(([label, value]) => (
+              {[
+                ['Price', loading ? '—' : <FC amount={price} />],
+                ['Supply', loading ? '—' : Number(coin?.tokens_minted ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })],
+                ['Status', coin?.status ?? '—'],
+                ['Your hold', holding ? `${Number(holding.tokens_held).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${coinName}` : '—'],
+              ].map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#161616', borderRadius: 6, border: '1px solid #1a2e1a', marginBottom: 6 }}>
                   <span style={{ color: '#4b5563', fontSize: 10 }}>{label}</span>
                   <span style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{value}</span>
                 </div>
               ))}
+            </>
+          )}
+
+          {tab === 'r' && (
+            <>
+              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Collectables</div>
+              {rewards.length === 0 && (
+                <div style={{ color: '#374151', fontSize: 10, textAlign: 'center', marginTop: 24 }}>Loading...</div>
+              )}
+              {rewards.map((item) => {
+                const Icon = LucideIcons[item.icon] ?? LucideIcons.Star;
+                const rarityColors = { legendary: '#f59e0b', epic: '#c084fc', rare: '#38bdf8', uncommon: '#4ade80', common: '#6b7280' };
+                const col = item.unlocked ? (rarityColors[item.rarity] ?? '#6b7280') : '#1f2937';
+                const isPlaced = item.unlocked && item.pos_x != null && item.pos_z != null;
+                return (
+                  <div
+                    key={item.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: item.unlocked ? '#161616' : '#0f0f0f', borderRadius: 7, border: `1px solid ${item.unlocked ? '#1a2e1a' : '#111'}`, marginBottom: 6, opacity: item.unlocked ? 1 : 0.5 }}
+                  >
+                    <div style={{ width: 30, height: 30, borderRadius: 7, background: item.unlocked ? `${col}18` : '#161616', border: `1px solid ${item.unlocked ? col : '#1f2937'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={14} color={col} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: item.unlocked ? '#e2e8f0' : '#374151', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
+                      <div style={{ color: item.unlocked ? col : '#374151', fontSize: 9, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {item.unlocked ? item.rarity : item.unlock_description}
+                      </div>
+                    </div>
+                    {item.unlocked && (
+                      <div style={{ flexShrink: 0 }}>
+                        {isPlaced
+                          ? <LucideIcons.Check size={12} color="#22c55e" />
+                          : <LucideIcons.MoveRight size={12} color="#4b5563" title="in staging area" />
+                        }
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {isOwner && unlockedCount > 0 && (
+                <div style={{ marginTop: 10, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#4b5563', fontSize: 9, lineHeight: 1.5 }}>
+                  Unplaced items appear on the left shelf. Drag them into the room to position them.
+                </div>
+              )}
             </>
           )}
         </div>

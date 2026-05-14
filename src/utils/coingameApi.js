@@ -372,3 +372,8 @@ export async function fetchCoinRewards(coinId) {
   const data = await rpc('cg_check_rewards', { p_coin_id: coinId });
   return data ?? [];
 }
+
+/** Save furniture position for a coin owner. */
+export async function updateFurniturePosition(coinId, collectableId, x, z) {
+  await rpc('cg_update_furniture_position', { p_coin_id: coinId, p_collectable: collectableId, p_x: x, p_z: z });
+}
