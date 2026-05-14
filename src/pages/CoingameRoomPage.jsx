@@ -206,10 +206,10 @@ export default function CoingameRoomPage() {
     return () => { cancelled = true; };
   }, [coinId]);
 
-  const savePosition = useCallback(async (collectableId, x, z) => {
+  const savePosition = useCallback(async (collectableId, x, z, rotY) => {
     try {
-      await updateFurniturePosition(coinId, collectableId, x, z);
-      setRewards((prev) => prev.map((r) => r.id === collectableId ? { ...r, pos_x: x, pos_z: z } : r));
+      await updateFurniturePosition(coinId, collectableId, x, z, rotY);
+      setRewards((prev) => prev.map((r) => r.id === collectableId ? { ...r, pos_x: x, pos_z: z, rot_y: rotY } : r));
     } catch {}
   }, [coinId]);
 
@@ -573,7 +573,7 @@ export default function CoingameRoomPage() {
           localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
         } else {
           if (furnitureMap[id]) furnitureMap[id].isStaged = false;
-          savePosition(id, x, z);
+          savePosition(id, x, z, parseFloat(group.rotation.y.toFixed(4)));
         }
         dragging = null;
         return;
@@ -697,10 +697,10 @@ export default function CoingameRoomPage() {
       if (!item.unlocked) return;
 
       if (furnitureMap[item.id]) {
-        // Update position if it changed (e.g. after save)
         const { group } = furnitureMap[item.id];
         if (item.pos_x != null && item.pos_z != null) {
           group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
+          if (item.rot_y != null) group.rotation.y = item.rot_y;
           furnitureMap[item.id].isStaged = false;
         }
         return;
@@ -738,6 +738,7 @@ export default function CoingameRoomPage() {
         stageSlot++;
       } else {
         group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
+        if (item.rot_y != null) group.rotation.y = item.rot_y;
       }
 
       scene.add(group);
