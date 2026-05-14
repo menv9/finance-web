@@ -342,6 +342,7 @@ export default function CoingameRoomPage() {
     function placeStatic(group, defaultX, defaultZ) {
       const saved = savedStatic[group.userData.furnitureId];
       group.position.set(saved ? saved.x : defaultX, 0, saved ? saved.z : defaultZ);
+      if (saved?.ry != null) group.rotation.y = saved.ry;
     }
 
     // Rug (grouped so it can be dragged)
@@ -568,7 +569,7 @@ export default function CoingameRoomPage() {
         group.position.y = FLOOR_Y;
         if (isStatic) {
           const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
-          cur[id] = { x, z };
+          cur[id] = { x, z, ry: parseFloat(group.rotation.y.toFixed(4)) };
           localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
         } else {
           if (furnitureMap[id]) furnitureMap[id].isStaged = false;
@@ -600,6 +601,13 @@ export default function CoingameRoomPage() {
     };
     wrap.addEventListener('touchstart', onTStart, { passive: true });
     wrap.addEventListener('touchmove', onTMove, { passive: false });
+
+    const onKeyDown = (e) => {
+      if ((e.key === 'r' || e.key === 'R') && dragging) {
+        dragging.group.rotation.y += Math.PI / 4;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
 
     // ── Animate ────────────────────────────────────────────────────────────────
     const clock = new THREE.Clock();
@@ -664,6 +672,7 @@ export default function CoingameRoomPage() {
       wrap.removeEventListener('wheel', onWheel);
       wrap.removeEventListener('touchstart', onTStart);
       wrap.removeEventListener('touchmove', onTMove);
+      window.removeEventListener('keydown', onKeyDown);
       renderer.dispose();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
