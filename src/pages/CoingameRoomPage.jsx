@@ -820,6 +820,12 @@ export default function CoingameRoomPage() {
     bucketCallbackRef.current = async () => {
       setBucketToast('ok');
       setTimeout(() => setBucketToast(null), 700);
+      // Optimistic update so the balance shows immediately
+      useFinanceStore.setState((s) => ({
+        coingameWallet: s.coingameWallet
+          ? { ...s.coingameWallet, fc_balance: (s.coingameWallet.fc_balance ?? 0) + 1 }
+          : s.coingameWallet,
+      }));
       try { await claimRoomFc(coinId); } catch {}
     };
   }, [coinId]);
