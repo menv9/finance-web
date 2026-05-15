@@ -11,8 +11,7 @@ export function normalizeChartTime(time) {
 
   if (typeof time === 'number' && Number.isFinite(time)) {
     const milliseconds = time > 100000000000 ? time : time * 1000;
-    const date = new Date(milliseconds);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+    return Number.isFinite(milliseconds) ? Math.floor(milliseconds / 1000) : null;
   }
 
   const value = String(time).trim();
@@ -25,7 +24,15 @@ export function normalizeChartTime(time) {
   }
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  return Number.isNaN(date.getTime()) ? null : Math.floor(date.getTime() / 1000);
+}
+
+function chartTimeToMs(time) {
+  const normalized = normalizeChartTime(time);
+  if (normalized == null) return Number.NaN;
+  if (typeof normalized === 'number') return normalized * 1000;
+  const date = new Date(`${normalized}T00:00:00`);
+  return date.getTime();
 }
 
 export function cleanChartData(points = []) {
@@ -33,28 +40,35 @@ export function cleanChartData(points = []) {
     .map((point, index) => {
       const time = normalizeChartTime(point?.time);
       const value = Number(point?.value);
-      return time && Number.isFinite(value) ? { ...point, time, value, __order: index } : null;
+      return time != null && Number.isFinite(value) ? { ...point, time, value, __order: index } : null;
     })
     .filter(Boolean)
-    .sort((a, b) => a.time.localeCompare(b.time) || a.__order - b.__order);
+    .sort((a, b) => chartTimeToMs(a.time) - chartTimeToMs(b.time) || a.__order - b.__order);
 
-  return [...new Map(normalized.map((point) => [point.time, point])).values()]
+  return [...new Map(normalized.map((point) => [String(point.time), point])).values()]
     .map(({ __order, ...point }) => point);
 }
 
 export function formatAxisTime(time) {
   const normalized = normalizeChartTime(time);
   if (!normalized) return '';
-  const date = new Date(`${normalized}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return normalized;
+  const date = typeof normalized === 'number'
+    ? new Date(normalized * 1000)
+    : new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return String(normalized);
+  if (typeof normalized === 'number') {
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit' }).format(date);
+  }
   return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit' }).format(date);
 }
 
 export function formatAxisMonth(time) {
   const normalized = normalizeChartTime(time);
   if (!normalized) return '';
-  const date = new Date(`${normalized}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return normalized.slice(5, 7);
+  const date = typeof normalized === 'number'
+    ? new Date(normalized * 1000)
+    : new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return String(normalized).slice(5, 7);
   return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
 }
 

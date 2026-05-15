@@ -119,6 +119,23 @@ function buildCostAtDateFn(cashflows, portfolioSales, holdings = [], fxRates = {
   };
 }
 
+function firstPortfolioCostDate(cashflows, holdings = []) {
+  const buyHoldingIds = new Set((cashflows || [])
+    .filter((cf) => cf.kind === 'buy' && cf.holdingId)
+    .map((cf) => cf.holdingId));
+  const dates = [
+    ...(cashflows || [])
+      .filter((cf) => cf.kind === 'buy' && cf.date)
+      .map((cf) => cf.date),
+    ...(holdings || [])
+      .filter((holding) => !buyHoldingIds.has(holding.id))
+      .map((holding) => holding.purchaseDate || holding.createdAt?.slice(0, 10))
+      .filter(Boolean),
+  ].sort((a, b) => a.localeCompare(b));
+
+  return dates[0] || null;
+}
+
 function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period = '1m', investedCents = 0, cashflows = [], portfolioSales = [], holdings = [], fxRates = {}, baseCurrency = 'EUR') {
   const costAtDate = buildCostAtDateFn(cashflows, portfolioSales, holdings, fxRates, baseCurrency);
   const sorted = (snapshots || [])
@@ -144,18 +161,23 @@ function buildPortfolioValueSeries(snapshots, currentValueCents, locale, period 
       label: formatHourlyLabel(snapshot.capturedAt, locale),
     };
   });
-  // Prepend a purchase-start point at cost basis level so the green line starts
-  // at the same height as the red cost line on the first purchase date
-  if (series.length > 0 && investedCents > 0) {
-    const firstTs = new Date(series[0].capturedAt).getTime() - 1000;
-    const startCost = series[0].costCents || investedCents;
-    series.unshift({
-      id: 'purchase-start',
-      capturedAt: new Date(firstTs).toISOString(),
-      valueCents: startCost,
-      costCents: startCost,
-      label: formatHourlyLabel(new Date(firstTs).toISOString(), locale),
-    });
+  const firstCostDate = firstPortfolioCostDate(cashflows, holdings);
+  if (series.length > 0 && investedCents > 0 && firstCostDate) {
+    const firstTs = new Date(`${firstCostDate}T00:00:00`).getTime();
+    const firstSeriesTs = new Date(series[0].capturedAt).getTime();
+    const [windowStart] = period === 'all' ? [Number.NEGATIVE_INFINITY] : getPortfolioPeriodWindow(period);
+    const shouldAddStart = firstTs < firstSeriesTs && firstTs >= windowStart;
+    if (shouldAddStart) {
+      const capturedAt = new Date(firstTs).toISOString();
+      const startCost = costAtDate(capturedAt) || series[0].costCents || investedCents;
+      series.unshift({
+        id: 'purchase-start',
+        capturedAt,
+        valueCents: startCost,
+        costCents: startCost,
+        label: formatHourlyLabel(capturedAt, locale),
+      });
+    }
   }
   if (currentValueCents > 0) {
     const capturedAt = new Date().toISOString();
@@ -1230,6 +1252,20 @@ function PortfolioNews({ tickers, apiKey }) {
 const PORTFOLIO_PERIOD_OPTIONS = ['1d', '1w', '1m', '6m', '1y', 'all'];
 const PORTFOLIO_SNAPSHOT_SCOPE_VERSION = 'assigned-only-v1';
 
+function toChartTimestamp(timestamp) {
+  const time = new Date(timestamp).getTime();
+  return Number.isNaN(time) ? null : Math.floor(time / 1000);
+}
+
+function toChartVisibleRange(period) {
+  if (period === 'all') return null;
+  const [from, to] = getPortfolioPeriodWindow(period);
+  return {
+    from: Math.floor(from / 1000),
+    to: Math.floor(to / 1000),
+  };
+}
+
 function chooseCanonicalSnapshots(snapshots) {
   const canonical = (snapshots || []).filter((snapshot) => snapshot.scopeVersion === PORTFOLIO_SNAPSHOT_SCOPE_VERSION);
   return canonical.length ? canonical : (snapshots || []).filter((snapshot) => !snapshot.scopeVersion);
@@ -1290,6 +1326,7 @@ export default function PortfolioPage() {
         archivedAt: null,
       }
     : modalHolding;
+
   const fxRates = useFinanceStore((state) => state.fxRates);
   const currency = settings.baseCurrency;
   const assignedHoldings = useMemo(
@@ -1349,9 +1386,18 @@ export default function PortfolioPage() {
     [portfolioValueSeries, portfolioValuePeriod, locale],
   );
   const lwPortfolioValueData = useMemo(() => ({
-    main: visiblePortfolioValueSeries.map((p) => ({ time: p.capturedAt?.slice(0, 10), value: p.valueCents })),
-    cost: visiblePortfolioValueSeries.filter((p) => p.costCents != null).map((p) => ({ time: p.capturedAt?.slice(0, 10), value: p.costCents })),
+    main: visiblePortfolioValueSeries
+      .map((p) => ({ time: toChartTimestamp(p.capturedAt), value: p.valueCents }))
+      .filter((p) => p.time != null),
+    cost: visiblePortfolioValueSeries
+      .filter((p) => p.costCents != null)
+      .map((p) => ({ time: toChartTimestamp(p.capturedAt), value: p.costCents }))
+      .filter((p) => p.time != null),
   }), [visiblePortfolioValueSeries]);
+  const lwPortfolioValueRange = useMemo(
+    () => toChartVisibleRange(portfolioValuePeriod),
+    [portfolioValuePeriod],
+  );
 
   const lwRebalanceData = useMemo(() => {
     const items = visiblePortfolioMetrics.allocationActual || [];
@@ -1975,6 +2021,7 @@ export default function PortfolioPage() {
               topOpacity={0.22}
               secondSeries={{ data: lwPortfolioValueData.cost, color: 'var(--danger)', topOpacity: 0.06, bottomOpacity: 0.06, dashed: true }}
               priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+              visibleRange={lwPortfolioValueRange}
             />
           </div>
         ) : (
