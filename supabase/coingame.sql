@@ -2379,3 +2379,30 @@ end;
 $$;
 
 grant execute on function public.cg_gamble_dice(integer, numeric) to authenticated;
+
+
+-- ── Room layouts (Sims-style room state synced across all visitors) ──────
+-- Each row stores the entire localStorage blob for a given coin's room,
+-- so visitors can fetch and apply the owner's room arrangement.
+create table if not exists public.coingame_room_layouts (
+  coin_id uuid primary key references public.coingame_coins(coin_id) on delete cascade,
+  layout jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.coingame_room_layouts enable row level security;
+
+drop policy if exists "room layouts readable by authenticated" on public.coingame_room_layouts;
+create policy "room layouts readable by authenticated"
+  on public.coingame_room_layouts for select to authenticated using (true);
+
+drop policy if exists "room layouts writable by owner" on public.coingame_room_layouts;
+create policy "room layouts writable by owner"
+  on public.coingame_room_layouts for all to authenticated
+  using (exists (select 1 from public.coingame_coins c where c.coin_id = coingame_room_layouts.coin_id and c.owner_user_id = auth.uid()))
+  with check (exists (select 1 from public.coingame_coins c where c.coin_id = coingame_room_layouts.coin_id and c.owner_user_id = auth.uid()));
+
+drop trigger if exists coingame_room_layouts_set_updated_at on public.coingame_room_layouts;
+create trigger coingame_room_layouts_set_updated_at
+  before update on public.coingame_room_layouts
+  for each row execute function public.set_updated_at();

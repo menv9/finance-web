@@ -9,6 +9,7 @@ import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { HOME_PACK, HOME_PACK_CATEGORIES, findHomeModel, loadHomeModel } from '../utils/coinroomHomePack';
 import { getSupabaseBrowserClient } from '../utils/supabase';
+import { serializeLocalLayout, applyLayoutToLocal, fetchRoomLayout, saveRoomLayout } from '../utils/coinroomSync';
 import HomeModelThumb from '../components/coingame/HomeModelThumb';
 
 const ROOM = { w: 22, d: 22, h: 9 };
@@ -566,6 +567,8 @@ export default function CoingameRoomPage() {
   const [coin, setCoin] = useState(null);
   const [tab, setTab] = useState('i');
   const [loading, setLoading] = useState(true);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState(0);
   const [tooltip, setTooltip] = useState(null);
   const [ambientColor, setAmbientColor] = useState(() => localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e');
   const [bucketToast, setBucketToast] = useState(null);
@@ -649,7 +652,7 @@ export default function CoingameRoomPage() {
     if (STATIC_KEY) {
       const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
       delete cur[`static_shop_${itemId}`];
-      localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+      localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
     }
   }
 
@@ -664,7 +667,7 @@ export default function CoingameRoomPage() {
     if (STATIC_KEY) {
       const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
       delete cur[`static_home_${name}`];
-      localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+      localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
     }
   }
 
@@ -684,6 +687,45 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-room-size-${coinId}`, String(roomSize)); }, [roomSize, coinId]);
   useEffect(() => { localStorage.setItem(`cg-walls-${coinId}`, JSON.stringify(walls)); }, [walls, coinId]);
+
+  // Fetch the owner's room layout from Supabase on mount so visitors see it
+  useEffect(() => {
+    let cancelled = false;
+    setLayoutReady(false);
+    (async () => {
+      try {
+        const layout = await fetchRoomLayout(coinId);
+        if (cancelled) return;
+        if (layout) {
+          applyLayoutToLocal(coinId, layout);
+          try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
+          try { setHomeOwned(JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}')); } catch (_) {}
+          try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
+          const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
+          if (!Number.isNaN(rs)) setRoomSize(rs);
+          const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
+          if (amb) setAmbientColor(amb);
+        }
+      } finally {
+        if (!cancelled) setLayoutReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [coinId]);
+
+  // For owner: debounce-save layout to Supabase whenever any synced state changes
+  useEffect(() => {
+    if (!isOwner || !layoutReady) return;
+    const tid = setTimeout(() => {
+      saveRoomLayout(coinId, serializeLocalLayout(coinId))
+        .then(() => {
+          const ch = sceneRef.current?.supaChannel;
+          if (ch) ch.send({ type: 'broadcast', event: 'layout', payload: { coinId } });
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(tid);
+  }, [coinId, isOwner, layoutReady, walls, homeOwned, shopOwned, roomSize, ambientColor, layoutVersion]);
 
   function addWall(w) { setWalls((prev) => [...prev, w]); }
   function deleteWall(id) { setWalls((prev) => prev.filter((w) => w.id !== id)); }
@@ -1095,11 +1137,31 @@ export default function CoingameRoomPage() {
         });
       });
 
+      const sendInitialPose = () => {
+        if (!supaChannel || !myId) return;
+        supaChannel.send({
+          type: 'broadcast',
+          event: 'pose',
+          payload: { id: myId, name: myName, x: player.position.x, z: player.position.z, yaw: player.rotation.y },
+        });
+      };
+
+      // When someone new joins, re-broadcast so they see us idle
+      supaChannel.on('presence', { event: 'join' }, () => { sendInitialPose(); });
+
+      // Owner published a layout change — pull latest from DB and apply
+      supaChannel.on('broadcast', { event: 'layout' }, () => {
+        sceneRef.current?.reloadLayout?.();
+      });
+
       supaChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await supaChannel.track({ id: myId, name: myName });
+          // Wait a tick so other clients are also subscribed and listening
+          setTimeout(sendInitialPose, 200);
         }
       });
+      if (sceneRef.current) sceneRef.current.supaChannel = supaChannel;
     })();
 
     let lastBroadcast = 0;
@@ -1411,7 +1473,7 @@ export default function CoingameRoomPage() {
             // save cube position
             const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
             cur['fc_cube'] = { x, z };
-            localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+            localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
           }
           dragging = null;
           return;
@@ -1428,7 +1490,7 @@ export default function CoingameRoomPage() {
         if (isStatic) {
           const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
           cur[id] = { x, y: parseFloat(group.position.y.toFixed(3)), z, ry: parseFloat(group.rotation.y.toFixed(4)) };
-          localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+          localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
         }
         selected = { id, group, isStatic };
         dragging = null;
@@ -1482,7 +1544,7 @@ export default function CoingameRoomPage() {
           const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
           const prev = cur[id] || {};
           cur[id] = { ...prev, x: parseFloat(group.position.x.toFixed(3)), y: parseFloat(newY.toFixed(3)), z: parseFloat(group.position.z.toFixed(3)), ry: parseFloat(group.rotation.y.toFixed(4)) };
-          localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+          localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
         }
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected && sceneRef.current?.isOwner) {
@@ -1721,6 +1783,19 @@ export default function CoingameRoomPage() {
     sceneRef.current.addWall = addWall;
     sceneRef.current.deleteWall = deleteWall;
     sceneRef.current.buildMode = buildMode;
+    sceneRef.current.markLayoutDirty = () => setLayoutVersion((v) => v + 1);
+    sceneRef.current.reloadLayout = async () => {
+      const layout = await fetchRoomLayout(coinId);
+      if (!layout) return;
+      applyLayoutToLocal(coinId, layout);
+      try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
+      try { setHomeOwned(JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}')); } catch (_) {}
+      try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
+      const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
+      if (!Number.isNaN(rs)) setRoomSize(rs);
+      const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
+      if (amb) setAmbientColor(amb);
+    };
   });
 
   // Rebuild wall meshes whenever the walls array (or room) changes
