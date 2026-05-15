@@ -198,6 +198,15 @@ const FURNITURE_BUILDERS = {
   chart:    buildCandleChart,
 };
 
+const UPGRADES = [
+  { id: 'cursor', label: 'Gilded Cursor',  desc: '+1 per click',   baseCost: 20,   click: 1,  passive: 0   },
+  { id: 'auto',   label: 'Auto Ticker',    desc: '+0.5 RC/s',      baseCost: 65,   click: 0,  passive: 0.5 },
+  { id: 'power',  label: 'Power Click',    desc: '+5 per click',   baseCost: 280,  click: 5,  passive: 0   },
+  { id: 'turbo',  label: 'Turbo Ticker',   desc: '+2 RC/s',        baseCost: 560,  click: 0,  passive: 2   },
+  { id: 'mega',   label: 'Mega Click',     desc: '+20 per click',  baseCost: 2400, click: 20, passive: 0   },
+  { id: 'farm',   label: 'Coin Farm',      desc: '+10 RC/s',       baseCost: 7200, click: 0,  passive: 10  },
+];
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function CoingameRoomPage() {
@@ -218,7 +227,31 @@ export default function CoingameRoomPage() {
   const [bucketToast, setBucketToast] = useState(null); // null | 'ok' | 'cooldown'
   const bucketCallbackRef = useRef(null);
 
+  const [roomCoins, setRoomCoins] = useState(() => parseFloat(localStorage.getItem(`cg-rc-${coinId}`) || '0'));
+  const [upgradesPurchased, setUpgradesPurchased] = useState(() => JSON.parse(localStorage.getItem(`cg-ru-${coinId}`) || '{}'));
+  const [floaters, setFloaters] = useState([]);
+  const [combo, setCombo] = useState(0);
+  const [sessionClicks, setSessionClicks] = useState(0);
+  const [totalClicks, setTotalClicks] = useState(() => parseInt(localStorage.getItem(`cg-rt-${coinId}`) || '0', 10));
+  const lastClickRef = useRef(0);
+  const comboTimerRef = useRef(null);
+  const clickerCallbackRef = useRef(null);
+  const floaterIdRef = useRef(0);
+
   const isOwner = ownCoin?.coin_id === coinId;
+  const clickPower = 1 + UPGRADES.reduce((acc, u) => acc + u.click * (upgradesPurchased[u.id] || 0), 0);
+  const passiveRate = UPGRADES.reduce((acc, u) => acc + u.passive * (upgradesPurchased[u.id] || 0), 0);
+  const upgradeLevel = Math.floor(Math.log2(totalClicks + 2));
+
+  function buyUpgrade(upgId) {
+    const upg = UPGRADES.find((u) => u.id === upgId);
+    if (!upg) return;
+    const count = upgradesPurchased[upgId] || 0;
+    const cost = Math.ceil(upg.baseCost * Math.pow(1.5, count));
+    if (roomCoins < cost) return;
+    setRoomCoins((c) => c - cost);
+    setUpgradesPurchased((u) => ({ ...u, [upgId]: count + 1 }));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -242,6 +275,41 @@ export default function CoingameRoomPage() {
       setRewards((prev) => prev.map((r) => r.id === collectableId ? { ...r, pos_x: x, pos_z: z, rot_y: rotY } : r));
     } catch {}
   }, [coinId]);
+
+  // Persist clicker state
+  useEffect(() => { localStorage.setItem(`cg-rc-${coinId}`, roomCoins.toFixed(3)); }, [roomCoins, coinId]);
+  useEffect(() => { localStorage.setItem(`cg-ru-${coinId}`, JSON.stringify(upgradesPurchased)); }, [upgradesPurchased, coinId]);
+  useEffect(() => { localStorage.setItem(`cg-rt-${coinId}`, String(totalClicks)); }, [totalClicks, coinId]);
+
+  // Passive income tick
+  useEffect(() => {
+    if (passiveRate <= 0) return;
+    const id = setInterval(() => setRoomCoins((c) => c + passiveRate / 10), 100);
+    return () => clearInterval(id);
+  }, [passiveRate]);
+
+  // Clicker callback — captured fresh each render so combo/clickPower are current
+  useEffect(() => {
+    clickerCallbackRef.current = () => {
+      const now = Date.now();
+      const gap = now - lastClickRef.current;
+      lastClickRef.current = now;
+      const newCombo = gap < 600 ? combo + 1 : 0;
+      setCombo(newCombo);
+      const mult = newCombo >= 5 ? 1 + Math.floor(newCombo / 5) * 0.5 : 1;
+      const earned = Math.max(1, Math.floor(clickPower * mult));
+      setRoomCoins((c) => c + earned);
+      setSessionClicks((s) => s + 1);
+      setTotalClicks((t) => t + 1);
+      const fId = ++floaterIdRef.current;
+      const x = 36 + Math.random() * 28;
+      const y = 26 + Math.random() * 30;
+      setFloaters((f) => [...f, { id: fId, amount: earned, x, y, isCombo: newCombo >= 5 }]);
+      setTimeout(() => setFloaters((f) => f.filter((fl) => fl.id !== fId)), 1400);
+      clearTimeout(comboTimerRef.current);
+      comboTimerRef.current = setTimeout(() => setCombo(0), 1500);
+    };
+  }, [combo, clickPower]);
 
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -840,6 +908,7 @@ export default function CoingameRoomPage() {
   // Bucket claim callback — always up to date in the ref
   useEffect(() => {
     bucketCallbackRef.current = async () => {
+      clickerCallbackRef.current?.();
       setBucketToast('ok');
       setTimeout(() => setBucketToast(null), 700);
       // Optimistic update so the balance shows immediately
@@ -910,6 +979,7 @@ export default function CoingameRoomPage() {
 
   // ── Derived UI values ────────────────────────────────────────────────────
   const price = coin ? spotPrice(Number(coin.tokens_minted), Number(coin.base_price)) : 0;
+  const comboMult = combo >= 5 ? 1 + Math.floor(combo / 5) * 0.5 : 1;
   const holding = holdings.find((h) => h.coin_id === coinId);
   const coinName = coin?.coin_name || coin?.profiles?.username || '?';
   const initial = (coinName[0] || '?').toUpperCase();
@@ -979,6 +1049,48 @@ export default function CoingameRoomPage() {
               <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', letterSpacing: '0.02em' }}>+1 FC</div>
             </div>
           )}
+
+          {/* Room Coin tycoon HUD — top right */}
+          <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(6,8,6,0.92)', border: '1px solid #1a2e1a', borderRadius: 10, padding: '10px 14px', backdropFilter: 'blur(12px)', minWidth: 148, textAlign: 'right' }}>
+            <div style={{ color: '#4b5563', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>Room Coins</div>
+            <div style={{ color: '#4ade80', fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
+              {Math.floor(roomCoins).toLocaleString()}
+            </div>
+            {passiveRate > 0 && (
+              <div style={{ color: '#22c55e', fontSize: 9, marginTop: 3 }}>+{passiveRate.toFixed(1)} /sec</div>
+            )}
+            <div style={{ color: '#374151', fontSize: 8, marginTop: 4 }}>
+              {sessionClicks.toLocaleString()} clicks · Lv.{upgradeLevel}
+            </div>
+            {combo >= 3 && (
+              <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 800, marginTop: 5, animation: 'rc-combo-pop 0.3s ease' }}>
+                COMBO ×{comboMult.toFixed(1)}
+              </div>
+            )}
+          </div>
+
+          {/* Floating +N RC numbers */}
+          {floaters.map((fl) => (
+            <div
+              key={fl.id}
+              style={{
+                position: 'absolute',
+                left: `${fl.x}%`,
+                top: `${fl.y}%`,
+                pointerEvents: 'none',
+                animation: 'rc-float 1.4s ease-out forwards',
+                fontSize: fl.isCombo ? 19 : 14,
+                fontWeight: 900,
+                color: fl.isCombo ? '#f59e0b' : '#4ade80',
+                textShadow: fl.isCombo ? '0 0 14px #f59e0b' : '0 0 8px #22c55e',
+                whiteSpace: 'nowrap',
+                userSelect: 'none',
+                fontFamily: "'DM Mono','Space Mono',monospace",
+              }}
+            >
+              +{fl.amount} RC{fl.isCombo ? ' COMBO!' : ''}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -993,7 +1105,7 @@ export default function CoingameRoomPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #1a2e1a' }}>
-          {[['i', 'Info'], ['r', 'Rewards']].map(([key, label]) => (
+          {[['i', 'Info'], ['r', 'Rewards'], ['s', 'Shop']].map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -1064,6 +1176,65 @@ export default function CoingameRoomPage() {
                   Unplaced items appear on the left shelf. Drag them into the room to position them.
                 </div>
               )}
+            </>
+          )}
+
+          {tab === 's' && (
+            <>
+              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Room Upgrades</div>
+
+              {/* Stats row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                {[['Click Power', `${clickPower}×`], ['Passive', `${passiveRate.toFixed(1)}/s`]].map(([l, v]) => (
+                  <div key={l} style={{ background: '#0d0d0d', border: '1px solid #1a2e1a', borderRadius: 6, padding: '7px 8px', textAlign: 'center' }}>
+                    <div style={{ color: '#4b5563', fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{l}</div>
+                    <div style={{ color: '#4ade80', fontSize: 13, fontWeight: 800, marginTop: 2 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#0d1a0d', borderRadius: 6, border: '1px solid #1a2e1a', marginBottom: 12 }}>
+                <span style={{ color: '#4b5563', fontSize: 9 }}>Balance</span>
+                <span style={{ color: '#4ade80', fontSize: 12, fontWeight: 800 }}>{Math.floor(roomCoins).toLocaleString()} RC</span>
+              </div>
+
+              {/* Upgrade list */}
+              {UPGRADES.map((upg) => {
+                const count = upgradesPurchased[upg.id] || 0;
+                const cost = Math.ceil(upg.baseCost * Math.pow(1.5, count));
+                const canAfford = roomCoins >= cost;
+                return (
+                  <div
+                    key={upg.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#161616', borderRadius: 7, border: `1px solid ${canAfford ? '#1a3a1a' : '#111'}`, marginBottom: 6, opacity: canAfford ? 1 : 0.55 }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>
+                        {upg.label}{count > 0 && <span style={{ color: '#22c55e', fontSize: 9, marginLeft: 5 }}>×{count}</span>}
+                      </div>
+                      <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{upg.desc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => buyUpgrade(upg.id)}
+                      disabled={!canAfford}
+                      style={{
+                        background: canAfford ? '#22c55e' : '#1a2e1a',
+                        border: 'none', borderRadius: 5,
+                        color: canAfford ? '#000' : '#374151',
+                        fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                        padding: '5px 9px', cursor: canAfford ? 'pointer' : 'default',
+                        whiteSpace: 'nowrap', flexShrink: 0,
+                      }}
+                    >
+                      {cost.toLocaleString()} RC
+                    </button>
+                  </div>
+                );
+              })}
+
+              <div style={{ marginTop: 10, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
+                Click the glowing cube in the room to earn RC. Build up combos by clicking fast!
+              </div>
             </>
           )}
         </div>
