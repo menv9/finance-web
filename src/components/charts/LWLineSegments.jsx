@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ColorType, LineSeries, createChart } from 'lightweight-charts';
 import { axisLabelsFromPoints, cleanChartData } from './chartData';
+import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -15,9 +16,10 @@ function customPriceFormat(formatter) {
 
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
-    if (!series) return;
+    const seriesApi = series?.series || series;
+    if (!seriesApi) return;
     try {
-      chart.removeSeries(series);
+      chart.removeSeries(seriesApi);
     } catch {
       // React dev remounts can leave a stale series handle behind.
     }
@@ -36,6 +38,8 @@ export default function LWLineSegments({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const formatterRef = useRef(priceFormatter);
+  formatterRef.current = priceFormatter;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -68,7 +72,12 @@ export default function LWLineSegments({
     });
 
     chartRef.current = chart;
+    const cleanupTooltip = subscribeChartTooltip(chart, container, seriesRef, {
+      formatterRef,
+      labels: ['Value'],
+    });
     return () => {
+      cleanupTooltip();
       seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
@@ -99,7 +108,7 @@ export default function LWLineSegments({
         ...customPriceFormat(priceFormatter),
       });
       series.setData(segmentData);
-      seriesRef.current.push(series);
+      seriesRef.current.push({ series, label: segment.label || segment.key || 'Value' });
     });
 
     chart.timeScale().fitContent();

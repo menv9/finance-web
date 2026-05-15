@@ -61,7 +61,7 @@ const SECTIONS = [
     id: 'intellectual-property',
     icon: '○',
     title: 'Intellectual Property',
-    content: `The application, its design, code, and all associated content are protected by copyright and other intellectual property laws. You are granted a limited, non-exclusive, non-transferable licence to use the application for personal, non-commercial purposes. All rights not expressly granted are reserved.`,
+    content: `The application, its design, code, and all associated content are protected by copyright and other intellectual property laws. Some visual components, including financial charts rendered with TradingView Lightweight Charts, are provided by third-party libraries and remain subject to their own licences and notices. You are granted a limited, non-exclusive, non-transferable licence to use the application for personal, non-commercial purposes. All rights not expressly granted are reserved.`,
   },
   {
     id: 'termination',

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { axisLabelsFromPoints, cleanChartData } from './chartData';
+import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -29,9 +30,10 @@ function customPriceFormat(formatter) {
 
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
-    if (!series) return;
+    const seriesApi = series?.series || series;
+    if (!seriesApi) return;
     try {
-      chart.removeSeries(series);
+      chart.removeSeries(seriesApi);
     } catch {
       // React dev remounts can leave a stale series handle behind.
     }
@@ -52,6 +54,8 @@ export default function LWAreaChart({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const formatterRef = useRef(priceFormatter);
+  formatterRef.current = priceFormatter;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -89,7 +93,12 @@ export default function LWAreaChart({
     });
 
     chartRef.current = chart;
+    const cleanupTooltip = subscribeChartTooltip(chart, container, seriesRef, {
+      formatterRef,
+      labels: ['Value', 'Cost basis'],
+    });
     return () => {
+      cleanupTooltip();
       seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
@@ -122,7 +131,7 @@ export default function LWAreaChart({
       ...customPriceFormat(priceFormatter),
     });
     series.setData(mainData);
-    seriesRef.current.push(series);
+    seriesRef.current.push({ series, label: 'Value' });
 
     if (referenceY !== null) {
       series.createPriceLine({
@@ -149,7 +158,7 @@ export default function LWAreaChart({
         ...customPriceFormat(priceFormatter),
       });
       s2.setData(secondaryData);
-      seriesRef.current.push(s2);
+      seriesRef.current.push({ series: s2, label: secondSeries.label || 'Cost basis' });
     }
 
     if (visibleRange?.from && visibleRange?.to) {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ColorType, HistogramSeries, createChart } from 'lightweight-charts';
 import { axisLabelsFromPoints, cleanChartData, formatAxisMonth, normalizeChartTime } from './chartData';
+import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -53,9 +54,10 @@ function nonNegativeAutoscale(baseImplementation) {
 
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
-    if (!series) return;
+    const seriesApi = series?.series || series;
+    if (!seriesApi) return;
     try {
-      chart.removeSeries(series);
+      chart.removeSeries(seriesApi);
     } catch {
       // React dev remounts can leave a stale series handle behind.
     }
@@ -79,7 +81,9 @@ export default function LWGroupedHistogram({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const formatterRef = useRef(priceFormatter);
   const [coordinateLabels, setCoordinateLabels] = useState([]);
+  formatterRef.current = priceFormatter;
   const dateLabels = xLabels?.length
     ? []
     : axisLabelsFromPoints([...(seriesA.data || []), ...(seriesB.data || [])]);
@@ -118,7 +122,12 @@ export default function LWGroupedHistogram({
     });
 
     chartRef.current = chart;
+    const cleanupTooltip = subscribeChartTooltip(chart, container, seriesRef, {
+      formatterRef,
+      labels: ['Series A', 'Series B'],
+    });
     return () => {
+      cleanupTooltip();
       seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
@@ -148,7 +157,7 @@ export default function LWGroupedHistogram({
         autoscaleInfoProvider: nonNegativeAutoscale,
         ...customPriceFormat(priceFormatter),
       });
-      seriesRef.current.push(sA);
+      seriesRef.current.push({ series: sA, label: seriesA.label || 'Series A' });
       sA.setData(dataA.map((d) => {
         const isSelected = !selectedTime || d.time === selectedTime;
         const itemColor = d.color || (selectedTime ? withAlpha(colorA, isSelected ? 1 : dimOpacity) : colorA);
@@ -165,7 +174,7 @@ export default function LWGroupedHistogram({
         autoscaleInfoProvider: nonNegativeAutoscale,
         ...customPriceFormat(priceFormatter),
       });
-      seriesRef.current.push(sB);
+      seriesRef.current.push({ series: sB, label: seriesB.label || 'Series B' });
       sB.setData(dataB.map((d) => {
         const shifted = shiftDate(d.time, offsetDays);
         if (!shifted) return null;

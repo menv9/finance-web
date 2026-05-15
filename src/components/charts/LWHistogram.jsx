@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ColorType, HistogramSeries, createChart } from 'lightweight-charts';
 import { axisLabelsFromPoints, cleanChartData, formatAxisMonth } from './chartData';
+import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -29,9 +30,10 @@ function nonNegativeAutoscale(baseImplementation) {
 
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
-    if (!series) return;
+    const seriesApi = series?.series || series;
+    if (!seriesApi) return;
     try {
-      chart.removeSeries(series);
+      chart.removeSeries(seriesApi);
     } catch {
       // React dev remounts can leave a stale series handle behind.
     }
@@ -47,7 +49,9 @@ export default function LWHistogram({
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const formatterRef = useRef(priceFormatter);
   const [coordinateLabels, setCoordinateLabels] = useState([]);
+  formatterRef.current = priceFormatter;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -83,7 +87,12 @@ export default function LWHistogram({
     });
 
     chartRef.current = chart;
+    const cleanupTooltip = subscribeChartTooltip(chart, container, seriesRef, {
+      formatterRef,
+      labels: ['Amount'],
+    });
     return () => {
+      cleanupTooltip();
       seriesRef.current = [];
       chart.remove();
       chartRef.current = null;
@@ -117,7 +126,7 @@ export default function LWHistogram({
       ...(d.color ? { color: d.color } : {}),
     })));
 
-    seriesRef.current.push(series);
+    seriesRef.current.push({ series, label: 'Amount' });
     chart.timeScale().fitContent();
 
     if (!showAllMonthLabels) {

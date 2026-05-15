@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { BaselineSeries, ColorType, createChart } from 'lightweight-charts';
 import { axisLabelsFromPoints, cleanChartData } from './chartData';
+import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
   if (!color || !color.includes('var(')) return color;
@@ -28,9 +29,10 @@ function customPriceFormat(formatter) {
 
 function removeSeriesSafely(chart, seriesList) {
   seriesList.forEach((series) => {
-    if (!series) return;
+    const seriesApi = series?.series || series;
+    if (!seriesApi) return;
     try {
-      chart.removeSeries(series);
+      chart.removeSeries(seriesApi);
     } catch {
       // React dev remounts can leave a stale series handle behind.
     }
@@ -41,6 +43,8 @@ export default function LWSalesChart({ data = [], priceFormatter = null }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef([]);
+  const formatterRef = useRef(priceFormatter);
+  formatterRef.current = priceFormatter;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -56,7 +60,11 @@ export default function LWSalesChart({ data = [], priceFormatter = null }) {
       crosshair: { vertLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false }, horzLine: { color: 'rgba(128,128,128,0.25)', labelVisible: false } },
     });
     chartRef.current = chart;
-    return () => { seriesRef.current = []; chart.remove(); chartRef.current = null; };
+    const cleanupTooltip = subscribeChartTooltip(chart, container, seriesRef, {
+      formatterRef,
+      labels: ['Realized P&L'],
+    });
+    return () => { cleanupTooltip(); seriesRef.current = []; chart.remove(); chartRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -84,7 +92,7 @@ export default function LWSalesChart({ data = [], priceFormatter = null }) {
       ...customPriceFormat(priceFormatter),
     });
     series.setData(chartData);
-    seriesRef.current.push(series);
+    seriesRef.current.push({ series, label: 'Realized P&L' });
     chart.timeScale().fitContent();
   }, [data, priceFormatter]);
 

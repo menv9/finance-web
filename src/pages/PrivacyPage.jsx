@@ -66,6 +66,10 @@ const SECTIONS = [
         body: 'If you use "Sign in with Google", your authentication is handled via Google OAuth 2.0 through Supabase. We receive only your name, email address, and profile picture URL — the minimum data needed to create your account. We do not receive access to your Google Drive, Gmail, Calendar, Contacts, or any other Google service. Google user data is used solely for authentication and is never shared with third parties, sold, or used for advertising. You can revoke FinGes\'s access at any time from your Google Account permissions page (myaccount.google.com/permissions).',
       },
       {
+        label: 'TradingView charts',
+        body: 'We use TradingView Lightweight Charts to render financial charts in the app. Chart rendering happens in your browser; we do not send your personal financial records to TradingView for chart rendering.',
+      },
+      {
         label: 'Font delivery',
         body: 'We load fonts from Google Fonts. Google may log the request (IP address, browser headers) per their own privacy policy.',
       },
