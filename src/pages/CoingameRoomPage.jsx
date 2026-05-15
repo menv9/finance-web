@@ -1562,10 +1562,14 @@ export default function CoingameRoomPage() {
         raycaster.ray.intersectPlane(floorPlane, intersectPt);
         const hw = ROOM.w / 2 - 1.2;
         const hd = ROOM.d / 2 - 1.2;
-        const nx = Math.max(-hw, Math.min(hw, intersectPt.x));
-        const nz = Math.max(-hd, Math.min(hd, intersectPt.z));
+        let nx = Math.max(-hw, Math.min(hw, intersectPt.x));
+        let nz = Math.max(-hd, Math.min(hd, intersectPt.z));
+        // Snap to floor grid (1.0 units = cell size). Hold Shift for free placement.
+        if (!e.shiftKey) {
+          nx = Math.round(nx);
+          nz = Math.round(nz);
+        }
         if (dragging.isCube) {
-          // y is handled by animate loop; just move x/z
           dragging.group.position.x = nx;
           dragging.group.position.z = nz;
           const dx = nx - dragging.startX;
@@ -1986,7 +1990,7 @@ export default function CoingameRoomPage() {
           {isOwner && (
             <>
               <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: '1px solid #1a2e1a', borderRadius: 6, padding: '5px 12px', color: '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                drag to place · R to rotate · ↑↓ raise/lower · scroll to zoom
+                drag to place (snaps to grid · Shift = free) · R rotate · ↑↓ raise/lower · Del remove
               </div>
               <div style={{ position: 'absolute', bottom: 46, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(6,8,6,0.88)', border: '1px solid #1a2e1a', borderRadius: 20, padding: '5px 10px', pointerEvents: 'all' }}>
                 {AMBIENT_PRESETS.map((hex) => (
