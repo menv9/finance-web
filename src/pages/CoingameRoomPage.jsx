@@ -1142,8 +1142,8 @@ export default function CoingameRoomPage() {
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
-    let theta = 0.12; let phi = 0.40;
-    let tTheta = 0.12; let tPhi = 0.40;
+    let theta = Math.PI; let phi = 0.40;
+    let tTheta = Math.PI; let tPhi = 0.40;
     let tRad = 8; let autoRot = false;
 
     // ── Drag-to-place state ────────────────────────────────────────────────────
@@ -1409,13 +1409,6 @@ export default function CoingameRoomPage() {
       if (playerMixer) playerMixer.update(dt);
 
       if (autoRot) tTheta += 0.0018;
-      // Auto-orient camera behind player unless user is mouse-dragging
-      if (!isDrag) {
-        let target = player.rotation.y + Math.PI;
-        while (target - tTheta > Math.PI) target -= Math.PI * 2;
-        while (target - tTheta < -Math.PI) target += Math.PI * 2;
-        tTheta = target;
-      }
       theta += (tTheta - theta) * 0.06;
       phi += (tPhi - phi) * 0.06;
 
@@ -1464,7 +1457,11 @@ export default function CoingameRoomPage() {
         } else if (!blockedAt(player.position.x, nz)) {
           player.position.z = nz;
         }
-        player.rotation.y = Math.atan2(wx, wz);
+        const targetYaw = Math.atan2(wx, wz);
+        let dYaw = targetYaw - player.rotation.y;
+        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+        player.rotation.y += dYaw * Math.min(1, dt * 12);
         autoRot = false;
       }
       if (playerMixer?.userData) {
@@ -1745,8 +1742,8 @@ export default function CoingameRoomPage() {
 
           {isOwner && (
             <>
-              {/* Build mode toggle (top-right of canvas) */}
-              <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, pointerEvents: 'all' }}>
+              {/* Build mode toggle (right side, below RC stats card) */}
+              <div style={{ position: 'absolute', top: 116, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, pointerEvents: 'all', zIndex: 2 }}>
                 <button
                   type="button"
                   onClick={() => setBuildMode((b) => !b)}
