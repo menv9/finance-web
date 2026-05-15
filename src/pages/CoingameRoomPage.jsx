@@ -998,7 +998,7 @@ export default function CoingameRoomPage() {
         const box = new THREE.Box3().setFromObject(g);
         const size = new THREE.Vector3(); box.getSize(size);
         const center = new THREE.Vector3(); box.getCenter(center);
-        const targetH = 1.6;
+        const targetH = 2.8;
         const s = targetH / Math.max(0.001, size.y);
         g.scale.setScalar(s);
         g.position.x = -center.x * s;
@@ -1121,7 +1121,7 @@ export default function CoingameRoomPage() {
     scene.add(wallGroup);
     // Preview wall during drag
     const previewWall = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 2.7, 0.16),
+      new THREE.BoxGeometry(1, ROOM.h, 0.16),
       new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.4, transparent: true, opacity: 0.55 }),
     );
     previewWall.visible = false;
@@ -1230,7 +1230,7 @@ export default function CoingameRoomPage() {
       if (len < 0.2) { previewWall.visible = false; return; }
       previewWall.visible = true;
       previewWall.scale.set(len, 1, 1);
-      previewWall.position.set((x1 + x2) / 2, 1.35, (z1 + z2) / 2);
+      previewWall.position.set((x1 + x2) / 2, ROOM.h / 2, (z1 + z2) / 2);
       previewWall.rotation.y = -Math.atan2(dz, dx);
     }
 
@@ -1426,8 +1426,35 @@ export default function CoingameRoomPage() {
         const wz = mx * sinT + mz * cosT;
         const hw = ROOM.w / 2 - 0.8;
         const hd = ROOM.d / 2 - 0.8;
-        player.position.x = Math.max(-hw, Math.min(hw, player.position.x + wx * moveSpeed));
-        player.position.z = Math.max(-hd, Math.min(hd, player.position.z + wz * moveSpeed));
+
+        // Build collider list this frame
+        const colliders = [];
+        wallGroup.children.forEach((c) => { if (c.userData.wallId) colliders.push(new THREE.Box3().setFromObject(c)); });
+        Object.entries(staticMap).forEach(([id, g]) => {
+          if (id === 'fc_cube') return;
+          if (g && g.isObject3D) colliders.push(new THREE.Box3().setFromObject(g));
+        });
+        Object.values(furnitureMap).forEach((f) => { if (f?.group?.isObject3D) colliders.push(new THREE.Box3().setFromObject(f.group)); });
+
+        const pr = 0.45;
+        const testBox = new THREE.Box3();
+        const blockedAt = (x, z) => {
+          testBox.min.set(x - pr, 0.15, z - pr);
+          testBox.max.set(x + pr, 1.4, z + pr);
+          for (const b of colliders) if (b.intersectsBox(testBox)) return true;
+          return false;
+        };
+
+        let nx = Math.max(-hw, Math.min(hw, player.position.x + wx * moveSpeed));
+        let nz = Math.max(-hd, Math.min(hd, player.position.z + wz * moveSpeed));
+        if (!blockedAt(nx, nz)) {
+          player.position.x = nx;
+          player.position.z = nz;
+        } else if (!blockedAt(nx, player.position.z)) {
+          player.position.x = nx;
+        } else if (!blockedAt(player.position.x, nz)) {
+          player.position.z = nz;
+        }
         player.rotation.y = Math.atan2(wx, wz);
         autoRot = false;
       }
@@ -1591,8 +1618,8 @@ export default function CoingameRoomPage() {
       const angle = -Math.atan2(dz, dx);
       const cx = (w.x1 + w.x2) / 2;
       const cz = (w.z1 + w.z2) / 2;
-      const main = new THREE.Mesh(new THREE.BoxGeometry(len, 2.7, 0.16), wallMat);
-      main.position.set(cx, 1.35, cz);
+      const main = new THREE.Mesh(new THREE.BoxGeometry(len, ROOM.h, 0.16), wallMat);
+      main.position.set(cx, ROOM.h / 2, cz);
       main.rotation.y = angle;
       main.userData.wallId = w.id;
       wallGroup.add(main);
@@ -1602,7 +1629,7 @@ export default function CoingameRoomPage() {
       base.userData.wallId = w.id;
       wallGroup.add(base);
       const cap = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.04, 0.22), capMat);
-      cap.position.set(cx, 2.88, cz);
+      cap.position.set(cx, ROOM.h - 0.02, cz);
       cap.rotation.y = angle;
       cap.userData.wallId = w.id;
       wallGroup.add(cap);
