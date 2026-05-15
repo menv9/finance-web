@@ -1007,9 +1007,14 @@ export default function CoingameRoomPage() {
         g.traverse((c) => { if (c.isMesh) c.castShadow = true; });
         player.add(g);
         if (g.animations && g.animations.length > 0) {
+          console.log('[Alien] animation clips:', g.animations.map((a) => a.name));
           playerMixer = new THREE.AnimationMixer(g);
           playerActions = g.animations.map((clip) => playerMixer.clipAction(clip));
-          playerActions[0]?.play();
+          const pickByHint = (hints) => playerActions.find((a) => hints.some((h) => a.getClip().name.toLowerCase().includes(h)));
+          const idle = pickByHint(['idle', 'stand', 'breath']) || playerActions[0];
+          const walk = pickByHint(['walk', 'run', 'move']) || playerActions[1] || playerActions[0];
+          playerActions.forEach((a) => { a.enabled = true; a.setEffectiveWeight(a === idle ? 1 : 0); a.play(); });
+          playerMixer.userData = { idle, walk };
         }
       });
       fbx.load('/models/player/fbx/Alien_Helmet.fbx', (h) => {
@@ -1424,7 +1429,8 @@ export default function CoingameRoomPage() {
       if (keyState.s) mz += 1;
       if (keyState.a) mx -= 1;
       if (keyState.d) mx += 1;
-      if (mx || mz) {
+      const moving = !!(mx || mz);
+      if (moving) {
         const len = Math.sqrt(mx * mx + mz * mz);
         mx /= len; mz /= len;
         const cosT = Math.cos(theta), sinT = Math.sin(theta);
@@ -1436,6 +1442,16 @@ export default function CoingameRoomPage() {
         player.position.z = Math.max(-hd, Math.min(hd, player.position.z + wz * moveSpeed));
         player.rotation.y = Math.atan2(wx, wz);
         autoRot = false;
+      }
+      if (playerMixer?.userData) {
+        const { idle, walk } = playerMixer.userData;
+        if (idle && walk && idle !== walk) {
+          const target = moving ? 1 : 0;
+          const cur = walk.getEffectiveWeight();
+          const next = cur + (target - cur) * Math.min(1, dt * 8);
+          walk.setEffectiveWeight(next);
+          idle.setEffectiveWeight(1 - next);
+        }
       }
 
       const px2 = player.position.x;
