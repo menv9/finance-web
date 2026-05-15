@@ -283,7 +283,7 @@ export default function CoingameRoomPage() {
   const [rewards, setRewards] = useState([]);
   const [tooltip, setTooltip] = useState(null);
   const [ambientColor, setAmbientColor] = useState(() => localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e');
-  const [bucketToast, setBucketToast] = useState(null); // null | 'ok' | 'cooldown'
+  const [bucketToast, setBucketToast] = useState(null);
   const bucketCallbackRef = useRef(null);
 
   const [roomCoins, setRoomCoins] = useState(() => parseFloat(localStorage.getItem(`cg-rc-${coinId}`) || '0'));
@@ -1056,8 +1056,6 @@ export default function CoingameRoomPage() {
   useEffect(() => {
     bucketCallbackRef.current = async () => {
       clickerCallbackRef.current?.();
-      setBucketToast('ok');
-      setTimeout(() => setBucketToast(null), 700);
       // Optimistic update so the balance shows immediately
       useFinanceStore.setState((s) => ({
         coingameWallet: s.coingameWallet
@@ -1189,11 +1187,6 @@ export default function CoingameRoomPage() {
           {!isOwner && (
             <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#1e3a1e', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
               drag to orbit · scroll to zoom
-            </div>
-          )}
-          {bucketToast && (
-            <div style={{ position: 'absolute', top: '52%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(6,20,6,0.9)', border: '1px solid #22c55e', borderRadius: 8, padding: '8px 18px', pointerEvents: 'none' }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', letterSpacing: '0.02em' }}>+1 FC</div>
             </div>
           )}
 
