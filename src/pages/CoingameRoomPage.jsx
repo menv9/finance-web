@@ -1192,7 +1192,7 @@ export default function CoingameRoomPage() {
             </div>
           )}
           {bucketToast && (
-            <div style={{ position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,20,6,0.9)', border: '1px solid #22c55e', borderRadius: 8, padding: '8px 18px', pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', top: '52%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(6,20,6,0.9)', border: '1px solid #22c55e', borderRadius: 8, padding: '8px 18px', pointerEvents: 'none' }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', letterSpacing: '0.02em' }}>+1 FC</div>
             </div>
           )}
