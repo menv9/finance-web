@@ -925,8 +925,9 @@ export default function CoingameRoomPage() {
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Floor grid
-    scene.add(new THREE.GridHelper(ROOM.w, ROOM.w, 0x0d2b0d, 0x0a1a0a));
+    // Floor grid (toggle with H)
+    const gridHelper = new THREE.GridHelper(ROOM.w, ROOM.w, 0x0d2b0d, 0x0a1a0a);
+    scene.add(gridHelper);
 
     // Baseboard trim on walls
     const baseMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
@@ -1333,7 +1334,7 @@ export default function CoingameRoomPage() {
       isDrag = false;
     }
 
-    const onWheel = (e) => { tRad = Math.max(3, Math.min(18, tRad + e.deltaY * 0.013)); e.preventDefault(); };
+    const onWheel = (e) => { tRad = Math.max(3, Math.min(40, tRad + e.deltaY * 0.018)); e.preventDefault(); };
 
     wrap.addEventListener('mousedown', onMDown);
     window.addEventListener('mousemove', onMMove);
@@ -1363,6 +1364,7 @@ export default function CoingameRoomPage() {
     const onKeyDown = (e) => {
       const lk = e.key.toLowerCase();
       if (lk in keyState) { keyState[lk] = true; }
+      if (lk === 'h') { gridHelper.visible = !gridHelper.visible; }
       if ((e.key === 'r' || e.key === 'R') && dragging) {
         dragging.group.rotation.y += Math.PI / 4;
       }
@@ -1407,6 +1409,13 @@ export default function CoingameRoomPage() {
       if (playerMixer) playerMixer.update(dt);
 
       if (autoRot) tTheta += 0.0018;
+      // Auto-orient camera behind player unless user is mouse-dragging
+      if (!isDrag) {
+        let target = player.rotation.y + Math.PI;
+        while (target - tTheta > Math.PI) target -= Math.PI * 2;
+        while (target - tTheta < -Math.PI) target += Math.PI * 2;
+        tTheta = target;
+      }
       theta += (tTheta - theta) * 0.06;
       phi += (tPhi - phi) * 0.06;
 
