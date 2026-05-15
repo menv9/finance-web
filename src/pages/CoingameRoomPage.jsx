@@ -540,8 +540,8 @@ function buildNeonSign() {
   g.add(mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.04, 16), brushed, 0, 0.06, 0));
 
   // Lights
-  g.add(Object.assign(new THREE.PointLight(0xec4899, 1.6, 4), { position: new THREE.Vector3(-0.3, 1.2, 0.4) }));
-  g.add(Object.assign(new THREE.PointLight(0x22d3ee, 1.6, 4), { position: new THREE.Vector3(0.3, 1.2, 0.4) }));
+  const pinkPL = new THREE.PointLight(0xec4899, 1.6, 4); pinkPL.position.set(-0.3, 1.2, 0.4); g.add(pinkPL);
+  const cyanPL = new THREE.PointLight(0x22d3ee, 1.6, 4); cyanPL.position.set(0.3, 1.2, 0.4); g.add(cyanPL);
 
   g.userData.emissiveMats = [pinkNeon, cyanNeon];
   return g;
