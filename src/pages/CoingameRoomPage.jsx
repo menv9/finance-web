@@ -843,13 +843,71 @@ function buildLavaLamp() {
   return g;
 }
 
+// ── Wall partition builders (sub-room dividers) ─────────────────────────────
+
+function buildWallMaterials() {
+  return {
+    wall: new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85, metalness: 0.05 }),
+    base: new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.45, metalness: 0.4 }),
+    cap: new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.5, metalness: 0.3 }),
+  };
+}
+
+function buildWallStraight() {
+  const g = new THREE.Group();
+  const m = buildWallMaterials();
+  // 4u long, 3u tall, 0.18 thick
+  g.add(mesh(new THREE.BoxGeometry(4, 2.7, 0.18), m.wall, 0, 1.5, 0));
+  g.add(mesh(new THREE.BoxGeometry(4.1, 0.16, 0.22), m.base, 0, 0.08, 0));
+  g.add(mesh(new THREE.BoxGeometry(4.1, 0.04, 0.22), m.cap, 0, 2.88, 0));
+  return g;
+}
+
+function buildWallCorner() {
+  const g = new THREE.Group();
+  const m = buildWallMaterials();
+  // L-shape: 3u arm along +x, 3u arm along +z
+  g.add(mesh(new THREE.BoxGeometry(3, 2.7, 0.18), m.wall, 1.5, 1.5, 0));
+  g.add(mesh(new THREE.BoxGeometry(3.1, 0.16, 0.22), m.base, 1.5, 0.08, 0));
+  g.add(mesh(new THREE.BoxGeometry(3.1, 0.04, 0.22), m.cap, 1.5, 2.88, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.18, 2.7, 3), m.wall, 0, 1.5, 1.5));
+  g.add(mesh(new THREE.BoxGeometry(0.22, 0.16, 3.1), m.base, 0, 0.08, 1.5));
+  g.add(mesh(new THREE.BoxGeometry(0.22, 0.04, 3.1), m.cap, 0, 2.88, 1.5));
+  return g;
+}
+
+function buildWallDoorway() {
+  const g = new THREE.Group();
+  const m = buildWallMaterials();
+  // Two side panels + lintel; 4u total, doorway is 1.4u wide
+  g.add(mesh(new THREE.BoxGeometry(1.3, 2.7, 0.18), m.wall, -1.35, 1.5, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.3, 2.7, 0.18), m.wall,  1.35, 1.5, 0));
+  g.add(mesh(new THREE.BoxGeometry(4, 0.6, 0.18), m.wall, 0, 2.55, 0));
+  // Side bases only (clear the doorway)
+  g.add(mesh(new THREE.BoxGeometry(1.3, 0.16, 0.22), m.base, -1.35, 0.08, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.3, 0.16, 0.22), m.base,  1.35, 0.08, 0));
+  g.add(mesh(new THREE.BoxGeometry(4.1, 0.04, 0.22), m.cap, 0, 2.88, 0));
+  return g;
+}
+
 const SHOP_FURNITURE = [
-  { id: 'plant',     label: 'Potted Plant',    desc: 'Cozy green vibes',           cost: 800,    builder: buildPlant,     scale: 1.6, icon: 'Leaf' },
-  { id: 'neon_sign', label: 'Neon Sign',       desc: 'Glowing $COIN signage',      cost: 2500,   builder: buildNeonSign,  scale: 1.4, icon: 'Zap' },
-  { id: 'lava',      label: 'Lava Lamp',       desc: 'Hypnotic blob action',       cost: 8000,   builder: buildLavaLamp,  scale: 1.7, icon: 'Flame' },
-  { id: 'arcade',    label: 'Arcade Cabinet',  desc: 'Pixel paradise',             cost: 25000,  builder: buildArcade,    scale: 1.7, icon: 'Gamepad2' },
-  { id: 'chest',     label: 'Treasure Chest',  desc: 'Overflowing with gold',      cost: 80000,  builder: buildChest,     scale: 1.5, icon: 'Box' },
-  { id: 'disco',     label: 'Disco Ball',      desc: 'Bring the party',            cost: 250000, builder: buildDiscoBall, scale: 1.6, icon: 'Sparkles' },
+  { id: 'plant',     label: 'Potted Plant',    desc: 'Cozy green vibes',           cost: 800,    builder: buildPlant,         scale: 1.6, icon: 'Leaf' },
+  { id: 'wall_straight', label: 'Wall (Straight)', desc: 'Sub-room divider, 4u long',  cost: 1500,   builder: buildWallStraight,  scale: 1.0, icon: 'Minus' },
+  { id: 'wall_corner',   label: 'Wall (Corner)',   desc: 'L-shape partition',          cost: 2400,   builder: buildWallCorner,    scale: 1.0, icon: 'CornerDownRight' },
+  { id: 'wall_doorway',  label: 'Wall (Doorway)',  desc: 'Wall with arched opening',   cost: 3200,   builder: buildWallDoorway,   scale: 1.0, icon: 'DoorOpen' },
+  { id: 'neon_sign', label: 'Neon Sign',       desc: 'Glowing $COIN signage',      cost: 2500,   builder: buildNeonSign,      scale: 1.4, icon: 'Zap' },
+  { id: 'lava',      label: 'Lava Lamp',       desc: 'Hypnotic blob action',       cost: 8000,   builder: buildLavaLamp,      scale: 1.7, icon: 'Flame' },
+  { id: 'arcade',    label: 'Arcade Cabinet',  desc: 'Pixel paradise',             cost: 25000,  builder: buildArcade,        scale: 1.7, icon: 'Gamepad2' },
+  { id: 'chest',     label: 'Treasure Chest',  desc: 'Overflowing with gold',      cost: 80000,  builder: buildChest,         scale: 1.5, icon: 'Box' },
+  { id: 'disco',     label: 'Disco Ball',      desc: 'Bring the party',            cost: 250000, builder: buildDiscoBall,     scale: 1.6, icon: 'Sparkles' },
+];
+
+const ROOM_TIERS = [
+  { size: 22, cost: 0,       label: 'Starter Den' },
+  { size: 30, cost: 75000,   label: 'Loft' },
+  { size: 40, cost: 400000,  label: 'Penthouse' },
+  { size: 50, cost: 2000000, label: 'Mansion' },
+  { size: 64, cost: 10000000,label: 'Skyhall' },
 ];
 
 const UPGRADES = [
@@ -889,6 +947,7 @@ export default function CoingameRoomPage() {
   const [upgradesPurchased, setUpgradesPurchased] = useState(() => JSON.parse(localStorage.getItem(`cg-ru-${coinId}`) || '{}'));
   const [shopOwned, setShopOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}'));
   const [homeOwned, setHomeOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'));
+  const [roomSize, setRoomSize] = useState(() => parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10));
   const [homeCategory, setHomeCategory] = useState('All');
   const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
@@ -1007,6 +1066,17 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-rt-${coinId}`, String(totalClicks)); }, [totalClicks, coinId]);
   useEffect(() => { localStorage.setItem(`cg-shop-${coinId}`, JSON.stringify(shopOwned)); }, [shopOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
+  useEffect(() => { localStorage.setItem(`cg-room-size-${coinId}`, String(roomSize)); }, [roomSize, coinId]);
+
+  function buyRoomExpansion(targetSize) {
+    if (!isOwner) return;
+    const tier = ROOM_TIERS.find((t) => t.size === targetSize);
+    if (!tier) return;
+    if (roomSize >= targetSize) return;
+    if (roomCoins < tier.cost) return;
+    setRoomCoins((c) => c - tier.cost);
+    setRoomSize(targetSize);
+  }
 
   // Sync home-pack owned items into scene as static (async OBJ load, draggable)
   useEffect(() => {
@@ -1165,6 +1235,9 @@ export default function CoingameRoomPage() {
 
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
+    // Drive room dimensions from state so expansion rebuilds the scene at new size.
+    ROOM.w = roomSize;
+    ROOM.d = roomSize;
     const wrap = wrapRef.current;
     const cvs = canvasRef.current;
     if (!wrap || !cvs) return;
@@ -1803,9 +1876,10 @@ export default function CoingameRoomPage() {
       wrap.removeEventListener('touchmove', onTMove);
       window.removeEventListener('keydown', onKeyDown);
       renderer.dispose();
+      sceneRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [roomSize]);
 
   // ── Sync furniture into scene when rewards load ───────────────────────────
   useEffect(() => {
@@ -1873,7 +1947,7 @@ export default function CoingameRoomPage() {
       scene.add(group);
       furnitureMap[item.id] = { group, isStaged };
     });
-  }, [rewards]);
+  }, [rewards, roomSize]);
 
   // Keep isOwner live in the scene (ownCoin may load after the scene effect)
   useEffect(() => {
@@ -2127,6 +2201,51 @@ export default function CoingameRoomPage() {
                   <span style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{value}</span>
                 </div>
               ))}
+
+              {/* Room expansion */}
+              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 16, marginBottom: 10 }}>Room Tier</div>
+              {ROOM_TIERS.map((tier) => {
+                const isCurrent = roomSize === tier.size;
+                const isUnlocked = roomSize >= tier.size;
+                const canAfford = roomCoins >= tier.cost;
+                const canBuy = isOwner && !isUnlocked && canAfford;
+                return (
+                  <div
+                    key={tier.size}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: isCurrent ? '#0d1a0d' : '#161616', borderRadius: 7, border: `1px solid ${isCurrent ? '#22c55e' : isUnlocked ? '#1a3a1a' : (canAfford ? '#1a3a1a' : '#111')}`, marginBottom: 6, opacity: isUnlocked || canAfford ? 1 : 0.55 }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: isCurrent ? '#22c55e' : '#e2e8f0', fontSize: 11, fontWeight: 700 }}>
+                        {tier.label}
+                        {isCurrent && <span style={{ color: '#4ade80', fontSize: 9, marginLeft: 6, fontWeight: 800 }}>CURRENT</span>}
+                      </div>
+                      <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{tier.size} × {tier.size} units</div>
+                    </div>
+                    {isUnlocked ? (
+                      <LucideIcons.Check size={14} color="#22c55e" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => buyRoomExpansion(tier.size)}
+                        disabled={!canBuy}
+                        style={{
+                          background: canBuy ? '#22c55e' : '#1a2e1a',
+                          color: canBuy ? '#000' : '#374151',
+                          border: 'none', borderRadius: 5, fontSize: 9, fontWeight: 800,
+                          fontFamily: 'inherit', padding: '5px 9px',
+                          cursor: canBuy ? 'pointer' : 'default',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        {tier.cost.toLocaleString()} RC
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 6, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
+                Bigger rooms = more space for furniture and sub-room walls. Existing items stay in place.
+              </div>
             </>
           )}
 
