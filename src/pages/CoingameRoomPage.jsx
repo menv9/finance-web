@@ -948,6 +948,8 @@ export default function CoingameRoomPage() {
   const [shopOwned, setShopOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}'));
   const [homeOwned, setHomeOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'));
   const [roomSize, setRoomSize] = useState(() => parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10));
+  const [buildMode, setBuildMode] = useState(false);
+  const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
   const [homeCategory, setHomeCategory] = useState('All');
   const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
@@ -1067,6 +1069,14 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-shop-${coinId}`, JSON.stringify(shopOwned)); }, [shopOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-room-size-${coinId}`, String(roomSize)); }, [roomSize, coinId]);
+  useEffect(() => { localStorage.setItem(`cg-walls-${coinId}`, JSON.stringify(walls)); }, [walls, coinId]);
+
+  function addWall(w) { setWalls((prev) => [...prev, w]); }
+  function deleteWall(id) { setWalls((prev) => prev.filter((w) => w.id !== id)); }
+  function clearAllWalls() {
+    if (!isOwner) return;
+    setWalls([]);
+  }
 
   function buyRoomExpansion(targetSize) {
     if (!isOwner) return;
@@ -1552,12 +1562,25 @@ export default function CoingameRoomPage() {
     nameSprite.position.set(0, 1.55, 0);
     cg.add(nameSprite);
 
+    // ── Drawable wall group (Sims build mode) ────────────────────────────────
+    const wallGroup = new THREE.Group();
+    scene.add(wallGroup);
+    // Preview wall during drag
+    const previewWall = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 2.7, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.4, transparent: true, opacity: 0.55 }),
+    );
+    previewWall.visible = false;
+    scene.add(previewWall);
+
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
     const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup, fc_cube: bucket, ...initialShopGroups };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket,
+      wallGroup, previewWall,
+      buildMode: false,
       hypePumping: false,
       evolveCube: (stage) => { bucket.userData.setStage?.(stage); },
     };
@@ -1589,11 +1612,32 @@ export default function CoingameRoomPage() {
       return null;
     }
 
+    let wallDraw = null; // { x1, z1 } while drawing a wall
+
     function onMDown(e) {
       const rect = wrap.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
+
+      // ── Build mode: draw/delete walls ───────────────────────────────────────
+      if (sceneRef.current?.buildMode && sceneRef.current?.isOwner) {
+        // First: does the click hit an existing wall? If so, delete it.
+        const wallHits = raycaster.intersectObjects(wallGroup.children, false);
+        if (wallHits.length > 0) {
+          const wallId = wallHits[0].object.userData.wallId;
+          if (wallId) sceneRef.current.deleteWall?.(wallId);
+          return;
+        }
+        // Otherwise start drawing from this grid corner
+        raycaster.ray.intersectPlane(floorPlane, intersectPt);
+        const sx = Math.round(intersectPt.x);
+        const sz = Math.round(intersectPt.z);
+        wallDraw = { x1: sx, z1: sz, x2: sx, z2: sz };
+        previewWall.visible = false;
+        autoRot = false;
+        return;
+      }
 
       // Cube click (anyone can click, owner can also drag)
       if (raycaster.intersectObject(bucket, true).length > 0) {
@@ -1626,7 +1670,28 @@ export default function CoingameRoomPage() {
       isDrag = true; autoRot = false; px = e.clientX; py = e.clientY;
     }
 
+    function updatePreviewWall(x1, z1, x2, z2) {
+      const dx = x2 - x1; const dz = z2 - z1;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 0.2) { previewWall.visible = false; return; }
+      previewWall.visible = true;
+      previewWall.scale.set(len, 1, 1);
+      previewWall.position.set((x1 + x2) / 2, 1.35, (z1 + z2) / 2);
+      previewWall.rotation.y = -Math.atan2(dz, dx);
+    }
+
     function onMMove(e) {
+      if (wallDraw) {
+        const rect = wrap.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        raycaster.ray.intersectPlane(floorPlane, intersectPt);
+        wallDraw.x2 = Math.round(intersectPt.x);
+        wallDraw.z2 = Math.round(intersectPt.z);
+        updatePreviewWall(wallDraw.x1, wallDraw.z1, wallDraw.x2, wallDraw.z2);
+        return;
+      }
       if (dragging) {
         const rect = wrap.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
@@ -1663,6 +1728,17 @@ export default function CoingameRoomPage() {
     }
 
     function onMUp() {
+      if (wallDraw) {
+        const { x1, z1, x2, z2 } = wallDraw;
+        const dx = x2 - x1; const dz = z2 - z1;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        previewWall.visible = false;
+        if (len >= 0.5 && sceneRef.current?.addWall) {
+          sceneRef.current.addWall({ id: `w_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, x1, z1, x2, z2 });
+        }
+        wallDraw = null;
+        return;
+      }
       if (dragging) {
         const { id, group, isStatic, isCube } = dragging;
         const x = parseFloat(group.position.x.toFixed(3));
@@ -1954,12 +2030,55 @@ export default function CoingameRoomPage() {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
 
-  // Expose remove fns to the scene so keydown can refund + clear
+  // Expose remove fns + build mode + wall ops to the scene
   useEffect(() => {
     if (!sceneRef.current) return;
     sceneRef.current.removeShopItem = removeShopItem;
     sceneRef.current.removeHomeItem = removeHomeItem;
+    sceneRef.current.addWall = addWall;
+    sceneRef.current.deleteWall = deleteWall;
+    sceneRef.current.buildMode = buildMode;
   });
+
+  // Rebuild wall meshes whenever the walls array (or room) changes
+  useEffect(() => {
+    const ref = sceneRef.current;
+    if (!ref?.wallGroup) return;
+    const { wallGroup } = ref;
+    while (wallGroup.children.length) {
+      const c = wallGroup.children[0];
+      wallGroup.remove(c);
+      c.geometry?.dispose();
+      if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => m.dispose());
+    }
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85, metalness: 0.05 });
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.45, metalness: 0.4 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.5, metalness: 0.3 });
+    walls.forEach((w) => {
+      const dx = w.x2 - w.x1;
+      const dz = w.z2 - w.z1;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 0.1) return;
+      const angle = -Math.atan2(dz, dx);
+      const cx = (w.x1 + w.x2) / 2;
+      const cz = (w.z1 + w.z2) / 2;
+      const main = new THREE.Mesh(new THREE.BoxGeometry(len, 2.7, 0.16), wallMat);
+      main.position.set(cx, 1.35, cz);
+      main.rotation.y = angle;
+      main.userData.wallId = w.id;
+      wallGroup.add(main);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.16, 0.22), baseMat);
+      base.position.set(cx, 0.08, cz);
+      base.rotation.y = angle;
+      base.userData.wallId = w.id;
+      wallGroup.add(base);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.04, 0.22), capMat);
+      cap.position.set(cx, 2.88, cz);
+      cap.rotation.y = angle;
+      cap.userData.wallId = w.id;
+      wallGroup.add(cap);
+    });
+  }, [walls, roomSize]);
 
   // Bucket click → RC clicker (no server call; FC claim was repurposed)
   useEffect(() => {
@@ -2063,8 +2182,42 @@ export default function CoingameRoomPage() {
 
           {isOwner && (
             <>
-              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: '1px solid #1a2e1a', borderRadius: 6, padding: '5px 12px', color: '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                drag to place (snaps to grid · Shift = free) · R rotate · ↑↓ raise/lower · Del remove
+              {/* Build mode toggle (top-left of canvas) */}
+              <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'all' }}>
+                <button
+                  type="button"
+                  onClick={() => setBuildMode((b) => !b)}
+                  style={{
+                    background: buildMode ? '#22c55e' : 'rgba(6,8,6,0.88)',
+                    color: buildMode ? '#000' : '#4ade80',
+                    border: `1px solid ${buildMode ? '#22c55e' : '#1a2e1a'}`,
+                    borderRadius: 8, padding: '8px 12px', fontSize: 11, fontFamily: 'inherit',
+                    fontWeight: 800, cursor: 'pointer', letterSpacing: '0.06em',
+                    display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase',
+                  }}
+                >
+                  <LucideIcons.Hammer size={13} /> {buildMode ? 'Building' : 'Build mode'}
+                </button>
+                {buildMode && walls.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { if (confirm(`Clear all ${walls.length} walls?`)) clearAllWalls(); }}
+                    style={{
+                      background: 'rgba(26,13,13,0.88)', color: '#ef4444',
+                      border: '1px solid #3a1a1a', borderRadius: 8, padding: '5px 10px',
+                      fontSize: 9, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                      letterSpacing: '0.06em', textTransform: 'uppercase',
+                    }}
+                  >
+                    Clear walls ({walls.length})
+                  </button>
+                )}
+              </div>
+
+              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.82)', border: `1px solid ${buildMode ? '#22c55e' : '#1a2e1a'}`, borderRadius: 6, padding: '5px 12px', color: buildMode ? '#22c55e' : '#4b5563', fontSize: 9, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                {buildMode
+                  ? 'drag from corner to corner to draw a wall · click a wall to delete it'
+                  : 'drag to place (snaps to grid · Shift = free) · R rotate · ↑↓ raise/lower · Del remove'}
               </div>
               <div style={{ position: 'absolute', bottom: 46, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(6,8,6,0.88)', border: '1px solid #1a2e1a', borderRadius: 20, padding: '5px 10px', pointerEvents: 'all' }}>
                 {AMBIENT_PRESETS.map((hex) => (
