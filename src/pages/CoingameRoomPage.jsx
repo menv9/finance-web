@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import * as THREE from 'three';
 import * as LucideIcons from 'lucide-react';
-import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition, claimRoomFc } from '../utils/coingameApi';
+import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 
 const ROOM = { w: 22, d: 22, h: 9 };
@@ -1757,17 +1757,10 @@ export default function CoingameRoomPage() {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
 
-  // Bucket claim callback — always up to date in the ref
+  // Bucket click → RC clicker (no server call; FC claim was repurposed)
   useEffect(() => {
-    bucketCallbackRef.current = async () => {
+    bucketCallbackRef.current = () => {
       clickerCallbackRef.current?.();
-      // Optimistic update so the balance shows immediately
-      useFinanceStore.setState((s) => ({
-        coingameWallet: s.coingameWallet
-          ? { ...s.coingameWallet, fc_balance: (s.coingameWallet.fc_balance ?? 0) + 1 }
-          : s.coingameWallet,
-      }));
-      try { await claimRoomFc(coinId); } catch {}
     };
   }, [coinId]);
 
