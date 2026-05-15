@@ -2461,3 +2461,7 @@ button.cg-back-link {
   70%  { transform: scale(0.96); }
   100% { opacity: 1; transform: scale(1); }
 }
+@keyframes rc-crit {
+  0%   { opacity: 0.8; }
+  100% { opacity: 0; }
+}

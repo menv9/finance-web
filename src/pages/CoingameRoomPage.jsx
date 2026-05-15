@@ -168,7 +168,7 @@ function buildCandleChart() {
   return g;
 }
 
-function buildFCCube() {
+function buildCubeStage0() {
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.08, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.5 });
   const edgeMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 3.0, roughness: 0.1, metalness: 0.5 });
@@ -178,13 +178,72 @@ function buildFCCube() {
     g.add(mesh(new THREE.BoxGeometry(0.04, 0.72, 0.04), edgeMat, a*0.35, 0, b*0.35));
     g.add(mesh(new THREE.BoxGeometry(0.04, 0.04, 0.72), edgeMat, a*0.35, b*0.35, 0));
   });
-  const pl = new THREE.PointLight(0x22c55e, 3, 5);
-  g.add(pl);
-  g.userData.emissiveMats = [mat, edgeMat];
-  g.userData.isBucket = true;
-  g.userData.furnitureId = 'fc_cube';
-  g.traverse((c) => { c.userData.furnitureId = 'fc_cube'; });
+  g.add(new THREE.PointLight(0x22c55e, 3, 5));
   return g;
+}
+
+function buildCubeStage1() {
+  const g = new THREE.Group();
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x06b6d4, emissiveIntensity: 1.4, roughness: 0, metalness: 0.4 });
+  const cageMat = new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x22d3ee, emissiveIntensity: 1.0, roughness: 0.1, metalness: 1 });
+  g.add(mesh(new THREE.OctahedronGeometry(0.42), coreMat));
+  const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.02, 8, 48), cageMat);
+  r1.rotation.x = Math.PI / 2;
+  const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.02, 8, 48), cageMat);
+  r2.rotation.z = Math.PI / 3;
+  g.add(r1); g.add(r2);
+  g.add(new THREE.PointLight(0x22d3ee, 5, 7));
+  g.userData.spinRings = [r1, r2];
+  return g;
+}
+
+function buildCubeStage2() {
+  const g = new THREE.Group();
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, emissive: 0x6366f1, emissiveIntensity: 1.6, roughness: 0, metalness: 0.3 });
+  const r1Mat = new THREE.MeshStandardMaterial({ color: 0xc4b5fd, emissive: 0xa78bfa, emissiveIntensity: 1.1, roughness: 0.1, metalness: 0.9 });
+  const r2Mat = new THREE.MeshStandardMaterial({ color: 0xf0abfc, emissive: 0xe879f9, emissiveIntensity: 0.9, roughness: 0.1, metalness: 1 });
+  g.add(mesh(new THREE.SphereGeometry(0.36, 24, 24), coreMat));
+  const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.60, 0.024, 8, 64), r1Mat);
+  const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.60, 0.024, 8, 64), r2Mat);
+  r2.rotation.y = Math.PI / 3;
+  g.add(r1); g.add(r2);
+  g.add(new THREE.PointLight(0x7c3aed, 6, 8));
+  g.userData.orbitRings = [r1, r2];
+  return g;
+}
+
+function buildCubeStage3() {
+  const g = new THREE.Group();
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 2.0, roughness: 0, metalness: 1 });
+  const r1Mat = new THREE.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfcd34d, emissiveIntensity: 1.3, roughness: 0, metalness: 1 });
+  const r2Mat = new THREE.MeshStandardMaterial({ color: 0xc084fc, emissive: 0xa855f7, emissiveIntensity: 1.1, roughness: 0, metalness: 1 });
+  const r3Mat = new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x22d3ee, emissiveIntensity: 1.1, roughness: 0, metalness: 1 });
+  g.add(mesh(new THREE.IcosahedronGeometry(0.40, 0), coreMat));
+  const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.026, 8, 64), r1Mat);
+  const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.026, 8, 64), r2Mat);
+  r2.rotation.x = Math.PI / 2;
+  const r3 = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.026, 8, 64), r3Mat);
+  r3.rotation.z = Math.PI / 3;
+  g.add(r1); g.add(r2); g.add(r3);
+  g.add(new THREE.PointLight(0xf59e0b, 8, 10));
+  g.userData.orbitRings = [r1, r2, r3];
+  return g;
+}
+
+function buildFCCube() {
+  const outer = new THREE.Group();
+  const stages = [buildCubeStage0(), buildCubeStage1(), buildCubeStage2(), buildCubeStage3()];
+  stages.forEach((s, i) => { s.visible = i === 0; outer.add(s); });
+  outer.userData.stages = stages;
+  outer.userData.currentStage = 0;
+  outer.userData.setStage = (n) => {
+    stages.forEach((s, i) => { s.visible = i === n; });
+    outer.userData.currentStage = n;
+  };
+  outer.userData.isBucket = true;
+  outer.userData.furnitureId = 'fc_cube';
+  outer.traverse((c) => { c.userData.furnitureId = 'fc_cube'; });
+  return outer;
 }
 
 const FURNITURE_BUILDERS = {
@@ -238,10 +297,21 @@ export default function CoingameRoomPage() {
   const clickerCallbackRef = useRef(null);
   const floaterIdRef = useRef(0);
 
+  const [hype, setHype] = useState(0);
+  const [hypePhase, setHypePhase] = useState('normal'); // 'normal' | 'pumping' | 'crashed'
+  const [critFlash, setCritFlash] = useState(false);
+  const [evolutionToast, setEvolutionToast] = useState(null);
+  const hypePhaseRef = useRef('normal');
+  const prevStageRef = useRef(totalClicks >= 1000 ? 3 : totalClicks >= 200 ? 2 : totalClicks >= 50 ? 1 : 0);
+
   const isOwner = ownCoin?.coin_id === coinId;
   const clickPower = 1 + UPGRADES.reduce((acc, u) => acc + u.click * (upgradesPurchased[u.id] || 0), 0);
   const passiveRate = UPGRADES.reduce((acc, u) => acc + u.passive * (upgradesPurchased[u.id] || 0), 0);
   const upgradeLevel = Math.floor(Math.log2(totalClicks + 2));
+  const cubeStage = totalClicks >= 1000 ? 3 : totalClicks >= 200 ? 2 : totalClicks >= 50 ? 1 : 0;
+  const hypeMultiplier = hypePhase === 'pumping' ? 2 : 1;
+  const hypeColor = hype >= 80 ? '#ef4444' : hype >= 50 ? '#f97316' : hype >= 25 ? '#f59e0b' : '#22c55e';
+  const STAGE_NAMES = ['Starter Cube', 'Power Gem', 'Cosmic Orb', 'Legendary Core'];
 
   function buyUpgrade(upgId) {
     const upg = UPGRADES.find((u) => u.id === upgId);
@@ -288,28 +358,82 @@ export default function CoingameRoomPage() {
     return () => clearInterval(id);
   }, [passiveRate]);
 
-  // Clicker callback — captured fresh each render so combo/clickPower are current
+  // Clicker callback — captured fresh each render so combo/clickPower/hype are current
   useEffect(() => {
     clickerCallbackRef.current = () => {
+      // build hype on click (not during crash)
+      if (hypePhaseRef.current !== 'crashed' && hypePhaseRef.current !== 'pumping') {
+        setHype((h) => Math.min(100, h + 9));
+      }
+
       const now = Date.now();
       const gap = now - lastClickRef.current;
       lastClickRef.current = now;
       const newCombo = gap < 600 ? combo + 1 : 0;
       setCombo(newCombo);
-      const mult = newCombo >= 5 ? 1 + Math.floor(newCombo / 5) * 0.5 : 1;
-      const earned = Math.max(1, Math.floor(clickPower * mult));
+      const comboMult = newCombo >= 5 ? 1 + Math.floor(newCombo / 5) * 0.5 : 1;
+
+      const isCrit = Math.random() < 0.05;
+      if (isCrit) {
+        setCritFlash(true);
+        setTimeout(() => setCritFlash(false), 380);
+      }
+
+      const earned = Math.max(1, Math.floor(clickPower * comboMult * (isCrit ? 10 : 1) * hypeMultiplier));
       setRoomCoins((c) => c + earned);
       setSessionClicks((s) => s + 1);
       setTotalClicks((t) => t + 1);
+
       const fId = ++floaterIdRef.current;
       const x = 36 + Math.random() * 28;
       const y = 26 + Math.random() * 30;
-      setFloaters((f) => [...f, { id: fId, amount: earned, x, y, isCombo: newCombo >= 5 }]);
+      setFloaters((f) => [...f, { id: fId, amount: earned, x, y, isCombo: newCombo >= 5, isCrit }]);
       setTimeout(() => setFloaters((f) => f.filter((fl) => fl.id !== fId)), 1400);
       clearTimeout(comboTimerRef.current);
       comboTimerRef.current = setTimeout(() => setCombo(0), 1500);
     };
-  }, [combo, clickPower]);
+  }, [combo, clickPower, hypeMultiplier]);
+
+  // Hype drain — runs unconditionally, reads phase via ref
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (hypePhaseRef.current === 'pumping') return;
+      setHype((h) => Math.max(0, h - (hypePhaseRef.current === 'crashed' ? 0 : 0.7)));
+    }, 140);
+    return () => clearInterval(id);
+  }, []);
+
+  // Hype peak → pump → crash state machine
+  useEffect(() => {
+    if (hype >= 100 && hypePhase === 'normal') {
+      setHypePhase('pumping');
+      hypePhaseRef.current = 'pumping';
+      if (sceneRef.current) sceneRef.current.hypePumping = true;
+      const crashTimer = setTimeout(() => {
+        setHypePhase('crashed');
+        hypePhaseRef.current = 'crashed';
+        setHype(0);
+        if (sceneRef.current) sceneRef.current.hypePumping = false;
+        const recoverTimer = setTimeout(() => {
+          setHypePhase('normal');
+          hypePhaseRef.current = 'normal';
+        }, 6000);
+        return () => clearTimeout(recoverTimer);
+      }, 15000);
+      return () => clearTimeout(crashTimer);
+    }
+  }, [hype, hypePhase]);
+
+  // Cube stage evolution
+  useEffect(() => {
+    if (cubeStage > prevStageRef.current) {
+      setEvolutionToast(STAGE_NAMES[cubeStage]);
+      setTimeout(() => setEvolutionToast(null), 3200);
+    }
+    prevStageRef.current = cubeStage;
+    sceneRef.current?.evolveCube?.(cubeStage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cubeStage]);
 
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -595,7 +719,12 @@ export default function CoingameRoomPage() {
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
     const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup, fc_cube: bucket };
-    sceneRef.current = { scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY, lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket };
+    sceneRef.current = {
+      scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
+      lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket,
+      hypePumping: false,
+      evolveCube: (stage) => { bucket.userData.setStage?.(stage); },
+    };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
     let isDrag = false; let px = 0; let py = 0;
@@ -773,10 +902,12 @@ export default function CoingameRoomPage() {
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
       gem.rotation.y = t * 2.0;
 
-      // Cube float + spin + click squish
-      if (!dragging?.isCube) bucket.position.y = 1.5 + Math.sin(t * 1.2) * 0.15;
-      bucket.rotation.y = t * 0.8;
-      bucket.rotation.x = t * 0.3;
+      // Cube float + spin + click squish (faster during hype pump)
+      const isHypePumping = sceneRef.current?.hypePumping;
+      const spinSpeed = isHypePumping ? 2.8 : 0.8;
+      if (!dragging?.isCube) bucket.position.y = 1.5 + Math.sin(t * (isHypePumping ? 2.4 : 1.2)) * 0.15;
+      bucket.rotation.y = t * spinSpeed;
+      bucket.rotation.x = t * (isHypePumping ? 0.9 : 0.3);
       if (t < bucketBounceEnd) {
         const p = (bucketBounceEnd - t) / 0.25;
         const squish = Math.sin(p * Math.PI);
@@ -785,10 +916,26 @@ export default function CoingameRoomPage() {
         bucket.scale.setScalar(1.6);
       }
 
-      ringMat.emissiveIntensity = 0.5 + Math.sin(t * 2.8) * 0.28;
-      ceilLight.intensity = 40 + Math.sin(t * 1.4) * 4.0;
+      // Animate stage-specific rings
+      const stageGroup = bucket.userData.stages?.[bucket.userData.currentStage ?? 0];
+      if (stageGroup?.userData?.orbitRings) {
+        const sp = isHypePumping ? 2.2 : 1.0;
+        stageGroup.userData.orbitRings.forEach((r, i) => {
+          r.rotation.z = t * sp * (0.9 + i * 0.45);
+          r.rotation.x = t * sp * (0.55 + i * 0.3);
+        });
+      }
+      if (stageGroup?.userData?.spinRings) {
+        const sp = isHypePumping ? 2.5 : 1.2;
+        stageGroup.userData.spinRings.forEach((r, i) => {
+          r.rotation.z = t * sp * (1.0 + i * 0.6);
+        });
+      }
+
+      ringMat.emissiveIntensity = 0.5 + Math.sin(t * (isHypePumping ? 5.5 : 2.8)) * 0.28;
+      ceilLight.intensity = (isHypePumping ? 60 : 40) + Math.sin(t * (isHypePumping ? 3.2 : 1.4)) * (isHypePumping ? 12 : 4);
       ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
-      bulb.material.emissiveIntensity = 1.8 + Math.sin(t * 1.4) * 0.5;
+      bulb.material.emissiveIntensity = 1.8 + Math.sin(t * (isHypePumping ? 3.0 : 1.4)) * 0.5;
 
       const pp = pGeo.attributes.position;
       for (let i = 0; i < N; i++) {
@@ -1051,7 +1198,7 @@ export default function CoingameRoomPage() {
           )}
 
           {/* Room Coin tycoon HUD — top right */}
-          <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(6,8,6,0.92)', border: '1px solid #1a2e1a', borderRadius: 10, padding: '10px 14px', backdropFilter: 'blur(12px)', minWidth: 148, textAlign: 'right' }}>
+          <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(6,8,6,0.92)', border: `1px solid ${hypePhase === 'pumping' ? '#78350f' : '#1a2e1a'}`, borderRadius: 10, padding: '10px 14px', backdropFilter: 'blur(12px)', minWidth: 158, textAlign: 'right', transition: 'border-color 0.4s' }}>
             <div style={{ color: '#4b5563', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>Room Coins</div>
             <div style={{ color: '#4ade80', fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
               {Math.floor(roomCoins).toLocaleString()}
@@ -1060,14 +1207,41 @@ export default function CoingameRoomPage() {
               <div style={{ color: '#22c55e', fontSize: 9, marginTop: 3 }}>+{passiveRate.toFixed(1)} /sec</div>
             )}
             <div style={{ color: '#374151', fontSize: 8, marginTop: 4 }}>
-              {sessionClicks.toLocaleString()} clicks · Lv.{upgradeLevel}
+              {sessionClicks.toLocaleString()} clicks · {STAGE_NAMES[cubeStage]}
             </div>
             {combo >= 3 && (
               <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 800, marginTop: 5, animation: 'rc-combo-pop 0.3s ease' }}>
                 COMBO ×{comboMult.toFixed(1)}
               </div>
             )}
+            {/* Hype meter */}
+            <div style={{ marginTop: 8, borderTop: '1px solid #1a2e1a', paddingTop: 7 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ color: hypePhase === 'pumping' ? '#f59e0b' : hypePhase === 'crashed' ? '#374151' : '#4b5563', fontSize: 8, fontWeight: hypePhase !== 'normal' ? 800 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {hypePhase === 'pumping' ? '🔥 PUMPING' : hypePhase === 'crashed' ? 'CRASHED' : 'Hype'}
+                </span>
+                <span style={{ color: hypePhase === 'pumping' ? '#f59e0b' : hypePhase === 'crashed' ? '#374151' : hypeColor, fontSize: 8, fontWeight: 700 }}>{Math.floor(hype)}%</span>
+              </div>
+              <div style={{ height: 5, background: '#1a2e1a', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${hype}%`, background: hypePhase === 'pumping' ? '#f59e0b' : hypePhase === 'crashed' ? '#374151' : hypeColor, borderRadius: 3, transition: 'width 0.14s ease, background 0.3s', boxShadow: hypePhase === 'pumping' ? '0 0 8px #f59e0b' : 'none' }} />
+              </div>
+              {hypePhase === 'pumping' && <div style={{ color: '#f59e0b', fontSize: 8, marginTop: 3, fontWeight: 800 }}>RC ×2 active!</div>}
+              {hypePhase === 'crashed' && <div style={{ color: '#374151', fontSize: 8, marginTop: 3 }}>recovering...</div>}
+            </div>
           </div>
+
+          {/* Crit flash overlay */}
+          {critFlash && (
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 25, background: 'radial-gradient(circle at 50% 44%, rgba(251,191,36,0.22) 0%, transparent 60%)', animation: 'rc-crit 0.38s ease-out forwards' }} />
+          )}
+
+          {/* Evolution toast */}
+          {evolutionToast && (
+            <div style={{ position: 'absolute', top: '38%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(6,8,6,0.95)', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 22px', pointerEvents: 'none', textAlign: 'center', animation: 'rc-combo-pop 0.4s ease' }}>
+              <div style={{ color: '#f59e0b', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Cube Evolved!</div>
+              <div style={{ color: '#fde68a', fontSize: 17, fontWeight: 900 }}>{evolutionToast}</div>
+            </div>
+          )}
 
           {/* Floating +N RC numbers */}
           {floaters.map((fl) => (
@@ -1079,16 +1253,16 @@ export default function CoingameRoomPage() {
                 top: `${fl.y}%`,
                 pointerEvents: 'none',
                 animation: 'rc-float 1.4s ease-out forwards',
-                fontSize: fl.isCombo ? 19 : 14,
+                fontSize: fl.isCrit ? 22 : fl.isCombo ? 19 : 14,
                 fontWeight: 900,
-                color: fl.isCombo ? '#f59e0b' : '#4ade80',
-                textShadow: fl.isCombo ? '0 0 14px #f59e0b' : '0 0 8px #22c55e',
+                color: fl.isCrit ? '#fbbf24' : fl.isCombo ? '#f59e0b' : '#4ade80',
+                textShadow: fl.isCrit ? '0 0 18px #f59e0b' : fl.isCombo ? '0 0 14px #f59e0b' : '0 0 8px #22c55e',
                 whiteSpace: 'nowrap',
                 userSelect: 'none',
                 fontFamily: "'DM Mono','Space Mono',monospace",
               }}
             >
-              +{fl.amount} RC{fl.isCombo ? ' COMBO!' : ''}
+              +{fl.amount} RC{fl.isCrit ? ' CRITICAL!' : fl.isCombo ? ' COMBO!' : ''}
             </div>
           ))}
         </div>
