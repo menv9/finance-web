@@ -1,19 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import * as THREE from 'three';
 import * as LucideIcons from 'lucide-react';
-import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition } from '../utils/coingameApi';
+import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { HOME_PACK, HOME_PACK_CATEGORIES, findHomeModel, loadHomeModel } from '../utils/coinroomHomePack';
 import HomeModelThumb from '../components/coingame/HomeModelThumb';
 
 const ROOM = { w: 22, d: 22, h: 9 };
 const FLOOR_Y = 0;
-const STAGE_X = -9;
-const STAGE_Z_START = -8;
-const STAGE_Z_STEP = 2.6;
-
-const RARITY_HEX = { legendary: 0xf59e0b, epic: 0xc084fc, rare: 0x38bdf8, uncommon: 0x4ade80, common: 0x6b7280 };
 
 const AMBIENT_PRESETS = ['#22c55e','#a855f7','#3b82f6','#06b6d4','#f97316','#ef4444','#ec4899','#94a3b8'];
 
@@ -45,365 +40,6 @@ function bevelBox(w, h, d, bevel = 0.02, smooth = 2) {
   return geo;
 }
 
-function buildThrone() {
-  const g = new THREE.Group();
-  const gold = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.12, metalness: 1, emissive: 0xb45309, emissiveIntensity: 0.35 });
-  const goldDark = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.25, metalness: 1, emissive: 0x78350f, emissiveIntensity: 0.18 });
-  const velvet = new THREE.MeshStandardMaterial({ color: 0x6d28d9, roughness: 0.95, metalness: 0, emissive: 0x4c1d95, emissiveIntensity: 0.08 });
-  const tuft = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.95, metalness: 0 });
-
-  // Stepped base platform
-  g.add(mesh(bevelBox(1.5, 0.12, 1.35, 0.025), goldDark, 0, 0.06, 0));
-  g.add(mesh(bevelBox(1.3, 0.1, 1.2, 0.02), gold, 0, 0.17, 0));
-
-  // Seat (beveled, with velvet cushion)
-  g.add(mesh(bevelBox(1.15, 0.14, 1.05, 0.03), gold, 0, 0.36, 0));
-  g.add(mesh(bevelBox(1.0, 0.18, 0.92, 0.04, 3), velvet, 0, 0.52, 0));
-  // Cushion button tufts
-  for (let i = -1; i <= 1; i += 1) for (let j = -1; j <= 1; j += 1) {
-    g.add(mesh(new THREE.SphereGeometry(0.025, 8, 8), tuft, i * 0.28, 0.6, j * 0.26));
-  }
-
-  // Backrest (tall, with velvet panel inset and gold frame)
-  g.add(mesh(bevelBox(1.18, 2.0, 0.12, 0.03), gold, 0, 1.6, -0.5));
-  g.add(mesh(bevelBox(0.9, 1.5, 0.06, 0.02), velvet, 0, 1.55, -0.44));
-  // Frame trim on backrest
-  [[-0.5, 1.6, -0.43], [0.5, 1.6, -0.43]].forEach(([x, y, z]) => {
-    g.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.7, 12), gold, x, y, z));
-  });
-  // Top crest — rounded crown shape
-  const crestMat = gold;
-  g.add(mesh(new THREE.TorusGeometry(0.42, 0.05, 8, 24, Math.PI), crestMat, 0, 2.5, -0.47));
-  [-0.35, 0, 0.35].forEach((x, i) => {
-    const h = i === 1 ? 0.32 : 0.22;
-    g.add(mesh(new THREE.ConeGeometry(0.06, h, 8), crestMat, x, 2.6 + h / 2, -0.47));
-    g.add(mesh(new THREE.SphereGeometry(0.045, 12, 12), crestMat, x, 2.6 + h + 0.04, -0.47));
-  });
-
-  // Armrests (with curved scroll ends)
-  [-0.6, 0.6].forEach((x) => {
-    g.add(mesh(bevelBox(0.18, 0.16, 1.0, 0.03), gold, x, 0.78, 0));
-    g.add(mesh(bevelBox(0.16, 0.14, 0.92, 0.02), velvet, x, 0.85, 0));
-    // Scroll cap front
-    g.add(mesh(new THREE.TorusGeometry(0.08, 0.04, 8, 16, Math.PI), gold, x, 0.78, 0.5, 0, Math.PI / 2, 0));
-    // Support
-    g.add(mesh(bevelBox(0.1, 0.32, 0.1, 0.02), goldDark, x, 0.54, 0.4));
-  });
-
-  // Lathe-turned front legs (clawfoot vibe)
-  [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.45], [0.5, 0.45]].forEach(([x, z]) => {
-    const isFront = z > 0;
-    const lathePts = isFront
-      ? [[0.1, 0], [0.12, 0.04], [0.08, 0.1], [0.07, 0.22], [0.06, 0.32]]
-      : [[0.08, 0], [0.08, 0.32]];
-    const pts = lathePts.map(([r, y]) => new THREE.Vector2(r, y));
-    g.add(mesh(new THREE.LatheGeometry(pts, 12), gold, x, 0, z));
-  });
-
-  // Gem on backrest
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0xa855f7, emissiveIntensity: 1.6, roughness: 0.1, metalness: 0.6 }));
-  gem.position.set(0, 2.35, -0.44); g.add(gem);
-  const gemLight = new THREE.PointLight(0xa855f7, 0.8, 2.5); gemLight.position.set(0, 2.35, -0.3); g.add(gemLight);
-
-  return g;
-}
-
-function buildGoldPile() {
-  const g = new THREE.Group();
-  const gold = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.18, metalness: 1, emissive: 0xb45309, emissiveIntensity: 0.32 });
-  const goldDeep = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.3, metalness: 1, emissive: 0x78350f, emissiveIntensity: 0.18 });
-  const gem = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 1.2, roughness: 0.1, metalness: 0.5 });
-  const gem2 = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x22d3ee, emissiveIntensity: 1.2, roughness: 0.1, metalness: 0.5 });
-
-  // Coin with embossed edge — beveled cylinder
-  function coin(r = 0.1) {
-    const cg = new THREE.Group();
-    cg.add(mesh(new THREE.CylinderGeometry(r, r, 0.018, 24), gold));
-    cg.add(mesh(new THREE.TorusGeometry(r * 0.95, 0.005, 6, 24), goldDeep, 0, 0.01, 0));
-    cg.add(mesh(new THREE.TorusGeometry(r * 0.95, 0.005, 6, 24), goldDeep, 0, -0.01, 0));
-    // Tiny star in middle
-    cg.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.022, 5), goldDeep, 0, 0, 0));
-    return cg;
-  }
-
-  // Build a real heap — randomized coins on multiple levels
-  const positions = [];
-  for (let i = 0; i < 18; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * 0.42;
-    positions.push([Math.cos(angle) * r, 0.012, Math.sin(angle) * r, 0.08 + Math.random() * 0.04]);
-  }
-  for (let i = 0; i < 10; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * 0.3;
-    positions.push([Math.cos(angle) * r, 0.04 + Math.random() * 0.02, Math.sin(angle) * r, 0.08 + Math.random() * 0.04]);
-  }
-  for (let i = 0; i < 5; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * 0.18;
-    positions.push([Math.cos(angle) * r, 0.08 + Math.random() * 0.02, Math.sin(angle) * r, 0.075 + Math.random() * 0.03]);
-  }
-
-  positions.forEach(([x, y, z, r]) => {
-    const c = coin(r);
-    c.position.set(x, y, z);
-    c.rotation.set((Math.random() - 0.5) * 0.6, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.6);
-    g.add(c);
-  });
-
-  // Top crown coin slightly elevated
-  const topCoin = coin(0.12); topCoin.position.set(0.02, 0.13, 0); topCoin.rotation.set(0.08, 0.5, 0.05);
-  g.add(topCoin);
-
-  // Scattered gems on top of pile
-  const gemMesh1 = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), gem);
-  gemMesh1.position.set(0.12, 0.17, 0.08); gemMesh1.rotation.set(0.3, 0.5, 0.7); g.add(gemMesh1);
-  const gemMesh2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), gem2);
-  gemMesh2.position.set(-0.1, 0.16, -0.05); gemMesh2.rotation.set(0.2, 1.2, 0.4); g.add(gemMesh2);
-
-  // Glow from within the pile
-  const pl = new THREE.PointLight(0xfbbf24, 1.0, 2.5); pl.position.set(0, 0.2, 0); g.add(pl);
-  g.userData.emissiveMats = [gem, gem2];
-  return g;
-}
-
-function buildMoonLamp() {
-  const g = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.3, metalness: 0.8 });
-  const glow = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x4ade80, emissiveIntensity: 1.2, roughness: 0.5, metalness: 0 });
-  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.06, 16), metal, 0, 0.03, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8), metal, 0, 0.83, 0));
-  g.add(mesh(new THREE.BoxGeometry(0.5, 0.025, 0.025), metal, 0.2, 1.62, 0));
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 20), glow);
-  moon.position.set(0.42, 1.62, 0); g.add(moon);
-  const pl = new THREE.PointLight(0x4ade80, 1.8, 4.5);
-  pl.position.set(0.42, 1.62, 0); g.add(pl);
-  g.userData.emissiveMats = [glow];
-  return g;
-}
-
-function buildTradingDesk() {
-  const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.5, metalness: 0.5 });
-  const woodLight = new THREE.MeshStandardMaterial({ color: 0x2d4a2d, roughness: 0.6, metalness: 0.3 });
-  const bezel = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.4, metalness: 0.8 });
-  const screen = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x22c55e, emissiveIntensity: 1.1, roughness: 1 });
-  const screenRed = new THREE.MeshStandardMaterial({ color: 0x0d0303, emissive: 0xef4444, emissiveIntensity: 0.9, roughness: 1 });
-  const key = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.55, metalness: 0.4 });
-  const keyEdge = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.6, roughness: 0.4 });
-  const mouse = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.3, metalness: 0.6 });
-  const mug = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.5, metalness: 0.1 });
-  const coffee = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.4, metalness: 0 });
-
-  // Desktop — beveled with edge profile
-  g.add(mesh(bevelBox(2.2, 0.09, 1.0, 0.018), wood, 0, 0.72, 0));
-  g.add(mesh(bevelBox(2.1, 0.04, 0.96, 0.01), woodLight, 0, 0.78, 0));
-  // Legs (rounded supports)
-  [[-1.0, -0.42], [1.0, -0.42], [-1.0, 0.42], [1.0, 0.42]].forEach(([x, z]) => {
-    g.add(mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.72, 12), wood, x, 0.36, z));
-  });
-  // Cross brace
-  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.95, 8), wood, 0, 0.1, -0.42, 0, 0, Math.PI / 2));
-  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.95, 8), wood, 0, 0.1, 0.42, 0, 0, Math.PI / 2));
-
-  // Three monitors — each on its own stand with bezels
-  [-0.66, 0, 0.66].forEach((x, i) => {
-    // Stand pole + base
-    g.add(mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.04, 12), bezel, x, 0.79, -0.3));
-    g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.36, 8), bezel, x, 0.97, -0.3));
-    // Monitor body (bezel) — slight tilt
-    const mon = new THREE.Group();
-    mon.add(mesh(bevelBox(0.6, 0.4, 0.05, 0.012), bezel, 0, 0, 0));
-    mon.add(mesh(new THREE.PlaneGeometry(0.54, 0.34), i === 1 ? screen : (i === 0 ? screenRed : screen), 0, 0, 0.028));
-    // Logo dot under screen
-    mon.add(mesh(new THREE.CircleGeometry(0.008, 12), keyEdge, 0, -0.17, 0.029));
-    mon.position.set(x, 1.36, -0.3);
-    mon.rotation.x = -0.08;
-    mon.rotation.y = i === 0 ? 0.15 : i === 2 ? -0.15 : 0;
-    g.add(mon);
-  });
-
-  // Keyboard — RGB underglow
-  const kbGroup = new THREE.Group();
-  kbGroup.add(mesh(bevelBox(0.58, 0.03, 0.18, 0.005), key, 0, 0, 0));
-  // Key dots
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 12; j++) {
-    kbGroup.add(mesh(new THREE.BoxGeometry(0.034, 0.012, 0.034), bezel, -0.27 + j * 0.046, 0.018, -0.07 + i * 0.046));
-  }
-  // Underglow strip
-  kbGroup.add(mesh(new THREE.BoxGeometry(0.6, 0.005, 0.005), keyEdge, 0, -0.015, 0.09));
-  kbGroup.position.set(0, 0.77, 0.18);
-  g.add(kbGroup);
-
-  // Mouse
-  g.add(mesh(new THREE.SphereGeometry(0.05, 14, 8), mouse, 0.35, 0.79, 0.22));
-  g.add(mesh(new THREE.BoxGeometry(0.02, 0.005, 0.06), keyEdge, 0.35, 0.81, 0.22));
-
-  // Coffee mug
-  const mugGroup = new THREE.Group();
-  mugGroup.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 16, 1, true), mug, 0, 0.06, 0));
-  mugGroup.add(mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.005, 16), coffee, 0, 0.11, 0));
-  mugGroup.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.005, 16), mug, 0, 0.01, 0));
-  mugGroup.add(mesh(new THREE.TorusGeometry(0.035, 0.008, 6, 12), mug, 0.075, 0.06, 0, 0, Math.PI / 2, 0));
-  mugGroup.position.set(-0.45, 0.77, 0.22);
-  g.add(mugGroup);
-
-  // Small chart stand toy / paper
-  g.add(mesh(bevelBox(0.18, 0.005, 0.24, 0.002), woodLight, 0.5, 0.78, -0.05));
-
-  g.userData.emissiveMats = [screen, screenRed, keyEdge];
-  return g;
-}
-
-function buildNftFrame() {
-  const g = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.35, metalness: 0.9 });
-  const trim = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.1, metalness: 1, emissive: 0x22c55e, emissiveIntensity: 0.6 });
-  const trimAlt = new THREE.MeshStandardMaterial({ color: 0xc084fc, roughness: 0.1, metalness: 1, emissive: 0xa855f7, emissiveIntensity: 0.6 });
-  const art = new THREE.MeshStandardMaterial({ color: 0x0a1a0a, emissive: 0x22c55e, emissiveIntensity: 0.45, roughness: 1 });
-
-  // Easel legs — A-frame with rear support
-  [[-0.32, 0], [0.32, 0]].forEach(([x]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 1.85, 10), metal);
-    leg.position.set(x, 0.92, 0.04);
-    leg.rotation.x = -0.08;
-    g.add(leg);
-  });
-  // Back support leg
-  const backLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 1.8, 10), metal);
-  backLeg.position.set(0, 0.9, -0.4); backLeg.rotation.x = 0.22; g.add(backLeg);
-  // Cross brace
-  g.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.7, 8), metal, 0, 0.5, 0.05, 0, 0, Math.PI / 2));
-  // Tray on lower brace
-  g.add(mesh(bevelBox(0.78, 0.04, 0.08, 0.008), metal, 0, 0.62, 0.08));
-
-  // Frame — thick beveled with double-rim
-  g.add(mesh(bevelBox(0.94, 1.18, 0.08, 0.02), metal, 0, 1.2, 0));
-  g.add(mesh(bevelBox(0.86, 1.1, 0.04, 0.014), trim, 0, 1.2, 0.04));
-  g.add(mesh(bevelBox(0.78, 1.02, 0.02, 0.005), metal, 0, 1.2, 0.05));
-
-  // Inner glowing art panel with animated checker
-  g.add(mesh(new THREE.PlaneGeometry(0.72, 0.96), art, 0, 1.2, 0.061));
-  // Pixel art highlights
-  const palette = [trim, trimAlt];
-  const pix = new THREE.PlaneGeometry(0.06, 0.06);
-  for (let i = 0; i < 14; i++) {
-    const xi = Math.floor(Math.random() * 10) - 5;
-    const yi = Math.floor(Math.random() * 14) - 7;
-    g.add(new THREE.Mesh(pix, palette[i % 2]).translateX(xi * 0.065).translateY(1.2 + yi * 0.065).translateZ(0.062));
-  }
-
-  // Corner ornaments
-  [[-0.43, 1.74], [0.43, 1.74], [-0.43, 0.66], [0.43, 0.66]].forEach(([x, y]) => {
-    g.add(mesh(new THREE.SphereGeometry(0.04, 12, 12), trim, x, y, 0.045));
-  });
-
-  // Plaque
-  g.add(mesh(bevelBox(0.45, 0.08, 0.02, 0.005), metal, 0, 0.58, 0.12));
-  g.add(mesh(new THREE.PlaneGeometry(0.4, 0.04), trim, 0, 0.58, 0.131));
-
-  g.userData.emissiveMats = [trim, trimAlt, art];
-  return g;
-}
-
-function buildDiamondDisplay() {
-  const g = new THREE.Group();
-  const pedestal = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.8 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, transparent: true, opacity: 0.18, roughness: 0, metalness: 0.1 });
-  const gemMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.4, roughness: 0, metalness: 0.5 });
-  g.add(mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.12, 8), pedestal, 0, 0.06, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.2, 0.32, 0.32, 8), pedestal, 0, 0.28, 0));
-  g.add(mesh(new THREE.SphereGeometry(0.28, 20, 20, 0, Math.PI*2, 0, Math.PI*0.55), glass, 0, 0.44, 0));
-  const d = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), gemMat);
-  d.position.set(0, 0.6, 0); g.add(d);
-  const pl = new THREE.PointLight(0x38bdf8, 1.2, 3);
-  pl.position.set(0, 0.65, 0); g.add(pl);
-  g.userData.emissiveMats = [gemMat];
-  return g;
-}
-
-function buildRocket() {
-  const g = new THREE.Group();
-  const body = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.9 });
-  const fin = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.8, emissive: 0x38bdf8, emissiveIntensity: 0.2 });
-  const flame = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf97316, emissiveIntensity: 1.5, roughness: 1 });
-  g.add(mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 8), body, 0, 0.07, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 16), body, 0, 0.49, 0));
-  g.add(mesh(new THREE.ConeGeometry(0.12, 0.32, 16), body, 0, 1.0, 0));
-  [0, 1, 2].forEach((i) => {
-    const a = (i / 3) * Math.PI * 2;
-    const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.18), fin);
-    f.position.set(Math.sin(a) * 0.14, 0.22, Math.cos(a) * 0.14);
-    f.rotation.y = -a; g.add(f);
-  });
-  g.add(mesh(new THREE.ConeGeometry(0.07, 0.18, 8), flame, 0, -0.09, 0, Math.PI, 0, 0));
-  const pl = new THREE.PointLight(0xf97316, 0.8, 2.5);
-  pl.position.set(0, -0.15, 0); g.add(pl);
-  g.userData.accentMats = [fin];
-  return g;
-}
-
-function buildCandleChart() {
-  const g = new THREE.Group();
-  const frame = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
-  const frameDark = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.6, metalness: 0.5 });
-  const screenMat = new THREE.MeshStandardMaterial({ color: 0x030d03, emissive: 0x064e3b, emissiveIntensity: 0.5, roughness: 1 });
-  const grid = new THREE.MeshStandardMaterial({ color: 0x14532d, emissive: 0x14532d, emissiveIntensity: 0.3, transparent: true, opacity: 0.6 });
-  const up = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.7, roughness: 0.4 });
-  const dn = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.6, roughness: 0.4 });
-  const wick = new THREE.MeshStandardMaterial({ color: 0xa3e635, emissive: 0xa3e635, emissiveIntensity: 0.4 });
-
-  // Base — circular with bevel
-  g.add(mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.06, 24), frame, 0, 0.03, 0));
-  g.add(mesh(new THREE.TorusGeometry(0.24, 0.012, 8, 32), frameDark, 0, 0.06, 0));
-  // Telescoping pole
-  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.85, 12), frame, 0, 0.49, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.018, 0.025, 0.4, 8), frame, 0, 0.7, 0));
-
-  // Monitor — beveled bezel
-  g.add(mesh(bevelBox(0.95, 0.65, 0.06, 0.015), frameDark, 0, 1.18, 0));
-  g.add(mesh(new THREE.PlaneGeometry(0.85, 0.55), screenMat, 0, 1.18, 0.035));
-
-  // Grid lines on screen
-  for (let i = 1; i < 6; i++) {
-    g.add(mesh(new THREE.PlaneGeometry(0.83, 0.003), grid, 0, 0.95 + i * 0.082, 0.036));
-  }
-  for (let i = 1; i < 7; i++) {
-    g.add(mesh(new THREE.PlaneGeometry(0.003, 0.53), grid, -0.41 + i * 0.117, 1.18, 0.036));
-  }
-
-  // Candlesticks — body + wick on each
-  const seq = [
-    { h: 0.10, y: 1.05, up: true },
-    { h: 0.14, y: 1.09, up: true },
-    { h: 0.08, y: 1.14, up: false },
-    { h: 0.18, y: 1.12, up: true },
-    { h: 0.12, y: 1.20, up: true },
-    { h: 0.10, y: 1.24, up: false },
-    { h: 0.16, y: 1.22, up: true },
-    { h: 0.20, y: 1.26, up: true },
-    { h: 0.14, y: 1.32, up: true },
-  ];
-  seq.forEach((c, i) => {
-    const x = -0.36 + i * 0.085;
-    g.add(mesh(bevelBox(0.05, c.h, 0.025, 0.005), c.up ? up : dn, x, c.y, 0.06));
-    // Upper wick
-    g.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.06, 6), c.up ? up : dn, x, c.y + c.h / 2 + 0.03, 0.06));
-    g.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.06, 6), c.up ? up : dn, x, c.y - c.h / 2 - 0.03, 0.06));
-  });
-
-  // Trendline (glowing tube along candle tops)
-  const linePts = seq.map((c, i) => new THREE.Vector3(-0.36 + i * 0.085, c.y + c.h / 2, 0.075));
-  const lineCurve = new THREE.CatmullRomCurve3(linePts);
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(lineCurve, 32, 0.006, 6, false), wick));
-
-  // Glow point on screen
-  const pl = new THREE.PointLight(0x22c55e, 0.7, 2);
-  pl.position.set(0, 1.18, 0.3); g.add(pl);
-
-  g.userData.emissiveMats = [screenMat, up, wick];
-  return g;
-}
 
 function buildCubeStage0() {
   const g = new THREE.Group();
@@ -482,17 +118,6 @@ function buildFCCube() {
   outer.traverse((c) => { c.userData.furnitureId = 'fc_cube'; });
   return outer;
 }
-
-const FURNITURE_BUILDERS = {
-  throne:   buildThrone,
-  gold:     buildGoldPile,
-  moon:     buildMoonLamp,
-  desk:     buildTradingDesk,
-  nft:      buildNftFrame,
-  diamond:  buildDiamondDisplay,
-  rocket:   buildRocket,
-  chart:    buildCandleChart,
-};
 
 // ── Shop-only furniture builders (purchased with RC) ────────────────────────
 
@@ -937,7 +562,6 @@ export default function CoingameRoomPage() {
   const [coin, setCoin] = useState(null);
   const [tab, setTab] = useState('i');
   const [loading, setLoading] = useState(true);
-  const [rewards, setRewards] = useState([]);
   const [tooltip, setTooltip] = useState(null);
   const [ambientColor, setAmbientColor] = useState(() => localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e');
   const [bucketToast, setBucketToast] = useState(null);
@@ -1045,21 +669,6 @@ export default function CoingameRoomPage() {
       if (!cancelled) { setCoin(c); setLoading(false); }
     }).catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [coinId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchCoinRewards(coinId).then((r) => {
-      if (!cancelled) setRewards(r);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [coinId]);
-
-  const savePosition = useCallback(async (collectableId, x, z, rotY) => {
-    try {
-      await updateFurniturePosition(coinId, collectableId, x, z, rotY);
-      setRewards((prev) => prev.map((r) => r.id === collectableId ? { ...r, pos_x: x, pos_z: z, rot_y: rotY } : r));
-    } catch {}
   }, [coinId]);
 
   // Persist clicker state
@@ -1516,24 +1125,6 @@ export default function CoingameRoomPage() {
     ring.position.y = 0.38; ring.rotation.x = Math.PI / 2;
     scene.add(ring);
 
-    // ── Staging area (left wall) ───────────────────────────────────────────────
-    const stageMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.6 });
-    const stageGlow = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.3, roughness: 0.1, metalness: 1 });
-
-    const stageShelf = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, ROOM.d * 0.55), stageMat);
-    stageShelf.position.set(-(ROOM.w / 2 - 0.22), 0.5, 0);
-    scene.add(stageShelf);
-    const stageStrip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, ROOM.d * 0.55), stageGlow);
-    stageStrip.position.set(-(ROOM.w / 2 - 0.08), 0.54, 0);
-    scene.add(stageStrip);
-
-    // Label plane for staging area
-    const stageLabelMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.15, roughness: 1 });
-    const stageLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 1.8), stageLabelMat);
-    stageLabel.position.set(-(ROOM.w / 2 - 0.05), 1.5, 0);
-    stageLabel.rotation.y = Math.PI / 2;
-    scene.add(stageLabel);
-
     // ── Particles ─────────────────────────────────────────────────────────────
     const N = 600;
     const pPos = new Float32Array(N * 3);
@@ -1771,9 +1362,6 @@ export default function CoingameRoomPage() {
           const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
           cur[id] = { x, y: parseFloat(group.position.y.toFixed(3)), z, ry: parseFloat(group.rotation.y.toFixed(4)) };
           localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
-        } else {
-          if (furnitureMap[id]) furnitureMap[id].isStaged = false;
-          savePosition(id, x, z, parseFloat(group.rotation.y.toFixed(4)));
         }
         selected = { id, group, isStatic };
         dragging = null;
@@ -1957,74 +1545,6 @@ export default function CoingameRoomPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomSize]);
 
-  // ── Sync furniture into scene when rewards load ───────────────────────────
-  useEffect(() => {
-    const ref = sceneRef.current;
-    if (!ref || rewards.length === 0) return;
-    const { scene, furnitureMap } = ref;
-
-    // Remove furniture that's no longer in rewards (shouldn't happen but safe)
-    Object.keys(furnitureMap).forEach((id) => {
-      if (!rewards.find((r) => r.id === id)) {
-        scene.remove(furnitureMap[id].group);
-        delete furnitureMap[id];
-      }
-    });
-
-    let stageSlot = 0;
-    rewards.forEach((item) => {
-      if (!item.unlocked) return;
-
-      if (furnitureMap[item.id]) {
-        const { group } = furnitureMap[item.id];
-        if (item.pos_x != null && item.pos_z != null) {
-          group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
-          if (item.rot_y != null) group.rotation.y = item.rot_y;
-          furnitureMap[item.id].isStaged = false;
-        }
-        return;
-      }
-
-      const builder = FURNITURE_BUILDERS[item.id];
-      if (!builder) return;
-
-      const group = builder();
-      group.userData.furnitureId = item.id;
-      group.userData.bobOffset = Math.random() * Math.PI * 2;
-
-      // Tag all children so raycaster can walk up to find the id
-      group.traverse((child) => { child.userData.furnitureId = item.id; });
-
-      const col = RARITY_HEX[item.rarity] ?? 0x22c55e;
-
-      // Glow ring under item (owner drag affordance)
-      if (ref.isOwner) {
-        const ringGeo = new THREE.TorusGeometry(0.45, 0.018, 8, 48);
-        const ringMat2 = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.1, metalness: 1 });
-        const glowRing = new THREE.Mesh(ringGeo, ringMat2);
-        glowRing.rotation.x = Math.PI / 2;
-        glowRing.position.y = 0.02;
-        group.add(glowRing);
-      }
-
-      group.scale.set(2, 2, 2);
-
-      const isStaged = item.pos_x == null || item.pos_z == null;
-      if (isStaged) {
-        const sx = STAGE_X;
-        const sz = STAGE_Z_START + stageSlot * STAGE_Z_STEP;
-        group.position.set(sx, 0.53, sz);
-        stageSlot++;
-      } else {
-        group.position.set(item.pos_x, FLOOR_Y, item.pos_z);
-        if (item.rot_y != null) group.rotation.y = item.rot_y;
-      }
-
-      scene.add(group);
-      furnitureMap[item.id] = { group, isStaged };
-    });
-  }, [rewards, roomSize]);
-
   // Keep isOwner live in the scene (ownCoin may load after the scene effect)
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
@@ -2149,8 +1669,6 @@ export default function CoingameRoomPage() {
   const holding = holdings.find((h) => h.coin_id === coinId);
   const coinName = coin?.coin_name || coin?.profiles?.username || '?';
   const initial = (coinName[0] || '?').toUpperCase();
-  const unlockedCount = rewards.filter((r) => r.unlocked).length;
-
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', background: '#060806', fontFamily: "'DM Mono', 'Space Mono', monospace", overflow: 'hidden', position: 'relative' }}>
       <div ref={wrapRef} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -2327,14 +1845,14 @@ export default function CoingameRoomPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #1a2e1a' }}>
-          {[['i', 'Info'], ['r', 'Rewards'], ['s', 'Shop']].map(([key, label]) => (
+          {[['i', 'Info'], ['s', 'Shop']].map(([key, label]) => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
               style={{ flex: 1, padding: '9px 0', background: 'none', border: 'none', borderBottom: tab === key ? '2px solid #22c55e' : '2px solid transparent', color: tab === key ? '#22c55e' : '#4b5563', fontSize: 10, fontFamily: 'inherit', fontWeight: 700, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase' }}
             >
-              {label}{key === 'r' && rewards.length > 0 ? ` ${unlockedCount}/${rewards.length}` : ''}
+              {label}
             </button>
           ))}
         </div>
@@ -2399,50 +1917,6 @@ export default function CoingameRoomPage() {
               <div style={{ marginTop: 6, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
                 Bigger rooms = more space for furniture and sub-room walls. Existing items stay in place.
               </div>
-            </>
-          )}
-
-          {tab === 'r' && (
-            <>
-              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Collectables</div>
-              {rewards.length === 0 && (
-                <div style={{ color: '#374151', fontSize: 10, textAlign: 'center', marginTop: 24 }}>Loading...</div>
-              )}
-              {rewards.map((item) => {
-                const Icon = LucideIcons[item.icon] ?? LucideIcons.Star;
-                const rarityColors = { legendary: '#f59e0b', epic: '#c084fc', rare: '#38bdf8', uncommon: '#4ade80', common: '#6b7280' };
-                const col = item.unlocked ? (rarityColors[item.rarity] ?? '#6b7280') : '#1f2937';
-                const isPlaced = item.unlocked && item.pos_x != null && item.pos_z != null;
-                return (
-                  <div
-                    key={item.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: item.unlocked ? '#161616' : '#0f0f0f', borderRadius: 7, border: `1px solid ${item.unlocked ? '#1a2e1a' : '#111'}`, marginBottom: 6, opacity: item.unlocked ? 1 : 0.5 }}
-                  >
-                    <div style={{ width: 30, height: 30, borderRadius: 7, background: item.unlocked ? `${col}18` : '#161616', border: `1px solid ${item.unlocked ? col : '#1f2937'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={14} color={col} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: item.unlocked ? '#e2e8f0' : '#374151', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ color: item.unlocked ? col : '#374151', fontSize: 9, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {item.unlocked ? item.rarity : item.unlock_description}
-                      </div>
-                    </div>
-                    {item.unlocked && (
-                      <div style={{ flexShrink: 0 }}>
-                        {isPlaced
-                          ? <LucideIcons.Check size={12} color="#22c55e" />
-                          : <LucideIcons.MoveRight size={12} color="#4b5563" title="in staging area" />
-                        }
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {isOwner && unlockedCount > 0 && (
-                <div style={{ marginTop: 10, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#4b5563', fontSize: 9, lineHeight: 1.5 }}>
-                  Unplaced items appear on the left shelf. Drag them into the room to position them.
-                </div>
-              )}
             </>
           )}
 
