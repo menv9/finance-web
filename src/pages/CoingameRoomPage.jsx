@@ -1408,24 +1408,23 @@ export default function CoingameRoomPage() {
       const t = clock.elapsedTime;
       if (playerMixer) playerMixer.update(dt);
 
-      if (autoRot) tTheta += 0.0018;
-      theta += (tTheta - theta) * 0.06;
-      phi += (tPhi - phi) * 0.06;
-
-      // ── Player WASD movement (relative to camera yaw) ───────────────────
-      const moveSpeed = 0.12;
-      let mx = 0, mz = 0;
-      if (keyState.w) mz -= 1;
-      if (keyState.s) mz += 1;
-      if (keyState.a) mx -= 1;
-      if (keyState.d) mx += 1;
-      const moving = !!(mx || mz);
-      if (moving) {
-        const len = Math.sqrt(mx * mx + mz * mz);
-        mx /= len; mz /= len;
-        const cosT = Math.cos(theta), sinT = Math.sin(theta);
-        const wx = mx * cosT - mz * sinT;
-        const wz = mx * sinT + mz * cosT;
+      // ── Player tank-style controls (W/S walk, A/D turn) ─────────────────
+      const moveSpeed = 0.14;
+      const turnSpeed = 2.4; // radians per second
+      let forward = 0; let turn = 0;
+      if (keyState.w) forward += 1;
+      if (keyState.s) forward -= 1;
+      if (keyState.a) turn += 1;
+      if (keyState.d) turn -= 1;
+      const moving = forward !== 0;
+      if (turn !== 0) {
+        player.rotation.y += turn * turnSpeed * dt;
+        autoRot = false;
+      }
+      if (forward !== 0) {
+        const yaw = player.rotation.y;
+        const wx = Math.sin(yaw) * forward;
+        const wz = Math.cos(yaw) * forward;
         const hw = ROOM.w / 2 - 0.8;
         const hd = ROOM.d / 2 - 0.8;
 
@@ -1457,13 +1456,19 @@ export default function CoingameRoomPage() {
         } else if (!blockedAt(player.position.x, nz)) {
           player.position.z = nz;
         }
-        const targetYaw = Math.atan2(wx, wz);
-        let dYaw = targetYaw - player.rotation.y;
-        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-        player.rotation.y += dYaw * Math.min(1, dt * 12);
         autoRot = false;
       }
+
+      // Camera auto-follows behind player unless user is mouse-dragging
+      if (autoRot) tTheta += 0.0018;
+      if (!isDrag) {
+        let target = player.rotation.y + Math.PI;
+        while (target - tTheta > Math.PI) target -= Math.PI * 2;
+        while (target - tTheta < -Math.PI) target += Math.PI * 2;
+        tTheta += (target - tTheta) * Math.min(1, dt * 4);
+      }
+      theta += (tTheta - theta) * 0.08;
+      phi += (tPhi - phi) * 0.06;
       if (playerMixer?.userData) {
         const { idle, walk } = playerMixer.userData;
         if (idle && walk && idle !== walk) {
