@@ -1745,8 +1745,8 @@ export default function CoingameRoomPage() {
 
           {isOwner && (
             <>
-              {/* Build mode toggle (top-left of canvas) */}
-              <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'all' }}>
+              {/* Build mode toggle (top-right of canvas) */}
+              <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, pointerEvents: 'all' }}>
                 <button
                   type="button"
                   onClick={() => setBuildMode((b) => !b)}
