@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import * as THREE from 'three';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as LucideIcons from 'lucide-react';
 import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -983,78 +986,45 @@ export default function CoingameRoomPage() {
       if (saved?.ry != null) group.rotation.y = saved.ry;
     }
 
-    // Rug (grouped so it can be dragged)
-    const rugGroup = new THREE.Group();
-    const rugBorderMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 9), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.9 }));
-    rugBorderMesh.rotation.x = -Math.PI / 2; rugBorderMesh.position.y = 0.004; rugGroup.add(rugBorderMesh);
-    const rugMesh = new THREE.Mesh(new THREE.PlaneGeometry(11.5, 8.5), new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.95, metalness: 0 }));
-    rugMesh.rotation.x = -Math.PI / 2; rugMesh.position.y = 0.005; rugGroup.add(rugMesh);
-    tagStatic(rugGroup, 'static_rug');
-    rugGroup.userData.accentMats = [rugBorderMesh.material, rugMesh.material];
-    placeStatic(rugGroup, 0, 0);
-    scene.add(rugGroup);
-
-    // Bookshelf (right wall)
-    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.45, metalness: 0.6 });
-    const bookshelf = new THREE.Group();
-    const bsFrame = new THREE.Mesh(new THREE.BoxGeometry(3.3, 4.8, 0.6), shelfMat);
-    bsFrame.position.set(0, 2.4, 0); bookshelf.add(bsFrame);
-    const shelfInner = new THREE.MeshStandardMaterial({ color: 0x0f2010, roughness: 0.5, metalness: 0.4 });
-    [0.75, 1.95, 3.15, 4.35].forEach((y) => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.09, 0.51), shelfInner);
-      s.position.set(0, y, 0.015); bookshelf.add(s);
-    });
-    const bookColors = [0x22c55e, 0x16a34a, 0x4ade80, 0x052e16, 0x15803d, 0x166534];
-    let bx = -1.32;
-    bookColors.forEach((col) => {
-      const bw = 0.15 + Math.random() * 0.15;
-      const bh = 0.42 + Math.random() * 0.27;
-      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.42), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      book.position.set(bx + bw/2, 1.95 + bh/2 + 0.045, 0.015); bookshelf.add(book);
-      bx += bw + 0.022;
-    });
-    bx = -1.05;
-    bookColors.slice().reverse().forEach((col) => {
-      const bw = 0.135 + Math.random() * 0.12;
-      const bh = 0.33 + Math.random() * 0.21;
-      const book = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.42), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      book.position.set(bx + bw/2, 3.15 + bh/2 + 0.045, 0.015); bookshelf.add(book);
-      bx += bw + 0.015;
-    });
-    bookshelf.rotation.y = -Math.PI / 2;
-    tagStatic(bookshelf, 'static_bookshelf');
-    const bookMats = [];
-    bookshelf.traverse((c) => { if (c.isMesh && c.material.roughness === 0.8) bookMats.push(c.material); });
-    bookshelf.userData.accentMats = bookMats;
-    placeStatic(bookshelf, 9.5, -7);
-    scene.add(bookshelf);
-
-    // Sofa
-    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.88, metalness: 0.05 });
-    const sofaAccent = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85, metalness: 0 });
-    const sofa = new THREE.Group();
-    [[4.2,0.42,1.42,sofaMat,0,0.57,0],[4.2,1.08,0.3,sofaMat,0,1.08,-0.57],[4.2,0.18,1.42,sofaAccent,0,0.33,0]].forEach(([w,h,d,mat,x,y,z]) => {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); p.position.set(x,y,z); sofa.add(p);
-    });
-    [-1.95, 1.95].forEach((x) => {
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.78, 1.42), sofaMat); arm.position.set(x, 0.78, 0); sofa.add(arm);
-    });
-    [-1.05, 0, 1.05].forEach((x) => {
-      const cushion = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.24, 1.05), sofaAccent);
-      cushion.position.set(x, 0.84, 0.15); sofa.add(cushion);
-    });
-    tagStatic(sofa, 'static_sofa');
-    sofa.userData.accentMats = [sofaAccent];
-    placeStatic(sofa, 4, -9);
-    scene.add(sofa);
-
-    // Side table
-    const tableGroup = new THREE.Group();
-    const tTop = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.09, 16), shelfMat); tTop.position.set(0, 1.0, 0); tableGroup.add(tTop);
-    const tLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.0, 8), shelfMat); tLeg.position.set(0, 0.5, 0); tableGroup.add(tLeg);
-    tagStatic(tableGroup, 'static_table');
-    placeStatic(tableGroup, 6.2, -8.2);
-    scene.add(tableGroup);
+    // ── Player avatar (animated Alien.fbx) with WASD controls ────────────────
+    const player = new THREE.Group();
+    player.position.set(0, 0, 4);
+    scene.add(player);
+    let playerMixer = null;
+    let playerActions = [];
+    {
+      const fbx = new FBXLoader();
+      fbx.load('/models/player/fbx/Alien.fbx', (g) => {
+        const box = new THREE.Box3().setFromObject(g);
+        const size = new THREE.Vector3(); box.getSize(size);
+        const center = new THREE.Vector3(); box.getCenter(center);
+        const targetH = 1.6;
+        const s = targetH / Math.max(0.001, size.y);
+        g.scale.setScalar(s);
+        g.position.x = -center.x * s;
+        g.position.z = -center.z * s;
+        g.position.y = -box.min.y * s;
+        g.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+        player.add(g);
+        if (g.animations && g.animations.length > 0) {
+          playerMixer = new THREE.AnimationMixer(g);
+          playerActions = g.animations.map((clip) => playerMixer.clipAction(clip));
+          playerActions[0]?.play();
+        }
+      });
+      fbx.load('/models/player/fbx/Alien_Helmet.fbx', (h) => {
+        const box = new THREE.Box3().setFromObject(h);
+        const size = new THREE.Vector3(); box.getSize(size);
+        const center = new THREE.Vector3(); box.getCenter(center);
+        const targetH = 1.6;
+        const s = targetH / Math.max(0.001, size.y);
+        h.scale.setScalar(s);
+        h.position.x = -center.x * s;
+        h.position.z = -center.z * s;
+        h.position.y = -box.min.y * s;
+        player.add(h);
+      });
+    }
 
     // ── Home-pack owned (async loaded at init from localStorage) ─────────────
     const initialHome = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
@@ -1166,7 +1136,7 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    const staticMap = { static_rug: rugGroup, static_bookshelf: bookshelf, static_sofa: sofa, static_table: tableGroup, fc_cube: bucket, ...initialShopGroups };
+    const staticMap = { fc_cube: bucket, ...initialShopGroups };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket,
@@ -1180,7 +1150,7 @@ export default function CoingameRoomPage() {
     let isDrag = false; let px = 0; let py = 0;
     let theta = 0.12; let phi = 0.40;
     let tTheta = 0.12; let tPhi = 0.40;
-    let tRad = 15; let autoRot = true;
+    let tRad = 8; let autoRot = false;
 
     // ── Drag-to-place state ────────────────────────────────────────────────────
     let dragging = null; // { id, group, origX, origZ }
@@ -1370,7 +1340,7 @@ export default function CoingameRoomPage() {
       isDrag = false;
     }
 
-    const onWheel = (e) => { tRad = Math.max(5, Math.min(22, tRad + e.deltaY * 0.013)); e.preventDefault(); };
+    const onWheel = (e) => { tRad = Math.max(3, Math.min(18, tRad + e.deltaY * 0.013)); e.preventDefault(); };
 
     wrap.addEventListener('mousedown', onMDown);
     window.addEventListener('mousemove', onMMove);
@@ -1391,7 +1361,15 @@ export default function CoingameRoomPage() {
     wrap.addEventListener('touchstart', onTStart, { passive: true });
     wrap.addEventListener('touchmove', onTMove, { passive: false });
 
+    const keyState = { w: false, a: false, s: false, d: false };
+    const onKeyUp = (e) => {
+      const k = e.key.toLowerCase();
+      if (k in keyState) keyState[k] = false;
+    };
+    window.addEventListener('keyup', onKeyUp);
     const onKeyDown = (e) => {
+      const lk = e.key.toLowerCase();
+      if (lk in keyState) { keyState[lk] = true; }
       if ((e.key === 'r' || e.key === 'R') && dragging) {
         dragging.group.rotation.y += Math.PI / 4;
       }
@@ -1411,7 +1389,7 @@ export default function CoingameRoomPage() {
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected && sceneRef.current?.isOwner) {
         const { id } = selected;
-        if (id === 'fc_cube' || ['static_rug', 'static_bookshelf', 'static_sofa', 'static_table'].includes(id)) return;
+        if (id === 'fc_cube') return;
         if (id.startsWith('static_shop_')) {
           sceneRef.current?.removeShopItem?.(id.slice('static_shop_'.length));
           selected = null;
@@ -1431,17 +1409,43 @@ export default function CoingameRoomPage() {
 
     function animate() {
       animId = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const dt = clock.getDelta();
+      const t = clock.elapsedTime;
+      if (playerMixer) playerMixer.update(dt);
 
       if (autoRot) tTheta += 0.0018;
       theta += (tTheta - theta) * 0.06;
       phi += (tPhi - phi) * 0.06;
+
+      // ── Player WASD movement (relative to camera yaw) ───────────────────
+      const moveSpeed = 0.12;
+      let mx = 0, mz = 0;
+      if (keyState.w) mz -= 1;
+      if (keyState.s) mz += 1;
+      if (keyState.a) mx -= 1;
+      if (keyState.d) mx += 1;
+      if (mx || mz) {
+        const len = Math.sqrt(mx * mx + mz * mz);
+        mx /= len; mz /= len;
+        const cosT = Math.cos(theta), sinT = Math.sin(theta);
+        const wx = mx * cosT - mz * sinT;
+        const wz = mx * sinT + mz * cosT;
+        const hw = ROOM.w / 2 - 0.8;
+        const hd = ROOM.d / 2 - 0.8;
+        player.position.x = Math.max(-hw, Math.min(hw, player.position.x + wx * moveSpeed));
+        player.position.z = Math.max(-hd, Math.min(hd, player.position.z + wz * moveSpeed));
+        player.rotation.y = Math.atan2(wx, wz);
+        autoRot = false;
+      }
+
+      const px2 = player.position.x;
+      const pz2 = player.position.z;
       camera.position.set(
-        Math.sin(theta) * Math.cos(phi) * tRad,
+        px2 + Math.sin(theta) * Math.cos(phi) * tRad,
         Math.sin(phi) * tRad + 1,
-        Math.cos(theta) * Math.cos(phi) * tRad
+        pz2 + Math.cos(theta) * Math.cos(phi) * tRad
       );
-      camera.lookAt(0, 1.5, 0);
+      camera.lookAt(px2, 1.5, pz2);
 
       cg.rotation.y = t * 0.65;
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
@@ -1539,6 +1543,7 @@ export default function CoingameRoomPage() {
       wrap.removeEventListener('touchstart', onTStart);
       wrap.removeEventListener('touchmove', onTMove);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
       renderer.dispose();
       sceneRef.current = null;
     };
