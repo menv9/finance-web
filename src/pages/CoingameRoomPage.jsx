@@ -947,6 +947,37 @@ export default function CoingameRoomPage() {
     setHomeOwned((o) => ({ ...o, [name]: true }));
   }
 
+  function removeShopItem(itemId) {
+    if (!isOwner) return;
+    if (!shopOwned[itemId]) return;
+    const item = SHOP_FURNITURE.find((i) => i.id === itemId);
+    if (!item) return;
+    setRoomCoins((c) => c + Math.floor(item.cost * 0.5));
+    setShopOwned((o) => { const n = { ...o }; delete n[itemId]; return n; });
+    // Clear saved position
+    const STATIC_KEY = sceneRef.current?.STATIC_KEY;
+    if (STATIC_KEY) {
+      const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+      delete cur[`static_shop_${itemId}`];
+      localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+    }
+  }
+
+  function removeHomeItem(name) {
+    if (!isOwner) return;
+    if (!homeOwned[name]) return;
+    const item = findHomeModel(name);
+    if (!item) return;
+    setRoomCoins((c) => c + Math.floor(item.price * 0.5));
+    setHomeOwned((o) => { const n = { ...o }; delete n[name]; return n; });
+    const STATIC_KEY = sceneRef.current?.STATIC_KEY;
+    if (STATIC_KEY) {
+      const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+      delete cur[`static_home_${name}`];
+      localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     fetchCoinById(coinId).then((c) => {
@@ -1637,6 +1668,19 @@ export default function CoingameRoomPage() {
           localStorage.setItem(STATIC_KEY, JSON.stringify(cur));
         }
       }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selected && sceneRef.current?.isOwner) {
+        const { id } = selected;
+        if (id === 'fc_cube' || ['static_rug', 'static_bookshelf', 'static_sofa', 'static_table'].includes(id)) return;
+        if (id.startsWith('static_shop_')) {
+          sceneRef.current?.removeShopItem?.(id.slice('static_shop_'.length));
+          selected = null;
+          e.preventDefault();
+        } else if (id.startsWith('static_home_')) {
+          sceneRef.current?.removeHomeItem?.(id.slice('static_home_'.length));
+          selected = null;
+          e.preventDefault();
+        }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
 
@@ -1831,6 +1875,13 @@ export default function CoingameRoomPage() {
   useEffect(() => {
     if (sceneRef.current) sceneRef.current.isOwner = isOwner;
   }, [isOwner]);
+
+  // Expose remove fns to the scene so keydown can refund + clear
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.removeShopItem = removeShopItem;
+    sceneRef.current.removeHomeItem = removeHomeItem;
+  });
 
   // Bucket click → RC clicker (no server call; FC claim was repurposed)
   useEffect(() => {
@@ -2191,21 +2242,38 @@ export default function CoingameRoomPage() {
                       <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
                       <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{item.desc}</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => buyShopItem(item.id)}
-                      disabled={disabled}
-                      style={{
-                        background: owned ? '#1a2e1a' : canAfford ? '#22c55e' : '#1a2e1a',
-                        border: 'none', borderRadius: 5,
-                        color: owned ? '#22c55e' : canAfford ? '#000' : '#374151',
-                        fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
-                        padding: '5px 9px', cursor: disabled ? 'default' : 'pointer',
-                        whiteSpace: 'nowrap', flexShrink: 0,
-                      }}
-                    >
-                      {owned ? 'OWNED' : `${item.cost.toLocaleString()} RC`}
-                    </button>
+                    {owned ? (
+                      <button
+                        type="button"
+                        onClick={() => removeShopItem(item.id)}
+                        disabled={!isOwner}
+                        title={`Refund ${Math.floor(item.cost * 0.5).toLocaleString()} RC`}
+                        style={{
+                          background: '#1a0d0d', border: '1px solid #3a1a1a', borderRadius: 5,
+                          color: '#ef4444', fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                          padding: '5px 9px', cursor: isOwner ? 'pointer' : 'default',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        REMOVE
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => buyShopItem(item.id)}
+                        disabled={disabled}
+                        style={{
+                          background: canAfford ? '#22c55e' : '#1a2e1a',
+                          border: 'none', borderRadius: 5,
+                          color: canAfford ? '#000' : '#374151',
+                          fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                          padding: '5px 9px', cursor: disabled ? 'default' : 'pointer',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        {item.cost.toLocaleString()} RC
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -2257,27 +2325,44 @@ export default function CoingameRoomPage() {
                           <HomeModelThumb name={it.name} size={64} />
                         </div>
                         <div style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 700, lineHeight: 1.2, minHeight: 24 }}>{it.label}</div>
-                        <button
-                          type="button"
-                          onClick={() => buyHomeItem(it.name)}
-                          disabled={disabled}
-                          style={{
-                            background: owned ? '#1a2e1a' : canAfford ? '#22c55e' : '#1a2e1a',
-                            color: owned ? '#22c55e' : canAfford ? '#000' : '#374151',
-                            border: 'none', borderRadius: 4, fontSize: 9, fontWeight: 800,
-                            fontFamily: 'inherit', padding: '4px 6px', cursor: disabled ? 'default' : 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {owned ? 'OWNED' : `${it.price.toLocaleString()}`}
-                        </button>
+                        {owned ? (
+                          <button
+                            type="button"
+                            onClick={() => removeHomeItem(it.name)}
+                            disabled={!isOwner}
+                            title={`Refund ${Math.floor(it.price * 0.5).toLocaleString()} RC`}
+                            style={{
+                              background: '#1a0d0d', border: '1px solid #3a1a1a', borderRadius: 4,
+                              color: '#ef4444', fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                              padding: '4px 6px', cursor: isOwner ? 'pointer' : 'default',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            REMOVE
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => buyHomeItem(it.name)}
+                            disabled={disabled}
+                            style={{
+                              background: canAfford ? '#22c55e' : '#1a2e1a',
+                              color: canAfford ? '#000' : '#374151',
+                              border: 'none', borderRadius: 4, fontSize: 9, fontWeight: 800,
+                              fontFamily: 'inherit', padding: '4px 6px', cursor: disabled ? 'default' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {it.price.toLocaleString()}
+                          </button>
+                        )}
                       </div>
                     );
                   })}
               </div>
 
               <div style={{ marginTop: 10, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
-                Click the glowing cube to earn RC. Combos build fast clicks. Drag furniture to place, R to rotate, ↑/↓ to raise/lower.
+                Click the glowing cube to earn RC. Combos build fast clicks. Drag furniture to place, R to rotate, ↑/↓ raise/lower, Delete to remove (50% RC refund).
               </div>
             </>
           )}
