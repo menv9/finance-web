@@ -192,14 +192,9 @@ function normalizeModel(group) {
       c.material = Array.isArray(c.material) ? newMats : newMats[0];
     }
   });
-  // Scale to fit a target bounding box of ~1.5 max dimension, then user can scale.
-  const size = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  if (maxDim > 0) {
-    const targetMax = 1.6;
-    const s = targetMax / maxDim;
-    group.scale.setScalar(s);
-  }
+  // Quaternius models use 1 unit = 1 meter. The room is ~22m wide.
+  // Apply a uniform world scale so everything feels appropriately sized.
+  group.scale.setScalar(1.5);
   return group;
 }
 
