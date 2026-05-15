@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import * as LucideIcons from 'lucide-react';
 import { fetchCoinById, fetchCoinRewards, spotPrice, updateFurniturePosition } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { HOME_PACK, HOME_PACK_CATEGORIES, findHomeModel, loadHomeModel } from '../utils/coinroomHomePack';
+import HomeModelThumb from '../components/coingame/HomeModelThumb';
 
 const ROOM = { w: 22, d: 22, h: 9 };
 const FLOOR_Y = 0;
@@ -886,6 +888,9 @@ export default function CoingameRoomPage() {
   const [roomCoins, setRoomCoins] = useState(() => parseFloat(localStorage.getItem(`cg-rc-${coinId}`) || '0'));
   const [upgradesPurchased, setUpgradesPurchased] = useState(() => JSON.parse(localStorage.getItem(`cg-ru-${coinId}`) || '{}'));
   const [shopOwned, setShopOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}'));
+  const [homeOwned, setHomeOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'));
+  const [homeCategory, setHomeCategory] = useState('All');
+  const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
   const [combo, setCombo] = useState(0);
   const [sessionClicks, setSessionClicks] = useState(0);
@@ -932,6 +937,16 @@ export default function CoingameRoomPage() {
     setShopOwned((o) => ({ ...o, [itemId]: true }));
   }
 
+  function buyHomeItem(name) {
+    if (!isOwner) return;
+    if (homeOwned[name]) return;
+    const item = findHomeModel(name);
+    if (!item) return;
+    if (roomCoins < item.price) return;
+    setRoomCoins((c) => c - item.price);
+    setHomeOwned((o) => ({ ...o, [name]: true }));
+  }
+
   useEffect(() => {
     let cancelled = false;
     fetchCoinById(coinId).then((c) => {
@@ -960,6 +975,49 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-ru-${coinId}`, JSON.stringify(upgradesPurchased)); }, [upgradesPurchased, coinId]);
   useEffect(() => { localStorage.setItem(`cg-rt-${coinId}`, String(totalClicks)); }, [totalClicks, coinId]);
   useEffect(() => { localStorage.setItem(`cg-shop-${coinId}`, JSON.stringify(shopOwned)); }, [shopOwned, coinId]);
+  useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
+
+  // Sync home-pack owned items into scene as static (async OBJ load, draggable)
+  useEffect(() => {
+    const ref = sceneRef.current;
+    if (!ref) return;
+    const { scene, staticMap, STATIC_KEY } = ref;
+    const savedStatic = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
+    const defaults = [[-4, 4], [4, 4], [-5, 0], [5, 0], [-4, -4], [4, -4], [0, 5], [0, -5]];
+    let slot = 0;
+
+    // Remove items that are no longer owned
+    Object.keys(staticMap).forEach((id) => {
+      if (!id.startsWith('static_home_')) return;
+      const name = id.slice('static_home_'.length);
+      if (!homeOwned[name]) {
+        scene.remove(staticMap[id]);
+        delete staticMap[id];
+      }
+    });
+
+    // Add newly-owned items (async)
+    Object.keys(homeOwned).forEach((name) => {
+      const sid = `static_home_${name}`;
+      if (staticMap[sid]) return;
+      // Placeholder to prevent double-loads while async resolves
+      staticMap[sid] = 'loading';
+      const [dx, dz] = defaults[slot % defaults.length];
+      slot++;
+      loadHomeModel(name).then((group) => {
+        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+        // Cancelled if no longer owned by the time it loads
+        if (!homeOwned[name]) { delete staticMap[sid]; return; }
+        group.userData.furnitureId = sid;
+        group.traverse((c) => { c.userData.furnitureId = sid; });
+        const saved = savedStatic[sid];
+        group.position.set(saved ? saved.x : dx, saved?.y != null ? saved.y : 0, saved ? saved.z : dz);
+        if (saved?.ry != null) group.rotation.y = saved.ry;
+        scene.add(group);
+        staticMap[sid] = group;
+      }).catch(() => { delete staticMap[sid]; });
+    });
+  }, [homeOwned]);
 
   // Sync shop-owned furniture into scene as static (draggable, persisted via STATIC_KEY)
   useEffect(() => {
@@ -1274,6 +1332,23 @@ export default function CoingameRoomPage() {
     tagStatic(tableGroup, 'static_table');
     placeStatic(tableGroup, 6.2, -8.2);
     scene.add(tableGroup);
+
+    // ── Home-pack owned (async loaded at init from localStorage) ─────────────
+    const initialHome = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
+    const homeDefaults = [[-4, 4], [4, 4], [-5, 0], [5, 0], [-4, -4], [4, -4], [0, 5], [0, -5]];
+    let homeSlot = 0;
+    Object.keys(initialHome).forEach((name) => {
+      const sid = `static_home_${name}`;
+      const [dx, dz] = homeDefaults[homeSlot % homeDefaults.length];
+      homeSlot++;
+      loadHomeModel(name).then((group) => {
+        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+        tagStatic(group, sid);
+        placeStatic(group, dx, dz);
+        scene.add(group);
+        if (sceneRef.current?.staticMap) sceneRef.current.staticMap[sid] = group;
+      }).catch(() => {});
+    });
 
     // ── Shop-owned furniture (loaded at init from localStorage) ──────────────
     const initialShop = JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}');
@@ -2134,6 +2209,72 @@ export default function CoingameRoomPage() {
                   </div>
                 );
               })}
+
+              {/* Home Pack browser */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 10 }}>
+                <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Home Pack</div>
+                <div style={{ color: '#374151', fontSize: 9 }}>{Object.keys(homeOwned).length}/{HOME_PACK.length}</div>
+              </div>
+              <input
+                type="text"
+                value={homeSearch}
+                onChange={(e) => setHomeSearch(e.target.value)}
+                placeholder="Search furniture..."
+                style={{ width: '100%', boxSizing: 'border-box', background: '#0d0d0d', border: '1px solid #1a2e1a', borderRadius: 5, color: '#e2e8f0', fontSize: 10, padding: '6px 8px', fontFamily: 'inherit', marginBottom: 6 }}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                {HOME_PACK_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setHomeCategory(cat)}
+                    style={{
+                      background: homeCategory === cat ? '#22c55e' : '#0d0d0d',
+                      color: homeCategory === cat ? '#000' : '#4b5563',
+                      border: `1px solid ${homeCategory === cat ? '#22c55e' : '#1a2e1a'}`,
+                      borderRadius: 4, padding: '3px 7px', fontSize: 9, fontFamily: 'inherit',
+                      fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em',
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+                {HOME_PACK
+                  .filter((it) => homeCategory === 'All' || it.category === homeCategory)
+                  .filter((it) => !homeSearch || it.label.toLowerCase().includes(homeSearch.toLowerCase()) || it.name.toLowerCase().includes(homeSearch.toLowerCase()))
+                  .map((it) => {
+                    const owned = !!homeOwned[it.name];
+                    const canAfford = roomCoins >= it.price;
+                    const disabled = owned || !canAfford || !isOwner;
+                    return (
+                      <div
+                        key={it.name}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: owned ? '#0d1a0d' : '#161616', borderRadius: 6, border: `1px solid ${owned ? '#1a3a1a' : '#1a2e1a'}`, opacity: owned ? 1 : (canAfford ? 1 : 0.6) }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <HomeModelThumb name={it.name} size={64} />
+                        </div>
+                        <div style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 700, lineHeight: 1.2, minHeight: 24 }}>{it.label}</div>
+                        <button
+                          type="button"
+                          onClick={() => buyHomeItem(it.name)}
+                          disabled={disabled}
+                          style={{
+                            background: owned ? '#1a2e1a' : canAfford ? '#22c55e' : '#1a2e1a',
+                            color: owned ? '#22c55e' : canAfford ? '#000' : '#374151',
+                            border: 'none', borderRadius: 4, fontSize: 9, fontWeight: 800,
+                            fontFamily: 'inherit', padding: '4px 6px', cursor: disabled ? 'default' : 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {owned ? 'OWNED' : `${it.price.toLocaleString()}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
 
               <div style={{ marginTop: 10, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
                 Click the glowing cube to earn RC. Combos build fast clicks. Drag furniture to place, R to rotate, ↑/↓ to raise/lower.
