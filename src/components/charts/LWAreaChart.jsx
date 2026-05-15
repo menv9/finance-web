@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AreaSeries, ColorType, createChart } from 'lightweight-charts';
-import { axisLabelsFromPoints, cleanChartData } from './chartData';
+import { chartTimeToMs, cleanChartData } from './chartData';
 import { subscribeChartTooltip } from './chartTooltip';
 
 function resolveColor(color, element) {
@@ -38,6 +38,29 @@ function removeSeriesSafely(chart, seriesList) {
       // React dev remounts can leave a stale series handle behind.
     }
   });
+}
+
+function shouldUseVisibleRange(visibleRange, points) {
+  if (!visibleRange?.from || !visibleRange?.to || points.length < 2) return false;
+
+  const from = chartTimeToMs(visibleRange.from);
+  const to = chartTimeToMs(visibleRange.to);
+  const times = points
+    .map((point) => chartTimeToMs(point.time))
+    .filter((time) => Number.isFinite(time));
+
+  if (!Number.isFinite(from) || !Number.isFinite(to) || times.length < 2) return false;
+
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  const rangeSpan = to - from;
+  if (rangeSpan <= 0) return false;
+
+  const leftGap = Math.max(0, min - from);
+  const rightGap = Math.max(0, to - max);
+  const dataSpan = max - min;
+
+  return dataSpan >= rangeSpan * 0.45 && leftGap <= rangeSpan * 0.28 && rightGap <= rangeSpan * 0.28;
 }
 
 export default function LWAreaChart({
@@ -82,7 +105,7 @@ export default function LWAreaChart({
         ticksVisible: true,
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 2,
+        rightOffset: 0,
       },
       handleScroll: false,
       handleScale: false,
@@ -161,7 +184,7 @@ export default function LWAreaChart({
       seriesRef.current.push({ series: s2, label: secondSeries.label || 'Cost basis' });
     }
 
-    if (visibleRange?.from && visibleRange?.to) {
+    if (shouldUseVisibleRange(visibleRange, mainData)) {
       chart.timeScale().setVisibleRange(visibleRange);
     } else {
       chart.timeScale().fitContent();
@@ -169,18 +192,9 @@ export default function LWAreaChart({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, color, topOpacity, bottomOpacity, referenceY, referenceColor, secondSeries?.data, secondSeries?.color, secondSeries?.topOpacity, secondSeries?.bottomOpacity, secondSeries?.dashed, priceFormatter, visibleRange?.from, visibleRange?.to]);
 
-  const labels = axisLabelsFromPoints(data);
-
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      {labels.length > 0 && (
-        <div style={{ position: 'absolute', left: 8, right: 8, bottom: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
-          {labels.map((label) => (
-            <span key={label} style={{ fontSize: 11, color: 'rgba(128,128,128,0.75)', fontFamily: 'JetBrains Mono, monospace' }}>{label}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

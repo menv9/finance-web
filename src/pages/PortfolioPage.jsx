@@ -217,7 +217,6 @@ function filterPortfolioValueSeries(series, period, locale) {
   if (!points.length) return points;
 
   const first = points[0];
-  const last = points[points.length - 1];
   const boundedPoints = [...points];
   if (first.capturedAtMs > start) {
     const prior = mapped.filter((p) => p.capturedAtMs < start);
@@ -235,15 +234,6 @@ function filterPortfolioValueSeries(series, period, locale) {
       });
     }
     // No prior data → don't add a phantom 0-point; domain clamping hides the empty gap
-  }
-  if (last.capturedAtMs < end) {
-    boundedPoints.push({
-      ...last,
-      id: last.id + '-period-end',
-      capturedAt: new Date(end).toISOString(),
-      capturedAtMs: end,
-      label: formatPortfolioPeriodLabel(end, period, locale),
-    });
   }
   return boundedPoints;
 }

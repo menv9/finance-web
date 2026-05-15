@@ -27,7 +27,7 @@ export function normalizeChartTime(time) {
   return Number.isNaN(date.getTime()) ? null : Math.floor(date.getTime() / 1000);
 }
 
-function chartTimeToMs(time) {
+export function chartTimeToMs(time) {
   const normalized = normalizeChartTime(time);
   if (normalized == null) return Number.NaN;
   if (typeof normalized === 'number') return normalized * 1000;
