@@ -8,6 +8,7 @@ import * as LucideIcons from 'lucide-react';
 import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { HOME_PACK, HOME_PACK_CATEGORIES, findHomeModel, loadHomeModel } from '../utils/coinroomHomePack';
+import { getSupabaseBrowserClient } from '../utils/supabase';
 import HomeModelThumb from '../components/coingame/HomeModelThumb';
 
 const ROOM = { w: 22, d: 22, h: 9 };
@@ -577,6 +578,7 @@ export default function CoingameRoomPage() {
   const [roomSize, setRoomSize] = useState(() => parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10));
   const [buildMode, setBuildMode] = useState(false);
   const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
+  const [wallView, setWallView] = useState('up'); // 'up' | 'cut' | 'down'
   const [homeCategory, setHomeCategory] = useState('All');
   const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
@@ -1020,6 +1022,107 @@ export default function CoingameRoomPage() {
       });
     }
 
+    // ── Realtime: broadcast our pose & render other visitors ────────────────
+    const remotePlayers = new Map(); // userId → { group, target, label }
+    let supaChannel = null;
+    let myId = null;
+    let myName = 'Visitor';
+
+    function makeRemotePlayer(name, colorSeed) {
+      const g = new THREE.Group();
+      const hue = ((colorSeed >>> 0) % 360) / 360;
+      const bodyColor = new THREE.Color().setHSL(hue, 0.6, 0.55);
+      const emissive = new THREE.Color().setHSL(hue, 0.7, 0.35);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, emissive, emissiveIntensity: 0.4, roughness: 0.45, metalness: 0.3 });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.4, 6, 12), bodyMat);
+      body.position.y = 1.2;
+      body.castShadow = true;
+      g.add(body);
+      // facing indicator (small nub)
+      const nub = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x0c1a0c }));
+      nub.position.set(0, 1.6, 0.4);
+      g.add(nub);
+      // name sprite
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+      const cx = c.getContext('2d');
+      cx.fillStyle = 'rgba(6,8,6,0.85)';
+      cx.fillRect(0, 0, 256, 64);
+      cx.fillStyle = '#bbf7d0';
+      cx.font = '700 28px monospace';
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillText((name || 'Visitor').slice(0, 16), 128, 32);
+      const tex = new THREE.CanvasTexture(c);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      sprite.scale.set(2.4, 0.6, 1);
+      sprite.position.y = 3.1;
+      g.add(sprite);
+      return { group: g, target: { x: 0, z: 4, yaw: 0 } };
+    }
+
+    (async () => {
+      const sb = getSupabaseBrowserClient();
+      if (!sb) return;
+      const { data: auth } = await sb.auth.getUser();
+      myId = auth?.user?.id;
+      if (!myId) return;
+      myName = (auth.user.user_metadata?.username) || (auth.user.email?.split('@')[0]) || 'Visitor';
+
+      supaChannel = sb.channel(`cg-room-${coinId}`, {
+        config: { broadcast: { self: false }, presence: { key: myId } },
+      });
+
+      supaChannel.on('broadcast', { event: 'pose' }, ({ payload }) => {
+        if (!payload || payload.id === myId) return;
+        let rp = remotePlayers.get(payload.id);
+        if (!rp) {
+          const seed = [...String(payload.id)].reduce((a, c) => a + c.charCodeAt(0), 0);
+          rp = makeRemotePlayer(payload.name || 'Visitor', seed * 47);
+          rp.group.position.set(payload.x, 0, payload.z);
+          rp.group.rotation.y = payload.yaw;
+          scene.add(rp.group);
+          remotePlayers.set(payload.id, rp);
+        }
+        rp.target.x = payload.x;
+        rp.target.z = payload.z;
+        rp.target.yaw = payload.yaw;
+      });
+
+      supaChannel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        (leftPresences || []).forEach((p) => {
+          const id = p.id || p.key;
+          const rp = remotePlayers.get(id);
+          if (rp) { scene.remove(rp.group); remotePlayers.delete(id); }
+        });
+      });
+
+      supaChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await supaChannel.track({ id: myId, name: myName });
+        }
+      });
+    })();
+
+    let lastBroadcast = 0;
+    let lastSentX = 0, lastSentZ = 0, lastSentYaw = 0;
+    function broadcastPose() {
+      if (!supaChannel || !myId) return;
+      const now = performance.now();
+      if (now - lastBroadcast < 100) return; // 10 Hz cap
+      const dx = player.position.x - lastSentX;
+      const dz = player.position.z - lastSentZ;
+      const dy = player.rotation.y - lastSentYaw;
+      if (Math.abs(dx) < 0.015 && Math.abs(dz) < 0.015 && Math.abs(dy) < 0.02) return;
+      lastBroadcast = now;
+      lastSentX = player.position.x;
+      lastSentZ = player.position.z;
+      lastSentYaw = player.rotation.y;
+      supaChannel.send({
+        type: 'broadcast',
+        event: 'pose',
+        payload: { id: myId, name: myName, x: player.position.x, z: player.position.z, yaw: player.rotation.y },
+      });
+    }
+
     // ── Home-pack owned (async loaded at init from localStorage) ─────────────
     const initialHome = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
     const homeDefaults = [[-4, 4], [4, 4], [-5, 0], [5, 0], [-4, -4], [4, -4], [0, 5], [0, -5]];
@@ -1409,8 +1512,8 @@ export default function CoingameRoomPage() {
       if (playerMixer) playerMixer.update(dt);
 
       // ── Player tank-style controls (W/S walk, A/D turn) ─────────────────
-      const moveSpeed = 0.14;
-      const turnSpeed = 2.4; // radians per second
+      const moveSpeed = 0.075;
+      const turnSpeed = 2.8; // radians per second
       let forward = 0; let turn = 0;
       if (keyState.w) forward += 1;
       if (keyState.s) forward -= 1;
@@ -1465,10 +1568,22 @@ export default function CoingameRoomPage() {
         let target = player.rotation.y + Math.PI;
         while (target - tTheta > Math.PI) target -= Math.PI * 2;
         while (target - tTheta < -Math.PI) target += Math.PI * 2;
-        tTheta += (target - tTheta) * Math.min(1, dt * 4);
+        tTheta += (target - tTheta) * Math.min(1, dt * 10);
       }
       theta += (tTheta - theta) * 0.08;
       phi += (tPhi - phi) * 0.06;
+      // Broadcast our pose and interpolate remote players
+      broadcastPose();
+      const rLerp = Math.min(1, dt * 12);
+      remotePlayers.forEach((rp) => {
+        rp.group.position.x += (rp.target.x - rp.group.position.x) * rLerp;
+        rp.group.position.z += (rp.target.z - rp.group.position.z) * rLerp;
+        let dy2 = rp.target.yaw - rp.group.rotation.y;
+        while (dy2 > Math.PI) dy2 -= Math.PI * 2;
+        while (dy2 < -Math.PI) dy2 += Math.PI * 2;
+        rp.group.rotation.y += dy2 * rLerp;
+      });
+
       if (playerMixer?.userData) {
         const { idle, walk } = playerMixer.userData;
         if (idle && walk && idle !== walk) {
@@ -1586,6 +1701,7 @@ export default function CoingameRoomPage() {
       wrap.removeEventListener('touchmove', onTMove);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      if (supaChannel) { try { supaChannel.unsubscribe(); } catch (e) { /* ignore */ } }
       renderer.dispose();
       sceneRef.current = null;
     };
@@ -1621,6 +1737,9 @@ export default function CoingameRoomPage() {
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85, metalness: 0.05 });
     const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.45, metalness: 0.4 });
     const capMat = new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.5, metalness: 0.3 });
+    const wallH = wallView === 'cut' ? 1.6 : ROOM.h;
+    const showMain = wallView !== 'down';
+    const showCap = wallView === 'up';
     walls.forEach((w) => {
       const dx = w.x2 - w.x1;
       const dz = w.z2 - w.z1;
@@ -1629,23 +1748,27 @@ export default function CoingameRoomPage() {
       const angle = -Math.atan2(dz, dx);
       const cx = (w.x1 + w.x2) / 2;
       const cz = (w.z1 + w.z2) / 2;
-      const main = new THREE.Mesh(new THREE.BoxGeometry(len, ROOM.h, 0.16), wallMat);
-      main.position.set(cx, ROOM.h / 2, cz);
-      main.rotation.y = angle;
-      main.userData.wallId = w.id;
-      wallGroup.add(main);
+      if (showMain) {
+        const main = new THREE.Mesh(new THREE.BoxGeometry(len, wallH, 0.16), wallMat);
+        main.position.set(cx, wallH / 2, cz);
+        main.rotation.y = angle;
+        main.userData.wallId = w.id;
+        wallGroup.add(main);
+      }
       const base = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.16, 0.22), baseMat);
       base.position.set(cx, 0.08, cz);
       base.rotation.y = angle;
       base.userData.wallId = w.id;
       wallGroup.add(base);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.04, 0.22), capMat);
-      cap.position.set(cx, ROOM.h - 0.02, cz);
-      cap.rotation.y = angle;
-      cap.userData.wallId = w.id;
-      wallGroup.add(cap);
+      if (showCap) {
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.04, 0.22), capMat);
+        cap.position.set(cx, ROOM.h - 0.02, cz);
+        cap.rotation.y = angle;
+        cap.userData.wallId = w.id;
+        wallGroup.add(cap);
+      }
     });
-  }, [walls, roomSize]);
+  }, [walls, roomSize, wallView]);
 
   // Bucket click → RC clicker (no server call; FC claim was repurposed)
   useEffect(() => {
@@ -1809,6 +1932,24 @@ export default function CoingameRoomPage() {
               drag to orbit · scroll to zoom
             </div>
           )}
+
+          {/* Wall view cycle (Sims-style) */}
+          <button
+            type="button"
+            onClick={() => setWallView((v) => v === 'up' ? 'cut' : v === 'cut' ? 'down' : 'up')}
+            style={{
+              position: 'absolute', top: isOwner ? 220 : 116, right: 16, zIndex: 2, pointerEvents: 'all',
+              background: 'rgba(6,8,6,0.88)', color: '#4ade80',
+              border: '1px solid #1a2e1a', borderRadius: 8, padding: '8px 12px',
+              fontSize: 11, fontFamily: 'inherit', fontWeight: 800, cursor: 'pointer',
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+            title="Cycle wall visibility (Up → Cut → Down)"
+          >
+            <LucideIcons.Layers size={13} /> Walls: {wallView}
+          </button>
+
 
           {/* Room Coin tycoon HUD — top right */}
           <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(6,8,6,0.92)', border: `1px solid ${hypePhase === 'pumping' ? '#78350f' : '#1a2e1a'}`, borderRadius: 10, padding: '10px 14px', backdropFilter: 'blur(12px)', minWidth: 158, textAlign: 'right', transition: 'border-color 0.4s' }}>
