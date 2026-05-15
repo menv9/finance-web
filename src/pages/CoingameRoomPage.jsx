@@ -1017,18 +1017,6 @@ export default function CoingameRoomPage() {
           playerMixer.userData = { idle, walk };
         }
       });
-      fbx.load('/models/player/fbx/Alien_Helmet.fbx', (h) => {
-        const box = new THREE.Box3().setFromObject(h);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const center = new THREE.Vector3(); box.getCenter(center);
-        const targetH = 1.6;
-        const s = targetH / Math.max(0.001, size.y);
-        h.scale.setScalar(s);
-        h.position.x = -center.x * s;
-        h.position.z = -center.z * s;
-        h.position.y = -box.min.y * s;
-        player.add(h);
-      });
     }
 
     // ── Home-pack owned (async loaded at init from localStorage) ─────────────
