@@ -1965,10 +1965,39 @@ export default function CoingameRoomPage() {
 
       const px2 = player.position.x;
       const pz2 = player.position.z;
+      // Desired camera position (orbit math)
+      const camDX = Math.sin(theta) * Math.cos(phi) * tRad;
+      const camDY = Math.sin(phi) * tRad + 1;
+      const camDZ = Math.cos(theta) * Math.cos(phi) * tRad;
+      // Raycast from player head toward desired camera position; if a hull wall is in the way, pull camera in.
+      const camOriginX = px2;
+      const camOriginY = 1.5;
+      const camOriginZ = pz2;
+      const dirX = camDX, dirY = camDY - camOriginY, dirZ = camDZ;
+      const dirLen = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1;
+      const ndx = dirX / dirLen, ndy = dirY / dirLen, ndz = dirZ / dirLen;
+      let safeRad = tRad;
+      if (spaceshipHullGroup) {
+        raycaster.set(
+          new THREE.Vector3(camOriginX, camOriginY, camOriginZ),
+          new THREE.Vector3(ndx, ndy, ndz),
+        );
+        raycaster.far = dirLen;
+        const hits = raycaster.intersectObject(spaceshipHullGroup, true);
+        const wallHit = hits.find((h) => {
+          const slot = h.object?.userData?.hullSlot;
+          // skip floor/glass — only opaque walls should pull the camera in
+          return slot !== 'deck_floor' && slot !== 'canopy_glass' && slot !== 'hull_trim';
+        });
+        if (wallHit) {
+          safeRad = Math.max(1.5, wallHit.distance - 0.5);
+        }
+      }
+      const r = safeRad;
       camera.position.set(
-        px2 + Math.sin(theta) * Math.cos(phi) * tRad,
-        Math.sin(phi) * tRad + 1,
-        pz2 + Math.cos(theta) * Math.cos(phi) * tRad
+        px2 + Math.sin(theta) * Math.cos(phi) * r,
+        Math.sin(phi) * r + 1,
+        pz2 + Math.cos(theta) * Math.cos(phi) * r,
       );
       camera.lookAt(px2, 1.5, pz2);
 
