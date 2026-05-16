@@ -448,9 +448,10 @@ export default function CoingameRoomPage() {
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
     // Drive room dimensions from state so expansion rebuilds the scene at new size.
-    // Elongated spaceship footprint: wider on Z (length) than X (width)
-    ROOM.w = 22;
-    ROOM.d = 32;
+    // Spaceship hull (Blender-exported Spaceship_interior.obj) — dims ~42 × 9 × 30
+    ROOM.w = 30;
+    ROOM.d = 42;
+    ROOM.h = 9;
     const wrap = wrapRef.current;
     const cvs = canvasRef.current;
     if (!wrap || !cvs) return;
@@ -635,47 +636,29 @@ export default function CoingameRoomPage() {
     }
     const trimHex = parseInt(initAmbient.replace('#', ''), 16) || 0x22c55e;
     // Elongated octagon footprint: 8 walls — 2 long sides, 2 short ends (cockpit + back), 4 chamfer corners
-    const HW = ROOM.w / 2;
-    const HL = ROOM.d / 2;
-    const CHF = 4;
-    const octVerts = [
-      [-HW, -HL + CHF], [-HW, HL - CHF],
-      [-HW + CHF, HL], [HW - CHF, HL],
-      [HW, HL - CHF], [HW, -HL + CHF],
-      [HW - CHF, -HL], [-HW + CHF, -HL],
-    ];
-    scene.userData.octVerts = octVerts;
-    scene.userData.octChamfer = CHF;
-    const edgeRoles = ['side', 'chamfer', 'back', 'chamfer', 'side', 'chamfer', 'cockpit', 'chamfer'];
-    const cantAngle = 0;
-    octVerts.forEach((a, i) => {
-      const b = octVerts[(i + 1) % octVerts.length];
-      const dx = b[0] - a[0], dz = b[1] - a[1];
-      const len = Math.hypot(dx, dz);
-      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-      const role = edgeRoles[i];
-      const ry = Math.atan2(dz, -dx);
-      const opts = role === 'cockpit'  ? { winCount: 1, winW: Math.min(len * 0.85, 11), winH: ROOM.h * 0.52 }
-                 : role === 'back'     ? { winCount: 1, winW: len * 0.55, winH: ROOM.h * 0.4 }
-                 : role === 'side'     ? { winCount: 3, winW: 4.2, winH: 3.5 }
-                 : { winCount: 0 };
-      const wall = buildSpaceshipWall(len, ROOM.h, trimHex, opts);
-      wall.position.y = ROOM.h / 2;
-      if (role === 'chamfer') {
-        const tMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 1.8, roughness: 0.5 });
-        const conduit = new THREE.Mesh(new THREE.BoxGeometry(0.06, ROOM.h * 0.8, 0.04), tMat);
-        conduit.position.set(0, 0, 0.08);
-        wall.add(conduit);
-      }
-      const inner = new THREE.Group();
-      inner.rotation.x = -cantAngle;
-      inner.add(wall);
-      const outer = new THREE.Group();
-      outer.position.set(mx, 0, mz);
-      outer.rotation.y = ry;
-      outer.add(inner);
-      scene.add(outer);
-    });
+    // Load the Blender-edited ship interior. Single OBJ mesh with inward-flipped normals.
+    {
+      const hullLoader = new OBJLoader();
+      hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
+        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+        const hullMat = new THREE.MeshStandardMaterial({
+          color: 0x3a4258, roughness: 0.45, metalness: 0.78,
+          side: THREE.DoubleSide,
+          flatShading: true,
+        });
+        group.traverse((c) => {
+          if (c.isMesh) {
+            c.material = hullMat;
+            c.receiveShadow = true;
+          }
+        });
+        group.position.set(0, 0, 0);
+        group.userData.spaceshipHull = true;
+        scene.add(group);
+      }, undefined, (err) => {
+        console.warn('Failed to load spaceship interior', err);
+      });
+    }
 
     // ── Outer space backdrop ─────────────────────────────────────────────────
     scene.background = new THREE.Color(0x02030a);
@@ -861,13 +844,9 @@ export default function CoingameRoomPage() {
       roughness: 0.55, metalness: 0.75,
       transparent: true, opacity: 0.92, depthWrite: true,
     });
-    const floorShape = new THREE.Shape();
-    floorShape.moveTo(octVerts[0][0], octVerts[0][1]);
-    for (let i = 1; i < octVerts.length; i++) floorShape.lineTo(octVerts[i][0], octVerts[i][1]);
-    floorShape.closePath();
-    const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w * 0.8, ROOM.d * 0.9), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.005;
+    floor.position.y = 0.02;
     floor.receiveShadow = true;
     scene.add(floor);
 
@@ -875,22 +854,6 @@ export default function CoingameRoomPage() {
     const gridHelper = new THREE.GridHelper(ROOM.w, ROOM.w, 0x2a3148, 0x1a2030);
     gridHelper.visible = false;
     scene.add(gridHelper);
-
-    // Emissive trim seam along each octagon edge
-    const seamMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.5 });
-    octVerts.forEach((a, i) => {
-      const b = octVerts[(i + 1) % octVerts.length];
-      const dx = b[0] - a[0], dz = b[1] - a[1];
-      const len = Math.hypot(dx, dz);
-      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-      const ry = Math.atan2(dz, -dx);
-      const s = new THREE.Mesh(new THREE.BoxGeometry(len * 0.95, 0.05, 0.06), seamMat);
-      // Push the seam slightly inward along its actual perpendicular
-      const nx = Math.sin(ry), nz = Math.cos(ry);
-      s.position.set(mx - nx * 0.06, 0.025, mz - nz * 0.06);
-      s.rotation.y = ry;
-      scene.add(s);
-    });
 
     // Ceiling LED panel — flat recessed rectangle
     const ceilFixMat = new THREE.MeshStandardMaterial({ color: 0x1a2030, roughness: 0.35, metalness: 0.85 });
@@ -903,19 +866,15 @@ export default function CoingameRoomPage() {
     glowPanel.position.set(0, ROOM.h - 0.08, 0);
     scene.add(glowPanel);
 
-    // Corner uplights — one tucked into each chamfer corner
-    [1, 3, 5, 7].forEach((chamferIdx) => {
-      const a = octVerts[chamferIdx];
-      const b = octVerts[(chamferIdx + 1) % octVerts.length];
-      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-      const tl = Math.hypot(mx, mz);
-      const x = mx * (1 - 0.5 / tl);
-      const z = mz * (1 - 0.5 / tl);
+    // Corner uplights along the ship's edges
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+      const x = sx * (ROOM.w / 2 - 2.5);
+      const z = sz * (ROOM.d / 2 - 2.5);
       const upMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.6 });
       const up = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.5, 12), upMat);
       up.position.set(x, 0.25, z);
       scene.add(up);
-      const pl = new THREE.PointLight(trimHex, 0.9, 7);
+      const pl = new THREE.PointLight(trimHex, 1.1, 9);
       pl.position.set(x, 0.6, z);
       scene.add(pl);
     });
@@ -1503,21 +1462,10 @@ export default function CoingameRoomPage() {
         mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         raycaster.ray.intersectPlane(floorPlane, intersectPt);
-        const hw = ROOM.w / 2 - 1.2;
-        const hd = ROOM.d / 2 - 1.2;
+        const hw = ROOM.w * 0.4;
+        const hd = ROOM.d * 0.45;
         let nx = Math.max(-hw, Math.min(hw, intersectPt.x));
         let nz = Math.max(-hd, Math.min(hd, intersectPt.z));
-        // Also clamp out of the chamfered corners
-        const fCHF = scene.userData.octChamfer || 4;
-        const fLimit = ROOM.w / 2 + ROOM.d / 2 - fCHF - 1.2 * Math.SQRT2;
-        [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => {
-          const sum = sx * nx + sz * nz;
-          if (sum > fLimit) {
-            const over = sum - fLimit;
-            nx -= sx * over / 2;
-            nz -= sz * over / 2;
-          }
-        });
         // Snap to floor grid (1.0 units = cell size). Hold Shift for free placement.
         if (!e.shiftKey) {
           nx = Math.round(nx);
@@ -1711,24 +1659,13 @@ export default function CoingameRoomPage() {
         const yaw = player.rotation.y;
         const wx = Math.sin(yaw) * forward;
         const wz = Math.cos(yaw) * forward;
-        const margin = 0.8;
-        const CHF = scene.userData.octChamfer || 4;
-        const chamferLimit = ROOM.w / 2 + ROOM.d / 2 - CHF - margin * Math.SQRT2;
-        const clampOct = (x, z) => {
-          x = Math.max(-(ROOM.w / 2 - margin), Math.min(ROOM.w / 2 - margin, x));
-          z = Math.max(-(ROOM.d / 2 - margin), Math.min(ROOM.d / 2 - margin, z));
-          // Project out of the 4 chamfer corners
-          const dirs = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
-          for (const [sx, sz] of dirs) {
-            const sum = sx * x + sz * z;
-            if (sum > chamferLimit) {
-              const over = sum - chamferLimit;
-              x -= sx * over / 2;
-              z -= sz * over / 2;
-            }
-          }
-          return [x, z];
-        };
+        // Conservative AABB inside the ship hull (~70% of bbox).
+        const hwBound = ROOM.w * 0.4;
+        const hdBound = ROOM.d * 0.45;
+        const clampOct = (x, z) => [
+          Math.max(-hwBound, Math.min(hwBound, x)),
+          Math.max(-hdBound, Math.min(hdBound, z)),
+        ];
 
         // Build collider list this frame
         const colliders = [];
