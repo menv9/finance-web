@@ -754,8 +754,9 @@ export default function CoingameRoomPage() {
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
           scene.add(group);
-          // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
-          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim', 'interior_floor']);
+          // Per-triangle AABBs for every wall-like face. Floors/ceilings are filtered below via the
+          // normal.y test, but no slot-based skipping — all walls in the model collide with the player.
+          const skipForCollision = new Set();
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
           const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
@@ -803,8 +804,9 @@ export default function CoingameRoomPage() {
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
           scene.add(group);
-          // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
-          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim', 'interior_floor']);
+          // Per-triangle AABBs for every wall-like face. Floors/ceilings are filtered below via the
+          // normal.y test, but no slot-based skipping — all walls in the model collide with the player.
+          const skipForCollision = new Set();
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
           const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
