@@ -1133,7 +1133,7 @@ export default function CoingameRoomPage() {
     scene.userData.octVerts = octVerts;
     scene.userData.octChamfer = CHF;
     const edgeRoles = ['side', 'chamfer', 'back', 'chamfer', 'side', 'chamfer', 'cockpit', 'chamfer'];
-    const cantAngle = 0.11;
+    const cantAngle = 0;
     octVerts.forEach((a, i) => {
       const b = octVerts[(i + 1) % octVerts.length];
       const dx = b[0] - a[0], dz = b[1] - a[1];
