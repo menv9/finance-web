@@ -967,9 +967,9 @@ export default function CoingameRoomPage() {
     renderer.setClearColor(0x060806);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x060806, 0.004);
+    scene.fog = new THREE.FogExp2(0x060806, 0.0008);
 
-    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 120);
+    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 3000);
     camera.position.set(0, 8, 15);
     camera.lookAt(0, 1.5, 0);
 
@@ -1027,7 +1027,7 @@ export default function CoingameRoomPage() {
         const u = Math.random(), v = Math.random();
         const theta = 2 * Math.PI * u;
         const phi = Math.acos(2 * v - 1);
-        const r = 180 + Math.random() * 60;
+        const r = 700 + Math.random() * 300;
         positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
         positions[i * 3 + 1] = r * Math.cos(phi);
         positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
@@ -1094,8 +1094,8 @@ export default function CoingameRoomPage() {
         return tex;
       }
 
-      const PLANET_R = 140;
-      const PLANET_Y = -200;
+      const PLANET_R = 420;
+      const PLANET_Y = -560;
       const planetMat = new THREE.MeshStandardMaterial({
         map: makeEarthTexture(),
         roughness: 0.85, metalness: 0.05,
