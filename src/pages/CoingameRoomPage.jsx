@@ -584,6 +584,7 @@ export default function CoingameRoomPage() {
   const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
   const [wallView, setWallView] = useState('up'); // 'up' | 'cut' | 'down'
   const [chatDraft, setChatDraft] = useState('');
+  const [emoteWheelOpen, setEmoteWheelOpen] = useState(false);
   const [homeCategory, setHomeCategory] = useState('All');
   const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
@@ -1076,6 +1077,40 @@ export default function CoingameRoomPage() {
       if (saved?.ry != null) group.rotation.y = saved.ry;
     }
 
+    // Alien emote/anim helpers
+    const EMOTE_DEFS = {
+      jump:    { hints: ['jump'],         exclude: ['running'] },
+      clap:    { hints: ['clap'] },
+      sit:     { hints: ['sit'] },
+      punch:   { hints: ['punch'] },
+      slash:   { hints: ['swordslash', 'slash'] },
+      bigjump: { hints: ['runningjump'] },
+      death:   { hints: ['death'] },
+    };
+    function buildAlienActionMap(acts) {
+      const pick = (hints, exclude = []) => acts.find((a) => {
+        const n = a.getClip().name.toLowerCase();
+        if (exclude.some((x) => n.includes(x))) return false;
+        return hints.some((h) => n.includes(h));
+      });
+      const map = {};
+      map.idle = pick(['idle', 'stand', 'breath']) || acts[0];
+      map.walk = pick(['walk']) || pick(['run']) || acts[0];
+      Object.entries(EMOTE_DEFS).forEach(([key, def]) => {
+        const a = pick(def.hints, def.exclude);
+        if (a) map[key] = a;
+      });
+      return map;
+    }
+    function triggerEmote(target, name) {
+      if (!target?.byName) return false;
+      const action = target.byName[name];
+      if (!action) return false;
+      target.emoteAction = action;
+      target.emoteUntil = performance.now() + (action.getClip().duration * 1000);
+      return true;
+    }
+
     // ── Player avatar (animated Alien.fbx) with WASD controls ────────────────
     const player = new THREE.Group();
     player.position.set(0, 0, 4);
@@ -1106,11 +1141,9 @@ export default function CoingameRoomPage() {
           console.log('[Alien] animation clips:', g.animations.map((a) => a.name));
           playerMixer = new THREE.AnimationMixer(g);
           playerActions = g.animations.map((clip) => playerMixer.clipAction(clip));
-          const pickByHint = (hints) => playerActions.find((a) => hints.some((h) => a.getClip().name.toLowerCase().includes(h)));
-          const idle = pickByHint(['idle', 'stand', 'breath']) || playerActions[0];
-          const walk = pickByHint(['walk', 'run', 'move']) || playerActions[1] || playerActions[0];
-          playerActions.forEach((a) => { a.enabled = true; a.setEffectiveWeight(a === idle ? 1 : 0); a.play(); });
-          playerMixer.userData = { idle, walk };
+          const byName = buildAlienActionMap(playerActions);
+          playerActions.forEach((a) => { a.enabled = true; a.setEffectiveWeight(a === byName.idle ? 1 : 0); a.play(); });
+          playerMixer.userData = { byName, allActions: playerActions };
         }
       });
     }
@@ -1193,8 +1226,10 @@ export default function CoingameRoomPage() {
         }
       });
       const mixer = new THREE.AnimationMixer(clone);
-      if (alienAnimations[0]) mixer.clipAction(alienAnimations[0]).play();
-      return { body: clone, mixer };
+      const acts = alienAnimations.map((clip) => mixer.clipAction(clip));
+      const byName = buildAlienActionMap(acts);
+      acts.forEach((a) => { a.enabled = true; a.setEffectiveWeight(a === byName.idle ? 1 : 0); a.play(); });
+      return { body: clone, mixer, byName, allActions: acts };
     }
 
     function upgradeRemoteToAlien(rp) {
@@ -1207,17 +1242,21 @@ export default function CoingameRoomPage() {
       toRemove.forEach((m) => rp.group.remove(m));
       rp.group.add(alien.body);
       rp.mixer = alien.mixer;
+      rp.byName = alien.byName;
+      rp.allActions = alien.allActions;
       rp.isAlien = true;
     }
 
     function makeRemotePlayer(id, name, colorSeed) {
       const g = new THREE.Group();
-      const rp = { id, name, group: g, target: { x: 0, z: 4, yaw: 0 }, isAlien: false, bubbleSprite: null, bubbleUntil: 0 };
+      const rp = { id, name, group: g, target: { x: 0, z: 4, yaw: 0 }, isAlien: false, bubbleSprite: null, bubbleUntil: 0, movingUntil: 0, emoteAction: null, emoteUntil: 0 };
       if (alienTemplate) {
         const alien = makeAlienClone(colorSeed);
         if (alien) {
           g.add(alien.body);
           rp.mixer = alien.mixer;
+          rp.byName = alien.byName;
+          rp.allActions = alien.allActions;
           rp.isAlien = true;
         }
       }
@@ -1273,9 +1312,21 @@ export default function CoingameRoomPage() {
           scene.add(rp.group);
           remotePlayers.set(payload.id, rp);
         }
+        const moved = Math.hypot(payload.x - rp.target.x, payload.z - rp.target.z) > 0.04;
         rp.target.x = payload.x;
         rp.target.z = payload.z;
         rp.target.yaw = payload.yaw;
+        if (moved) rp.movingUntil = performance.now() + 350;
+      });
+
+      supaChannel.on('broadcast', { event: 'emote' }, ({ payload }) => {
+        if (!payload || payload.id === myId) return;
+        const rp = remotePlayers.get(payload.id);
+        if (!rp || !rp.byName) return;
+        const action = rp.byName[payload.name];
+        if (!action) return;
+        rp.emoteAction = action;
+        rp.emoteUntil = performance.now() + (action.getClip().duration * 1000);
       });
 
       supaChannel.on('broadcast', { event: 'chat' }, ({ payload }) => {
@@ -1319,6 +1370,7 @@ export default function CoingameRoomPage() {
       });
       if (sceneRef.current) {
         sceneRef.current.supaChannel = supaChannel;
+        sceneRef.current.playEmote = playLocalEmote;
         sceneRef.current.sendChat = (message) => {
           const text = String(message || '').trim().slice(0, 120);
           if (!text) return;
@@ -1329,6 +1381,7 @@ export default function CoingameRoomPage() {
       }
     })();
 
+    const localTarget = { emoteAction: null, emoteUntil: 0 };
     let lastBroadcast = 0;
     let lastSentX = 0, lastSentZ = 0, lastSentYaw = 0;
     function broadcastPose() {
@@ -1348,6 +1401,20 @@ export default function CoingameRoomPage() {
         event: 'pose',
         payload: { id: myId, name: myName, x: player.position.x, z: player.position.z, yaw: player.rotation.y },
       });
+    }
+
+    function playLocalEmote(name) {
+      if (!playerMixer?.userData) return;
+      const ok = triggerEmote({ byName: playerMixer.userData.byName, emoteAction: null, emoteUntil: 0 }, name);
+      if (!ok) return;
+      // sync emote state into local target
+      const action = playerMixer.userData.byName[name];
+      if (!action) return;
+      localTarget.emoteAction = action;
+      localTarget.emoteUntil = performance.now() + (action.getClip().duration * 1000);
+      if (supaChannel && myId) {
+        supaChannel.send({ type: 'broadcast', event: 'emote', payload: { id: myId, name } });
+      }
     }
 
     // (Home/shop items are populated by the React sync effects after mount.)
@@ -1677,6 +1744,14 @@ export default function CoingameRoomPage() {
       const lk = e.key.toLowerCase();
       if (lk in keyState) { keyState[lk] = true; }
       if (lk === 'h') { gridHelper.visible = !gridHelper.visible; }
+      if (e.code === 'Space' || lk === ' ') {
+        playLocalEmote('jump');
+        e.preventDefault();
+      }
+      if (lk === 't') {
+        if (sceneRef.current?.toggleEmoteWheel) sceneRef.current.toggleEmoteWheel();
+        e.preventDefault();
+      }
       if ((e.key === 'r' || e.key === 'R') && dragging) {
         dragging.group.rotation.y += Math.PI / 4;
       }
@@ -1793,6 +1868,7 @@ export default function CoingameRoomPage() {
       broadcastPose();
       const rLerp = Math.min(1, dt * 12);
       const nowMs = performance.now();
+      const blendRate = Math.min(1, dt * 8);
       remotePlayers.forEach((rp) => {
         rp.group.position.x += (rp.target.x - rp.group.position.x) * rLerp;
         rp.group.position.z += (rp.target.z - rp.group.position.z) * rLerp;
@@ -1801,6 +1877,17 @@ export default function CoingameRoomPage() {
         while (dy2 < -Math.PI) dy2 += Math.PI * 2;
         rp.group.rotation.y += dy2 * rLerp;
         if (rp.mixer) rp.mixer.update(dt);
+        if (rp.byName && rp.allActions) {
+          const isMoving = nowMs < (rp.movingUntil || 0);
+          let target = rp.byName.idle;
+          if (rp.emoteAction && nowMs < (rp.emoteUntil || 0)) target = rp.emoteAction;
+          else if (isMoving && rp.byName.walk) target = rp.byName.walk;
+          rp.allActions.forEach((a) => {
+            const tgt = a === target ? 1 : 0;
+            const cur = a.getEffectiveWeight();
+            a.setEffectiveWeight(cur + (tgt - cur) * blendRate);
+          });
+        }
         if (rp.bubbleSprite && nowMs > rp.bubbleUntil) {
           rp.group.remove(rp.bubbleSprite);
           rp.bubbleSprite.material.map?.dispose();
@@ -1826,14 +1913,16 @@ export default function CoingameRoomPage() {
       });
 
       if (playerMixer?.userData) {
-        const { idle, walk } = playerMixer.userData;
-        if (idle && walk && idle !== walk) {
-          const target = moving ? 1 : 0;
-          const cur = walk.getEffectiveWeight();
-          const next = cur + (target - cur) * Math.min(1, dt * 8);
-          walk.setEffectiveWeight(next);
-          idle.setEffectiveWeight(1 - next);
-        }
+        const { byName, allActions } = playerMixer.userData;
+        let target = byName.idle;
+        if (localTarget.emoteAction && performance.now() < localTarget.emoteUntil) target = localTarget.emoteAction;
+        else if (moving && byName.walk) target = byName.walk;
+        const blend = Math.min(1, dt * 8);
+        allActions.forEach((a) => {
+          const tgt = a === target ? 1 : 0;
+          const cur = a.getEffectiveWeight();
+          a.setEffectiveWeight(cur + (tgt - cur) * blend);
+        });
       }
 
       const px2 = player.position.x;
@@ -1963,6 +2052,7 @@ export default function CoingameRoomPage() {
     sceneRef.current.deleteWall = deleteWall;
     sceneRef.current.buildMode = buildMode;
     sceneRef.current.markLayoutDirty = () => setLayoutVersion((v) => v + 1);
+    sceneRef.current.toggleEmoteWheel = () => setEmoteWheelOpen((o) => !o);
     sceneRef.current.reloadLayout = async () => {
       const layout = await fetchRoomLayout(coinId);
       if (!layout) return;
@@ -2186,6 +2276,61 @@ export default function CoingameRoomPage() {
               drag to orbit · scroll to zoom
             </div>
           )}
+
+          {/* Emote wheel (open with T) */}
+          {emoteWheelOpen && (() => {
+            const emotes = [
+              { name: 'clap',    label: 'Clap',  icon: 'Hand' },
+              { name: 'sit',     label: 'Sit',   icon: 'Armchair' },
+              { name: 'punch',   label: 'Punch', icon: 'Zap' },
+              { name: 'slash',   label: 'Slash', icon: 'Swords' },
+              { name: 'bigjump', label: 'Leap',  icon: 'ArrowUpFromLine' },
+              { name: 'death',   label: 'Faint', icon: 'Skull' },
+            ];
+            const radius = 110;
+            return (
+              <div
+                style={{ position: 'absolute', inset: 0, pointerEvents: 'all', zIndex: 4 }}
+                onClick={() => setEmoteWheelOpen(false)}
+              >
+                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 280, height: 280 }}>
+                  {emotes.map((em, i) => {
+                    const angle = (i / emotes.length) * Math.PI * 2 - Math.PI / 2;
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    const Ic = LucideIcons[em.icon] ?? LucideIcons.Smile;
+                    return (
+                      <button
+                        key={em.name}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sceneRef.current?.playEmote?.(em.name);
+                          setEmoteWheelOpen(false);
+                        }}
+                        style={{
+                          position: 'absolute', left: '50%', top: '50%',
+                          transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                          width: 76, height: 76, borderRadius: '50%',
+                          background: 'rgba(6,8,6,0.92)', border: '2px solid #22c55e',
+                          color: '#bbf7d0', cursor: 'pointer',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: 4, fontFamily: 'inherit', fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <Ic size={22} />
+                        <span>{em.label}</span>
+                      </button>
+                    );
+                  })}
+                  <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', color: '#4ade80', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em' }}>
+                    EMOTES
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Habbo-style chat input */}
           <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'all', zIndex: 3 }}>
