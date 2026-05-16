@@ -2308,7 +2308,7 @@ export default function CoingameRoomPage() {
       ringMat.emissiveIntensity = 0.5 + Math.sin(t * (isHypePumping ? 5.5 : 2.8)) * 0.28;
       ceilLight.intensity = (isHypePumping ? 60 : 40) + Math.sin(t * (isHypePumping ? 3.2 : 1.4)) * (isHypePumping ? 12 : 4);
       ceilLight.position.x = Math.sin(t * 0.22) * 2.5;
-      bulb.material.emissiveIntensity = 1.8 + Math.sin(t * (isHypePumping ? 3.0 : 1.4)) * 0.5;
+      ceilGlowMat.emissiveIntensity = 2.4 + Math.sin(t * (isHypePumping ? 3.0 : 1.4)) * 0.6;
 
       const pp = pGeo.attributes.position;
       for (let i = 0; i < N; i++) {
