@@ -1140,8 +1140,7 @@ export default function CoingameRoomPage() {
       const len = Math.hypot(dx, dz);
       const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
       const role = edgeRoles[i];
-      const tl = Math.hypot(mx, mz);
-      const ry = Math.atan2(-mx / tl, -mz / tl);
+      const ry = Math.atan2(dz, -dx);
       const opts = role === 'cockpit'  ? { winCount: 1, winW: Math.min(len * 0.85, 11), winH: ROOM.h * 0.52 }
                  : role === 'back'     ? { winCount: 1, winW: len * 0.55, winH: ROOM.h * 0.4 }
                  : role === 'side'     ? { winCount: 3, winW: 4.2, winH: 3.5 }
@@ -1370,10 +1369,11 @@ export default function CoingameRoomPage() {
       const dx = b[0] - a[0], dz = b[1] - a[1];
       const len = Math.hypot(dx, dz);
       const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-      const tl = Math.hypot(mx, mz);
-      const ry = Math.atan2(-mx / tl, -mz / tl);
+      const ry = Math.atan2(dz, -dx);
       const s = new THREE.Mesh(new THREE.BoxGeometry(len * 0.95, 0.05, 0.06), seamMat);
-      s.position.set(mx * 0.96, 0.025, mz * 0.96);
+      // Push the seam slightly inward along its actual perpendicular
+      const nx = Math.sin(ry), nz = Math.cos(ry);
+      s.position.set(mx - nx * 0.06, 0.025, mz - nz * 0.06);
       s.rotation.y = ry;
       scene.add(s);
     });
