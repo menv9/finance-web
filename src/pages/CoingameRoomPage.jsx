@@ -533,13 +533,7 @@ const SHOP_FURNITURE = [
   { id: 'disco',     label: 'Disco Ball',      desc: 'Bring the party',            cost: 250000, builder: buildDiscoBall,     scale: 1.6, icon: 'Sparkles' },
 ];
 
-const ROOM_TIERS = [
-  { size: 22, cost: 0,       label: 'Starter Den' },
-  { size: 30, cost: 75000,   label: 'Loft' },
-  { size: 40, cost: 400000,  label: 'Penthouse' },
-  { size: 50, cost: 2000000, label: 'Mansion' },
-  { size: 64, cost: 10000000,label: 'Skyhall' },
-];
+const SPACESHIP_ROOM_SIZE = 30;
 
 const UPGRADES = [
   { id: 'cursor',  label: 'Gilded Cursor',  desc: '+1 per click',        baseCost: 20,     click: 1,   passive: 0,   crit: 0    },
@@ -584,7 +578,7 @@ export default function CoingameRoomPage() {
     Object.entries(raw).forEach(([name, v]) => { if (findHomeModel(name)) cleaned[name] = v; });
     return cleaned;
   });
-  const [roomSize, setRoomSize] = useState(() => parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10));
+  const [roomSize] = useState(SPACESHIP_ROOM_SIZE);
   const [buildMode, setBuildMode] = useState(false);
   const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
   const [wallView, setWallView] = useState('up'); // 'up' | 'cut' | 'down'
@@ -713,7 +707,6 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-rt-${coinId}`, String(totalClicks)); }, [totalClicks, coinId]);
   useEffect(() => { localStorage.setItem(`cg-shop-${coinId}`, JSON.stringify(shopOwned)); }, [shopOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
-  useEffect(() => { localStorage.setItem(`cg-room-size-${coinId}`, String(roomSize)); }, [roomSize, coinId]);
   useEffect(() => { localStorage.setItem(`cg-walls-${coinId}`, JSON.stringify(walls)); }, [walls, coinId]);
 
   // Fetch the owner's room layout from Supabase on mount so visitors see it
@@ -729,8 +722,6 @@ export default function CoingameRoomPage() {
           try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
           try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
           try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
-          const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
-          if (!Number.isNaN(rs)) setRoomSize(rs);
           const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
           if (amb) setAmbientColor(amb);
         }
@@ -760,16 +751,6 @@ export default function CoingameRoomPage() {
   function clearAllWalls() {
     if (!isOwner) return;
     setWalls([]);
-  }
-
-  function buyRoomExpansion(targetSize) {
-    if (!isOwner) return;
-    const tier = ROOM_TIERS.find((t) => t.size === targetSize);
-    if (!tier) return;
-    if (roomSize >= targetSize) return;
-    if (roomCoins < tier.cost) return;
-    setRoomCoins((c) => c - tier.cost);
-    setRoomSize(targetSize);
   }
 
   // Sync home-pack owned items into scene as static instances (async OBJ load, draggable)
@@ -1006,8 +987,137 @@ export default function CoingameRoomPage() {
       scene.add(fillLights[i]);
     });
 
-    // ── Room shell (4 walls + open sky — no ceiling, so space is visible above)
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 0.88, metalness: 0.05, side: THREE.DoubleSide });
+    // ── Spaceship hull — metal panels with viewport cutouts ──
+    function makeHullPanelTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024; c.height = 256;
+      const cx = c.getContext('2d');
+      // Brushed dark metal base
+      const g = cx.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, '#1c2230'); g.addColorStop(0.5, '#252b3a'); g.addColorStop(1, '#161a25');
+      cx.fillStyle = g; cx.fillRect(0, 0, 1024, 256);
+      // Subtle horizontal scan lines
+      cx.globalAlpha = 0.08;
+      for (let y = 0; y < 256; y += 2) {
+        cx.fillStyle = y % 4 === 0 ? '#3a4258' : '#10131c';
+        cx.fillRect(0, y, 1024, 1);
+      }
+      cx.globalAlpha = 1;
+      // Panel seams (vertical)
+      cx.strokeStyle = '#0a0d14'; cx.lineWidth = 2;
+      for (let x = 0; x <= 1024; x += 128) {
+        cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, 256); cx.stroke();
+      }
+      cx.strokeStyle = '#3a4258'; cx.lineWidth = 1;
+      for (let x = 0; x <= 1024; x += 128) {
+        cx.beginPath(); cx.moveTo(x + 1, 0); cx.lineTo(x + 1, 256); cx.stroke();
+      }
+      // Panel seams (horizontal)
+      cx.strokeStyle = '#0a0d14'; cx.lineWidth = 2;
+      [0, 128, 256].forEach((y) => { cx.beginPath(); cx.moveTo(0, y); cx.lineTo(1024, y); cx.stroke(); });
+      // Bolts at panel corners
+      cx.fillStyle = '#0a0d14';
+      for (let x = 0; x <= 1024; x += 128) {
+        for (let y = 0; y <= 256; y += 128) {
+          cx.beginPath(); cx.arc(x + (x % 256 === 0 ? 8 : -8), y + (y === 0 ? 8 : -8), 3, 0, Math.PI * 2); cx.fill();
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    const hullTexShared = makeHullPanelTexture();
+    function buildSpaceshipWall(w, h, trimColorHex) {
+      const group = new THREE.Group();
+      // Wall shape with rectangular viewport holes
+      const shape = new THREE.Shape();
+      shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2);
+      shape.lineTo(w / 2, h / 2);   shape.lineTo(-w / 2, h / 2);
+      shape.lineTo(-w / 2, -h / 2);
+      const winCount = w > 22 ? 3 : 2;
+      const winW = Math.min(5, w / (winCount + 1.4));
+      const winH = Math.min(3.6, h * 0.42);
+      const winYCenter = 0;
+      const winFrames = [];
+      for (let i = 0; i < winCount; i++) {
+        const cx = -w / 2 + (w * (i + 1)) / (winCount + 1);
+        const hole = new THREE.Path();
+        hole.moveTo(cx - winW / 2, winYCenter - winH / 2);
+        hole.lineTo(cx + winW / 2, winYCenter - winH / 2);
+        hole.lineTo(cx + winW / 2, winYCenter + winH / 2);
+        hole.lineTo(cx - winW / 2, winYCenter + winH / 2);
+        hole.lineTo(cx - winW / 2, winYCenter - winH / 2);
+        shape.holes.push(hole);
+        winFrames.push({ cx, cy: winYCenter });
+      }
+      const wallTex = hullTexShared.clone();
+      wallTex.needsUpdate = true;
+      wallTex.repeat.set(w / 8, h / 8);
+      const wallMat = new THREE.MeshStandardMaterial({
+        map: wallTex, color: 0x9aa3b8,
+        roughness: 0.5, metalness: 0.7, side: THREE.DoubleSide,
+      });
+      const wallMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), wallMat);
+      wallMesh.receiveShadow = true;
+      group.add(wallMesh);
+      // Window frame + glass per viewport
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a3148, roughness: 0.35, metalness: 0.85 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: trimColorHex, emissive: trimColorHex, emissiveIntensity: 1.6, roughness: 0.5, metalness: 0.4 });
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0x88c8ff, transparent: true, opacity: 0.06,
+        roughness: 0.05, metalness: 0.1, transmission: 0.85,
+        clearcoat: 1, clearcoatRoughness: 0.05,
+        side: THREE.DoubleSide,
+      });
+      winFrames.forEach(({ cx, cy }) => {
+        const frameThick = 0.18;
+        const frameDepth = 0.22;
+        // Top
+        const fT = new THREE.Mesh(new THREE.BoxGeometry(winW + frameThick * 2, frameThick, frameDepth), frameMat);
+        fT.position.set(cx, cy + winH / 2 + frameThick / 2, 0);
+        group.add(fT);
+        // Bottom
+        const fB = new THREE.Mesh(new THREE.BoxGeometry(winW + frameThick * 2, frameThick, frameDepth), frameMat);
+        fB.position.set(cx, cy - winH / 2 - frameThick / 2, 0);
+        group.add(fB);
+        // Sides
+        const fL = new THREE.Mesh(new THREE.BoxGeometry(frameThick, winH, frameDepth), frameMat);
+        fL.position.set(cx - winW / 2 - frameThick / 2, cy, 0);
+        group.add(fL);
+        const fR = new THREE.Mesh(new THREE.BoxGeometry(frameThick, winH, frameDepth), frameMat);
+        fR.position.set(cx + winW / 2 + frameThick / 2, cy, 0);
+        group.add(fR);
+        // Inner emissive trim around the window
+        const tT = new THREE.Mesh(new THREE.BoxGeometry(winW + 0.04, 0.04, 0.04), trimMat);
+        tT.position.set(cx, cy + winH / 2, 0.12);
+        group.add(tT);
+        const tB = new THREE.Mesh(new THREE.BoxGeometry(winW + 0.04, 0.04, 0.04), trimMat);
+        tB.position.set(cx, cy - winH / 2, 0.12);
+        group.add(tB);
+        const tL = new THREE.Mesh(new THREE.BoxGeometry(0.04, winH, 0.04), trimMat);
+        tL.position.set(cx - winW / 2, cy, 0.12);
+        group.add(tL);
+        const tR = new THREE.Mesh(new THREE.BoxGeometry(0.04, winH, 0.04), trimMat);
+        tR.position.set(cx + winW / 2, cy, 0.12);
+        group.add(tR);
+        // Glass pane
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), glassMat);
+        glass.position.set(cx, cy, 0);
+        group.add(glass);
+      });
+      // Horizontal emissive trim strips: floor edge + ceiling edge
+      const stripMat = new THREE.MeshStandardMaterial({ color: trimColorHex, emissive: trimColorHex, emissiveIntensity: 2.0, roughness: 0.5 });
+      const stripT = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.05, 0.08), stripMat);
+      stripT.position.set(0, h / 2 - 0.15, 0.06);
+      group.add(stripT);
+      const stripB = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.05, 0.08), stripMat);
+      stripB.position.set(0, -h / 2 + 0.15, 0.06);
+      group.add(stripB);
+      return group;
+    }
+    const trimHex = parseInt(initAmbient.replace('#', ''), 16) || 0x22c55e;
     const wallDefs = [
       { pos: [0, ROOM.h / 2, -ROOM.d / 2], ry: 0,            w: ROOM.w, h: ROOM.h },
       { pos: [0, ROOM.h / 2,  ROOM.d / 2], ry: Math.PI,      w: ROOM.w, h: ROOM.h },
@@ -1015,10 +1125,9 @@ export default function CoingameRoomPage() {
       { pos: [ ROOM.w / 2, ROOM.h / 2, 0], ry: -Math.PI / 2, w: ROOM.d, h: ROOM.h },
     ];
     wallDefs.forEach(({ pos, ry, w, h }) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
-      m.position.set(...pos); m.rotation.y = ry;
-      m.receiveShadow = true;
-      scene.add(m);
+      const g = buildSpaceshipWall(w, h, trimHex);
+      g.position.set(...pos); g.rotation.y = ry;
+      scene.add(g);
     });
 
     // ── Outer space backdrop ─────────────────────────────────────────────────
@@ -1163,10 +1272,45 @@ export default function CoingameRoomPage() {
       scene.userData.spaceRefs = { planet, clouds, stars };
     }
 
-    // Floor — glass over space so the planet below is visible
+    // Spaceship floor — dark hex/grid metal plate with emissive seams
+    function makeDeckTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#10141d'; cx.fillRect(0, 0, 512, 512);
+      // Diagonal scratches
+      cx.globalAlpha = 0.06; cx.strokeStyle = '#3a4258'; cx.lineWidth = 0.5;
+      for (let i = 0; i < 60; i++) {
+        const x = Math.random() * 512;
+        cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x + 50, 512); cx.stroke();
+      }
+      cx.globalAlpha = 1;
+      // Plate divisions
+      cx.strokeStyle = '#252b3a'; cx.lineWidth = 2;
+      for (let i = 0; i <= 512; i += 128) {
+        cx.beginPath(); cx.moveTo(0, i); cx.lineTo(512, i); cx.stroke();
+        cx.beginPath(); cx.moveTo(i, 0); cx.lineTo(i, 512); cx.stroke();
+      }
+      // Bolts at plate corners
+      cx.fillStyle = '#0a0d14';
+      for (let x = 0; x <= 512; x += 128) {
+        for (let y = 0; y <= 512; y += 128) {
+          cx.beginPath(); cx.arc(x, y, 4, 0, Math.PI * 2); cx.fill();
+          cx.fillStyle = '#3a4258';
+          cx.beginPath(); cx.arc(x, y, 1.5, 0, Math.PI * 2); cx.fill();
+          cx.fillStyle = '#0a0d14';
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.repeat.set(ROOM.w / 4, ROOM.d / 4);
+      return tex;
+    }
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x1a301a, roughness: 0.4, metalness: 0.3,
-      transparent: true, opacity: 0.28, depthWrite: false,
+      map: makeDeckTexture(), color: 0xb8c0d4,
+      roughness: 0.55, metalness: 0.75,
+      transparent: true, opacity: 0.92, depthWrite: true,
     });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -1174,51 +1318,45 @@ export default function CoingameRoomPage() {
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Floor grid (toggle with H)
-    const gridHelper = new THREE.GridHelper(ROOM.w, ROOM.w, 0x0d2b0d, 0x0a1a0a);
+    // Hidden grid helper (H toggle)
+    const gridHelper = new THREE.GridHelper(ROOM.w, ROOM.w, 0x2a3148, 0x1a2030);
+    gridHelper.visible = false;
     scene.add(gridHelper);
 
-    // Baseboard trim on walls
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.4, metalness: 0.7 });
-    const bH = 0.12;
+    // Emissive trim seam where floor meets each wall
+    const seamMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.5 });
     [
-      [0, 0, -(ROOM.d/2 - 0.05), 0,         ROOM.w],
-      [0, 0,  (ROOM.d/2 - 0.05), 0,         ROOM.w],
-      [-(ROOM.w/2 - 0.05), 0, 0, Math.PI/2, ROOM.d],
-      [ (ROOM.w/2 - 0.05), 0, 0, Math.PI/2, ROOM.d],
-    ].forEach(([x, , z, ry, len]) => {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(len, bH, 0.06), baseMat);
-      b.position.set(x, bH / 2, z);
-      b.rotation.y = ry;
-      scene.add(b);
+      [0, 0.025, -(ROOM.d/2 - 0.06), 0,         ROOM.w * 0.97],
+      [0, 0.025,  (ROOM.d/2 - 0.06), 0,         ROOM.w * 0.97],
+      [-(ROOM.w/2 - 0.06), 0.025, 0, Math.PI/2, ROOM.d * 0.97],
+      [ (ROOM.w/2 - 0.06), 0.025, 0, Math.PI/2, ROOM.d * 0.97],
+    ].forEach(([x, y, z, ry, len]) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.06), seamMat);
+      s.position.set(x, y, z); s.rotation.y = ry;
+      scene.add(s);
     });
 
-    // Ceiling light fixture
-    const fixtMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.9 });
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 1.8, roughness: 1 });
-    const fixtBase = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.06, 24), fixtMat);
-    fixtBase.position.set(0, ROOM.h - 0.04, 0);
-    scene.add(fixtBase);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), glowMat);
-    bulb.position.set(0, ROOM.h - 0.22, 0);
-    scene.add(bulb);
-    const chord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), fixtMat);
-    chord.position.set(0, ROOM.h - 0.55, 0);
-    scene.add(chord);
+    // Ceiling LED panel — flat recessed rectangle
+    const ceilFixMat = new THREE.MeshStandardMaterial({ color: 0x1a2030, roughness: 0.35, metalness: 0.85 });
+    const ceilGlowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: trimHex, emissiveIntensity: 2.4, roughness: 0.9 });
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.05, 1.6), ceilFixMat);
+    panel.position.set(0, ROOM.h - 0.04, 0);
+    scene.add(panel);
+    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.3), ceilGlowMat);
+    glowPanel.rotation.x = Math.PI / 2;
+    glowPanel.position.set(0, ROOM.h - 0.08, 0);
+    scene.add(glowPanel);
 
-    // Wall sconce lights (left & right walls)
-    [-1, 1].forEach((side) => {
-      const x = side * (ROOM.w / 2 - 0.12);
-      const sconceMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 0.3, metalness: 0.85 });
-      const sconceGlow = new THREE.MeshStandardMaterial({ color: 0x86efac, emissive: 0x4ade80, emissiveIntensity: 0.9, roughness: 1 });
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.22), sconceMat);
-      plate.position.set(x, 5, -3);
-      scene.add(plate);
-      const globe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), sconceGlow);
-      globe.position.set(x - side * 0.12, 5, -3);
-      scene.add(globe);
-      const pl = new THREE.PointLight(0x4ade80, 1.1, 8);
-      pl.position.set(x - side * 0.2, 5, -3);
+    // Corner uplights — soft sci-fi accent lighting
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+      const x = sx * (ROOM.w / 2 - 0.4);
+      const z = sz * (ROOM.d / 2 - 0.4);
+      const upMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.6 });
+      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.45, 12), upMat);
+      up.position.set(x, 0.22, z);
+      scene.add(up);
+      const pl = new THREE.PointLight(trimHex, 0.9, 7);
+      pl.position.set(x, 0.6, z);
       scene.add(pl);
     });
 
@@ -2259,8 +2397,6 @@ export default function CoingameRoomPage() {
       try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
       try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
       try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
-      const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
-      if (!Number.isNaN(rs)) setRoomSize(rs);
       const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
       if (amb) setAmbientColor(amb);
     };
@@ -2685,50 +2821,6 @@ export default function CoingameRoomPage() {
                 </div>
               ))}
 
-              {/* Room expansion */}
-              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 16, marginBottom: 10 }}>Room Tier</div>
-              {ROOM_TIERS.map((tier) => {
-                const isCurrent = roomSize === tier.size;
-                const isUnlocked = roomSize >= tier.size;
-                const canAfford = roomCoins >= tier.cost;
-                const canBuy = isOwner && !isUnlocked && canAfford;
-                return (
-                  <div
-                    key={tier.size}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: isCurrent ? '#0d1a0d' : '#161616', borderRadius: 7, border: `1px solid ${isCurrent ? '#22c55e' : isUnlocked ? '#1a3a1a' : (canAfford ? '#1a3a1a' : '#111')}`, marginBottom: 6, opacity: isUnlocked || canAfford ? 1 : 0.55 }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: isCurrent ? '#22c55e' : '#e2e8f0', fontSize: 11, fontWeight: 700 }}>
-                        {tier.label}
-                        {isCurrent && <span style={{ color: '#4ade80', fontSize: 9, marginLeft: 6, fontWeight: 800 }}>CURRENT</span>}
-                      </div>
-                      <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{tier.size} × {tier.size} units</div>
-                    </div>
-                    {isUnlocked ? (
-                      <LucideIcons.Check size={14} color="#22c55e" />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => buyRoomExpansion(tier.size)}
-                        disabled={!canBuy}
-                        style={{
-                          background: canBuy ? '#22c55e' : '#1a2e1a',
-                          color: canBuy ? '#000' : '#374151',
-                          border: 'none', borderRadius: 5, fontSize: 9, fontWeight: 800,
-                          fontFamily: 'inherit', padding: '5px 9px',
-                          cursor: canBuy ? 'pointer' : 'default',
-                          whiteSpace: 'nowrap', flexShrink: 0,
-                        }}
-                      >
-                        {tier.cost.toLocaleString()} RC
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              <div style={{ marginTop: 6, padding: '8px 10px', background: '#0f0f0f', borderRadius: 6, border: '1px solid #1a2e1a', color: '#374151', fontSize: 9, lineHeight: 1.6 }}>
-                Bigger rooms = more space for furniture and sub-room walls. Existing items stay in place.
-              </div>
             </>
           )}
 
