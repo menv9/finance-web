@@ -578,7 +578,12 @@ export default function CoingameRoomPage() {
   const [roomCoins, setRoomCoins] = useState(() => parseFloat(localStorage.getItem(`cg-rc-${coinId}`) || '0'));
   const [upgradesPurchased, setUpgradesPurchased] = useState(() => JSON.parse(localStorage.getItem(`cg-ru-${coinId}`) || '{}'));
   const [shopOwned, setShopOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}'));
-  const [homeOwned, setHomeOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'));
+  const [homeOwned, setHomeOwned] = useState(() => {
+    const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
+    const cleaned = {};
+    Object.entries(raw).forEach(([name, v]) => { if (findHomeModel(name)) cleaned[name] = v; });
+    return cleaned;
+  });
   const [roomSize, setRoomSize] = useState(() => parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10));
   const [buildMode, setBuildMode] = useState(false);
   const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
@@ -722,7 +727,7 @@ export default function CoingameRoomPage() {
         if (layout) {
           applyLayoutToLocal(coinId, layout);
           try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
-          try { setHomeOwned(JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}')); } catch (_) {}
+          try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
           try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
           const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
           if (!Number.isNaN(rs)) setRoomSize(rs);
@@ -2252,7 +2257,7 @@ export default function CoingameRoomPage() {
       if (!layout) return;
       applyLayoutToLocal(coinId, layout);
       try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
-      try { setHomeOwned(JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}')); } catch (_) {}
+      try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
       try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
       const rs = parseInt(localStorage.getItem(`cg-room-size-${coinId}`) || '22', 10);
       if (!Number.isNaN(rs)) setRoomSize(rs);

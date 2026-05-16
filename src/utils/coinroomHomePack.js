@@ -1,159 +1,55 @@
-// Quaternius Ultimate Home Interior — OBJ pack catalog, loader, thumbnail renderer.
-// Models live in /public/models/home/<name>.{obj,mtl}. Color-only materials.
+// Sci-Fi Essentials Kit — OBJ pack catalog, loader, thumbnail renderer.
+// Models live in /public/models/home/<name>.{obj,mtl} with PBR textures in /Textures.
 
 import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
+// Names whose materials should glow in the dark — keyed by lowercase prop name.
+// Value is { color: hex, intensity: number }.
+const EMISSIVE_HINTS = {
+  prop_healthpack:      { color: 0x22ff66, intensity: 1.4 },
+  prop_healthpack_tube: { color: 0x22ff66, intensity: 1.6 },
+  prop_keycard:         { color: 0x4cc9ff, intensity: 1.2 },
+  prop_grenade:         { color: 0xff4422, intensity: 0.8 },
+  prop_mine:            { color: 0xff2266, intensity: 1.0 },
+  prop_satellitedish:   { color: 0x66ccff, intensity: 0.5 },
+  prop_syringe:         { color: 0xb066ff, intensity: 1.0 },
+  prop_mug:             { color: 0x66ddff, intensity: 0.3 },
+};
+
 // ── Catalog ───────────────────────────────────────────────────────────────
 
-// All 123 model filenames (sans extension), grouped by category with a price.
-// Prices are tiered roughly by item size/utility.
 export const HOME_PACK = [
-  // Bathroom (big-ticket plumbing)
-  { name: 'Bathroom_Bathtub',          label: 'Bathtub',          category: 'Bathroom', price: 35000 },
-  { name: 'Bathroom_Shower1',          label: 'Shower',           category: 'Bathroom', price: 28000 },
-  { name: 'Bathroom_Sink',             label: 'Bathroom Sink',    category: 'Bathroom', price: 9000 },
-  { name: 'Bathroom_Toilet',           label: 'Toilet',           category: 'Bathroom', price: 7000 },
-  { name: 'Bathroom_Toilet2',          label: 'Toilet (Modern)',  category: 'Bathroom', price: 8500 },
-  { name: 'Bathroom_Mirror1',          label: 'Mirror',           category: 'Bathroom', price: 4000 },
-  { name: 'Bathroom_Mirror2',          label: 'Mirror (Round)',   category: 'Bathroom', price: 4500 },
-  { name: 'Bathroom_Towel',            label: 'Towel',            category: 'Bathroom', price: 600 },
-  { name: 'Bathroom_ToiletPaper',      label: 'Toilet Paper',     category: 'Bathroom', price: 200 },
-  { name: 'Bathroom_ToiletPaperPile',  label: 'TP Pile',          category: 'Bathroom', price: 400 },
-  { name: 'Bathroom_WashingMachine',   label: 'Washing Machine',  category: 'Bathroom', price: 22000 },
+  // Furniture — desks, chairs, shelves, lockers
+  { name: 'Prop_Chair',            label: 'Crew Chair',         category: 'Furniture', price: 1800 },
+  { name: 'Prop_Desk_Small',       label: 'Console (S)',        category: 'Furniture', price: 3200 },
+  { name: 'Prop_Desk_Medium',      label: 'Console (M)',        category: 'Furniture', price: 5500 },
+  { name: 'Prop_Desk_L',           label: 'Command Console',    category: 'Furniture', price: 12000 },
+  { name: 'Prop_Locker',           label: 'Crew Locker',        category: 'Furniture', price: 4500 },
+  { name: 'Prop_Shelves_ThinShort',label: 'Thin Shelf (S)',     category: 'Furniture', price: 2200 },
+  { name: 'Prop_Shelves_ThinTall', label: 'Thin Shelf (T)',     category: 'Furniture', price: 3000 },
+  { name: 'Prop_Shelves_WideShort',label: 'Wide Shelf (S)',     category: 'Furniture', price: 2800 },
+  { name: 'Prop_Shelves_WideTall', label: 'Wide Shelf (T)',     category: 'Furniture', price: 3800 },
+  { name: 'Prop_Chest',            label: 'Cargo Chest',        category: 'Furniture', price: 8500 },
 
-  // Beds
-  { name: 'Bed_Bunk',                  label: 'Bunk Bed',         category: 'Beds',     price: 45000 },
-  { name: 'Bed_King',                  label: 'King Bed',         category: 'Beds',     price: 60000 },
-  { name: 'Bed_Single',                label: 'Single Bed',       category: 'Beds',     price: 25000 },
+  // Storage — crates
+  { name: 'Prop_Crate',            label: 'Crate',              category: 'Storage',   price: 1200 },
+  { name: 'Prop_Crate_Large',      label: 'Large Crate',        category: 'Storage',   price: 2400 },
+  { name: 'Prop_Crate_Tarp',       label: 'Tarp Crate',         category: 'Storage',   price: 1600 },
+  { name: 'Prop_Crate_Tarp_Large', label: 'Large Tarp Crate',   category: 'Storage',   price: 3200 },
 
-  // Seating
-  { name: 'Chair_1',                   label: 'Wooden Chair',     category: 'Seating',  price: 1400 },
-  { name: 'Chair_2',                   label: 'Lounge Chair',     category: 'Seating',  price: 2200 },
-  { name: 'Chair_3',                   label: 'Office Chair',     category: 'Seating',  price: 2800 },
-  { name: 'Chair_4',                   label: 'Armchair',         category: 'Seating',  price: 3400 },
-  { name: 'Stool',                     label: 'Stool',            category: 'Seating',  price: 800 },
-  { name: 'Couch_Small1',              label: 'Small Couch',      category: 'Seating',  price: 6500 },
-  { name: 'Couch_Small2',              label: 'Loveseat',         category: 'Seating',  price: 7200 },
-  { name: 'Couch_Medium1',             label: 'Mid Couch',        category: 'Seating',  price: 9500 },
-  { name: 'Couch_Medium2',             label: 'Mid Couch (alt)',  category: 'Seating',  price: 10500 },
-  { name: 'Couch_Large1',              label: 'Long Couch',       category: 'Seating',  price: 14000 },
-  { name: 'Couch_Large2',              label: 'Sectional',        category: 'Seating',  price: 16000 },
-  { name: 'Couch_Large3',              label: 'Lux Sectional',    category: 'Seating',  price: 18500 },
-  { name: 'Couch_L',                   label: 'L-Shape Sofa',     category: 'Seating',  price: 22000 },
+  // Loot — glowy sci-fi gizmos
+  { name: 'Prop_HealthPack',       label: 'Med Pack',           category: 'Loot',      price: 900 },
+  { name: 'Prop_HealthPack_Tube',  label: 'Stim Tube',          category: 'Loot',      price: 600 },
+  { name: 'Prop_KeyCard',          label: 'Key Card',           category: 'Loot',      price: 1500 },
+  { name: 'Prop_Grenade',          label: 'Grenade',            category: 'Loot',      price: 1200 },
+  { name: 'Prop_Mine',             label: 'Proximity Mine',     category: 'Loot',      price: 1800 },
+  { name: 'Prop_Syringe',          label: 'Syringe',            category: 'Loot',      price: 700 },
+  { name: 'Prop_Mug',              label: 'Crew Mug',           category: 'Loot',      price: 400 },
 
-  // Tables
-  { name: 'Table_RoundLarge',          label: 'Round Table (L)',  category: 'Tables',   price: 9500 },
-  { name: 'Table_RoundSmall',          label: 'Round Table (S)',  category: 'Tables',   price: 5500 },
-  { name: 'Table_RoundSmall2',         label: 'Side Table',       category: 'Tables',   price: 3800 },
-  { name: 'NightStand_1',              label: 'Nightstand',       category: 'Tables',   price: 4200 },
-  { name: 'NightStand_2',              label: 'Nightstand (alt)', category: 'Tables',   price: 4400 },
-  { name: 'NightStand_3',              label: 'Modern Nightstand',category: 'Tables',   price: 5200 },
-
-  // Storage
-  { name: 'Bookshelf',                 label: 'Bookshelf',        category: 'Storage',  price: 6500 },
-  { name: 'Shelf_1',                   label: 'Tall Shelf',       category: 'Storage',  price: 4500 },
-  { name: 'Shelf_2',                   label: 'Wide Shelf',       category: 'Storage',  price: 5000 },
-  { name: 'Shelf_Large',               label: 'Large Shelf',      category: 'Storage',  price: 7500 },
-  { name: 'Shelf_Small1',              label: 'Small Shelf',      category: 'Storage',  price: 1800 },
-  { name: 'Shelf_Small2',              label: 'Small Shelf (alt)',category: 'Storage',  price: 1900 },
-  { name: 'Shelf_Small3',              label: 'Wall Shelf',       category: 'Storage',  price: 2100 },
-  { name: 'Drawer_1',                  label: 'Dresser',          category: 'Storage',  price: 6000 },
-  { name: 'Drawer_2',                  label: 'Dresser (alt)',    category: 'Storage',  price: 6200 },
-  { name: 'Drawer_3',                  label: 'Tall Dresser',     category: 'Storage',  price: 8500 },
-  { name: 'Drawer_4',                  label: 'Wide Dresser',     category: 'Storage',  price: 9200 },
-  { name: 'Drawer_5',                  label: 'Modern Dresser',   category: 'Storage',  price: 10000 },
-
-  // Lighting
-  { name: 'Light_Desk',                label: 'Desk Lamp',        category: 'Lighting', price: 1500 },
-  { name: 'Light_Small',               label: 'Small Lamp',       category: 'Lighting', price: 1200 },
-  { name: 'Light_Cube',                label: 'Cube Light',       category: 'Lighting', price: 2800 },
-  { name: 'Light_Cube2',               label: 'Cube Light (alt)', category: 'Lighting', price: 3000 },
-  { name: 'Light_Icosahedron',         label: 'Geo Lamp',         category: 'Lighting', price: 6500 },
-  { name: 'Light_Icosahedron2',        label: 'Geo Lamp (alt)',   category: 'Lighting', price: 7000 },
-  { name: 'Light_Stand1',              label: 'Standing Lamp',    category: 'Lighting', price: 4200 },
-  { name: 'Light_Stand2',              label: 'Standing Lamp (alt)',category: 'Lighting', price: 4400 },
-  { name: 'Light_Floor1',              label: 'Floor Lamp',       category: 'Lighting', price: 3800 },
-  { name: 'Light_Floor2',              label: 'Floor Lamp (alt)', category: 'Lighting', price: 4000 },
-  { name: 'Light_Floor3',              label: 'Tall Floor Lamp',  category: 'Lighting', price: 5200 },
-  { name: 'Light_Floor4',              label: 'Designer Lamp',    category: 'Lighting', price: 5800 },
-  { name: 'Light_Ceiling1',            label: 'Ceiling Light',    category: 'Lighting', price: 3500 },
-  { name: 'Light_Ceiling2',            label: 'Ceiling Light (2)',category: 'Lighting', price: 3700 },
-  { name: 'Light_Ceiling3',            label: 'Ceiling Light (3)',category: 'Lighting', price: 3900 },
-  { name: 'Light_Ceiling4',            label: 'Ceiling Light (4)',category: 'Lighting', price: 4100 },
-  { name: 'Light_Ceiling5',            label: 'Ceiling Light (5)',category: 'Lighting', price: 4300 },
-  { name: 'Light_Ceiling6',            label: 'Ceiling Light (6)',category: 'Lighting', price: 4500 },
-  { name: 'Light_CeilingSingle',       label: 'Pendant',          category: 'Lighting', price: 2800 },
-  { name: 'Light_Chandelier',          label: 'Chandelier',       category: 'Lighting', price: 38000 },
-
-  // Plants
-  { name: 'Houseplant_1',              label: 'Houseplant',       category: 'Plants',   price: 2000 },
-  { name: 'Houseplant_2',              label: 'Houseplant (2)',   category: 'Plants',   price: 2200 },
-  { name: 'Houseplant_3',              label: 'Houseplant (3)',   category: 'Plants',   price: 2500 },
-  { name: 'Houseplant_4',              label: 'Houseplant (4)',   category: 'Plants',   price: 2800 },
-  { name: 'Houseplant_5',              label: 'Houseplant (5)',   category: 'Plants',   price: 3000 },
-  { name: 'Houseplant_6',              label: 'Tall Plant',       category: 'Plants',   price: 4500 },
-  { name: 'Houseplant_7',              label: 'Tall Plant (2)',   category: 'Plants',   price: 4800 },
-  { name: 'Houseplant_8',              label: 'Tall Plant (3)',   category: 'Plants',   price: 5200 },
-
-  // Kitchen
-  { name: 'Kitchen_Fridge',            label: 'Fridge',           category: 'Kitchen',  price: 32000 },
-  { name: 'Kitchen_Oven',              label: 'Oven',             category: 'Kitchen',  price: 22000 },
-  { name: 'Kitchen_Oven_Large',        label: 'Large Oven',       category: 'Kitchen',  price: 28000 },
-  { name: 'Kitchen_Sink',              label: 'Kitchen Sink',     category: 'Kitchen',  price: 12000 },
-  { name: 'Kitchen_1Drawers',          label: 'Cabinet (1)',      category: 'Kitchen',  price: 5500 },
-  { name: 'Kitchen_2Drawers',          label: 'Cabinet (2)',      category: 'Kitchen',  price: 6800 },
-  { name: 'Kitchen_3Drawers',          label: 'Cabinet (3)',      category: 'Kitchen',  price: 8000 },
-  { name: 'Kitchen_Cabinet1',          label: 'Wall Cabinet',     category: 'Kitchen',  price: 4500 },
-  { name: 'Kitchen_Cabinet2',          label: 'Wall Cabinet (2)', category: 'Kitchen',  price: 4700 },
-  { name: 'Kitchen_CabinetSmall',      label: 'Small Cabinet',    category: 'Kitchen',  price: 2800 },
-  { name: 'Plate_1',                   label: 'Plate',            category: 'Kitchen',  price: 200 },
-  { name: 'Plate_2',                   label: 'Plate (2)',        category: 'Kitchen',  price: 220 },
-  { name: 'Plate_3',                   label: 'Plate (3)',        category: 'Kitchen',  price: 240 },
-  { name: 'Fork',                      label: 'Fork',             category: 'Kitchen',  price: 100 },
-  { name: 'Knife',                     label: 'Knife',            category: 'Kitchen',  price: 100 },
-  { name: 'Spoon',                     label: 'Spoon',            category: 'Kitchen',  price: 100 },
-
-  // Decor
-  { name: 'Fireplace',                 label: 'Fireplace',        category: 'Decor',    price: 24000 },
-  { name: 'Carpet_1',                  label: 'Carpet',           category: 'Decor',    price: 3500 },
-  { name: 'Carpet_2',                  label: 'Carpet (2)',       category: 'Decor',    price: 3700 },
-  { name: 'Carpet_Round',              label: 'Round Carpet',     category: 'Decor',    price: 4200 },
-  { name: 'Curtains_Double',           label: 'Curtains',         category: 'Decor',    price: 4500 },
-  { name: 'Curtains_Single',           label: 'Single Curtain',   category: 'Decor',    price: 3200 },
-  { name: 'Column_Round1',             label: 'Round Column',     category: 'Decor',    price: 6000 },
-  { name: 'Column_Round2',             label: 'Round Column (2)', category: 'Decor',    price: 6200 },
-  { name: 'Column_Round3',             label: 'Round Column (3)', category: 'Decor',    price: 6500 },
-  { name: 'Column_SquareBig',          label: 'Big Square Column',category: 'Decor',    price: 9000 },
-  { name: 'Column_SquareSmall',        label: 'Small Square Column',category: 'Decor', price: 5500 },
-
-  // Doors & Windows
-  { name: 'Door_1',                    label: 'Door',             category: 'Doors',    price: 3000 },
-  { name: 'Door_2',                    label: 'Door (2)',         category: 'Doors',    price: 3100 },
-  { name: 'Door_3',                    label: 'Door (3)',         category: 'Doors',    price: 3200 },
-  { name: 'Door_4',                    label: 'Door (4)',         category: 'Doors',    price: 3300 },
-  { name: 'Door_5',                    label: 'Door (5)',         category: 'Doors',    price: 3400 },
-  { name: 'Door_6',                    label: 'Door (6)',         category: 'Doors',    price: 3500 },
-  { name: 'Door_7',                    label: 'Door (7)',         category: 'Doors',    price: 3600 },
-  { name: 'Door_8',                    label: 'Door (8)',         category: 'Doors',    price: 3700 },
-  { name: 'Door_9',                    label: 'Door (9)',         category: 'Doors',    price: 3800 },
-  { name: 'Door_Double',               label: 'Double Door',      category: 'Doors',    price: 6500 },
-  { name: 'Window_Large1',             label: 'Large Window',     category: 'Doors',    price: 5500 },
-  { name: 'Window_Large2',             label: 'Large Window (2)', category: 'Doors',    price: 5700 },
-  { name: 'Window_Small1',             label: 'Small Window',     category: 'Doors',    price: 3500 },
-  { name: 'Window_Small2',             label: 'Small Window (2)', category: 'Doors',    price: 3700 },
-  { name: 'Window_Small3',             label: 'Small Window (3)', category: 'Doors',    price: 3900 },
-  { name: 'Window_Round1',             label: 'Round Window',     category: 'Doors',    price: 6500 },
-  { name: 'Window_Round2',             label: 'Round Window (2)', category: 'Doors',    price: 6700 },
-  { name: 'Window_Round3',             label: 'Round Window (3)', category: 'Doors',    price: 6900 },
-
-  // Misc
-  { name: 'Trashcan_Small1',           label: 'Trashcan',         category: 'Misc',     price: 400 },
-  { name: 'Trashcan_Small2',           label: 'Trashcan (alt)',   category: 'Misc',     price: 420 },
-  { name: 'Trashcan_Cylindric',        label: 'Round Trashcan',   category: 'Misc',     price: 600 },
-  { name: 'Trashcan_Green',            label: 'Recycling Bin',    category: 'Misc',     price: 700 },
-  { name: 'Trashcan_Large',            label: 'Dumpster',         category: 'Misc',     price: 1200 },
+  // Exterior
+  { name: 'Prop_SatelliteDish',    label: 'Satellite Dish',     category: 'Exterior',  price: 18000 },
 ];
 
 export const HOME_PACK_CATEGORIES = ['All', ...Array.from(new Set(HOME_PACK.map((m) => m.category)))];
@@ -166,34 +62,65 @@ export const findHomeModel = (name) => BY_NAME.get(name);
 const loadCache = new Map(); // name → Promise<Group> (template)
 const thumbCache = new Map(); // name → dataURL
 
-function normalizeModel(group) {
-  // Auto-center on X/Z, drop base to y=0
+const textureLoader = new THREE.TextureLoader();
+const emissiveCache = new Map(); // base color filename → emissive THREE.Texture or null
+
+function tryLoadEmissiveFor(baseColorMap) {
+  if (!baseColorMap || !baseColorMap.image || !baseColorMap.image.src) return null;
+  const src = baseColorMap.image.src;
+  // T_*_BaseColor.png → T_*_Emissive.png in same Textures folder
+  const m = src.match(/^(.*\/)([^/]*?)_BaseColor\.(png|jpg|jpeg)$/i);
+  if (!m) return null;
+  const emissiveUrl = `${m[1]}${m[2]}_Emissive.${m[3]}`;
+  if (emissiveCache.has(emissiveUrl)) return emissiveCache.get(emissiveUrl);
+  const tex = textureLoader.load(
+    emissiveUrl,
+    undefined,
+    undefined,
+    () => { emissiveCache.set(emissiveUrl, null); },
+  );
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  emissiveCache.set(emissiveUrl, tex);
+  return tex;
+}
+
+function normalizeModel(group, name) {
   const box = new THREE.Box3().setFromObject(group);
   if (!isFinite(box.min.x)) return group;
   const center = box.getCenter(new THREE.Vector3());
   group.position.x -= center.x;
   group.position.z -= center.z;
   group.position.y -= box.min.y;
-  // Convert MeshPhongMaterial (default from MTLLoader) to MeshStandardMaterial
-  // for better lighting + glow integration with the room.
+  const hint = EMISSIVE_HINTS[name.toLowerCase()] || null;
   group.traverse((c) => {
     if (c.isMesh && c.material) {
       const mats = Array.isArray(c.material) ? c.material : [c.material];
       const newMats = mats.map((m) => {
         if (m.isMeshStandardMaterial) return m;
+        const baseColor = m.map || null;
+        const normalMap = m.normalMap || m.bumpMap || null;
         const sm = new THREE.MeshStandardMaterial({
-          color: m.color ? m.color.clone() : new THREE.Color(0xcccccc),
-          roughness: 0.7,
-          metalness: 0.05,
-          emissive: m.emissive ? m.emissive.clone() : new THREE.Color(0x000000),
+          color: baseColor ? new THREE.Color(0xffffff) : (m.color ? m.color.clone() : new THREE.Color(0xcccccc)),
+          map: baseColor,
+          normalMap,
+          roughness: 0.65,
+          metalness: 0.25,
+          emissive: hint ? new THREE.Color(hint.color) : new THREE.Color(0x000000),
+          emissiveIntensity: hint ? hint.intensity : 0,
         });
+        if (baseColor && baseColor.colorSpace !== THREE.SRGBColorSpace) {
+          baseColor.colorSpace = THREE.SRGBColorSpace;
+        }
+        if (hint) {
+          const emap = tryLoadEmissiveFor(baseColor);
+          if (emap) sm.emissiveMap = emap;
+        }
         return sm;
       });
       c.material = Array.isArray(c.material) ? newMats : newMats[0];
     }
   });
-  // Quaternius models use 1 unit = 1 meter. The room is ~22m wide.
-  // Apply a uniform world scale so everything feels appropriately sized.
   group.scale.setScalar(1.5);
   return group;
 }
@@ -212,7 +139,7 @@ export function loadHomeModel(name) {
           obj.setPath('/models/home/');
           obj.load(
             `${name}.obj`,
-            (group) => resolve(normalizeModel(group)),
+            (group) => resolve(normalizeModel(group, name)),
             undefined,
             reject,
           );
