@@ -1038,41 +1038,101 @@ export default function CoingameRoomPage() {
       stars.frustumCulled = false;
       scene.add(stars);
 
-      // Big planet hovering off to the side, above the open ceiling
-      const planetGeo = new THREE.SphereGeometry(28, 48, 32);
+      // ── Earth-like planet directly below the room (we orbit above it) ──
+      function makeEarthTexture() {
+        const c = document.createElement('canvas');
+        c.width = 1024; c.height = 512;
+        const cx = c.getContext('2d');
+        const grad = cx.createLinearGradient(0, 0, 0, 512);
+        grad.addColorStop(0.0, '#0c1f4a');
+        grad.addColorStop(0.5, '#1e40af');
+        grad.addColorStop(1.0, '#0c1f4a');
+        cx.fillStyle = grad; cx.fillRect(0, 0, 1024, 512);
+        // Continents — random irregular blobs
+        const landColors = ['#15803d', '#166534', '#65a30d', '#a16207', '#365314'];
+        for (let i = 0; i < 90; i++) {
+          cx.fillStyle = landColors[(Math.random() * landColors.length) | 0];
+          const x = Math.random() * 1024;
+          const y = 60 + Math.random() * 390;
+          const segs = 6 + ((Math.random() * 6) | 0);
+          cx.beginPath();
+          for (let s = 0; s < segs; s++) {
+            const a = (s / segs) * Math.PI * 2;
+            const r = 20 + Math.random() * 90;
+            const px = x + Math.cos(a) * r;
+            const py = y + Math.sin(a) * r * 0.7;
+            if (s === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+          }
+          cx.closePath(); cx.fill();
+        }
+        // Ice caps
+        const caps = cx.createLinearGradient(0, 0, 0, 60);
+        caps.addColorStop(0, '#f1f5f9'); caps.addColorStop(1, 'rgba(241,245,249,0)');
+        cx.fillStyle = caps; cx.fillRect(0, 0, 1024, 60);
+        const caps2 = cx.createLinearGradient(0, 452, 0, 512);
+        caps2.addColorStop(0, 'rgba(241,245,249,0)'); caps2.addColorStop(1, '#f1f5f9');
+        cx.fillStyle = caps2; cx.fillRect(0, 452, 1024, 60);
+        return new THREE.CanvasTexture(c);
+      }
+      function makeCloudTexture() {
+        const c = document.createElement('canvas');
+        c.width = 1024; c.height = 512;
+        const cx = c.getContext('2d');
+        cx.clearRect(0, 0, 1024, 512);
+        cx.fillStyle = 'rgba(255,255,255,0.85)';
+        for (let i = 0; i < 120; i++) {
+          const x = Math.random() * 1024;
+          const y = 30 + Math.random() * 450;
+          const rx = 30 + Math.random() * 90;
+          const ry = 10 + Math.random() * 25;
+          cx.beginPath();
+          cx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+          cx.fill();
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        return tex;
+      }
+
+      const PLANET_R = 140;
+      const PLANET_Y = -200;
       const planetMat = new THREE.MeshStandardMaterial({
-        color: 0x7c3aed, emissive: 0x4c1d95, emissiveIntensity: 0.45,
-        roughness: 0.9, metalness: 0.05,
+        map: makeEarthTexture(),
+        roughness: 0.85, metalness: 0.05,
+        emissive: 0x0a1638, emissiveIntensity: 0.25,
       });
-      const planet = new THREE.Mesh(planetGeo, planetMat);
-      planet.position.set(-55, 38, -70);
+      const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R, 96, 64), planetMat);
+      planet.position.set(0, PLANET_Y, 0);
       scene.add(planet);
-      // Rim glow as a slightly larger transparent sphere
-      const haloMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.18, side: THREE.BackSide });
-      const halo = new THREE.Mesh(new THREE.SphereGeometry(30.5, 32, 24), haloMat);
+
+      // Cloud layer
+      const cloudsMat = new THREE.MeshStandardMaterial({
+        map: makeCloudTexture(), transparent: true, opacity: 0.55,
+        depthWrite: false, roughness: 1, metalness: 0,
+      });
+      const clouds = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R + 1.5, 64, 48), cloudsMat);
+      clouds.position.copy(planet.position);
+      scene.add(clouds);
+
+      // Atmospheric halo (rim glow)
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false });
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R + 8, 64, 48), haloMat);
       halo.position.copy(planet.position);
       scene.add(halo);
-      // Ring (Saturn-style)
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0xc4b5fd, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(34, 44, 64), ringMat);
-      ring.position.copy(planet.position);
-      ring.rotation.x = -Math.PI / 2.3;
-      scene.add(ring);
 
-      // Distant directional starlight (cold)
-      const starlight = new THREE.DirectionalLight(0xa8b3ff, 0.35);
-      starlight.position.set(-40, 60, -30);
-      scene.add(starlight);
+      // Sunlight illuminating the planet from above-side
+      const sun = new THREE.DirectionalLight(0xfff7e0, 1.2);
+      sun.position.set(120, 80, 60);
+      scene.add(sun);
 
-      // Expose for the rAF loop
-      var spacePlanet = planet;
-      var spaceRing = ring;
-      var spaceStars = stars;
-      scene.userData.spaceRefs = { planet: spacePlanet, ring: spaceRing, stars: spaceStars };
+      scene.userData.spaceRefs = { planet, clouds, stars };
     }
 
-    // Floor
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a301a, roughness: 0.7, metalness: 0.2 });
+    // Floor — glass over space so the planet below is visible
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x1a301a, roughness: 0.4, metalness: 0.3,
+      transparent: true, opacity: 0.28, depthWrite: false,
+    });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.005;
@@ -2030,12 +2090,12 @@ export default function CoingameRoomPage() {
       );
       camera.lookAt(px2, 1.5, pz2);
 
-      // Planet slow-rotate + starfield drift
+      // Earth rotation + cloud drift + starfield drift
       const space = scene.userData.spaceRefs;
       if (space) {
-        space.planet.rotation.y = t * 0.05;
-        space.ring.rotation.z = t * 0.02;
-        space.stars.rotation.y = t * 0.005;
+        space.planet.rotation.y = t * 0.025;
+        space.clouds.rotation.y = t * 0.040;
+        space.stars.rotation.y = t * 0.003;
       }
 
       cg.rotation.y = t * 0.65;
