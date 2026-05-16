@@ -1044,12 +1044,12 @@ export default function CoingameRoomPage() {
         c.width = 1024; c.height = 512;
         const cx = c.getContext('2d');
         const grad = cx.createLinearGradient(0, 0, 0, 512);
-        grad.addColorStop(0.0, '#0c1f4a');
-        grad.addColorStop(0.5, '#1e40af');
-        grad.addColorStop(1.0, '#0c1f4a');
+        grad.addColorStop(0.0, '#0c2660');
+        grad.addColorStop(0.5, '#1d4ed8');
+        grad.addColorStop(1.0, '#0c2660');
         cx.fillStyle = grad; cx.fillRect(0, 0, 1024, 512);
-        // Continents — random irregular blobs
-        const landColors = ['#15803d', '#166534', '#65a30d', '#a16207', '#365314'];
+        // Continents — lush greens, no browns
+        const landColors = ['#16a34a', '#15803d', '#166534', '#22c55e', '#4ade80', '#365314'];
         for (let i = 0; i < 90; i++) {
           cx.fillStyle = landColors[(Math.random() * landColors.length) | 0];
           const x = Math.random() * 1024;
@@ -1079,8 +1079,8 @@ export default function CoingameRoomPage() {
         c.width = 1024; c.height = 512;
         const cx = c.getContext('2d');
         cx.clearRect(0, 0, 1024, 512);
-        cx.fillStyle = 'rgba(255,255,255,0.85)';
-        for (let i = 0; i < 120; i++) {
+        cx.fillStyle = 'rgba(255,255,255,0.7)';
+        for (let i = 0; i < 35; i++) {
           const x = Math.random() * 1024;
           const y = 30 + Math.random() * 450;
           const rx = 30 + Math.random() * 90;
@@ -1127,7 +1127,7 @@ export default function CoingameRoomPage() {
 
       // Cloud layer
       const cloudsMat = new THREE.MeshStandardMaterial({
-        map: makeCloudTexture(), transparent: true, opacity: 0.55,
+        map: makeCloudTexture(), transparent: true, opacity: 0.3,
         depthWrite: false, roughness: 1, metalness: 0,
       });
       const clouds = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R + 1.5, 64, 48), cloudsMat);
