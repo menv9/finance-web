@@ -1,10 +1,11 @@
 import { cn } from './ui';
 
-export function PageHeader({ title, description, actions, className, ...rest }) {
+export function PageHeader({ eyebrow, number, title, description, actions, className, ...rest }) {
   return (
     <header className={cn('mb-0 grid gap-6 border-b border-rule pb-6 lg:grid-cols-12 lg:gap-8', className)} {...rest}>
       <div className="lg:col-span-8 flex gap-4 lg:gap-6">
         <div className="min-w-0 flex-1">
+          {eyebrow ? <p className="eyebrow mb-2">{eyebrow}</p> : null}
           <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl text-ink leading-[0.95] tracking-tight break-words">
             {title}
           </h1>
