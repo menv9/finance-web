@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import * as LucideIcons from 'lucide-react';
 import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -582,6 +583,7 @@ export default function CoingameRoomPage() {
   const [buildMode, setBuildMode] = useState(false);
   const [walls, setWalls] = useState(() => JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]'));
   const [wallView, setWallView] = useState('up'); // 'up' | 'cut' | 'down'
+  const [chatDraft, setChatDraft] = useState('');
   const [homeCategory, setHomeCategory] = useState('All');
   const [homeSearch, setHomeSearch] = useState('');
   const [floaters, setFloaters] = useState([]);
@@ -1037,6 +1039,8 @@ export default function CoingameRoomPage() {
     scene.add(player);
     let playerMixer = null;
     let playerActions = [];
+    let alienTemplate = null;
+    let alienAnimations = [];
     {
       const fbx = new FBXLoader();
       fbx.load('/models/player/fbx/Alien.fbx', (g) => {
@@ -1050,7 +1054,11 @@ export default function CoingameRoomPage() {
         g.position.z = -center.z * s;
         g.position.y = -box.min.y * s;
         g.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+        alienTemplate = g;
+        alienAnimations = g.animations || [];
         player.add(g);
+        // Upgrade any already-spawned remote players from capsule to alien
+        remotePlayers.forEach((rp) => { if (!rp.isAlien) upgradeRemoteToAlien(rp); });
         if (g.animations && g.animations.length > 0) {
           console.log('[Alien] animation clips:', g.animations.map((a) => a.name));
           playerMixer = new THREE.AnimationMixer(g);
@@ -1066,25 +1074,12 @@ export default function CoingameRoomPage() {
 
     // ── Realtime: broadcast our pose & render other visitors ────────────────
     const remotePlayers = new Map(); // userId → { group, target, label }
+    const localBubbleSlot = { bubbleSprite: null, bubbleUntil: 0 };
     let supaChannel = null;
     let myId = null;
     let myName = 'Visitor';
 
-    function makeRemotePlayer(name, colorSeed) {
-      const g = new THREE.Group();
-      const hue = ((colorSeed >>> 0) % 360) / 360;
-      const bodyColor = new THREE.Color().setHSL(hue, 0.6, 0.55);
-      const emissive = new THREE.Color().setHSL(hue, 0.7, 0.35);
-      const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, emissive, emissiveIntensity: 0.4, roughness: 0.45, metalness: 0.3 });
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.4, 6, 12), bodyMat);
-      body.position.y = 1.2;
-      body.castShadow = true;
-      g.add(body);
-      // facing indicator (small nub)
-      const nub = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x0c1a0c }));
-      nub.position.set(0, 1.6, 0.4);
-      g.add(nub);
-      // name sprite
+    function makeNameSprite(name) {
       const c = document.createElement('canvas'); c.width = 256; c.height = 64;
       const cx = c.getContext('2d');
       cx.fillStyle = 'rgba(6,8,6,0.85)';
@@ -1096,9 +1091,120 @@ export default function CoingameRoomPage() {
       const tex = new THREE.CanvasTexture(c);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
       sprite.scale.set(2.4, 0.6, 1);
-      sprite.position.y = 3.1;
-      g.add(sprite);
-      return { group: g, target: { x: 0, z: 4, yaw: 0 } };
+      sprite.position.y = 3.3;
+      return sprite;
+    }
+
+    function makeChatBubble(text) {
+      const lines = wrapBubbleText(text, 20);
+      const w = 360; const lh = 36; const padX = 22; const padY = 14;
+      const h = padY * 2 + lines.length * lh;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const cx = c.getContext('2d');
+      cx.fillStyle = 'rgba(252,252,252,0.96)';
+      roundRect(cx, 0, 0, w, h - 10, 14); cx.fill();
+      // tail
+      cx.beginPath(); cx.moveTo(w/2 - 12, h - 10); cx.lineTo(w/2, h); cx.lineTo(w/2 + 12, h - 10); cx.closePath();
+      cx.fill();
+      cx.fillStyle = '#111';
+      cx.font = '700 28px DM Mono, monospace';
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      lines.forEach((ln, i) => cx.fillText(ln, w / 2, padY + lh / 2 + i * lh));
+      const tex = new THREE.CanvasTexture(c);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      const scaleW = 3.0; const scaleH = scaleW * (h / w);
+      sprite.scale.set(scaleW, scaleH, 1);
+      sprite.position.y = 4.0 + scaleH / 2;
+      return sprite;
+    }
+
+    function wrapBubbleText(s, max) {
+      const words = String(s).split(/\s+/); const out = []; let cur = '';
+      for (const w of words) {
+        if ((cur + ' ' + w).trim().length > max) { if (cur) out.push(cur); cur = w; }
+        else cur = cur ? cur + ' ' + w : w;
+      }
+      if (cur) out.push(cur);
+      return out.slice(0, 4);
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y,     x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x,     y + h, r);
+      ctx.arcTo(x,     y + h, x,     y,     r);
+      ctx.arcTo(x,     y,     x + w, y,     r);
+      ctx.closePath();
+    }
+
+    function makeAlienClone(seed) {
+      if (!alienTemplate) return null;
+      const clone = cloneSkinned(alienTemplate);
+      const hue = ((seed >>> 0) % 360) / 360;
+      clone.traverse((c) => {
+        if (c.isMesh && c.material) {
+          const dup = (m) => { const nm = m.clone(); if (nm.color) nm.color.offsetHSL(hue - 0.33, 0.1, 0); return nm; };
+          c.material = Array.isArray(c.material) ? c.material.map(dup) : dup(c.material);
+          c.castShadow = true;
+        }
+      });
+      const mixer = new THREE.AnimationMixer(clone);
+      if (alienAnimations[0]) mixer.clipAction(alienAnimations[0]).play();
+      return { body: clone, mixer };
+    }
+
+    function upgradeRemoteToAlien(rp) {
+      if (!alienTemplate || rp.isAlien) return;
+      const seed = [...String(rp.id || '')].reduce((a, c) => a + c.charCodeAt(0), 0) * 47;
+      const alien = makeAlienClone(seed);
+      if (!alien) return;
+      // remove placeholder body but keep label/bubble
+      const toRemove = rp.bodyMesh ? [rp.bodyMesh, rp.nubMesh].filter(Boolean) : [];
+      toRemove.forEach((m) => rp.group.remove(m));
+      rp.group.add(alien.body);
+      rp.mixer = alien.mixer;
+      rp.isAlien = true;
+    }
+
+    function makeRemotePlayer(id, name, colorSeed) {
+      const g = new THREE.Group();
+      const rp = { id, name, group: g, target: { x: 0, z: 4, yaw: 0 }, isAlien: false, bubbleSprite: null, bubbleUntil: 0 };
+      if (alienTemplate) {
+        const alien = makeAlienClone(colorSeed);
+        if (alien) {
+          g.add(alien.body);
+          rp.mixer = alien.mixer;
+          rp.isAlien = true;
+        }
+      }
+      if (!rp.isAlien) {
+        const hue = ((colorSeed >>> 0) % 360) / 360;
+        const bodyColor = new THREE.Color().setHSL(hue, 0.6, 0.55);
+        const emissive = new THREE.Color().setHSL(hue, 0.7, 0.35);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, emissive, emissiveIntensity: 0.4, roughness: 0.45, metalness: 0.3 });
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.4, 6, 12), bodyMat);
+        body.position.y = 1.2; body.castShadow = true; g.add(body);
+        const nub = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x0c1a0c }));
+        nub.position.set(0, 1.6, 0.4); g.add(nub);
+        rp.bodyMesh = body; rp.nubMesh = nub;
+      }
+      g.add(makeNameSprite(name));
+      return rp;
+    }
+
+    function showChatBubble(group, slot, text) {
+      // slot must be an object with bubbleSprite/bubbleUntil keys (rp or localBubbleSlot)
+      if (slot.bubbleSprite) {
+        group.remove(slot.bubbleSprite);
+        slot.bubbleSprite.material.map?.dispose();
+        slot.bubbleSprite.material.dispose();
+        slot.bubbleSprite = null;
+      }
+      const sprite = makeChatBubble(text);
+      group.add(sprite);
+      slot.bubbleSprite = sprite;
+      slot.bubbleUntil = performance.now() + 5000;
     }
 
     (async () => {
@@ -1118,7 +1224,7 @@ export default function CoingameRoomPage() {
         let rp = remotePlayers.get(payload.id);
         if (!rp) {
           const seed = [...String(payload.id)].reduce((a, c) => a + c.charCodeAt(0), 0);
-          rp = makeRemotePlayer(payload.name || 'Visitor', seed * 47);
+          rp = makeRemotePlayer(payload.id, payload.name || 'Visitor', seed * 47);
           rp.group.position.set(payload.x, 0, payload.z);
           rp.group.rotation.y = payload.yaw;
           scene.add(rp.group);
@@ -1127,6 +1233,13 @@ export default function CoingameRoomPage() {
         rp.target.x = payload.x;
         rp.target.z = payload.z;
         rp.target.yaw = payload.yaw;
+      });
+
+      supaChannel.on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (!payload?.message) return;
+        if (payload.id === myId) return; // own bubble is rendered locally
+        const rp = remotePlayers.get(payload.id);
+        if (rp) showChatBubble(rp.group, rp, payload.message);
       });
 
       supaChannel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
@@ -1161,7 +1274,16 @@ export default function CoingameRoomPage() {
           setTimeout(sendInitialPose, 200);
         }
       });
-      if (sceneRef.current) sceneRef.current.supaChannel = supaChannel;
+      if (sceneRef.current) {
+        sceneRef.current.supaChannel = supaChannel;
+        sceneRef.current.sendChat = (message) => {
+          const text = String(message || '').trim().slice(0, 120);
+          if (!text) return;
+          // Local bubble for self
+          showChatBubble(player, localBubbleSlot, text);
+          supaChannel.send({ type: 'broadcast', event: 'chat', payload: { id: myId, name: myName, message: text } });
+        };
+      }
     })();
 
     let lastBroadcast = 0;
@@ -1521,12 +1643,19 @@ export default function CoingameRoomPage() {
     wrap.addEventListener('touchmove', onTMove, { passive: false });
 
     const keyState = { w: false, a: false, s: false, d: false };
+    const isTyping = (e) => {
+      const t = e.target;
+      if (!t) return false;
+      const tag = t.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable;
+    };
     const onKeyUp = (e) => {
       const k = e.key.toLowerCase();
       if (k in keyState) keyState[k] = false;
     };
     window.addEventListener('keyup', onKeyUp);
     const onKeyDown = (e) => {
+      if (isTyping(e)) return;
       const lk = e.key.toLowerCase();
       if (lk in keyState) { keyState[lk] = true; }
       if (lk === 'h') { gridHelper.visible = !gridHelper.visible; }
@@ -1637,6 +1766,7 @@ export default function CoingameRoomPage() {
       // Broadcast our pose and interpolate remote players
       broadcastPose();
       const rLerp = Math.min(1, dt * 12);
+      const nowMs = performance.now();
       remotePlayers.forEach((rp) => {
         rp.group.position.x += (rp.target.x - rp.group.position.x) * rLerp;
         rp.group.position.z += (rp.target.z - rp.group.position.z) * rLerp;
@@ -1644,7 +1774,20 @@ export default function CoingameRoomPage() {
         while (dy2 > Math.PI) dy2 -= Math.PI * 2;
         while (dy2 < -Math.PI) dy2 += Math.PI * 2;
         rp.group.rotation.y += dy2 * rLerp;
+        if (rp.mixer) rp.mixer.update(dt);
+        if (rp.bubbleSprite && nowMs > rp.bubbleUntil) {
+          rp.group.remove(rp.bubbleSprite);
+          rp.bubbleSprite.material.map?.dispose();
+          rp.bubbleSprite.material.dispose();
+          rp.bubbleSprite = null;
+        }
       });
+      if (localBubbleSlot.bubbleSprite && nowMs > localBubbleSlot.bubbleUntil) {
+        player.remove(localBubbleSlot.bubbleSprite);
+        localBubbleSlot.bubbleSprite.material.map?.dispose();
+        localBubbleSlot.bubbleSprite.material.dispose();
+        localBubbleSlot.bubbleSprite = null;
+      }
 
       if (playerMixer?.userData) {
         const { idle, walk } = playerMixer.userData;
@@ -1946,7 +2089,7 @@ export default function CoingameRoomPage() {
           {isOwner && (
             <>
               {/* Build mode toggle (right side, below RC stats card) */}
-              <div style={{ position: 'absolute', top: 116, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, pointerEvents: 'all', zIndex: 2 }}>
+              <div style={{ position: 'absolute', top: 200, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, pointerEvents: 'all', zIndex: 2 }}>
                 <button
                   type="button"
                   onClick={() => setBuildMode((b) => !b)}
@@ -2008,12 +2151,38 @@ export default function CoingameRoomPage() {
             </div>
           )}
 
+          {/* Habbo-style chat input */}
+          <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'all', zIndex: 3 }}>
+            <input
+              type="text"
+              value={chatDraft}
+              maxLength={120}
+              placeholder="Say something…"
+              onChange={(e) => setChatDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const text = chatDraft.trim();
+                  if (text) sceneRef.current?.sendChat?.(text);
+                  setChatDraft('');
+                  e.currentTarget.blur();
+                }
+                if (e.key === 'Escape') { setChatDraft(''); e.currentTarget.blur(); }
+              }}
+              style={{
+                background: 'rgba(6,8,6,0.88)', color: '#bbf7d0',
+                border: '1px solid #1a2e1a', borderRadius: 20,
+                padding: '10px 18px', fontSize: 12, width: 320,
+                fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+          </div>
+
           {/* Wall view cycle (Sims-style) */}
           <button
             type="button"
             onClick={() => setWallView((v) => v === 'up' ? 'cut' : v === 'cut' ? 'down' : 'up')}
             style={{
-              position: 'absolute', top: isOwner ? 220 : 116, right: 16, zIndex: 2, pointerEvents: 'all',
+              position: 'absolute', top: isOwner ? 296 : 200, right: 16, zIndex: 2, pointerEvents: 'all',
               background: 'rgba(6,8,6,0.88)', color: '#4ade80',
               border: '1px solid #1a2e1a', borderRadius: 8, padding: '8px 12px',
               fontSize: 11, fontFamily: 'inherit', fontWeight: 800, cursor: 'pointer',
