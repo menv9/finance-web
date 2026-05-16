@@ -73,6 +73,30 @@ describe('sync conflict detection', () => {
 
     expect(result).toBe(true);
   });
+
+  it('does not flag conflict when both local and remote are deletions', () => {
+    const result = detectConflict({
+      lastPulledAt: '2026-04-20T10:00:00.000Z',
+      localRecord: {
+        id: 'savings-config',
+        updatedAt: '2026-04-20T11:00:00.000Z',
+        deletedAt: '2026-04-20T11:00:00.000Z',
+      },
+      localTombstone: {
+        id: 'savings-config',
+        updatedAt: '2026-04-20T11:00:00.000Z',
+        deletedAt: '2026-04-20T11:00:00.000Z',
+      },
+      remoteChange: {
+        record_id: 'savings-config',
+        updated_at: '2026-04-20T11:30:00.000Z',
+        deleted_at: '2026-04-20T11:30:00.000Z',
+        payload: null,
+      },
+    });
+
+    expect(result).toBe(false);
+  });
 });
 
 describe('sync conflict helpers', () => {

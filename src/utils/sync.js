@@ -37,6 +37,9 @@ export function detectConflict({ localRecord, localTombstone, remoteChange, last
   if (!localChangedAfterSync) return false;
 
   if (remoteChange.deleted_at) {
+    // If local is also deleted (either via tombstone or a record with deletedAt),
+    // both sides agree — no conflict.
+    if (localTombstone || localRecord?.deletedAt) return false;
     return Boolean(localRecord);
   }
 
