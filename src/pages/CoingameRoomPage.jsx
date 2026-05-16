@@ -967,7 +967,7 @@ export default function CoingameRoomPage() {
     renderer.setClearColor(0x060806);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x060806, 0.016);
+    scene.fog = new THREE.FogExp2(0x060806, 0.004);
 
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 120);
     camera.position.set(0, 8, 15);
@@ -1001,11 +1001,75 @@ export default function CoingameRoomPage() {
       scene.add(fillLights[i]);
     });
 
-    // ── Room shell ────────────────────────────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 0.88, metalness: 0.05, side: THREE.BackSide });
-    const room = new THREE.Mesh(new THREE.BoxGeometry(ROOM.w, ROOM.h, ROOM.d), wallMat);
-    room.position.y = ROOM.h / 2;
-    scene.add(room);
+    // ── Room shell (4 walls + open sky — no ceiling, so space is visible above)
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 0.88, metalness: 0.05, side: THREE.DoubleSide });
+    const wallDefs = [
+      { pos: [0, ROOM.h / 2, -ROOM.d / 2], ry: 0,            w: ROOM.w, h: ROOM.h },
+      { pos: [0, ROOM.h / 2,  ROOM.d / 2], ry: Math.PI,      w: ROOM.w, h: ROOM.h },
+      { pos: [-ROOM.w / 2, ROOM.h / 2, 0], ry: Math.PI / 2,  w: ROOM.d, h: ROOM.h },
+      { pos: [ ROOM.w / 2, ROOM.h / 2, 0], ry: -Math.PI / 2, w: ROOM.d, h: ROOM.h },
+    ];
+    wallDefs.forEach(({ pos, ry, w, h }) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+      m.position.set(...pos); m.rotation.y = ry;
+      m.receiveShadow = true;
+      scene.add(m);
+    });
+
+    // ── Outer space backdrop ─────────────────────────────────────────────────
+    scene.background = new THREE.Color(0x02030a);
+    {
+      // Starfield: random points on a large sphere
+      const starGeo = new THREE.BufferGeometry();
+      const N = 1800;
+      const positions = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) {
+        const u = Math.random(), v = Math.random();
+        const theta = 2 * Math.PI * u;
+        const phi = Math.acos(2 * v - 1);
+        const r = 180 + Math.random() * 60;
+        positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.cos(phi);
+        positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false });
+      const stars = new THREE.Points(starGeo, starMat);
+      stars.frustumCulled = false;
+      scene.add(stars);
+
+      // Big planet hovering off to the side, above the open ceiling
+      const planetGeo = new THREE.SphereGeometry(28, 48, 32);
+      const planetMat = new THREE.MeshStandardMaterial({
+        color: 0x7c3aed, emissive: 0x4c1d95, emissiveIntensity: 0.45,
+        roughness: 0.9, metalness: 0.05,
+      });
+      const planet = new THREE.Mesh(planetGeo, planetMat);
+      planet.position.set(-55, 38, -70);
+      scene.add(planet);
+      // Rim glow as a slightly larger transparent sphere
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.18, side: THREE.BackSide });
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(30.5, 32, 24), haloMat);
+      halo.position.copy(planet.position);
+      scene.add(halo);
+      // Ring (Saturn-style)
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xc4b5fd, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(34, 44, 64), ringMat);
+      ring.position.copy(planet.position);
+      ring.rotation.x = -Math.PI / 2.3;
+      scene.add(ring);
+
+      // Distant directional starlight (cold)
+      const starlight = new THREE.DirectionalLight(0xa8b3ff, 0.35);
+      starlight.position.set(-40, 60, -30);
+      scene.add(starlight);
+
+      // Expose for the rAF loop
+      var spacePlanet = planet;
+      var spaceRing = ring;
+      var spaceStars = stars;
+      scene.userData.spaceRefs = { planet: spacePlanet, ring: spaceRing, stars: spaceStars };
+    }
 
     // Floor
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a301a, roughness: 0.7, metalness: 0.2 });
@@ -1965,6 +2029,14 @@ export default function CoingameRoomPage() {
         pz2 + Math.cos(theta) * Math.cos(phi) * tRad
       );
       camera.lookAt(px2, 1.5, pz2);
+
+      // Planet slow-rotate + starfield drift
+      const space = scene.userData.spaceRefs;
+      if (space) {
+        space.planet.rotation.y = t * 0.05;
+        space.ring.rotation.z = t * 0.02;
+        space.stars.rotation.y = t * 0.005;
+      }
 
       cg.rotation.y = t * 0.65;
       cg.position.y = 2.6 + Math.sin(t * 1.0) * 0.18;
