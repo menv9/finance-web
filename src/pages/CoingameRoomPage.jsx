@@ -711,6 +711,7 @@ export default function CoingameRoomPage() {
       deck_floor:      { color: 0x1a1f2a, roughness: 0.55, metalness: 0.75, texture: hullTexShared, texRepeat: [4, 4] },
       hull_trim:       { color: 0x0c1418, roughness: 0.40, metalness: 0.3,  emissive: trimHex, emissiveIntensity: 4.5 },
       console:         { color: 0x242938, roughness: 0.40, metalness: 0.7,  emissive: trimHex, emissiveIntensity: 0.6 },
+      interior_floor:  { color: 0x111720, roughness: 0.62, metalness: 0.70, texture: hullTexShared, texRepeat: [6, 6], emissive: trimHex, emissiveIntensity: 0.08 },
     };
     function buildHullMaterial(name) {
       const cfg = HULL_MATS[name];
@@ -754,7 +755,7 @@ export default function CoingameRoomPage() {
           spaceshipHullGroup = group;
           scene.add(group);
           // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
-          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim']);
+          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim', 'interior_floor']);
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
           const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
@@ -803,7 +804,7 @@ export default function CoingameRoomPage() {
           spaceshipHullGroup = group;
           scene.add(group);
           // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
-          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim']);
+          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim', 'interior_floor']);
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
           const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
@@ -1986,8 +1987,8 @@ export default function CoingameRoomPage() {
         const hits = raycaster.intersectObject(spaceshipHullGroup, true);
         const wallHit = hits.find((h) => {
           const slot = h.object?.userData?.hullSlot;
-          // skip floor/glass — only opaque walls should pull the camera in
-          return slot !== 'deck_floor' && slot !== 'canopy_glass' && slot !== 'hull_trim';
+          // skip floor/glass/trim — only opaque walls should pull the camera in
+          return slot !== 'deck_floor' && slot !== 'canopy_glass' && slot !== 'hull_trim' && slot !== 'interior_floor';
         });
         if (wallHit) {
           safeRad = Math.max(1.5, wallHit.distance - 0.5);
