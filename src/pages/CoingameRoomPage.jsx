@@ -448,10 +448,10 @@ export default function CoingameRoomPage() {
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
     // Drive room dimensions from state so expansion rebuilds the scene at new size.
-    // Spaceship hull (Blender-exported Spaceship_interior.obj) — dims ~42 × 9 × 30
-    ROOM.w = 30;
-    ROOM.d = 42;
-    ROOM.h = 9;
+    // Spaceship hull (Blender-exported Spaceship_interior.obj) — dims ~64 × 10 × 45 with the roof cut off
+    ROOM.w = 64;
+    ROOM.d = 45;
+    ROOM.h = 9.8;
     const wrap = wrapRef.current;
     const cvs = canvasRef.current;
     if (!wrap || !cvs) return;
@@ -844,14 +844,10 @@ export default function CoingameRoomPage() {
       roughness: 0.55, metalness: 0.75,
       transparent: true, opacity: 0.92, depthWrite: true,
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w * 0.8, ROOM.d * 0.9), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0.02;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    // No explicit floor — the ship hull's interior bottom serves as the floor.
 
     // Hidden grid helper (H toggle)
-    const gridHelper = new THREE.GridHelper(ROOM.w, ROOM.w, 0x2a3148, 0x1a2030);
+    const gridHelper = new THREE.GridHelper(ROOM.w, Math.floor(ROOM.w), 0x2a3148, 0x1a2030);
     gridHelper.visible = false;
     scene.add(gridHelper);
 
