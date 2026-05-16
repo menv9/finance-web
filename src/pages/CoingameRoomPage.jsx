@@ -1994,6 +1994,17 @@ export default function CoingameRoomPage() {
         const hd = ROOM.d / 2 - 1.2;
         let nx = Math.max(-hw, Math.min(hw, intersectPt.x));
         let nz = Math.max(-hd, Math.min(hd, intersectPt.z));
+        // Also clamp out of the chamfered corners
+        const fCHF = scene.userData.octChamfer || 4;
+        const fLimit = ROOM.w / 2 + ROOM.d / 2 - fCHF - 1.2 * Math.SQRT2;
+        [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => {
+          const sum = sx * nx + sz * nz;
+          if (sum > fLimit) {
+            const over = sum - fLimit;
+            nx -= sx * over / 2;
+            nz -= sz * over / 2;
+          }
+        });
         // Snap to floor grid (1.0 units = cell size). Hold Shift for free placement.
         if (!e.shiftKey) {
           nx = Math.round(nx);
@@ -2195,8 +2206,24 @@ export default function CoingameRoomPage() {
         const yaw = player.rotation.y;
         const wx = Math.sin(yaw) * forward;
         const wz = Math.cos(yaw) * forward;
-        const hw = ROOM.w / 2 - 0.8;
-        const hd = ROOM.d / 2 - 0.8;
+        const margin = 0.8;
+        const CHF = scene.userData.octChamfer || 4;
+        const chamferLimit = ROOM.w / 2 + ROOM.d / 2 - CHF - margin * Math.SQRT2;
+        const clampOct = (x, z) => {
+          x = Math.max(-(ROOM.w / 2 - margin), Math.min(ROOM.w / 2 - margin, x));
+          z = Math.max(-(ROOM.d / 2 - margin), Math.min(ROOM.d / 2 - margin, z));
+          // Project out of the 4 chamfer corners
+          const dirs = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+          for (const [sx, sz] of dirs) {
+            const sum = sx * x + sz * z;
+            if (sum > chamferLimit) {
+              const over = sum - chamferLimit;
+              x -= sx * over / 2;
+              z -= sz * over / 2;
+            }
+          }
+          return [x, z];
+        };
 
         // Build collider list this frame
         const colliders = [];
@@ -2216,8 +2243,8 @@ export default function CoingameRoomPage() {
           return false;
         };
 
-        let nx = Math.max(-hw, Math.min(hw, player.position.x + wx * moveSpeed));
-        let nz = Math.max(-hd, Math.min(hd, player.position.z + wz * moveSpeed));
+        const cand = clampOct(player.position.x + wx * moveSpeed, player.position.z + wz * moveSpeed);
+        let nx = cand[0], nz = cand[1];
         if (!blockedAt(nx, nz)) {
           player.position.x = nx;
           player.position.z = nz;
