@@ -622,53 +622,73 @@ export default function CoingameRoomPage() {
     setUpgradesPurchased((u) => ({ ...u, [upgId]: count + 1 }));
   }
 
+  // Each entry is a count; instance scene-ids are `static_<kind>_<name>_<idx>` for idx 0..count-1
+  const ownedCount = (map, key) => {
+    const v = map?.[key];
+    if (typeof v === 'number') return v;
+    if (v === true) return 1;
+    return 0;
+  };
+
   function buyShopItem(itemId) {
     if (!isOwner) return;
-    if (shopOwned[itemId]) return;
     const item = SHOP_FURNITURE.find((i) => i.id === itemId);
     if (!item) return;
     if (roomCoins < item.cost) return;
     setRoomCoins((c) => c - item.cost);
-    setShopOwned((o) => ({ ...o, [itemId]: true }));
+    setShopOwned((o) => ({ ...o, [itemId]: ownedCount(o, itemId) + 1 }));
   }
 
   function buyHomeItem(name) {
     if (!isOwner) return;
-    if (homeOwned[name]) return;
     const item = findHomeModel(name);
     if (!item) return;
     if (roomCoins < item.price) return;
     setRoomCoins((c) => c - item.price);
-    setHomeOwned((o) => ({ ...o, [name]: true }));
+    setHomeOwned((o) => ({ ...o, [name]: ownedCount(o, name) + 1 }));
   }
 
-  function removeShopItem(itemId) {
+  // Remove specific instance (slotIdx) when provided, else the last one
+  function removeShopItem(itemId, slotIdx) {
     if (!isOwner) return;
-    if (!shopOwned[itemId]) return;
+    const cnt = ownedCount(shopOwned, itemId);
+    if (cnt < 1) return;
     const item = SHOP_FURNITURE.find((i) => i.id === itemId);
     if (!item) return;
     setRoomCoins((c) => c + Math.floor(item.cost * 0.5));
-    setShopOwned((o) => { const n = { ...o }; delete n[itemId]; return n; });
-    // Clear saved position
+    setShopOwned((o) => {
+      const n = { ...o };
+      const next = ownedCount(n, itemId) - 1;
+      if (next <= 0) delete n[itemId]; else n[itemId] = next;
+      return n;
+    });
     const STATIC_KEY = sceneRef.current?.STATIC_KEY;
     if (STATIC_KEY) {
+      const idx = slotIdx != null ? slotIdx : cnt - 1;
       const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
-      delete cur[`static_shop_${itemId}`];
+      delete cur[`static_shop_${itemId}_${idx}`];
       localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
     }
   }
 
-  function removeHomeItem(name) {
+  function removeHomeItem(name, slotIdx) {
     if (!isOwner) return;
-    if (!homeOwned[name]) return;
+    const cnt = ownedCount(homeOwned, name);
+    if (cnt < 1) return;
     const item = findHomeModel(name);
     if (!item) return;
     setRoomCoins((c) => c + Math.floor(item.price * 0.5));
-    setHomeOwned((o) => { const n = { ...o }; delete n[name]; return n; });
+    setHomeOwned((o) => {
+      const n = { ...o };
+      const next = ownedCount(n, name) - 1;
+      if (next <= 0) delete n[name]; else n[name] = next;
+      return n;
+    });
     const STATIC_KEY = sceneRef.current?.STATIC_KEY;
     if (STATIC_KEY) {
+      const idx = slotIdx != null ? slotIdx : cnt - 1;
       const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
-      delete cur[`static_home_${name}`];
+      delete cur[`static_home_${name}_${idx}`];
       localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
     }
   }
@@ -746,7 +766,7 @@ export default function CoingameRoomPage() {
     setRoomSize(targetSize);
   }
 
-  // Sync home-pack owned items into scene as static (async OBJ load, draggable)
+  // Sync home-pack owned items into scene as static instances (async OBJ load, draggable)
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
@@ -755,40 +775,48 @@ export default function CoingameRoomPage() {
     const defaults = [[-4, 4], [4, 4], [-5, 0], [5, 0], [-4, -4], [4, -4], [0, 5], [0, -5]];
     let slot = 0;
 
-    // Remove items that are no longer owned
+    // Remove instances that are no longer owned
     Object.keys(staticMap).forEach((id) => {
       if (!id.startsWith('static_home_')) return;
-      const name = id.slice('static_home_'.length);
-      if (!homeOwned[name]) {
-        scene.remove(staticMap[id]);
+      const rest = id.slice('static_home_'.length);
+      const lastUnder = rest.lastIndexOf('_');
+      const name = lastUnder > 0 ? rest.slice(0, lastUnder) : rest;
+      const idxStr = lastUnder > 0 ? rest.slice(lastUnder + 1) : '0';
+      const idx = parseInt(idxStr, 10);
+      const cnt = ownedCount(homeOwned, name);
+      if (Number.isNaN(idx) || idx >= cnt) {
+        if (staticMap[id]?.isObject3D) scene.remove(staticMap[id]);
         delete staticMap[id];
       }
     });
 
-    // Add newly-owned items (async)
-    Object.keys(homeOwned).forEach((name) => {
-      const sid = `static_home_${name}`;
-      if (staticMap[sid]) return;
-      // Placeholder to prevent double-loads while async resolves
-      staticMap[sid] = 'loading';
-      const [dx, dz] = defaults[slot % defaults.length];
-      slot++;
-      loadHomeModel(name).then((group) => {
-        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
-        // Cancelled if no longer owned by the time it loads
-        if (!homeOwned[name]) { delete staticMap[sid]; return; }
-        group.userData.furnitureId = sid;
-        group.traverse((c) => { c.userData.furnitureId = sid; });
-        const saved = savedStatic[sid];
-        group.position.set(saved ? saved.x : dx, saved?.y != null ? saved.y : 0, saved ? saved.z : dz);
-        if (saved?.ry != null) group.rotation.y = saved.ry;
-        scene.add(group);
-        staticMap[sid] = group;
-      }).catch(() => { delete staticMap[sid]; });
+    // Add missing instances (one per slot 0..count-1)
+    Object.entries(homeOwned).forEach(([name, raw]) => {
+      const cnt = ownedCount({ [name]: raw }, name);
+      for (let i = 0; i < cnt; i++) {
+        const sid = `static_home_${name}_${i}`;
+        if (staticMap[sid]) continue;
+        staticMap[sid] = 'loading';
+        const [dx, dz] = defaults[slot % defaults.length];
+        slot++;
+        // capture sid in closure
+        const mySid = sid;
+        loadHomeModel(name).then((group) => {
+          if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+          if (ownedCount(homeOwned, name) <= i) { delete staticMap[mySid]; return; }
+          group.userData.furnitureId = mySid;
+          group.traverse((c) => { c.userData.furnitureId = mySid; });
+          const saved = savedStatic[mySid];
+          group.position.set(saved ? saved.x : dx, saved?.y != null ? saved.y : 0, saved ? saved.z : dz);
+          if (saved?.ry != null) group.rotation.y = saved.ry;
+          scene.add(group);
+          staticMap[mySid] = group;
+        }).catch(() => { delete staticMap[mySid]; });
+      }
     });
   }, [homeOwned]);
 
-  // Sync shop-owned furniture into scene as static (draggable, persisted via STATIC_KEY)
+  // Sync shop-owned furniture instances into scene
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
@@ -796,24 +824,39 @@ export default function CoingameRoomPage() {
     const savedStatic = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
     const defaults = [[-6, 6], [6, 6], [-7, 1], [7, 1], [-6, -3], [6, -3]];
     let slot = 0;
-    SHOP_FURNITURE.forEach((item) => {
-      const sid = `static_shop_${item.id}`;
-      if (!shopOwned[item.id]) {
-        if (staticMap[sid]) { scene.remove(staticMap[sid]); delete staticMap[sid]; }
-        return;
+
+    // Remove instances that are no longer owned
+    Object.keys(staticMap).forEach((id) => {
+      if (!id.startsWith('static_shop_')) return;
+      const rest = id.slice('static_shop_'.length);
+      const lastUnder = rest.lastIndexOf('_');
+      const itemId = lastUnder > 0 ? rest.slice(0, lastUnder) : rest;
+      const idxStr = lastUnder > 0 ? rest.slice(lastUnder + 1) : '0';
+      const idx = parseInt(idxStr, 10);
+      const cnt = ownedCount(shopOwned, itemId);
+      if (Number.isNaN(idx) || idx >= cnt) {
+        if (staticMap[id]?.isObject3D) scene.remove(staticMap[id]);
+        delete staticMap[id];
       }
-      if (staticMap[sid]) return;
-      const group = item.builder();
-      group.scale.setScalar(item.scale || 1.5);
-      group.userData.furnitureId = sid;
-      group.traverse((c) => { c.userData.furnitureId = sid; });
-      const saved = savedStatic[sid];
-      const [dx, dz] = defaults[slot % defaults.length];
-      group.position.set(saved ? saved.x : dx, 0, saved ? saved.z : dz);
-      if (saved?.ry != null) group.rotation.y = saved.ry;
-      scene.add(group);
-      staticMap[sid] = group;
-      slot++;
+    });
+
+    SHOP_FURNITURE.forEach((item) => {
+      const cnt = ownedCount(shopOwned, item.id);
+      for (let i = 0; i < cnt; i++) {
+        const sid = `static_shop_${item.id}_${i}`;
+        if (staticMap[sid]) continue;
+        const group = item.builder();
+        group.scale.setScalar(item.scale || 1.5);
+        group.userData.furnitureId = sid;
+        group.traverse((c) => { c.userData.furnitureId = sid; });
+        const saved = savedStatic[sid];
+        const [dx, dz] = defaults[slot % defaults.length];
+        group.position.set(saved ? saved.x : dx, 0, saved ? saved.z : dz);
+        if (saved?.ry != null) group.rotation.y = saved.ry;
+        scene.add(group);
+        staticMap[sid] = group;
+        slot++;
+      }
     });
   }, [shopOwned]);
 
@@ -1307,40 +1350,8 @@ export default function CoingameRoomPage() {
       });
     }
 
-    // ── Home-pack owned (async loaded at init from localStorage) ─────────────
-    const initialHome = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
-    const homeDefaults = [[-4, 4], [4, 4], [-5, 0], [5, 0], [-4, -4], [4, -4], [0, 5], [0, -5]];
-    let homeSlot = 0;
-    Object.keys(initialHome).forEach((name) => {
-      const sid = `static_home_${name}`;
-      const [dx, dz] = homeDefaults[homeSlot % homeDefaults.length];
-      homeSlot++;
-      loadHomeModel(name).then((group) => {
-        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
-        tagStatic(group, sid);
-        placeStatic(group, dx, dz);
-        scene.add(group);
-        if (sceneRef.current?.staticMap) sceneRef.current.staticMap[sid] = group;
-      }).catch(() => {});
-    });
-
-    // ── Shop-owned furniture (loaded at init from localStorage) ──────────────
-    const initialShop = JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}');
-    const shopDefaults = [[-6, 6], [6, 6], [-7, 1], [7, 1], [-6, -3], [6, -3]];
+    // (Home/shop items are populated by the React sync effects after mount.)
     const initialShopGroups = {};
-    let shopSlot = 0;
-    SHOP_FURNITURE.forEach((item) => {
-      if (!initialShop[item.id]) return;
-      const sid = `static_shop_${item.id}`;
-      const group = item.builder();
-      group.scale.setScalar(item.scale || 1.5);
-      tagStatic(group, sid);
-      const [dx, dz] = shopDefaults[shopSlot % shopDefaults.length];
-      placeStatic(group, dx, dz);
-      scene.add(group);
-      initialShopGroups[sid] = group;
-      shopSlot++;
-    });
 
     // ── FC Cube (clicker, grants 1 FC per click, floats + draggable) ─────────
     const bucket = buildFCCube();
@@ -1605,6 +1616,13 @@ export default function CoingameRoomPage() {
           // Treat as select — keep position, target for arrow-key Y nudges
           selected = { id, group, isStatic };
           group.position.set(dragging.startX, dragging.startY, dragging.startZ);
+          // Doors: click to toggle open/closed (90° swing around the group's center)
+          if (typeof id === 'string' && id.startsWith('static_home_Door_')) {
+            if (group.userData.baseRotY == null) group.userData.baseRotY = group.rotation.y;
+            group.userData.doorOpen = !group.userData.doorOpen;
+            const target = group.userData.baseRotY + (group.userData.doorOpen ? Math.PI / 2 : 0);
+            group.userData.doorTween = { from: group.rotation.y, to: target, startT: clock.getElapsedTime(), dur: 0.35 };
+          }
           dragging = null;
           return;
         }
@@ -1680,11 +1698,19 @@ export default function CoingameRoomPage() {
         const { id } = selected;
         if (id === 'fc_cube') return;
         if (id.startsWith('static_shop_')) {
-          sceneRef.current?.removeShopItem?.(id.slice('static_shop_'.length));
+          const rest = id.slice('static_shop_'.length);
+          const lu = rest.lastIndexOf('_');
+          const itemId = lu > 0 ? rest.slice(0, lu) : rest;
+          const idx = lu > 0 ? parseInt(rest.slice(lu + 1), 10) : 0;
+          sceneRef.current?.removeShopItem?.(itemId, Number.isNaN(idx) ? undefined : idx);
           selected = null;
           e.preventDefault();
         } else if (id.startsWith('static_home_')) {
-          sceneRef.current?.removeHomeItem?.(id.slice('static_home_'.length));
+          const rest = id.slice('static_home_'.length);
+          const lu = rest.lastIndexOf('_');
+          const name = lu > 0 ? rest.slice(0, lu) : rest;
+          const idx = lu > 0 ? parseInt(rest.slice(lu + 1), 10) : 0;
+          sceneRef.current?.removeHomeItem?.(name, Number.isNaN(idx) ? undefined : idx);
           selected = null;
           e.preventDefault();
         }
@@ -1788,6 +1814,16 @@ export default function CoingameRoomPage() {
         localBubbleSlot.bubbleSprite.material.dispose();
         localBubbleSlot.bubbleSprite = null;
       }
+
+      // Tick door open/close tweens
+      Object.values(staticMap).forEach((g) => {
+        if (!g || !g.isObject3D || !g.userData?.doorTween) return;
+        const tw = g.userData.doorTween;
+        const p = Math.min(1, (clock.getElapsedTime() - tw.startT) / tw.dur);
+        const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        g.rotation.y = tw.from + (tw.to - tw.from) * ease;
+        if (p >= 1) delete g.userData.doorTween;
+      });
 
       if (playerMixer?.userData) {
         const { idle, walk } = playerMixer.userData;
@@ -2409,22 +2445,26 @@ export default function CoingameRoomPage() {
               <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 16, marginBottom: 10 }}>Furniture Shop</div>
               {SHOP_FURNITURE.map((item) => {
                 const Icon = LucideIcons[item.icon] ?? LucideIcons.Box;
-                const owned = !!shopOwned[item.id];
+                const count = ownedCount(shopOwned, item.id);
+                const owned = count > 0;
                 const canAfford = roomCoins >= item.cost;
-                const disabled = owned || !canAfford || !isOwner;
+                const buyDisabled = !canAfford || !isOwner;
                 return (
                   <div
                     key={item.id}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: owned ? '#0d1a0d' : '#161616', borderRadius: 7, border: `1px solid ${owned ? '#1a3a1a' : canAfford ? '#1a3a1a' : '#111'}`, marginBottom: 6, opacity: owned ? 1 : (canAfford ? 1 : 0.55) }}
                   >
-                    <div style={{ width: 28, height: 28, borderRadius: 6, background: owned ? '#22c55e22' : '#0f0f0f', border: `1px solid ${owned ? '#22c55e' : '#1f2937'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 6, background: owned ? '#22c55e22' : '#0f0f0f', border: `1px solid ${owned ? '#22c55e' : '#1f2937'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
                       <Icon size={13} color={owned ? '#22c55e' : '#4b5563'} />
+                      {count > 1 && (
+                        <span style={{ position: 'absolute', top: -6, right: -6, background: '#22c55e', color: '#000', fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 8 }}>×{count}</span>
+                      )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
                       <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{item.desc}</div>
                     </div>
-                    {owned ? (
+                    {owned && (
                       <button
                         type="button"
                         onClick={() => removeShopItem(item.id)}
@@ -2437,25 +2477,24 @@ export default function CoingameRoomPage() {
                           whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                       >
-                        REMOVE
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => buyShopItem(item.id)}
-                        disabled={disabled}
-                        style={{
-                          background: canAfford ? '#22c55e' : '#1a2e1a',
-                          border: 'none', borderRadius: 5,
-                          color: canAfford ? '#000' : '#374151',
-                          fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
-                          padding: '5px 9px', cursor: disabled ? 'default' : 'pointer',
-                          whiteSpace: 'nowrap', flexShrink: 0,
-                        }}
-                      >
-                        {item.cost.toLocaleString()} RC
+                        −
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => buyShopItem(item.id)}
+                      disabled={buyDisabled}
+                      style={{
+                        background: canAfford ? '#22c55e' : '#1a2e1a',
+                        border: 'none', borderRadius: 5,
+                        color: canAfford ? '#000' : '#374151',
+                        fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                        padding: '5px 9px', cursor: buyDisabled ? 'default' : 'pointer',
+                        whiteSpace: 'nowrap', flexShrink: 0,
+                      }}
+                    >
+                      {item.cost.toLocaleString()} RC
+                    </button>
                   </div>
                 );
               })}
@@ -2495,49 +2534,52 @@ export default function CoingameRoomPage() {
                   .filter((it) => homeCategory === 'All' || it.category === homeCategory)
                   .filter((it) => !homeSearch || it.label.toLowerCase().includes(homeSearch.toLowerCase()) || it.name.toLowerCase().includes(homeSearch.toLowerCase()))
                   .map((it) => {
-                    const owned = !!homeOwned[it.name];
+                    const count = ownedCount(homeOwned, it.name);
+                    const owned = count > 0;
                     const canAfford = roomCoins >= it.price;
-                    const disabled = owned || !canAfford || !isOwner;
+                    const buyDisabled = !canAfford || !isOwner;
                     return (
                       <div
                         key={it.name}
-                        style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: owned ? '#0d1a0d' : '#161616', borderRadius: 6, border: `1px solid ${owned ? '#1a3a1a' : '#1a2e1a'}`, opacity: owned ? 1 : (canAfford ? 1 : 0.6) }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: owned ? '#0d1a0d' : '#161616', borderRadius: 6, border: `1px solid ${owned ? '#1a3a1a' : '#1a2e1a'}`, opacity: owned ? 1 : (canAfford ? 1 : 0.6), position: 'relative' }}
                       >
+                        {count > 1 && (
+                          <span style={{ position: 'absolute', top: 4, right: 4, background: '#22c55e', color: '#000', fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 8, zIndex: 1 }}>×{count}</span>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                           <HomeModelThumb name={it.name} size={64} />
                         </div>
                         <div style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 700, lineHeight: 1.2, minHeight: 24 }}>{it.label}</div>
-                        {owned ? (
-                          <button
-                            type="button"
-                            onClick={() => removeHomeItem(it.name)}
-                            disabled={!isOwner}
-                            title={`Refund ${Math.floor(it.price * 0.5).toLocaleString()} RC`}
-                            style={{
-                              background: '#1a0d0d', border: '1px solid #3a1a1a', borderRadius: 4,
-                              color: '#ef4444', fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
-                              padding: '4px 6px', cursor: isOwner ? 'pointer' : 'default',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            REMOVE
-                          </button>
-                        ) : (
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          {owned && (
+                            <button
+                              type="button"
+                              onClick={() => removeHomeItem(it.name)}
+                              disabled={!isOwner}
+                              title={`Refund ${Math.floor(it.price * 0.5).toLocaleString()} RC`}
+                              style={{
+                                background: '#1a0d0d', border: '1px solid #3a1a1a', borderRadius: 4,
+                                color: '#ef4444', fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
+                                padding: '4px 8px', cursor: isOwner ? 'pointer' : 'default',
+                              }}
+                            >−</button>
+                          )}
                           <button
                             type="button"
                             onClick={() => buyHomeItem(it.name)}
-                            disabled={disabled}
+                            disabled={buyDisabled}
                             style={{
+                              flex: 1,
                               background: canAfford ? '#22c55e' : '#1a2e1a',
                               color: canAfford ? '#000' : '#374151',
                               border: 'none', borderRadius: 4, fontSize: 9, fontWeight: 800,
-                              fontFamily: 'inherit', padding: '4px 6px', cursor: disabled ? 'default' : 'pointer',
+                              fontFamily: 'inherit', padding: '4px 6px', cursor: buyDisabled ? 'default' : 'pointer',
                               whiteSpace: 'nowrap',
                             }}
                           >
                             {it.price.toLocaleString()}
                           </button>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
