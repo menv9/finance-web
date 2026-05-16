@@ -468,6 +468,65 @@ export default function CoingameRoomPage() {
     renderer.toneMappingExposure = 1.8;
     renderer.setClearColor(0x060806);
 
+    // ── Sci-fi ambient audio ────────────────────────────────────────────────
+    let audioCtx = null;
+    let ambientNodes = null;
+    function ensureAudio() {
+      if (audioCtx) return audioCtx;
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+      return audioCtx;
+    }
+    function startAmbientHum() {
+      const ctx = ensureAudio();
+      if (!ctx || ambientNodes) return;
+      const master = ctx.createGain();
+      master.gain.value = 0.035;
+      master.connect(ctx.destination);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 280;
+      lp.Q.value = 1.2;
+      lp.connect(master);
+      const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 60; o1.connect(lp); o1.start();
+      const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = 60.4; o2.connect(lp); o2.start();
+      const o3 = ctx.createOscillator(); o3.type = 'triangle'; o3.frequency.value = 120; o3.connect(lp); o3.start();
+      // Subtle pulsing LFO on the master
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.13;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.015;
+      lfo.connect(lfoGain); lfoGain.connect(master.gain); lfo.start();
+      ambientNodes = { master, lp, oscs: [o1, o2, o3, lfo] };
+    }
+    function playJoinBeep() {
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.18, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      g.connect(ctx.destination);
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880; o.connect(g);
+      o.start(now); o.stop(now + 0.3);
+      // Second tone — quick fifth above for the "ping" feel
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, now + 0.06);
+      g2.gain.linearRampToValueAtTime(0.1, now + 0.07);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      g2.connect(ctx.destination);
+      const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 1320; o2.connect(g2);
+      o2.start(now + 0.05); o2.stop(now + 0.34);
+    }
+    // Browsers block AudioContext until a user gesture — kick off the hum on first interaction
+    const kickAudio = () => {
+      const ctx = ensureAudio();
+      if (ctx && ctx.state === 'suspended') ctx.resume();
+      startAmbientHum();
+      window.removeEventListener('pointerdown', kickAudio);
+      window.removeEventListener('keydown', kickAudio);
+    };
+    window.addEventListener('pointerdown', kickAudio);
+    window.addEventListener('keydown', kickAudio);
+
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x060806, 0.0008);
 
@@ -641,9 +700,15 @@ export default function CoingameRoomPage() {
       const hullLoader = new OBJLoader();
       hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
         if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+        const hullTex = hullTexShared.clone();
+        hullTex.repeat.set(3, 2);
+        hullTex.needsUpdate = true;
         const hullMat = new THREE.MeshStandardMaterial({
-          color: 0x3a4258, roughness: 0.45, metalness: 0.78,
-          flatShading: true,
+          map: hullTex,
+          color: 0x8993ad,
+          roughness: 0.42, metalness: 0.85,
+          emissive: trimHex,
+          emissiveIntensity: 0.08,
         });
         group.traverse((c) => {
           if (c.isMesh) {
@@ -850,29 +915,64 @@ export default function CoingameRoomPage() {
     gridHelper.visible = false;
     scene.add(gridHelper);
 
-    // Ceiling LED panel — flat recessed rectangle
-    const ceilFixMat = new THREE.MeshStandardMaterial({ color: 0x1a2030, roughness: 0.35, metalness: 0.85 });
-    const ceilGlowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: trimHex, emissiveIntensity: 2.4, roughness: 0.9 });
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.05, 1.6), ceilFixMat);
-    panel.position.set(0, ROOM.h - 0.04, 0);
-    scene.add(panel);
-    const glowPanel = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.3), ceilGlowMat);
-    glowPanel.rotation.x = Math.PI / 2;
-    glowPanel.position.set(0, ROOM.h - 0.08, 0);
-    scene.add(glowPanel);
-
-    // Corner uplights along the ship's edges
-    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
-      const x = sx * (ROOM.w / 2 - 2.5);
-      const z = sz * (ROOM.d / 2 - 2.5);
-      const upMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.6 });
-      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.5, 12), upMat);
-      up.position.set(x, 0.25, z);
-      scene.add(up);
-      const pl = new THREE.PointLight(trimHex, 1.1, 9);
-      pl.position.set(x, 0.6, z);
-      scene.add(pl);
+    // Emissive trim — bright glowing line tracing the floor perimeter
+    const trimMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 3.0, roughness: 0.4 });
+    const trimW = ROOM.w * 0.78;
+    const trimD = ROOM.d * 0.88;
+    [
+      [0, 0.04, -trimD / 2, 0, trimW],
+      [0, 0.04, trimD / 2, 0, trimW],
+      [-trimW / 2, 0.04, 0, Math.PI / 2, trimD],
+      [trimW / 2, 0.04, 0, Math.PI / 2, trimD],
+    ].forEach(([x, y, z, ry, len]) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.08), trimMat);
+      s.position.set(x, y, z);
+      s.rotation.y = ry;
+      scene.add(s);
     });
+
+    // Recessed overhead LED strips — long emissive bars running along the ship's length
+    const ledStripMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: trimHex, emissiveIntensity: 2.6, roughness: 0.85 });
+    [-1, 1].forEach((sx) => {
+      const x = sx * ROOM.w * 0.22;
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, ROOM.d * 0.7), ledStripMat);
+      strip.position.set(x, ROOM.h - 0.6, 0);
+      scene.add(strip);
+      // Two soft fill point lights along each strip
+      [-1, 1].forEach((sz) => {
+        const pl = new THREE.PointLight(trimHex, 1.4, 18);
+        pl.position.set(x, ROOM.h - 1.0, sz * ROOM.d * 0.22);
+        scene.add(pl);
+      });
+    });
+
+    // Cockpit-end accent — bright forward spotlight highlighting the cockpit area
+    const cockpitLight = new THREE.SpotLight(0xeaf3ff, 8, ROOM.d * 0.7, Math.PI / 4.5, 0.5, 1);
+    cockpitLight.position.set(0, ROOM.h - 1.5, ROOM.d * 0.05);
+    cockpitLight.target.position.set(0, 1, -ROOM.d * 0.45);
+    scene.add(cockpitLight);
+    scene.add(cockpitLight.target);
+
+    // Animated status lights — small pulsing red/green dots scattered along the hull at floor level
+    const statusDots = [];
+    const dotPositions = [
+      [-ROOM.w * 0.32, 0.5, -ROOM.d * 0.35, 0xff3344],
+      [ROOM.w * 0.32, 0.5, -ROOM.d * 0.35, 0x33ff77],
+      [-ROOM.w * 0.32, 0.5, ROOM.d * 0.35, 0x33ff77],
+      [ROOM.w * 0.32, 0.5, ROOM.d * 0.35, 0xff3344],
+      [-ROOM.w * 0.32, 0.5, 0, 0x4cc9ff],
+      [ROOM.w * 0.32, 0.5, 0, 0x4cc9ff],
+    ];
+    dotPositions.forEach(([x, y, z, c]) => {
+      const dotMat = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 2.5, roughness: 1 });
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), dotMat);
+      dot.position.set(x, y, z);
+      dot.userData.basePhase = Math.random() * Math.PI * 2;
+      dot.userData.baseColor = c;
+      scene.add(dot);
+      statusDots.push(dot);
+    });
+    scene.userData.statusDots = statusDots;
 
     // ── Static furniture (draggable, positions saved to localStorage) ──────────
     const STATIC_KEY = `cg-room-static-${coinId}`;
@@ -1183,8 +1283,8 @@ export default function CoingameRoomPage() {
         });
       };
 
-      // When someone new joins, re-broadcast so they see us idle
-      supaChannel.on('presence', { event: 'join' }, () => { sendInitialPose(); });
+      // When someone new joins, re-broadcast so they see us idle + play the join beep
+      supaChannel.on('presence', { event: 'join' }, () => { sendInitialPose(); playJoinBeep(); });
 
       // Owner published a layout change — pull latest from DB and apply
       supaChannel.on('broadcast', { event: 'layout' }, () => {
@@ -1836,6 +1936,11 @@ export default function CoingameRoomPage() {
         if (isStaged) group.position.y = 0.53 + Math.sin(t * 1.8 + group.userData.bobOffset) * 0.06;
       });
 
+      // Pulse status dots
+      (scene.userData.statusDots || []).forEach((dot) => {
+        dot.material.emissiveIntensity = 1.8 + Math.sin(t * 2.4 + dot.userData.basePhase) * 1.2;
+      });
+
       renderer.render(scene, camera);
     }
     animate();
@@ -1859,6 +1964,13 @@ export default function CoingameRoomPage() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       if (supaChannel) { try { supaChannel.unsubscribe(); } catch (e) { /* ignore */ } }
+      window.removeEventListener('pointerdown', kickAudio);
+      window.removeEventListener('keydown', kickAudio);
+      if (ambientNodes) {
+        try { ambientNodes.oscs.forEach((o) => o.stop()); } catch (e) { /* ignore */ }
+        ambientNodes = null;
+      }
+      if (audioCtx) { try { audioCtx.close(); } catch (e) { /* ignore */ } }
       renderer.dispose();
       sceneRef.current = null;
     };
