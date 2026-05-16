@@ -827,7 +827,29 @@ export default function ExpensesPage() {
           onRemoveAttachment={removeAttachment}
           onSubmit={async (value, pendingFiles) => {
             try {
-              const saved = await saveEntity('expenses', value);
+              const today = new Date();
+              const todayDay = today.getDate();
+              const currentMonth = today.toISOString().slice(0, 7);
+              const isNew = !editingExpense;
+              let expenseValue = value;
+
+              if (isNew && value.isRecurring) {
+                const chargeDay = value.chargeDay || Number((value.date || '').slice(-2)) || 1;
+                if (chargeDay <= todayDay) {
+                  const shouldAffect = await confirm({
+                    title: t('expenses.recurringModal.affectThisMonthTitle'),
+                    description: t('expenses.recurringModal.affectThisMonthDescription', { chargeDay }),
+                    confirmLabel: t('expenses.recurringModal.affectThisMonthConfirm'),
+                    cancelLabel: t('expenses.recurringModal.affectThisMonthCancel'),
+                    confirmVariant: 'primary',
+                  });
+                  if (!shouldAffect) {
+                    expenseValue = { ...value, lastSkippedMonth: currentMonth };
+                  }
+                }
+              }
+
+              const saved = await saveEntity('expenses', expenseValue);
               for (const file of pendingFiles) {
                 await uploadAttachment(saved.id, file);
               }

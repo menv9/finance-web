@@ -1557,6 +1557,7 @@ export const useFinanceStore = create((set, get) => ({
         bankAccountId: value.bankAccountId || null,
         active: value.hasOwnProperty('active') ? value.active : true,
         alerts: value.hasOwnProperty('alerts') ? value.alerts : true,
+        lastSkippedMonth: value.lastSkippedMonth || null,
       }, { skipAutoCreate: true });
       value = { ...value, fixedExpenseId: fixed.id };
     }
