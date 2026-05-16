@@ -2151,7 +2151,7 @@ export const useFinanceStore = create((set, get) => ({
     await cleanupGeneratedPortfolioIncomesForState(get, set);
   },
 
-  saveFixedExpense: async (entity) => get().saveEntity('fixedExpenses', entity),
+  saveFixedExpense: async (entity, options) => get().saveEntity('fixedExpenses', entity, options),
 
   toggleFixedExpenseStatus: async (id) => {
     const current = get().fixedExpenses.find((item) => item.id === id);
@@ -2173,6 +2173,7 @@ export const useFinanceStore = create((set, get) => ({
 
     for (const fe of fixedExpenses) {
       if (!fe.active) continue;
+      if (fe.lastSkippedMonth === currentMonth) continue;
       if (fe.chargeDay > todayDay) continue; // not charged yet this month
 
       // Dedup: check by fixedExpenseId (new entries) or fuzzy match for entries

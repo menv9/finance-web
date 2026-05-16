@@ -852,7 +852,29 @@ export default function ExpensesPage() {
           categories={settings.categories}
           initialValue={editingFixedExpense}
           onSubmit={async (value) => {
-            await saveFixedExpense(value);
+            const today = new Date();
+            const todayDay = today.getDate();
+            const currentMonth = today.toISOString().slice(0, 7);
+            const isNew = !editingFixedExpense;
+            if (isNew && value.chargeDay <= todayDay) {
+              const shouldAffect = await confirm({
+                title: t('expenses.recurringModal.affectThisMonthTitle'),
+                description: t('expenses.recurringModal.affectThisMonthDescription', { chargeDay: value.chargeDay }),
+                confirmLabel: t('expenses.recurringModal.affectThisMonthConfirm'),
+                cancelLabel: t('expenses.recurringModal.affectThisMonthCancel'),
+                confirmVariant: 'primary',
+              });
+              if (shouldAffect) {
+                await saveFixedExpense(value);
+              } else {
+                await saveFixedExpense(
+                  { ...value, lastSkippedMonth: currentMonth },
+                  { skipAutoCreate: true },
+                );
+              }
+            } else {
+              await saveFixedExpense(value);
+            }
             closeFixedModal();
           }}
           onCancel={closeFixedModal}
