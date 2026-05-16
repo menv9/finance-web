@@ -2123,8 +2123,8 @@ export default function CoingameRoomPage() {
       // Earth rotation + cloud drift + starfield drift
       const space = scene.userData.spaceRefs;
       if (space) {
-        space.planet.rotation.y = t * 0.08;
-        space.clouds.rotation.y = t * 0.11;
+        space.planet.rotation.y = t * 0.035;
+        space.clouds.rotation.y = t * 0.05;
         space.stars.rotation.y = t * 0.003;
       }
 
