@@ -1101,9 +1101,29 @@ export default function CoingameRoomPage() {
         roughness: 0.85, metalness: 0.05,
         emissive: 0x0a1638, emissiveIntensity: 0.25,
       });
-      const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R, 96, 64), planetMat);
+      // Use a stylized planet model from /models/planets, scaled to PLANET_R
+      const planet = new THREE.Group();
       planet.position.set(0, PLANET_Y, 0);
       scene.add(planet);
+      {
+        const mtl = new MTLLoader();
+        mtl.setPath('/models/planets/');
+        mtl.load('Planet_1.mtl', (mats) => {
+          mats.preload();
+          const obj = new OBJLoader();
+          obj.setMaterials(mats);
+          obj.setPath('/models/planets/');
+          obj.load('Planet_1.obj', (g) => {
+            const box = new THREE.Box3().setFromObject(g);
+            const size = new THREE.Vector3(); box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const s = (PLANET_R * 2) / Math.max(0.001, maxDim);
+            g.scale.setScalar(s);
+            g.traverse((c) => { if (c.isMesh) c.material = planetMat; });
+            planet.add(g);
+          });
+        });
+      }
 
       // Cloud layer
       const cloudsMat = new THREE.MeshStandardMaterial({
