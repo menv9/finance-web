@@ -1824,7 +1824,7 @@ export default function CoingameRoomPage() {
     const staticMap = { fc_cube: bucket, ...initialShopGroups };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
-      lights: { hemi, ceil: ceilLight, fills: fillLights }, wallMat, floorMat, bucket,
+      lights: { hemi, ceil: ceilLight, fills: fillLights }, floorMat, bucket,
       wallGroup, previewWall,
       buildMode: false,
       hypePumping: false,
@@ -2465,8 +2465,6 @@ export default function CoingameRoomPage() {
     ref.lights.ceil.color.set(c);
     ref.lights.fills.forEach((l) => l.color.set(c));
     ref.scene.fog.color.set(new THREE.Color(ambientColor).multiplyScalar(0.06));
-    ref.wallMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.22));
-    ref.floorMat.color.set(new THREE.Color(ambientColor).multiplyScalar(0.16));
 
     // Update furniture materials + embedded lights
     const allGroups = [
