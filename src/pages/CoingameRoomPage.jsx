@@ -754,16 +754,16 @@ export default function CoingameRoomPage() {
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
           scene.add(group);
-          // Per-triangle AABBs for every wall-like face. Floors/ceilings are filtered below via the
-          // normal.y test, but no slot-based skipping — all walls in the model collide with the player.
-          const skipForCollision = new Set();
+          // Per-triangle AABBs for EVERY face in the hull. Floor and ceiling faces fall
+          // outside the player's vertical range (y=[0.15, 1.4]) so they auto-exclude geometrically —
+          // slanted body shoulders no longer get falsely skipped by a normal-angle heuristic.
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
-          const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
+          const PLAYER_FOOT = 0.15;
+          const PLAYER_HEAD = 1.4;
           group.updateMatrixWorld(true);
           group.traverse((c) => {
             if (!c.isMesh || !c.geometry) return;
-            if (skipForCollision.has(c.userData.hullSlot)) return;
             const geom = c.geometry;
             const pos = geom.attributes.position;
             const index = geom.index;
@@ -775,12 +775,15 @@ export default function CoingameRoomPage() {
               vA.fromBufferAttribute(pos, i0).applyMatrix4(c.matrixWorld);
               vB.fromBufferAttribute(pos, i1).applyMatrix4(c.matrixWorld);
               vC.fromBufferAttribute(pos, i2).applyMatrix4(c.matrixWorld);
-              ab.subVectors(vB, vA); ac.subVectors(vC, vA);
-              triNormal.crossVectors(ab, ac).normalize();
-              if (Math.abs(triNormal.y) >= 0.6) continue; // skip horizontal (floor/ceiling) faces
+              const minY = Math.min(vA.y, vB.y, vC.y);
+              const maxY = Math.max(vA.y, vB.y, vC.y);
+              // Only keep triangles that overlap the player's body Y range
+              if (maxY < PLAYER_FOOT || minY > PLAYER_HEAD) continue;
               const box = new THREE.Box3();
               box.expandByPoint(vA); box.expandByPoint(vB); box.expandByPoint(vC);
-              if (box.min.y < 0.15) box.min.y = 0.15; // lift feet off the floor seam
+              // Clamp the AABB to the player's Y range so the player can step over low lips
+              box.min.y = Math.max(box.min.y, PLAYER_FOOT);
+              box.max.y = Math.min(box.max.y, PLAYER_HEAD);
               spaceshipHullColliders.push(box);
             }
           });
@@ -804,16 +807,16 @@ export default function CoingameRoomPage() {
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
           scene.add(group);
-          // Per-triangle AABBs for every wall-like face. Floors/ceilings are filtered below via the
-          // normal.y test, but no slot-based skipping — all walls in the model collide with the player.
-          const skipForCollision = new Set();
+          // Per-triangle AABBs for EVERY face in the hull. Floor and ceiling faces fall
+          // outside the player's vertical range (y=[0.15, 1.4]) so they auto-exclude geometrically —
+          // slanted body shoulders no longer get falsely skipped by a normal-angle heuristic.
           spaceshipHullColliders = [];
           const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
-          const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
+          const PLAYER_FOOT = 0.15;
+          const PLAYER_HEAD = 1.4;
           group.updateMatrixWorld(true);
           group.traverse((c) => {
             if (!c.isMesh || !c.geometry) return;
-            if (skipForCollision.has(c.userData.hullSlot)) return;
             const geom = c.geometry;
             const pos = geom.attributes.position;
             const index = geom.index;
@@ -825,12 +828,15 @@ export default function CoingameRoomPage() {
               vA.fromBufferAttribute(pos, i0).applyMatrix4(c.matrixWorld);
               vB.fromBufferAttribute(pos, i1).applyMatrix4(c.matrixWorld);
               vC.fromBufferAttribute(pos, i2).applyMatrix4(c.matrixWorld);
-              ab.subVectors(vB, vA); ac.subVectors(vC, vA);
-              triNormal.crossVectors(ab, ac).normalize();
-              if (Math.abs(triNormal.y) >= 0.6) continue; // skip horizontal (floor/ceiling) faces
+              const minY = Math.min(vA.y, vB.y, vC.y);
+              const maxY = Math.max(vA.y, vB.y, vC.y);
+              // Only keep triangles that overlap the player's body Y range
+              if (maxY < PLAYER_FOOT || minY > PLAYER_HEAD) continue;
               const box = new THREE.Box3();
               box.expandByPoint(vA); box.expandByPoint(vB); box.expandByPoint(vC);
-              if (box.min.y < 0.15) box.min.y = 0.15; // lift feet off the floor seam
+              // Clamp the AABB to the player's Y range so the player can step over low lips
+              box.min.y = Math.max(box.min.y, PLAYER_FOOT);
+              box.max.y = Math.min(box.max.y, PLAYER_HEAD);
               spaceshipHullColliders.push(box);
             }
           });
