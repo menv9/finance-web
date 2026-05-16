@@ -1098,14 +1098,14 @@ export default function CoingameRoomPage() {
       const PLANET_Y = -560;
       const planetMat = new THREE.MeshStandardMaterial({
         map: makeEarthTexture(),
-        roughness: 0.85, metalness: 0.05,
-        emissive: 0x0a1638, emissiveIntensity: 0.25,
+        roughness: 0.7, metalness: 0.05,
+        emissive: 0x0a1638, emissiveIntensity: 0.2,
       });
       const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R, 96, 64), planetMat);
       planet.position.set(0, PLANET_Y, 0);
       scene.add(planet);
 
-      // Cloud layer
+      // Cloud layer (procedural fallback; replaced by real texture if available)
       const cloudsMat = new THREE.MeshStandardMaterial({
         map: makeCloudTexture(), transparent: true, opacity: 0.3,
         depthWrite: false, roughness: 1, metalness: 0,
@@ -1113,6 +1113,36 @@ export default function CoingameRoomPage() {
       const clouds = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R + 1.5, 64, 48), cloudsMat);
       clouds.position.copy(planet.position);
       scene.add(clouds);
+
+      // Try to upgrade to real NASA-style textures if present in /public/textures/earth/
+      {
+        const texLoader = new THREE.TextureLoader();
+        const trySet = (path, onOk) => texLoader.load(path, onOk, undefined, () => {});
+        trySet('/textures/earth/2k_earth_daymap.jpg', (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          planetMat.map = t;
+          planetMat.emissiveIntensity = 0.05;
+          planetMat.needsUpdate = true;
+        });
+        trySet('/textures/earth/2k_earth_normal_map.jpg', (t) => {
+          planetMat.normalMap = t;
+          planetMat.normalScale.set(0.8, 0.8);
+          planetMat.needsUpdate = true;
+        });
+        trySet('/textures/earth/2k_earth_specular_map.jpg', (t) => {
+          planetMat.roughnessMap = t;
+          planetMat.roughness = 1.0;
+          planetMat.metalness = 0.15;
+          planetMat.needsUpdate = true;
+        });
+        trySet('/textures/earth/2k_earth_clouds.jpg', (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          cloudsMat.map = t;
+          cloudsMat.alphaMap = t;
+          cloudsMat.opacity = 0.85;
+          cloudsMat.needsUpdate = true;
+        });
+      }
 
       // Atmospheric halo (rim glow)
       const haloMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false });
