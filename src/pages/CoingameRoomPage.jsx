@@ -643,7 +643,6 @@ export default function CoingameRoomPage() {
         if (!sceneRef.current || sceneRef.current.scene !== scene) return;
         const hullMat = new THREE.MeshStandardMaterial({
           color: 0x3a4258, roughness: 0.45, metalness: 0.78,
-          side: THREE.DoubleSide,
           flatShading: true,
         });
         group.traverse((c) => {
@@ -1836,20 +1835,6 @@ export default function CoingameRoomPage() {
       Object.values(furnitureMap).forEach(({ group, isStaged }) => {
         if (isStaged) group.position.y = 0.53 + Math.sin(t * 1.8 + group.userData.bobOffset) * 0.06;
       });
-
-      // Sims-style hull cull — hide hull meshes that sit between the camera and the player
-      {
-        const hullGroup = scene.children.find((c) => c.userData?.spaceshipHull);
-        if (hullGroup) {
-          const camToPlayer = new THREE.Vector3().subVectors(player.position, camera.position);
-          const dist = camToPlayer.length();
-          camToPlayer.normalize();
-          const ray = new THREE.Raycaster(camera.position, camToPlayer, 0.1, dist);
-          const hits = ray.intersectObject(hullGroup, true);
-          const blocking = hits.length > 0;
-          hullGroup.visible = !blocking;
-        }
-      }
 
       renderer.render(scene, camera);
     }
