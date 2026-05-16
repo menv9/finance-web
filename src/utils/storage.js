@@ -71,10 +71,13 @@ async function withStore(storeName, mode, callback) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeName, mode);
     const store = transaction.objectStore(storeName);
-    const result = callback(store);
+    const request = callback(store);
 
-    transaction.oncomplete = () => resolve(result?.result ?? result);
+    transaction.oncomplete = () => resolve(request?.result);
     transaction.onerror = () => reject(transaction.error);
+    if (request) {
+      request.onerror = () => reject(request.error);
+    }
   });
 }
 

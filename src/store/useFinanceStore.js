@@ -1740,7 +1740,12 @@ export const useFinanceStore = create((set, get) => ({
     const adjustedBankAccounts = applyBankAccountAdjustments(get().bankAccounts || [], bankAccountAdjustments, timestamp);
     const debtAdjustments = buildDebtAdjustments(storeName, previous, null);
     const adjustedDebts = applyDebtAdjustments(get().debts || [], debtAdjustments, timestamp);
-    await deleteRecord(storeName, id);
+    try {
+      await deleteRecord(storeName, id);
+    } catch (error) {
+      console.error(`Failed to delete ${storeName} record ${id}:`, error);
+      throw error;
+    }
     if (adjustedBankAccounts !== get().bankAccounts) {
       await Promise.all(
         adjustedBankAccounts
@@ -1795,6 +1800,23 @@ export const useFinanceStore = create((set, get) => ({
         derived: buildDerived(nextState),
       };
     });
+
+    // When deleting a current-month expense created from a recurring bill, mark the
+    // fixed expense so autoCreateFixedExpenses doesn't immediately recreate it.
+    if (storeName === 'expenses' && previous?.fixedExpenseId) {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      if (previous.date?.startsWith(currentMonth)) {
+        const fixed = get().fixedExpenses.find((f) => f.id === previous.fixedExpenseId);
+        if (fixed && fixed.lastSkippedMonth !== currentMonth) {
+          const updatedFixed = { ...fixed, lastSkippedMonth: currentMonth, updatedAt: new Date().toISOString() };
+          await putRecord('fixedExpenses', updatedFixed);
+          set((state) => ({
+            fixedExpenses: state.fixedExpenses.map((f) => (f.id === updatedFixed.id ? updatedFixed : f)),
+          }));
+        }
+      }
+    }
+
     if (previous) {
       await persistActivityLogs(set, [buildActivityLog({
         storeName,
@@ -3442,8 +3464,18 @@ export const useFinanceStore = create((set, get) => ({
           await deleteRecord(change.store_name, change.record_id);
           nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
         } else if (change.payload) {
-          await putRecord(change.store_name, ensureEntitySyncFields(change.payload, change.updated_at));
-          nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
+          // If we deleted locally but the tombstone hasn't been pushed yet, preserve
+          // the deletion instead of resurrecting the record from the server.
+          const tombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
+          if (tombstone && new Date(tombstone.updatedAt).getTime() > new Date(change.updated_at).getTime()) {
+            nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
+            if (!nextDeletedRecords[change.store_name].some((item) => item.id === tombstone.id)) {
+              nextDeletedRecords[change.store_name].push(tombstone);
+            }
+          } else {
+            await putRecord(change.store_name, ensureEntitySyncFields(change.payload, change.updated_at));
+            nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
+          }
         }
         nextConflicts = removeConflict(nextConflicts, `${change.store_name}:${change.record_id}`);
 
