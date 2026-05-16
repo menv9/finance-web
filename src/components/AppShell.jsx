@@ -282,6 +282,9 @@ export function AppShell({ children }) {
   const uploadAttachment = useFinanceStore((state) => state.uploadAttachment);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
+  const supabaseSyncStatus = useFinanceStore((state) => state.supabaseSyncStatus);
+  const supabaseError = useFinanceStore((state) => state.supabaseError);
+  const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
   const profile = useFinanceStore((state) => state.profile);
   const appMode = useFinanceStore((state) => state.appMode);
   const setAppMode = useFinanceStore((state) => state.setAppMode);
@@ -829,12 +832,15 @@ export function AppShell({ children }) {
                 title={t('nav.settings')}
                 className={({ isActive }) =>
                   cn(
-                    'inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+                    'relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-rule-strong transition-colors duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
                     isActive ? 'text-ink border-ink-faint bg-surface-raised' : 'text-ink-muted hover:text-ink hover:border-ink-faint',
                   )
                 }
               >
                 <SettingsIcon />
+                {(conflicts.length > 0 || supabaseSyncStatus === 'error') && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-danger border-2 border-canvas" />
+                )}
               </NavLink>
               {settingsHover && (
                 <div className="hidden lg:block absolute right-0 top-9 pt-1.5 z-40">
@@ -946,21 +952,28 @@ export function AppShell({ children }) {
             t={t}
           />
           <nav aria-label={t('nav.primaryMobile')} className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
-            {moreLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2.5 border-b border-rule last:border-b-0 transition-colors duration-120',
-                    isActive ? 'text-ink' : 'text-ink-muted',
-                  )
-                }
-              >
-                <span className="font-display text-lg">{t(link.labelKey)}</span>
-              </NavLink>
-            ))}
+            {moreLinks.map((link) => {
+              const isSettings = link.to === '/settings';
+              const showBadge = isSettings && (conflicts.length > 0 || supabaseSyncStatus === 'error');
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2.5 border-b border-rule last:border-b-0 transition-colors duration-120',
+                      isActive ? 'text-ink' : 'text-ink-muted',
+                    )
+                  }
+                >
+                  <span className="font-display text-lg">{t(link.labelKey)}</span>
+                  {showBadge && (
+                    <span className="h-2 w-2 rounded-full bg-danger" />
+                  )}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
         {/* Panel footer: balance + debt + sign-out */}

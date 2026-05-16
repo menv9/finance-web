@@ -19,6 +19,7 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import { buildDividendIncomeRows, computeIncomeSeries, isFixedIncomeSchedule, isReceivedIncome } from '../utils/finance';
 import { normalizeDateInput } from '../utils/dates';
 import { formatCurrency, formatCurrencyCompact } from '../utils/formatters';
+import { rowsToCsv } from '../utils/csv';
 import { Card, Button, Stat, EmptyState, Modal, FormField, Input, Select } from '../components/ui';
 import { rise } from '../utils/motion';
 import { useTranslation } from '../i18n/useTranslation';
@@ -242,6 +243,25 @@ export default function IncomePage() {
   const openEdit = (id) => setModal({ open: true, id });
   const close = () => setModal({ open: false, id: null });
 
+  const exportCsv = () => {
+    const csv = rowsToCsv(
+      incomes.map((income) => ({
+        date: income.date,
+        amount: (income.amountCents / 100).toFixed(2),
+        currency: income.currency,
+        source: income.source,
+        category: income.incomeKind || 'variable',
+      })),
+    );
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'incomes.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Filters ──
   const [selectedMonth, setSelectedMonth] = useState(normalizeDateInput(new Date()).slice(0, 7));
   const [filterKind, setFilterKind] = useState('all');
@@ -450,6 +470,9 @@ export default function IncomePage() {
             </Button>
           ) : (
             <>
+              <Button variant="secondary" size="sm" onClick={exportCsv}>
+                {t('income.exportCsv')}
+              </Button>
               <Button variant="primary" size="sm" onClick={openNew}>
                 <PlusIcon /> {t('income.newIncome')}
               </Button>

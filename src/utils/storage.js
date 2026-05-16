@@ -277,4 +277,7 @@ export async function importDatabaseSnapshot(snapshot) {
       supabaseAnonKey: currentSettings.supabaseAnonKey || '',
     });
   }
+  // Reset sync state so old tombstones / cursors / conflicts don't corrupt the
+  // newly imported data on the next push or pull.
+  saveSyncMeta({ lastPulledAt: {}, deletedRecords: {}, conflicts: [] });
 }
