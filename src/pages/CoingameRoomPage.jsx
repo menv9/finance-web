@@ -1102,12 +1102,22 @@ export default function CoingameRoomPage() {
       });
       return map;
     }
+    const SUSTAINED_EMOTES = new Set(['sit', 'death']);
+    function configureEmoteAction(action) {
+      action.reset();
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      action.play();
+    }
     function triggerEmote(target, name) {
       if (!target?.byName) return false;
       const action = target.byName[name];
       if (!action) return false;
+      const sustained = SUSTAINED_EMOTES.has(name);
+      configureEmoteAction(action);
       target.emoteAction = action;
-      target.emoteUntil = performance.now() + (action.getClip().duration * 1000);
+      target.emoteUntil = sustained ? Infinity : performance.now() + (action.getClip().duration * 1000);
+      target.emoteSustained = sustained;
       return true;
     }
 
@@ -1316,17 +1326,26 @@ export default function CoingameRoomPage() {
         rp.target.x = payload.x;
         rp.target.z = payload.z;
         rp.target.yaw = payload.yaw;
-        if (moved) rp.movingUntil = performance.now() + 350;
+        if (moved) {
+          rp.movingUntil = performance.now() + 350;
+          if (rp.emoteSustained) { rp.emoteAction = null; rp.emoteUntil = 0; rp.emoteSustained = false; }
+        }
       });
 
       supaChannel.on('broadcast', { event: 'emote' }, ({ payload }) => {
         if (!payload || payload.id === myId) return;
         const rp = remotePlayers.get(payload.id);
         if (!rp || !rp.byName) return;
+        if (!payload.name) {
+          rp.emoteAction = null; rp.emoteUntil = 0; rp.emoteSustained = false;
+          return;
+        }
         const action = rp.byName[payload.name];
         if (!action) return;
+        configureEmoteAction(action);
         rp.emoteAction = action;
-        rp.emoteUntil = performance.now() + (action.getClip().duration * 1000);
+        rp.emoteSustained = !!payload.sustain;
+        rp.emoteUntil = payload.sustain ? Infinity : performance.now() + (action.getClip().duration * 1000);
       });
 
       supaChannel.on('broadcast', { event: 'chat' }, ({ payload }) => {
@@ -1381,7 +1400,7 @@ export default function CoingameRoomPage() {
       }
     })();
 
-    const localTarget = { emoteAction: null, emoteUntil: 0 };
+    const localTarget = { emoteAction: null, emoteUntil: 0, emoteSustained: false };
     let lastBroadcast = 0;
     let lastSentX = 0, lastSentZ = 0, lastSentYaw = 0;
     function broadcastPose() {
@@ -1405,15 +1424,25 @@ export default function CoingameRoomPage() {
 
     function playLocalEmote(name) {
       if (!playerMixer?.userData) return;
-      const ok = triggerEmote({ byName: playerMixer.userData.byName, emoteAction: null, emoteUntil: 0 }, name);
+      const ok = triggerEmote({ byName: playerMixer.userData.byName, emoteAction: null, emoteUntil: 0, emoteSustained: false }, name);
       if (!ok) return;
-      // sync emote state into local target
       const action = playerMixer.userData.byName[name];
       if (!action) return;
+      const sustained = SUSTAINED_EMOTES.has(name);
+      configureEmoteAction(action);
       localTarget.emoteAction = action;
-      localTarget.emoteUntil = performance.now() + (action.getClip().duration * 1000);
+      localTarget.emoteUntil = sustained ? Infinity : performance.now() + (action.getClip().duration * 1000);
+      localTarget.emoteSustained = sustained;
       if (supaChannel && myId) {
-        supaChannel.send({ type: 'broadcast', event: 'emote', payload: { id: myId, name } });
+        supaChannel.send({ type: 'broadcast', event: 'emote', payload: { id: myId, name, sustain: sustained } });
+      }
+    }
+    function clearLocalEmote() {
+      localTarget.emoteAction = null;
+      localTarget.emoteUntil = 0;
+      localTarget.emoteSustained = false;
+      if (supaChannel && myId) {
+        supaChannel.send({ type: 'broadcast', event: 'emote', payload: { id: myId, name: null } });
       }
     }
 
@@ -1742,7 +1771,10 @@ export default function CoingameRoomPage() {
     const onKeyDown = (e) => {
       if (isTyping(e)) return;
       const lk = e.key.toLowerCase();
-      if (lk in keyState) { keyState[lk] = true; }
+      if (lk in keyState) {
+        keyState[lk] = true;
+        if (localTarget.emoteSustained) clearLocalEmote();
+      }
       if (lk === 'h') { gridHelper.visible = !gridHelper.visible; }
       if (e.code === 'Space' || lk === ' ') {
         playLocalEmote('jump');
