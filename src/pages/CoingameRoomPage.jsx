@@ -1108,12 +1108,12 @@ export default function CoingameRoomPage() {
       {
         const mtl = new MTLLoader();
         mtl.setPath('/models/planets/');
-        mtl.load('Planet_1.mtl', (mats) => {
+        mtl.load('Planet_2.mtl', (mats) => {
           mats.preload();
           const obj = new OBJLoader();
           obj.setMaterials(mats);
           obj.setPath('/models/planets/');
-          obj.load('Planet_1.obj', (g) => {
+          obj.load('Planet_2.obj', (g) => {
             const box = new THREE.Box3().setFromObject(g);
             const size = new THREE.Vector3(); box.getSize(size);
             const maxDim = Math.max(size.x, size.y, size.z);
