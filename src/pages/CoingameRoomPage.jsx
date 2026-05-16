@@ -934,8 +934,9 @@ export default function CoingameRoomPage() {
   // ── Three.js scene ─────────────────────────────────────────────────────────
   useEffect(() => {
     // Drive room dimensions from state so expansion rebuilds the scene at new size.
-    ROOM.w = roomSize;
-    ROOM.d = roomSize;
+    // Elongated spaceship footprint: wider on Z (length) than X (width)
+    ROOM.w = 22;
+    ROOM.d = 32;
     const wrap = wrapRef.current;
     const cvs = canvasRef.current;
     if (!wrap || !cvs) return;
@@ -1029,28 +1030,29 @@ export default function CoingameRoomPage() {
       return tex;
     }
     const hullTexShared = makeHullPanelTexture();
-    function buildSpaceshipWall(w, h, trimColorHex) {
+    function buildSpaceshipWall(w, h, trimColorHex, opts = {}) {
       const group = new THREE.Group();
-      // Wall shape with rectangular viewport holes
+      const winCount = opts.winCount !== undefined ? opts.winCount : 2;
+      const winW = opts.winW !== undefined ? opts.winW : Math.min(5, w / (winCount + 1.4));
+      const winH = opts.winH !== undefined ? opts.winH : Math.min(3.6, h * 0.42);
       const shape = new THREE.Shape();
       shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2);
       shape.lineTo(w / 2, h / 2);   shape.lineTo(-w / 2, h / 2);
       shape.lineTo(-w / 2, -h / 2);
-      const winCount = w > 22 ? 3 : 2;
-      const winW = Math.min(5, w / (winCount + 1.4));
-      const winH = Math.min(3.6, h * 0.42);
       const winYCenter = 0;
       const winFrames = [];
-      for (let i = 0; i < winCount; i++) {
-        const cx = -w / 2 + (w * (i + 1)) / (winCount + 1);
-        const hole = new THREE.Path();
-        hole.moveTo(cx - winW / 2, winYCenter - winH / 2);
-        hole.lineTo(cx + winW / 2, winYCenter - winH / 2);
-        hole.lineTo(cx + winW / 2, winYCenter + winH / 2);
-        hole.lineTo(cx - winW / 2, winYCenter + winH / 2);
-        hole.lineTo(cx - winW / 2, winYCenter - winH / 2);
-        shape.holes.push(hole);
-        winFrames.push({ cx, cy: winYCenter });
+      if (winCount > 0) {
+        for (let i = 0; i < winCount; i++) {
+          const cx = winCount === 1 ? 0 : -w / 2 + (w * (i + 1)) / (winCount + 1);
+          const hole = new THREE.Path();
+          hole.moveTo(cx - winW / 2, winYCenter - winH / 2);
+          hole.lineTo(cx + winW / 2, winYCenter - winH / 2);
+          hole.lineTo(cx + winW / 2, winYCenter + winH / 2);
+          hole.lineTo(cx - winW / 2, winYCenter + winH / 2);
+          hole.lineTo(cx - winW / 2, winYCenter - winH / 2);
+          shape.holes.push(hole);
+          winFrames.push({ cx, cy: winYCenter });
+        }
       }
       const wallTex = hullTexShared.clone();
       wallTex.needsUpdate = true;
@@ -1118,16 +1120,48 @@ export default function CoingameRoomPage() {
       return group;
     }
     const trimHex = parseInt(initAmbient.replace('#', ''), 16) || 0x22c55e;
-    const wallDefs = [
-      { pos: [0, ROOM.h / 2, -ROOM.d / 2], ry: 0,            w: ROOM.w, h: ROOM.h },
-      { pos: [0, ROOM.h / 2,  ROOM.d / 2], ry: Math.PI,      w: ROOM.w, h: ROOM.h },
-      { pos: [-ROOM.w / 2, ROOM.h / 2, 0], ry: Math.PI / 2,  w: ROOM.d, h: ROOM.h },
-      { pos: [ ROOM.w / 2, ROOM.h / 2, 0], ry: -Math.PI / 2, w: ROOM.d, h: ROOM.h },
+    // Elongated octagon footprint: 8 walls — 2 long sides, 2 short ends (cockpit + back), 4 chamfer corners
+    const HW = ROOM.w / 2;
+    const HL = ROOM.d / 2;
+    const CHF = 4;
+    const octVerts = [
+      [-HW, -HL + CHF], [-HW, HL - CHF],
+      [-HW + CHF, HL], [HW - CHF, HL],
+      [HW, HL - CHF], [HW, -HL + CHF],
+      [HW - CHF, -HL], [-HW + CHF, -HL],
     ];
-    wallDefs.forEach(({ pos, ry, w, h }) => {
-      const g = buildSpaceshipWall(w, h, trimHex);
-      g.position.set(...pos); g.rotation.y = ry;
-      scene.add(g);
+    scene.userData.octVerts = octVerts;
+    scene.userData.octChamfer = CHF;
+    const edgeRoles = ['side', 'chamfer', 'back', 'chamfer', 'side', 'chamfer', 'cockpit', 'chamfer'];
+    const cantAngle = 0.11;
+    octVerts.forEach((a, i) => {
+      const b = octVerts[(i + 1) % octVerts.length];
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const len = Math.hypot(dx, dz);
+      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      const role = edgeRoles[i];
+      const tl = Math.hypot(mx, mz);
+      const ry = Math.atan2(-mx / tl, -mz / tl);
+      const opts = role === 'cockpit'  ? { winCount: 1, winW: Math.min(len * 0.85, 11), winH: ROOM.h * 0.52 }
+                 : role === 'back'     ? { winCount: 1, winW: len * 0.55, winH: ROOM.h * 0.4 }
+                 : role === 'side'     ? { winCount: 3, winW: 4.2, winH: 3.5 }
+                 : { winCount: 0 };
+      const wall = buildSpaceshipWall(len, ROOM.h, trimHex, opts);
+      wall.position.y = ROOM.h / 2;
+      if (role === 'chamfer') {
+        const tMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 1.8, roughness: 0.5 });
+        const conduit = new THREE.Mesh(new THREE.BoxGeometry(0.06, ROOM.h * 0.8, 0.04), tMat);
+        conduit.position.set(0, 0, 0.08);
+        wall.add(conduit);
+      }
+      const inner = new THREE.Group();
+      inner.rotation.x = -cantAngle;
+      inner.add(wall);
+      const outer = new THREE.Group();
+      outer.position.set(mx, 0, mz);
+      outer.rotation.y = ry;
+      outer.add(inner);
+      scene.add(outer);
     });
 
     // ── Outer space backdrop ─────────────────────────────────────────────────
@@ -1307,12 +1341,18 @@ export default function CoingameRoomPage() {
       tex.repeat.set(ROOM.w / 4, ROOM.d / 4);
       return tex;
     }
+    const deckTex = makeDeckTexture();
+    deckTex.repeat.set(0.25, 0.25);
     const floorMat = new THREE.MeshStandardMaterial({
-      map: makeDeckTexture(), color: 0xb8c0d4,
+      map: deckTex, color: 0xb8c0d4,
       roughness: 0.55, metalness: 0.75,
       transparent: true, opacity: 0.92, depthWrite: true,
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
+    const floorShape = new THREE.Shape();
+    floorShape.moveTo(octVerts[0][0], octVerts[0][1]);
+    for (let i = 1; i < octVerts.length; i++) floorShape.lineTo(octVerts[i][0], octVerts[i][1]);
+    floorShape.closePath();
+    const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.005;
     floor.receiveShadow = true;
@@ -1323,16 +1363,18 @@ export default function CoingameRoomPage() {
     gridHelper.visible = false;
     scene.add(gridHelper);
 
-    // Emissive trim seam where floor meets each wall
+    // Emissive trim seam along each octagon edge
     const seamMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.5 });
-    [
-      [0, 0.025, -(ROOM.d/2 - 0.06), 0,         ROOM.w * 0.97],
-      [0, 0.025,  (ROOM.d/2 - 0.06), 0,         ROOM.w * 0.97],
-      [-(ROOM.w/2 - 0.06), 0.025, 0, Math.PI/2, ROOM.d * 0.97],
-      [ (ROOM.w/2 - 0.06), 0.025, 0, Math.PI/2, ROOM.d * 0.97],
-    ].forEach(([x, y, z, ry, len]) => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.06), seamMat);
-      s.position.set(x, y, z); s.rotation.y = ry;
+    octVerts.forEach((a, i) => {
+      const b = octVerts[(i + 1) % octVerts.length];
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const len = Math.hypot(dx, dz);
+      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      const tl = Math.hypot(mx, mz);
+      const ry = Math.atan2(-mx / tl, -mz / tl);
+      const s = new THREE.Mesh(new THREE.BoxGeometry(len * 0.95, 0.05, 0.06), seamMat);
+      s.position.set(mx * 0.96, 0.025, mz * 0.96);
+      s.rotation.y = ry;
       scene.add(s);
     });
 
@@ -1347,13 +1389,17 @@ export default function CoingameRoomPage() {
     glowPanel.position.set(0, ROOM.h - 0.08, 0);
     scene.add(glowPanel);
 
-    // Corner uplights — soft sci-fi accent lighting
-    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
-      const x = sx * (ROOM.w / 2 - 0.4);
-      const z = sz * (ROOM.d / 2 - 0.4);
+    // Corner uplights — one tucked into each chamfer corner
+    [1, 3, 5, 7].forEach((chamferIdx) => {
+      const a = octVerts[chamferIdx];
+      const b = octVerts[(chamferIdx + 1) % octVerts.length];
+      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      const tl = Math.hypot(mx, mz);
+      const x = mx * (1 - 0.5 / tl);
+      const z = mz * (1 - 0.5 / tl);
       const upMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 2.2, roughness: 0.6 });
-      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.45, 12), upMat);
-      up.position.set(x, 0.22, z);
+      const up = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.5, 12), upMat);
+      up.position.set(x, 0.25, z);
       scene.add(up);
       const pl = new THREE.PointLight(trimHex, 0.9, 7);
       pl.position.set(x, 0.6, z);
