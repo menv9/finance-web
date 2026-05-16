@@ -125,413 +125,6 @@ function buildFCCube() {
   return outer;
 }
 
-// ── Shop-only furniture builders (purchased with RC) ────────────────────────
-
-function buildNeonSign() {
-  const g = new THREE.Group();
-  const back = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.5, metalness: 0.5 });
-  const brushed = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.35, metalness: 0.9 });
-  const pinkNeon = new THREE.MeshStandardMaterial({ color: 0xfce7f3, emissive: 0xec4899, emissiveIntensity: 2.8, roughness: 0.15, metalness: 0.2 });
-  const cyanNeon = new THREE.MeshStandardMaterial({ color: 0xcffafe, emissive: 0x22d3ee, emissiveIntensity: 2.8, roughness: 0.15, metalness: 0.2 });
-
-  // Mounting plate with subtle bevel
-  g.add(mesh(bevelBox(1.7, 0.78, 0.08, 0.015), back, 0, 1.2, 0));
-  g.add(mesh(bevelBox(1.62, 0.7, 0.04, 0.01), brushed, 0, 1.2, 0.03));
-
-  // Helper to build a tube path
-  function tube(pts, mat, radius = 0.022) {
-    const curve = new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-    const geo = new THREE.TubeGeometry(curve, Math.max(16, pts.length * 4), radius, 12, false);
-    return new THREE.Mesh(geo, mat);
-  }
-
-  // "$" letter — vertical bar + S curve
-  g.add(tube([[-0.6, 1.5, 0.07], [-0.6, 0.95, 0.07]], pinkNeon));
-  g.add(tube([[-0.5, 1.45, 0.07], [-0.7, 1.42, 0.07], [-0.72, 1.32, 0.07], [-0.58, 1.25, 0.07], [-0.5, 1.18, 0.07], [-0.5, 1.08, 0.07], [-0.6, 1.0, 0.07], [-0.72, 1.0, 0.07]], pinkNeon));
-
-  // "C" letter
-  g.add(tube([[-0.18, 1.45, 0.07], [-0.3, 1.45, 0.07], [-0.35, 1.35, 0.07], [-0.35, 1.05, 0.07], [-0.3, 0.95, 0.07], [-0.18, 0.95, 0.07]], cyanNeon));
-
-  // "O" letter — torus
-  const o = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 10, 32), pinkNeon);
-  o.position.set(0.05, 1.2, 0.07); g.add(o);
-
-  // "I" letter
-  g.add(tube([[0.32, 1.45, 0.07], [0.32, 0.95, 0.07]], cyanNeon));
-
-  // "N" letter
-  g.add(tube([[0.5, 0.95, 0.07], [0.5, 1.45, 0.07], [0.7, 0.95, 0.07], [0.7, 1.45, 0.07]], pinkNeon));
-
-  // Tube end caps (small bulbs)
-  [[-0.6, 1.5], [-0.6, 0.95], [-0.5, 1.45], [-0.72, 1.0], [-0.18, 1.45], [-0.18, 0.95], [0.32, 1.45], [0.32, 0.95], [0.5, 0.95], [0.5, 1.45], [0.7, 0.95], [0.7, 1.45]].forEach(([x, y]) => {
-    g.add(mesh(new THREE.SphereGeometry(0.025, 10, 10), brushed, x, y, 0.07));
-  });
-
-  // Stand base
-  g.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.78, 12), brushed, 0, 0.4, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.05, 16), back, 0, 0.025, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.04, 16), brushed, 0, 0.06, 0));
-
-  // Lights
-  const pinkPL = new THREE.PointLight(0xec4899, 1.6, 4); pinkPL.position.set(-0.3, 1.2, 0.4); g.add(pinkPL);
-  const cyanPL = new THREE.PointLight(0x22d3ee, 1.6, 4); cyanPL.position.set(0.3, 1.2, 0.4); g.add(cyanPL);
-
-  g.userData.emissiveMats = [pinkNeon, cyanNeon];
-  return g;
-}
-
-function buildPlant() {
-  const g = new THREE.Group();
-  const pot = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.82, metalness: 0 });
-  const potRim = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.85, metalness: 0 });
-  const soil = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 1, metalness: 0 });
-  const leafA = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.55, metalness: 0, emissive: 0x14532d, emissiveIntensity: 0.12, side: THREE.DoubleSide });
-  const leafB = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.5, metalness: 0, emissive: 0x166534, emissiveIntensity: 0.18, side: THREE.DoubleSide });
-  const stemMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7, metalness: 0 });
-
-  // Terracotta pot — lathe for smooth taper
-  const potPts = [[0.0, 0], [0.28, 0.02], [0.3, 0.06], [0.27, 0.32], [0.32, 0.42], [0.32, 0.46], [0.0, 0.46]];
-  const potGeo = new THREE.LatheGeometry(potPts.map(([r, y]) => new THREE.Vector2(r, y)), 24);
-  g.add(new THREE.Mesh(potGeo, pot));
-  g.add(mesh(new THREE.TorusGeometry(0.32, 0.025, 8, 24), potRim, 0, 0.46, 0));
-  // Soil
-  g.add(mesh(new THREE.CylinderGeometry(0.28, 0.27, 0.04, 20), soil, 0, 0.44, 0));
-
-  // Main stem clump
-  const trunkPts = [new THREE.Vector3(0, 0.45, 0), new THREE.Vector3(0.02, 0.7, 0.01), new THREE.Vector3(-0.01, 0.95, -0.02), new THREE.Vector3(0.03, 1.15, 0.02)];
-  const trunkCurve = new THREE.CatmullRomCurve3(trunkPts);
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(trunkCurve, 8, 0.04, 8), stemMat));
-
-  // Monstera-style leaves — flat shapes that curl
-  function makeLeaf(scale = 1, mat = leafA) {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    shape.bezierCurveTo(0.25, 0.1, 0.42, 0.5, 0.32, 0.95);
-    shape.bezierCurveTo(0.2, 1.2, 0.05, 1.3, 0, 1.35);
-    shape.bezierCurveTo(-0.05, 1.3, -0.2, 1.2, -0.32, 0.95);
-    shape.bezierCurveTo(-0.42, 0.5, -0.25, 0.1, 0, 0);
-    const geo = new THREE.ShapeGeometry(shape, 16);
-    geo.scale(scale, scale, scale);
-    return new THREE.Mesh(geo, mat);
-  }
-  const leafConfigs = [
-    { s: 0.55, mat: leafA, rotZ: 0.2, rotY: 0,        rotX: -0.3, x: 0,    y: 1.15, z: 0.05 },
-    { s: 0.6,  mat: leafB, rotZ: -0.2, rotY: 1.05,    rotX: -0.4, x: 0.05, y: 1.1,  z: 0    },
-    { s: 0.5,  mat: leafA, rotZ: 0.3,  rotY: 2.1,     rotX: -0.35,x: -0.04,y: 1.08, z: -0.03},
-    { s: 0.55, mat: leafB, rotZ: -0.15,rotY: 3.14,    rotX: -0.3, x: 0,    y: 1.12, z: -0.05},
-    { s: 0.48, mat: leafA, rotZ: 0.25, rotY: 4.18,    rotX: -0.4, x: -0.04,y: 1.06, z: 0.02 },
-    { s: 0.52, mat: leafB, rotZ: -0.3, rotY: 5.23,    rotX: -0.35,x: 0.03, y: 1.1,  z: 0.04 },
-    { s: 0.42, mat: leafA, rotZ: 0,    rotY: 0.5,     rotX: -0.7, x: 0,    y: 1.28, z: 0    },
-  ];
-  leafConfigs.forEach((c) => {
-    const l = makeLeaf(c.s, c.mat);
-    l.position.set(c.x, c.y, c.z);
-    l.rotation.set(c.rotX, c.rotY, c.rotZ);
-    g.add(l);
-    // Small stem connecting to trunk
-    const sx = c.x - Math.sin(c.rotY) * 0.04;
-    const sz = c.z - Math.cos(c.rotY) * 0.04;
-    g.add(mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.18, 6), stemMat, sx, c.y - 0.08, sz, c.rotX, c.rotY, 0));
-  });
-  return g;
-}
-
-function buildDiscoBall() {
-  const g = new THREE.Group();
-  const chrome = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.02, metalness: 1, emissive: 0xc084fc, emissiveIntensity: 0.45, envMapIntensity: 1.5 });
-  const mirror = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.0, metalness: 1, emissive: 0xffffff, emissiveIntensity: 0.6 });
-  const chain = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.25, metalness: 1 });
-  const mount = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.4, metalness: 0.9 });
-
-  // Ball — core sphere + many tiny mirror tiles
-  const ballGroup = new THREE.Group();
-  const core = new THREE.Mesh(new THREE.SphereGeometry(0.36, 24, 24), chrome);
-  ballGroup.add(core);
-  // Tile pattern using lat/long
-  const tileGeo = new THREE.BoxGeometry(0.07, 0.07, 0.012);
-  const rings = 10;
-  for (let i = 1; i < rings; i++) {
-    const phi = (i / rings) * Math.PI;
-    const r = 0.365 * Math.sin(phi);
-    const y = 0.365 * Math.cos(phi);
-    const count = Math.max(6, Math.floor(r * 22));
-    for (let j = 0; j < count; j++) {
-      const theta = (j / count) * Math.PI * 2;
-      const tile = new THREE.Mesh(tileGeo, mirror);
-      tile.position.set(Math.sin(theta) * r, y, Math.cos(theta) * r);
-      tile.lookAt(0, 0, 0);
-      tile.rotateY(Math.PI);
-      ballGroup.add(tile);
-    }
-  }
-  ballGroup.position.set(0, 1.35, 0); g.add(ballGroup);
-
-  // Chain — beaded
-  for (let i = 0; i < 7; i++) {
-    g.add(mesh(new THREE.SphereGeometry(0.025, 8, 8), chain, 0, 1.78 + i * 0.07, 0));
-  }
-  // Ceiling mount
-  g.add(mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.06, 16), mount, 0, 2.28, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.04, 12), chain, 0, 2.22, 0));
-
-  // Lights — multiple colored, animated for sweep
-  const pl = new THREE.PointLight(0xa855f7, 2.0, 6); pl.position.set(0, 1.35, 0); g.add(pl);
-  const pl2 = new THREE.PointLight(0xec4899, 1.6, 5); pl2.position.set(0.5, 1.35, 0.3); g.add(pl2);
-  const pl3 = new THREE.PointLight(0x22d3ee, 1.4, 5); pl3.position.set(-0.4, 1.35, -0.3); g.add(pl3);
-
-  g.userData.spinBall = ballGroup;
-  g.userData.discoLights = [pl, pl2, pl3];
-  g.userData.emissiveMats = [chrome, mirror];
-  return g;
-}
-
-function buildArcade() {
-  const g = new THREE.Group();
-  const cab = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.55, metalness: 0.35 });
-  const cabDark = new THREE.MeshStandardMaterial({ color: 0x0f0a2e, roughness: 0.6, metalness: 0.3 });
-  const trim = new THREE.MeshStandardMaterial({ color: 0xec4899, emissive: 0xec4899, emissiveIntensity: 0.7, roughness: 0.35 });
-  const marquee = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 1.2, roughness: 0.5 });
-  const screenBezel = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.9, metalness: 0.5 });
-  const screen = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x22d3ee, emissiveIntensity: 1.4, roughness: 1 });
-  const joyBall = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.25, metalness: 0.6, emissive: 0xdc2626, emissiveIntensity: 0.2 });
-  const joyStick = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.9 });
-  const btnColors = [0xef4444, 0xfbbf24, 0x22c55e, 0x3b82f6];
-
-  // Main cabinet — beveled body
-  g.add(mesh(bevelBox(0.95, 1.55, 0.78, 0.025), cab, 0, 0.78, 0));
-  // Side stripes
-  [-0.477, 0.477].forEach((x) => {
-    g.add(mesh(bevelBox(0.012, 1.5, 0.78, 0.005), trim, x, 0.78, 0));
-  });
-
-  // Marquee header — slightly tilted, glowing
-  const marqueeGroup = new THREE.Group();
-  marqueeGroup.add(mesh(bevelBox(1.02, 0.32, 0.12, 0.02), cabDark, 0, 0, 0));
-  marqueeGroup.add(mesh(bevelBox(0.92, 0.22, 0.04, 0.015), marquee, 0, 0, 0.07));
-  // Pixel-ish dots on marquee
-  for (let i = 0; i < 5; i++) {
-    g.add(mesh(new THREE.SphereGeometry(0.018, 8, 8), trim, -0.32 + i * 0.16, 1.78, 0.1));
-  }
-  marqueeGroup.position.set(0, 1.78, 0);
-  marqueeGroup.rotation.x = -0.12;
-  g.add(marqueeGroup);
-
-  // Screen bezel — tilted back to face player
-  const screenGroup = new THREE.Group();
-  screenGroup.add(mesh(bevelBox(0.78, 0.6, 0.06, 0.015), screenBezel, 0, 0, 0));
-  screenGroup.add(mesh(new THREE.PlaneGeometry(0.66, 0.48), screen, 0, 0, 0.035));
-  // Scanlines on screen
-  for (let i = 0; i < 5; i++) {
-    g.add(mesh(new THREE.PlaneGeometry(0.62, 0.005), new THREE.MeshStandardMaterial({ color: 0x0e7490, emissive: 0x0e7490, emissiveIntensity: 0.4, transparent: true, opacity: 0.5 }), 0, 1.4 - 0.18 + i * 0.08, 0.42));
-  }
-  screenGroup.position.set(0, 1.36, 0.4);
-  screenGroup.rotation.x = 0.12;
-  g.add(screenGroup);
-
-  // Control deck — angled forward
-  const deck = new THREE.Group();
-  deck.add(mesh(bevelBox(0.86, 0.06, 0.42, 0.012), cabDark, 0, 0, 0));
-  deck.add(mesh(bevelBox(0.78, 0.04, 0.36, 0.008), cab, 0, 0.05, 0));
-  // Joystick
-  deck.add(mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.015, 16), joyStick, -0.22, 0.06, 0));
-  deck.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 8), joyStick, -0.22, 0.12, 0));
-  deck.add(mesh(new THREE.SphereGeometry(0.045, 16, 16), joyBall, -0.22, 0.2, 0));
-  // Buttons (4-pack)
-  btnColors.forEach((c, i) => {
-    const col = i % 2; const row = Math.floor(i / 2);
-    const bMat = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.4 });
-    deck.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.025, 16), bMat, 0.05 + col * 0.11, 0.07, -0.05 + row * 0.12));
-    deck.add(mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 16), joyStick, 0.05 + col * 0.11, 0.06, -0.05 + row * 0.12));
-  });
-  // Coin slot
-  deck.add(mesh(bevelBox(0.18, 0.04, 0.06, 0.005), joyStick, 0, 0.07, 0.15));
-  deck.position.set(0, 0.98, 0.22);
-  deck.rotation.x = -0.32;
-  g.add(deck);
-
-  // Coin door at base
-  g.add(mesh(bevelBox(0.36, 0.18, 0.04, 0.008), cabDark, 0, 0.32, 0.4));
-  g.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.05, 16), marquee, 0, 0.32, 0.43, Math.PI / 2, 0, 0));
-
-  // Vents on side
-  [-0.476, 0.476].forEach((x) => {
-    for (let i = 0; i < 4; i++) {
-      g.add(mesh(new THREE.BoxGeometry(0.008, 0.02, 0.2), cabDark, x, 1.42 - i * 0.04, 0));
-    }
-  });
-
-  // Lights
-  const pl = new THREE.PointLight(0x22d3ee, 1.1, 3); pl.position.set(0, 1.36, 0.7); g.add(pl);
-  const pl2 = new THREE.PointLight(0xfbbf24, 0.8, 2); pl2.position.set(0, 1.78, 0.3); g.add(pl2);
-
-  g.userData.emissiveMats = [screen, marquee, trim];
-  return g;
-}
-
-function buildChest() {
-  const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color: 0x5a2210, roughness: 0.88, metalness: 0 });
-  const woodDark = new THREE.MeshStandardMaterial({ color: 0x3a1607, roughness: 0.92, metalness: 0 });
-  const gold = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.15, metalness: 1, emissive: 0xb45309, emissiveIntensity: 0.35 });
-  const goldDark = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.3, metalness: 1 });
-  const inner = new THREE.MeshStandardMaterial({ color: 0xfde047, emissive: 0xf59e0b, emissiveIntensity: 1.6, roughness: 0.2, metalness: 0.9 });
-  const gem = new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0xa855f7, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.5 });
-  const gemR = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.5 });
-  const gemG = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.5 });
-
-  // Body — beveled box with plank seams
-  g.add(mesh(bevelBox(1.0, 0.5, 0.66, 0.018), wood, 0, 0.25, 0));
-  // Plank seams
-  [-0.3, 0, 0.3].forEach((x) => {
-    g.add(mesh(new THREE.BoxGeometry(0.005, 0.46, 0.665), woodDark, x, 0.25, 0));
-  });
-  // Bottom skirting
-  g.add(mesh(bevelBox(1.04, 0.08, 0.7, 0.015), woodDark, 0, 0.04, 0));
-
-  // Lid — curved top using lathe
-  const lid = new THREE.Group();
-  const lidPts = [[0, 0], [0.48, 0], [0.5, 0.04], [0.42, 0.22], [0.0, 0.32]];
-  const lidGeo = new THREE.LatheGeometry(lidPts.map(([r, y]) => new THREE.Vector2(r, y)), 24, 0, Math.PI);
-  const lidMesh = new THREE.Mesh(lidGeo, wood);
-  lidMesh.rotation.z = -Math.PI / 2;
-  lid.add(lidMesh);
-  // Cap ends of lid
-  lid.add(mesh(new THREE.CircleGeometry(0.32, 16, 0, Math.PI), wood, 0.5, 0.0, 0, 0, Math.PI / 2, 0));
-  lid.add(mesh(new THREE.CircleGeometry(0.32, 16, 0, Math.PI), wood, -0.5, 0.0, 0, 0, -Math.PI / 2, 0));
-  // Gold bands around lid
-  [-0.32, 0, 0.32].forEach((x) => {
-    lid.add(mesh(new THREE.TorusGeometry(0.32, 0.015, 8, 24, Math.PI), gold, x, 0, 0));
-  });
-  // Center lock plate
-  lid.add(mesh(bevelBox(0.18, 0.16, 0.03, 0.008), gold, 0, -0.1, 0.32));
-  lid.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.04, 12), goldDark, 0, -0.1, 0.34, Math.PI / 2, 0, 0));
-  lid.position.set(0, 0.5, 0); lid.rotation.x = -0.5;
-  g.add(lid);
-
-  // Corner reinforcements (gold) — 4 vertical bands
-  [-0.5, 0.5].forEach((x) => {
-    [-0.33, 0.33].forEach((z) => {
-      g.add(mesh(bevelBox(0.04, 0.48, 0.04, 0.008), gold, x, 0.25, z));
-    });
-  });
-  // Horizontal gold bands
-  g.add(mesh(bevelBox(1.06, 0.04, 0.005, 0.005), gold, 0, 0.46, 0.331));
-  g.add(mesh(bevelBox(1.06, 0.04, 0.005, 0.005), gold, 0, 0.46, -0.331));
-  g.add(mesh(bevelBox(0.005, 0.04, 0.7, 0.005), gold, 0.501, 0.46, 0));
-  g.add(mesh(bevelBox(0.005, 0.04, 0.7, 0.005), gold, -0.501, 0.46, 0));
-  // Lock front
-  g.add(mesh(bevelBox(0.22, 0.16, 0.02, 0.008), gold, 0, 0.42, 0.34));
-  g.add(mesh(new THREE.TorusGeometry(0.03, 0.012, 8, 16), goldDark, 0, 0.46, 0.35, Math.PI / 2, 0, 0));
-
-  // Overflowing treasure — varied gold + gems
-  const treasures = [
-    { type: 'coin', x: 0.18, y: 0.42, z: 0.05, r: 0.06 },
-    { type: 'coin', x: -0.15, y: 0.4,  z: -0.08, r: 0.05 },
-    { type: 'coin', x: 0.05, y: 0.48, z: 0.18,  r: 0.055 },
-    { type: 'coin', x: 0.25, y: 0.46, z: -0.1,  r: 0.045 },
-    { type: 'coin', x: -0.28, y: 0.42, z: 0.12, r: 0.05 },
-    { type: 'coin', x: 0,    y: 0.52, z: -0.05, r: 0.05 },
-    { type: 'gem',  x: 0.12, y: 0.5,  z: 0.0,   mat: gem,   r: 0.07 },
-    { type: 'gem',  x: -0.05,y: 0.55, z: 0.1,   mat: gemR,  r: 0.06 },
-    { type: 'gem',  x: 0.2,  y: 0.5,  z: 0.2,   mat: gemG,  r: 0.05 },
-  ];
-  treasures.forEach((t) => {
-    if (t.type === 'coin') {
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(t.r, t.r, 0.018, 18), inner);
-      c.position.set(t.x, t.y, t.z);
-      c.rotation.set(Math.random() * 0.6 - 0.3, Math.random() * Math.PI, Math.random() * 0.6 - 0.3);
-      g.add(c);
-    } else {
-      const j = new THREE.Mesh(new THREE.OctahedronGeometry(t.r, 0), t.mat);
-      j.position.set(t.x, t.y, t.z);
-      j.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      g.add(j);
-    }
-  });
-
-  const pl = new THREE.PointLight(0xfbbf24, 1.6, 3); pl.position.set(0, 0.55, 0.1); g.add(pl);
-  g.userData.emissiveMats = [inner, gem, gemR, gemG];
-  return g;
-}
-
-function buildLavaLamp() {
-  const g = new THREE.Group();
-  const base = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.4, metalness: 0.7 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0xfde68a, transparent: true, opacity: 0.25, roughness: 0.05, metalness: 0.1 });
-  const lava = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xf97316, emissiveIntensity: 1.6, roughness: 0.4 });
-  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.18, 16), base, 0, 0.09, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.17, 0.22, 0.06, 16), base, 0, 0.21, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.16, 0.17, 0.9, 20), glass, 0, 0.7, 0));
-  g.add(mesh(new THREE.SphereGeometry(0.16, 16, 16, 0, Math.PI*2, 0, Math.PI/2), base, 0, 1.15, 0));
-  const blobs = [];
-  [[0,0.4,0,0.09],[0.05,0.65,0,0.07],[-0.04,0.85,0,0.08],[0.02,1.0,0,0.06]].forEach(([x,y,z,r]) => {
-    const b = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), lava);
-    b.position.set(x, y, z); g.add(b); blobs.push({ mesh: b, baseY: y, phase: Math.random() * Math.PI * 2 });
-  });
-  const pl = new THREE.PointLight(0xf97316, 1.4, 3); pl.position.set(0, 0.7, 0); g.add(pl);
-  g.userData.lavaBlobs = blobs;
-  g.userData.emissiveMats = [lava];
-  return g;
-}
-
-// ── Wall partition builders (sub-room dividers) ─────────────────────────────
-
-function buildWallMaterials() {
-  return {
-    wall: new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85, metalness: 0.05 }),
-    base: new THREE.MeshStandardMaterial({ color: 0x1a2e1a, roughness: 0.45, metalness: 0.4 }),
-    cap: new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.5, metalness: 0.3 }),
-  };
-}
-
-function buildWallStraight() {
-  const g = new THREE.Group();
-  const m = buildWallMaterials();
-  // 4u long, 3u tall, 0.18 thick
-  g.add(mesh(new THREE.BoxGeometry(4, 2.7, 0.18), m.wall, 0, 1.5, 0));
-  g.add(mesh(new THREE.BoxGeometry(4.1, 0.16, 0.22), m.base, 0, 0.08, 0));
-  g.add(mesh(new THREE.BoxGeometry(4.1, 0.04, 0.22), m.cap, 0, 2.88, 0));
-  return g;
-}
-
-function buildWallCorner() {
-  const g = new THREE.Group();
-  const m = buildWallMaterials();
-  // L-shape: 3u arm along +x, 3u arm along +z
-  g.add(mesh(new THREE.BoxGeometry(3, 2.7, 0.18), m.wall, 1.5, 1.5, 0));
-  g.add(mesh(new THREE.BoxGeometry(3.1, 0.16, 0.22), m.base, 1.5, 0.08, 0));
-  g.add(mesh(new THREE.BoxGeometry(3.1, 0.04, 0.22), m.cap, 1.5, 2.88, 0));
-  g.add(mesh(new THREE.BoxGeometry(0.18, 2.7, 3), m.wall, 0, 1.5, 1.5));
-  g.add(mesh(new THREE.BoxGeometry(0.22, 0.16, 3.1), m.base, 0, 0.08, 1.5));
-  g.add(mesh(new THREE.BoxGeometry(0.22, 0.04, 3.1), m.cap, 0, 2.88, 1.5));
-  return g;
-}
-
-function buildWallDoorway() {
-  const g = new THREE.Group();
-  const m = buildWallMaterials();
-  // Two side panels + lintel; 4u total, doorway is 1.4u wide
-  g.add(mesh(new THREE.BoxGeometry(1.3, 2.7, 0.18), m.wall, -1.35, 1.5, 0));
-  g.add(mesh(new THREE.BoxGeometry(1.3, 2.7, 0.18), m.wall,  1.35, 1.5, 0));
-  g.add(mesh(new THREE.BoxGeometry(4, 0.6, 0.18), m.wall, 0, 2.55, 0));
-  // Side bases only (clear the doorway)
-  g.add(mesh(new THREE.BoxGeometry(1.3, 0.16, 0.22), m.base, -1.35, 0.08, 0));
-  g.add(mesh(new THREE.BoxGeometry(1.3, 0.16, 0.22), m.base,  1.35, 0.08, 0));
-  g.add(mesh(new THREE.BoxGeometry(4.1, 0.04, 0.22), m.cap, 0, 2.88, 0));
-  return g;
-}
-
-const SHOP_FURNITURE = [
-  { id: 'plant',     label: 'Potted Plant',    desc: 'Cozy green vibes',           cost: 800,    builder: buildPlant,         scale: 1.6, icon: 'Leaf' },
-  { id: 'wall_straight', label: 'Wall (Straight)', desc: 'Sub-room divider, 4u long',  cost: 1500,   builder: buildWallStraight,  scale: 1.0, icon: 'Minus' },
-  { id: 'wall_corner',   label: 'Wall (Corner)',   desc: 'L-shape partition',          cost: 2400,   builder: buildWallCorner,    scale: 1.0, icon: 'CornerDownRight' },
-  { id: 'wall_doorway',  label: 'Wall (Doorway)',  desc: 'Wall with arched opening',   cost: 3200,   builder: buildWallDoorway,   scale: 1.0, icon: 'DoorOpen' },
-  { id: 'neon_sign', label: 'Neon Sign',       desc: 'Glowing $COIN signage',      cost: 2500,   builder: buildNeonSign,      scale: 1.4, icon: 'Zap' },
-  { id: 'lava',      label: 'Lava Lamp',       desc: 'Hypnotic blob action',       cost: 8000,   builder: buildLavaLamp,      scale: 1.7, icon: 'Flame' },
-  { id: 'arcade',    label: 'Arcade Cabinet',  desc: 'Pixel paradise',             cost: 25000,  builder: buildArcade,        scale: 1.7, icon: 'Gamepad2' },
-  { id: 'chest',     label: 'Treasure Chest',  desc: 'Overflowing with gold',      cost: 80000,  builder: buildChest,         scale: 1.5, icon: 'Box' },
-  { id: 'disco',     label: 'Disco Ball',      desc: 'Bring the party',            cost: 250000, builder: buildDiscoBall,     scale: 1.6, icon: 'Sparkles' },
-];
 
 const SPACESHIP_ROOM_SIZE = 30;
 
@@ -571,7 +164,6 @@ export default function CoingameRoomPage() {
 
   const [roomCoins, setRoomCoins] = useState(() => parseFloat(localStorage.getItem(`cg-rc-${coinId}`) || '0'));
   const [upgradesPurchased, setUpgradesPurchased] = useState(() => JSON.parse(localStorage.getItem(`cg-ru-${coinId}`) || '{}'));
-  const [shopOwned, setShopOwned] = useState(() => JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}'));
   const [homeOwned, setHomeOwned] = useState(() => {
     const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}');
     const cleaned = {};
@@ -630,15 +222,6 @@ export default function CoingameRoomPage() {
     return 0;
   };
 
-  function buyShopItem(itemId) {
-    if (!isOwner) return;
-    const item = SHOP_FURNITURE.find((i) => i.id === itemId);
-    if (!item) return;
-    if (roomCoins < item.cost) return;
-    setRoomCoins((c) => c - item.cost);
-    setShopOwned((o) => ({ ...o, [itemId]: ownedCount(o, itemId) + 1 }));
-  }
-
   function buyHomeItem(name) {
     if (!isOwner) return;
     const item = findHomeModel(name);
@@ -646,29 +229,6 @@ export default function CoingameRoomPage() {
     if (roomCoins < item.price) return;
     setRoomCoins((c) => c - item.price);
     setHomeOwned((o) => ({ ...o, [name]: ownedCount(o, name) + 1 }));
-  }
-
-  // Remove specific instance (slotIdx) when provided, else the last one
-  function removeShopItem(itemId, slotIdx) {
-    if (!isOwner) return;
-    const cnt = ownedCount(shopOwned, itemId);
-    if (cnt < 1) return;
-    const item = SHOP_FURNITURE.find((i) => i.id === itemId);
-    if (!item) return;
-    setRoomCoins((c) => c + Math.floor(item.cost * 0.5));
-    setShopOwned((o) => {
-      const n = { ...o };
-      const next = ownedCount(n, itemId) - 1;
-      if (next <= 0) delete n[itemId]; else n[itemId] = next;
-      return n;
-    });
-    const STATIC_KEY = sceneRef.current?.STATIC_KEY;
-    if (STATIC_KEY) {
-      const idx = slotIdx != null ? slotIdx : cnt - 1;
-      const cur = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
-      delete cur[`static_shop_${itemId}_${idx}`];
-      localStorage.setItem(STATIC_KEY, JSON.stringify(cur)); sceneRef.current?.markLayoutDirty?.();
-    }
   }
 
   function removeHomeItem(name, slotIdx) {
@@ -705,7 +265,6 @@ export default function CoingameRoomPage() {
   useEffect(() => { localStorage.setItem(`cg-rc-${coinId}`, roomCoins.toFixed(3)); }, [roomCoins, coinId]);
   useEffect(() => { localStorage.setItem(`cg-ru-${coinId}`, JSON.stringify(upgradesPurchased)); }, [upgradesPurchased, coinId]);
   useEffect(() => { localStorage.setItem(`cg-rt-${coinId}`, String(totalClicks)); }, [totalClicks, coinId]);
-  useEffect(() => { localStorage.setItem(`cg-shop-${coinId}`, JSON.stringify(shopOwned)); }, [shopOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-home-${coinId}`, JSON.stringify(homeOwned)); }, [homeOwned, coinId]);
   useEffect(() => { localStorage.setItem(`cg-walls-${coinId}`, JSON.stringify(walls)); }, [walls, coinId]);
 
@@ -721,7 +280,6 @@ export default function CoingameRoomPage() {
           applyLayoutToLocal(coinId, layout);
           try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
           try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
-          try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
           const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
           if (amb) setAmbientColor(amb);
         }
@@ -744,7 +302,7 @@ export default function CoingameRoomPage() {
         .catch(() => {});
     }, 600);
     return () => clearTimeout(tid);
-  }, [coinId, isOwner, layoutReady, walls, homeOwned, shopOwned, roomSize, ambientColor, layoutVersion]);
+  }, [coinId, isOwner, layoutReady, walls, homeOwned, roomSize, ambientColor, layoutVersion]);
 
   function addWall(w) { setWalls((prev) => [...prev, w]); }
   function deleteWall(id) { setWalls((prev) => prev.filter((w) => w.id !== id)); }
@@ -802,50 +360,6 @@ export default function CoingameRoomPage() {
       }
     });
   }, [homeOwned]);
-
-  // Sync shop-owned furniture instances into scene
-  useEffect(() => {
-    const ref = sceneRef.current;
-    if (!ref) return;
-    const { scene, staticMap, STATIC_KEY } = ref;
-    const savedStatic = JSON.parse(localStorage.getItem(STATIC_KEY) || '{}');
-    const defaults = [[-6, 6], [6, 6], [-7, 1], [7, 1], [-6, -3], [6, -3]];
-    let slot = 0;
-
-    // Remove instances that are no longer owned
-    Object.keys(staticMap).forEach((id) => {
-      if (!id.startsWith('static_shop_')) return;
-      const rest = id.slice('static_shop_'.length);
-      const lastUnder = rest.lastIndexOf('_');
-      const itemId = lastUnder > 0 ? rest.slice(0, lastUnder) : rest;
-      const idxStr = lastUnder > 0 ? rest.slice(lastUnder + 1) : '0';
-      const idx = parseInt(idxStr, 10);
-      const cnt = ownedCount(shopOwned, itemId);
-      if (Number.isNaN(idx) || idx >= cnt) {
-        if (staticMap[id]?.isObject3D) scene.remove(staticMap[id]);
-        delete staticMap[id];
-      }
-    });
-
-    SHOP_FURNITURE.forEach((item) => {
-      const cnt = ownedCount(shopOwned, item.id);
-      for (let i = 0; i < cnt; i++) {
-        const sid = `static_shop_${item.id}_${i}`;
-        if (staticMap[sid]) continue;
-        const group = item.builder();
-        group.scale.setScalar(item.scale || 1.5);
-        group.userData.furnitureId = sid;
-        group.traverse((c) => { c.userData.furnitureId = sid; });
-        const saved = savedStatic[sid];
-        const [dx, dz] = defaults[slot % defaults.length];
-        group.position.set(saved ? saved.x : dx, 0, saved ? saved.z : dz);
-        if (saved?.ry != null) group.rotation.y = saved.ry;
-        scene.add(group);
-        staticMap[sid] = group;
-        slot++;
-      }
-    });
-  }, [shopOwned]);
 
   // Passive income tick
   useEffect(() => {
@@ -1790,7 +1304,6 @@ export default function CoingameRoomPage() {
     }
 
     // (Home/shop items are populated by the React sync effects after mount.)
-    const initialShopGroups = {};
 
     // ── FC Cube (clicker, grants 1 FC per click, floats + draggable) ─────────
     const bucket = buildFCCube();
@@ -1867,7 +1380,7 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    const staticMap = { fc_cube: bucket, ...initialShopGroups };
+    const staticMap = { fc_cube: bucket };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, floorMat, bucket,
@@ -2158,15 +1671,7 @@ export default function CoingameRoomPage() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected && sceneRef.current?.isOwner) {
         const { id } = selected;
         if (id === 'fc_cube') return;
-        if (id.startsWith('static_shop_')) {
-          const rest = id.slice('static_shop_'.length);
-          const lu = rest.lastIndexOf('_');
-          const itemId = lu > 0 ? rest.slice(0, lu) : rest;
-          const idx = lu > 0 ? parseInt(rest.slice(lu + 1), 10) : 0;
-          sceneRef.current?.removeShopItem?.(itemId, Number.isNaN(idx) ? undefined : idx);
-          selected = null;
-          e.preventDefault();
-        } else if (id.startsWith('static_home_')) {
+        if (id.startsWith('static_home_')) {
           const rest = id.slice('static_home_'.length);
           const lu = rest.lastIndexOf('_');
           const name = lu > 0 ? rest.slice(0, lu) : rest;
@@ -2399,26 +1904,6 @@ export default function CoingameRoomPage() {
         if (isStaged) group.position.y = 0.53 + Math.sin(t * 1.8 + group.userData.bobOffset) * 0.06;
       });
 
-      // animate shop furniture
-      Object.entries(staticMap).forEach(([id, group]) => {
-        if (!id.startsWith('static_shop_')) return;
-        if (group.userData.spinBall) {
-          group.userData.spinBall.rotation.y = t * 1.2;
-          group.userData.spinBall.rotation.x = t * 0.4;
-        }
-        if (group.userData.discoLights) {
-          group.userData.discoLights.forEach((pl, i) => {
-            pl.intensity = 1.4 + Math.sin(t * 2.2 + i * 1.5) * 0.8;
-          });
-        }
-        if (group.userData.lavaBlobs) {
-          group.userData.lavaBlobs.forEach((b) => {
-            b.mesh.position.y = b.baseY + Math.sin(t * 0.8 + b.phase) * 0.18;
-            b.mesh.scale.y = 1 + Math.sin(t * 1.2 + b.phase) * 0.15;
-          });
-        }
-      });
-
       renderer.render(scene, camera);
     }
     animate();
@@ -2456,7 +1941,6 @@ export default function CoingameRoomPage() {
   // Expose remove fns + build mode + wall ops to the scene
   useEffect(() => {
     if (!sceneRef.current) return;
-    sceneRef.current.removeShopItem = removeShopItem;
     sceneRef.current.removeHomeItem = removeHomeItem;
     sceneRef.current.addWall = addWall;
     sceneRef.current.deleteWall = deleteWall;
@@ -2469,7 +1953,6 @@ export default function CoingameRoomPage() {
       applyLayoutToLocal(coinId, layout);
       try { setWalls(JSON.parse(localStorage.getItem(`cg-walls-${coinId}`) || '[]')); } catch (_) {}
       try { const raw = JSON.parse(localStorage.getItem(`cg-home-${coinId}`) || '{}'); const cleaned = {}; Object.entries(raw).forEach(([n, v]) => { if (findHomeModel(n)) cleaned[n] = v; }); setHomeOwned(cleaned); } catch (_) {}
-      try { setShopOwned(JSON.parse(localStorage.getItem(`cg-shop-${coinId}`) || '{}')); } catch (_) {}
       const amb = localStorage.getItem(`cg-room-ambient-${coinId}`);
       if (amb) setAmbientColor(amb);
     };
@@ -2949,63 +2432,6 @@ export default function CoingameRoomPage() {
               })}
 
               {/* Furniture shop */}
-              <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 16, marginBottom: 10 }}>Furniture Shop</div>
-              {SHOP_FURNITURE.map((item) => {
-                const Icon = LucideIcons[item.icon] ?? LucideIcons.Box;
-                const count = ownedCount(shopOwned, item.id);
-                const owned = count > 0;
-                const canAfford = roomCoins >= item.cost;
-                const buyDisabled = !canAfford || !isOwner;
-                return (
-                  <div
-                    key={item.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: owned ? '#0d1a0d' : '#161616', borderRadius: 7, border: `1px solid ${owned ? '#1a3a1a' : canAfford ? '#1a3a1a' : '#111'}`, marginBottom: 6, opacity: owned ? 1 : (canAfford ? 1 : 0.55) }}
-                  >
-                    <div style={{ width: 28, height: 28, borderRadius: 6, background: owned ? '#22c55e22' : '#0f0f0f', border: `1px solid ${owned ? '#22c55e' : '#1f2937'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
-                      <Icon size={13} color={owned ? '#22c55e' : '#4b5563'} />
-                      {count > 1 && (
-                        <span style={{ position: 'absolute', top: -6, right: -6, background: '#22c55e', color: '#000', fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 8 }}>×{count}</span>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ color: '#4b5563', fontSize: 9, marginTop: 2 }}>{item.desc}</div>
-                    </div>
-                    {owned && (
-                      <button
-                        type="button"
-                        onClick={() => removeShopItem(item.id)}
-                        disabled={!isOwner}
-                        title={`Refund ${Math.floor(item.cost * 0.5).toLocaleString()} RC`}
-                        style={{
-                          background: '#1a0d0d', border: '1px solid #3a1a1a', borderRadius: 5,
-                          color: '#ef4444', fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
-                          padding: '5px 9px', cursor: isOwner ? 'pointer' : 'default',
-                          whiteSpace: 'nowrap', flexShrink: 0,
-                        }}
-                      >
-                        −
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => buyShopItem(item.id)}
-                      disabled={buyDisabled}
-                      style={{
-                        background: canAfford ? '#22c55e' : '#1a2e1a',
-                        border: 'none', borderRadius: 5,
-                        color: canAfford ? '#000' : '#374151',
-                        fontSize: 9, fontWeight: 800, fontFamily: 'inherit',
-                        padding: '5px 9px', cursor: buyDisabled ? 'default' : 'pointer',
-                        whiteSpace: 'nowrap', flexShrink: 0,
-                      }}
-                    >
-                      {item.cost.toLocaleString()} RC
-                    </button>
-                  </div>
-                );
-              })}
-
               {/* Home Pack browser */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 10 }}>
                 <div style={{ color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Home Pack</div>

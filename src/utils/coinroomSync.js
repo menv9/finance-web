@@ -4,8 +4,6 @@ export const LAYOUT_KEYS = [
   'cg-room-static',
   'cg-walls',
   'cg-home',
-  'cg-shop',
-  'cg-room-size',
   'cg-room-ambient',
 ];
 
