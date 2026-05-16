@@ -676,7 +676,7 @@ function buildActivityLog({ storeName, action, before = null, after = null, undo
 }
 
 function buildSettingsActivity(previousSettings, nextSettings, partial, summary = null) {
-  const sensitive = new Set(['finnhubApiKey', 'alphaVantageApiKey', 'supabaseUrl', 'supabaseAnonKey']);
+  const sensitive = new Set(['finnhubApiKey', 'alphaVantageApiKey']);
   const allKeys = Object.keys(partial || {});
   const keys = allKeys.filter((key) => !sensitive.has(key));
   if (!keys.length && allKeys.length) {

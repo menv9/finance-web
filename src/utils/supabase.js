@@ -17,8 +17,8 @@ export function getSupabaseConfig(settings) {
     return { url: '', anonKey: '' };
   }
   return {
-    url: settings?.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '',
-    anonKey: settings?.supabaseAnonKey || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
+    url: import.meta.env.VITE_SUPABASE_URL || '',
+    anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
   };
 }
 

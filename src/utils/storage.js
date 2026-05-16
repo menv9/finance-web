@@ -212,8 +212,7 @@ export async function ensureSeedData() {
   if (DEMO_BACKUP?.settings) {
     const existing = localStorage.getItem(SETTINGS_KEY);
     if (!existing) {
-      const { supabaseUrl: _u, supabaseAnonKey: _k, ...safeSettings } = DEMO_BACKUP.settings;
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...safeSettings }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...DEMO_BACKUP.settings }));
     }
   }
 
@@ -245,8 +244,6 @@ export async function exportDatabaseSnapshot(settings, storeFilter = null) {
 export function sanitizeSettingsForSync(settings) {
   return {
     ...settings,
-    supabaseUrl: '',
-    supabaseAnonKey: '',
     finnhubApiKey: '',
     alphaVantageApiKey: '',
   };
@@ -276,8 +273,6 @@ export async function importDatabaseSnapshot(snapshot) {
       locale: DEFAULT_SETTINGS.locale,
       // Never restore device-local / identity-managed fields from a backup
       theme: currentSettings.theme,
-      supabaseUrl: currentSettings.supabaseUrl || '',
-      supabaseAnonKey: currentSettings.supabaseAnonKey || '',
     });
   }
   // Reset sync state so old tombstones / cursors / conflicts don't corrupt the
