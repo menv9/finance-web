@@ -1544,7 +1544,7 @@ export const useFinanceStore = create((set, get) => ({
     // When an expense is flagged recurring, mirror it into the Recurring bills store
     // and keep a back-reference so repeat saves don't spawn duplicates.
     if (storeName === 'expenses' && value.isRecurring && !value.fixedExpenseId) {
-      const chargeDay = Number((value.date || '').slice(-2)) || 1;
+      const chargeDay = value.chargeDay || Number((value.date || '').slice(-2)) || 1;
       // skipAutoCreate=true: the expense state hasn't been written yet, so
       // autoCreateFixedExpenses would see the old isRecurring:false and create a
       // duplicate. The outer expense save triggers autoCreateFixedExpenses itself.
@@ -1555,8 +1555,8 @@ export const useFinanceStore = create((set, get) => ({
         chargeDay,
         category: value.category,
         bankAccountId: value.bankAccountId || null,
-        active: true,
-        alerts: true,
+        active: value.hasOwnProperty('active') ? value.active : true,
+        alerts: value.hasOwnProperty('alerts') ? value.alerts : true,
       }, { skipAutoCreate: true });
       value = { ...value, fixedExpenseId: fixed.id };
     }

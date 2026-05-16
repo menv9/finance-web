@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeDateInput } from '../../utils/dates';
-import { FormField, Input, Select, Textarea, Checkbox, Button } from '../ui';
+import { FormField, Input, Select, Textarea, Checkbox, Toggle, Button } from '../ui';
 import { CategorySelect } from './CategorySelect';
 
 const initialState = {
@@ -11,6 +11,9 @@ const initialState = {
   category: 'Other',
   description: '',
   isRecurring: false,
+  chargeDay: '',
+  active: true,
+  alerts: true,
   linkedDebtId: '',
 };
 
@@ -156,6 +159,13 @@ export function ExpenseForm({
             bankAccountId: bankAccounts.length ? form.bankAccountId || defaultBankAccountId : '',
             amountCents: Math.round(Number(form.amountCents || 0) * 100),
             linkedDebtId: form.linkedDebtId || null,
+            ...(form.isRecurring
+              ? {
+                  chargeDay: Number(form.chargeDay) || Number((form.date || '').slice(-2)) || 1,
+                  active: form.active,
+                  alerts: form.alerts,
+                }
+              : {}),
           },
           pendingFiles,
         );
@@ -227,6 +237,40 @@ export function ExpenseForm({
             }
           />
         </div>
+
+        {form.isRecurring && (
+          <>
+            <FormField label="Charge day" htmlFor="expense-charge-day" hint="Day of the month">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={form.chargeDay}
+                  onChange={set('chargeDay')}
+                />
+              )}
+            </FormField>
+            <div />
+            <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+              <Toggle
+                id="expense-recurring-active"
+                label="Active"
+                description="Include in recurring cashflow"
+                checked={form.active}
+                onChange={(checked) => setForm((prev) => ({ ...prev, active: checked }))}
+              />
+              <Toggle
+                id="expense-recurring-alerts"
+                label="Alerts"
+                description="Notify ahead of charge day"
+                checked={form.alerts}
+                onChange={(checked) => setForm((prev) => ({ ...prev, alerts: checked }))}
+              />
+            </div>
+          </>
+        )}
 
         <FormField label="Description" htmlFor="expense-description" className="md:col-span-2">
           {(props) => (
