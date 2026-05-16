@@ -694,33 +694,144 @@ export default function CoingameRoomPage() {
       return group;
     }
     const trimHex = parseInt(initAmbient.replace('#', ''), 16) || 0x22c55e;
-    // Elongated octagon footprint: 8 walls — 2 long sides, 2 short ends (cockpit + back), 4 chamfer corners
-    // Load the Blender-edited ship interior. Single OBJ mesh with inward-flipped normals.
+    // Holds the loaded ship hull group once OBJ load resolves (async). Read by collision logic.
+    let spaceshipHullGroup = null;
+    // Per-mesh AABBs of just the wall faces (skipping the deck floor — player must stand on it).
+    let spaceshipHullColliders = [];
+    // Fighter-ship hull with 10 material slots — load MTL first so slot names survive,
+    // then override each slot with a proper PBR config.
+    const HULL_MATS = {
+      hull_main:       { color: 0x8c95a8, roughness: 0.42, metalness: 0.85, texture: hullTexShared, texRepeat: [3, 2] },
+      hull_panel:      { color: 0x6b758a, roughness: 0.32, metalness: 0.90, texture: hullTexShared, texRepeat: [3, 2] },
+      hull_underbelly: { color: 0x2d3340, roughness: 0.55, metalness: 0.85, texture: hullTexShared, texRepeat: [3, 2] },
+      hull_wing:       { color: 0x525e74, roughness: 0.28, metalness: 0.95, texture: hullTexShared, texRepeat: [3, 2] },
+      hull_nose:       { color: 0xa6a8af, roughness: 0.38, metalness: 0.85, texture: hullTexShared, texRepeat: [2, 1] },
+      engine_glow:     { color: 0x1a2026, roughness: 0.45, metalness: 0.6,  emissive: trimHex, emissiveIntensity: 3.0 },
+      canopy_glass:    { color: 0x08101c, roughness: 0.08, metalness: 0.1,  emissive: 0x1a3055, emissiveIntensity: 0.35, transparent: true, opacity: 0.55 },
+      deck_floor:      { color: 0x1a1f2a, roughness: 0.55, metalness: 0.75, texture: hullTexShared, texRepeat: [4, 4] },
+      hull_trim:       { color: 0x0c1418, roughness: 0.40, metalness: 0.3,  emissive: trimHex, emissiveIntensity: 4.5 },
+      console:         { color: 0x242938, roughness: 0.40, metalness: 0.7,  emissive: trimHex, emissiveIntensity: 0.6 },
+    };
+    function buildHullMaterial(name) {
+      const cfg = HULL_MATS[name];
+      if (!cfg) return new THREE.MeshStandardMaterial({ color: 0x8993ad, roughness: 0.5, metalness: 0.7 });
+      const params = {
+        color: cfg.color,
+        roughness: cfg.roughness ?? 0.5,
+        metalness: cfg.metalness ?? 0.5,
+      };
+      if (cfg.emissive !== undefined) { params.emissive = cfg.emissive; params.emissiveIntensity = cfg.emissiveIntensity ?? 1; }
+      if (cfg.transparent) { params.transparent = true; params.opacity = cfg.opacity ?? 0.5; }
+      if (cfg.texture) {
+        const t = cfg.texture.clone();
+        t.repeat.set(cfg.texRepeat[0], cfg.texRepeat[1]);
+        t.needsUpdate = true;
+        params.map = t;
+      }
+      return new THREE.MeshStandardMaterial(params);
+    }
     {
-      const hullLoader = new OBJLoader();
-      hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
-        if (!sceneRef.current || sceneRef.current.scene !== scene) return;
-        const hullTex = hullTexShared.clone();
-        hullTex.repeat.set(3, 2);
-        hullTex.needsUpdate = true;
-        const hullMat = new THREE.MeshStandardMaterial({
-          map: hullTex,
-          color: 0x8993ad,
-          roughness: 0.42, metalness: 0.85,
-          emissive: trimHex,
-          emissiveIntensity: 0.08,
+      const mtlLoader = new MTLLoader();
+      mtlLoader.setPath('/models/spaceship/');
+      mtlLoader.load('Spaceship_interior.mtl', (mtlCreator) => {
+        mtlCreator.preload();
+        const hullLoader = new OBJLoader();
+        hullLoader.setMaterials(mtlCreator);
+        hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
+          if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+          group.traverse((c) => {
+            if (c.isMesh) {
+              const slotName = c.material?.name;
+              c.material = buildHullMaterial(slotName);
+              c.material.side = THREE.DoubleSide;
+              c.castShadow = false;
+              c.receiveShadow = true;
+              c.userData.hullSlot = slotName;
+            }
+          });
+          group.position.set(0, 0, 0);
+          group.userData.spaceshipHull = true;
+          spaceshipHullGroup = group;
+          scene.add(group);
+          // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
+          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim']);
+          spaceshipHullColliders = [];
+          const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+          const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
+          group.updateMatrixWorld(true);
+          group.traverse((c) => {
+            if (!c.isMesh || !c.geometry) return;
+            if (skipForCollision.has(c.userData.hullSlot)) return;
+            const geom = c.geometry;
+            const pos = geom.attributes.position;
+            const index = geom.index;
+            const triCount = index ? index.count / 3 : pos.count / 3;
+            for (let t = 0; t < triCount; t++) {
+              const i0 = index ? index.getX(t * 3)     : t * 3;
+              const i1 = index ? index.getX(t * 3 + 1) : t * 3 + 1;
+              const i2 = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+              vA.fromBufferAttribute(pos, i0).applyMatrix4(c.matrixWorld);
+              vB.fromBufferAttribute(pos, i1).applyMatrix4(c.matrixWorld);
+              vC.fromBufferAttribute(pos, i2).applyMatrix4(c.matrixWorld);
+              ab.subVectors(vB, vA); ac.subVectors(vC, vA);
+              triNormal.crossVectors(ab, ac).normalize();
+              if (Math.abs(triNormal.y) >= 0.6) continue; // skip horizontal (floor/ceiling) faces
+              const box = new THREE.Box3();
+              box.expandByPoint(vA); box.expandByPoint(vB); box.expandByPoint(vC);
+              if (box.min.y < 0.15) box.min.y = 0.15; // lift feet off the floor seam
+              spaceshipHullColliders.push(box);
+            }
+          });
+        }, undefined, (err) => {
+          console.warn('Failed to load spaceship interior OBJ', err);
         });
-        group.traverse((c) => {
-          if (c.isMesh) {
-            c.material = hullMat;
-            c.receiveShadow = true;
-          }
-        });
-        group.position.set(0, 0, 0);
-        group.userData.spaceshipHull = true;
-        scene.add(group);
       }, undefined, (err) => {
-        console.warn('Failed to load spaceship interior', err);
+        console.warn('Failed to load spaceship interior MTL — falling back', err);
+        // Fallback: single material
+        const hullLoader = new OBJLoader();
+        hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
+          if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+          group.traverse((c) => {
+            if (c.isMesh) {
+              c.material = buildHullMaterial('hull_main');
+              c.material.side = THREE.DoubleSide;
+              c.receiveShadow = true;
+            }
+          });
+          group.position.set(0, 0, 0);
+          group.userData.spaceshipHull = true;
+          spaceshipHullGroup = group;
+          scene.add(group);
+          // Per-triangle AABBs for wall-like faces only (vertical normals). Skip floor/glass/trim.
+          const skipForCollision = new Set(['deck_floor', 'canopy_glass', 'hull_trim']);
+          spaceshipHullColliders = [];
+          const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+          const triNormal = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
+          group.updateMatrixWorld(true);
+          group.traverse((c) => {
+            if (!c.isMesh || !c.geometry) return;
+            if (skipForCollision.has(c.userData.hullSlot)) return;
+            const geom = c.geometry;
+            const pos = geom.attributes.position;
+            const index = geom.index;
+            const triCount = index ? index.count / 3 : pos.count / 3;
+            for (let t = 0; t < triCount; t++) {
+              const i0 = index ? index.getX(t * 3)     : t * 3;
+              const i1 = index ? index.getX(t * 3 + 1) : t * 3 + 1;
+              const i2 = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+              vA.fromBufferAttribute(pos, i0).applyMatrix4(c.matrixWorld);
+              vB.fromBufferAttribute(pos, i1).applyMatrix4(c.matrixWorld);
+              vC.fromBufferAttribute(pos, i2).applyMatrix4(c.matrixWorld);
+              ab.subVectors(vB, vA); ac.subVectors(vC, vA);
+              triNormal.crossVectors(ab, ac).normalize();
+              if (Math.abs(triNormal.y) >= 0.6) continue; // skip horizontal (floor/ceiling) faces
+              const box = new THREE.Box3();
+              box.expandByPoint(vA); box.expandByPoint(vB); box.expandByPoint(vC);
+              if (box.min.y < 0.15) box.min.y = 0.15; // lift feet off the floor seam
+              spaceshipHullColliders.push(box);
+            }
+          });
+        });
       });
     }
 
@@ -915,21 +1026,7 @@ export default function CoingameRoomPage() {
     gridHelper.visible = false;
     scene.add(gridHelper);
 
-    // Emissive trim — bright glowing line tracing the floor perimeter
-    const trimMat = new THREE.MeshStandardMaterial({ color: trimHex, emissive: trimHex, emissiveIntensity: 3.0, roughness: 0.4 });
-    const trimW = ROOM.w * 0.78;
-    const trimD = ROOM.d * 0.88;
-    [
-      [0, 0.04, -trimD / 2, 0, trimW],
-      [0, 0.04, trimD / 2, 0, trimW],
-      [-trimW / 2, 0.04, 0, Math.PI / 2, trimD],
-      [trimW / 2, 0.04, 0, Math.PI / 2, trimD],
-    ].forEach(([x, y, z, ry, len]) => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.08), trimMat);
-      s.position.set(x, y, z);
-      s.rotation.y = ry;
-      scene.add(s);
-    });
+    // (Floor perimeter trim is now baked into the ship OBJ — see hull_trim material slot.)
 
     // Recessed overhead LED strips — long emissive bars running along the ship's length
     const ledStripMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: trimHex, emissiveIntensity: 2.6, roughness: 0.85 });
@@ -1770,6 +1867,8 @@ export default function CoingameRoomPage() {
           if (g && g.isObject3D) colliders.push(new THREE.Box3().setFromObject(g));
         });
         Object.values(furnitureMap).forEach((f) => { if (f?.group?.isObject3D) colliders.push(new THREE.Box3().setFromObject(f.group)); });
+        // Spaceship hull walls — cached once on load, not recomputed every frame
+        for (const b of spaceshipHullColliders) colliders.push(b);
 
         const pr = 0.45;
         const testBox = new THREE.Box3();
