@@ -731,24 +731,6 @@ export default function CoingameRoomPage() {
       }
       return new THREE.MeshStandardMaterial(params);
     }
-
-    // Back-wall viewport — transparent panel on the interior rear wall of the
-    // cabin so the player can look out at the stars. Collider added below once
-    // wallGroup exists.
-    const BACK_WINDOW = { w: 10, h: 4, x: 0, y: 2.5, z: -3.5 };
-    {
-      const winGeom = new THREE.PlaneGeometry(BACK_WINDOW.w, BACK_WINDOW.h);
-      const winMat = new THREE.MeshStandardMaterial({
-        color: 0x0a1428, roughness: 0.05, metalness: 0.1,
-        emissive: 0x2a4d80, emissiveIntensity: 0.6,
-        transparent: true, opacity: 0.5, side: THREE.DoubleSide,
-      });
-      const backWindow = new THREE.Mesh(winGeom, winMat);
-      backWindow.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
-      backWindow.rotation.y = Math.PI;
-      scene.add(backWindow);
-    }
-
     {
       const mtlLoader = new MTLLoader();
       mtlLoader.setPath('/models/spaceship/');
@@ -1558,15 +1540,7 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    // Invisible collider so the player stops at the back-wall window plane.
-    // Lives in staticMap so it persists across wallGroup rebuilds.
-    const backWindowCollider = new THREE.Mesh(
-      new THREE.BoxGeometry(BACK_WINDOW.w, BACK_WINDOW.h, 0.3),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    );
-    backWindowCollider.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
-    scene.add(backWindowCollider);
-    const staticMap = { fc_cube: bucket, back_window: backWindowCollider };
+    const staticMap = { fc_cube: bucket };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, floorMat, bucket,
