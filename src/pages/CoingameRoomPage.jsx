@@ -731,6 +731,24 @@ export default function CoingameRoomPage() {
       }
       return new THREE.MeshStandardMaterial(params);
     }
+
+    // Back-wall viewport — a transparent panel set just inside the rear engine
+    // bulkhead so the player can look out the back of the ship at the stars.
+    {
+      const winGeom = new THREE.PlaneGeometry(12, 5);
+      const winMat = new THREE.MeshStandardMaterial({
+        color: 0x08101c, roughness: 0.08, metalness: 0.1,
+        emissive: 0x1a3055, emissiveIntensity: 0.35,
+        transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+      });
+      const backWindow = new THREE.Mesh(winGeom, winMat);
+      // Hull rear bulkhead is at z=-16.62; nudge inward to avoid z-fighting.
+      backWindow.position.set(0, 3.0, -16.4);
+      // PlaneGeometry faces +Z by default; rotate to face into the cabin (+Z normal toward player).
+      backWindow.rotation.y = Math.PI;
+      scene.add(backWindow);
+    }
+
     {
       const mtlLoader = new MTLLoader();
       mtlLoader.setPath('/models/spaceship/');
