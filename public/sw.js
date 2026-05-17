@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'finges-v3';
+const CACHE_VERSION = 'finges-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const APP_SHELL = [
   '/',
@@ -40,6 +40,23 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('/') || caches.match('/index.html')),
+    );
+    return;
+  }
+
+  // Network-first for 3D model assets so updates to the spaceship (OBJ/MTL/textures)
+  // show up on the next reload without needing a hard refresh or a CACHE_VERSION bump.
+  if (url.pathname.startsWith('/models/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }
