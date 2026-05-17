@@ -732,19 +732,19 @@ export default function CoingameRoomPage() {
       return new THREE.MeshStandardMaterial(params);
     }
 
-    // Back-wall viewport — a transparent panel set just inside the rear engine
-    // bulkhead so the player can look out the back of the ship at the stars.
+    // Back-wall viewport — transparent panel on the interior rear wall of the
+    // cabin so the player can look out at the stars. Collider added below once
+    // wallGroup exists.
+    const BACK_WINDOW = { w: 10, h: 4, x: 0, y: 2.5, z: -3.5 };
     {
-      const winGeom = new THREE.PlaneGeometry(12, 5);
+      const winGeom = new THREE.PlaneGeometry(BACK_WINDOW.w, BACK_WINDOW.h);
       const winMat = new THREE.MeshStandardMaterial({
-        color: 0x08101c, roughness: 0.08, metalness: 0.1,
-        emissive: 0x1a3055, emissiveIntensity: 0.35,
-        transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+        color: 0x0a1428, roughness: 0.05, metalness: 0.1,
+        emissive: 0x2a4d80, emissiveIntensity: 0.6,
+        transparent: true, opacity: 0.5, side: THREE.DoubleSide,
       });
       const backWindow = new THREE.Mesh(winGeom, winMat);
-      // Hull rear bulkhead is at z=-16.62; nudge inward to avoid z-fighting.
-      backWindow.position.set(0, 3.0, -16.4);
-      // PlaneGeometry faces +Z by default; rotate to face into the cabin (+Z normal toward player).
+      backWindow.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
       backWindow.rotation.y = Math.PI;
       scene.add(backWindow);
     }
@@ -1558,7 +1558,15 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    const staticMap = { fc_cube: bucket };
+    // Invisible collider so the player stops at the back-wall window plane.
+    // Lives in staticMap so it persists across wallGroup rebuilds.
+    const backWindowCollider = new THREE.Mesh(
+      new THREE.BoxGeometry(BACK_WINDOW.w, BACK_WINDOW.h, 0.3),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    backWindowCollider.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
+    scene.add(backWindowCollider);
+    const staticMap = { fc_cube: bucket, back_window: backWindowCollider };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, floorMat, bucket,
