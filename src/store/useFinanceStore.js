@@ -18,6 +18,7 @@ import {
   saveSettings,
   saveSyncMeta,
   sanitizeSettingsForSync,
+  mergeRemoteSettings,
   setActiveUserId,
 } from '../utils/storage';
 import {
@@ -36,7 +37,7 @@ import {
   getSupabaseConfig,
   upsertRemoteRecords,
 } from '../utils/supabase';
-import { buildConflict, detectConflict, removeConflict, upsertConflict } from '../utils/sync';
+import { buildConflict, detectConflict, isChangedAfter, recordsDiffer, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 import { loadAppMode, saveAppMode } from '../utils/appMode';
 import { makeId } from '../utils/makeId';
@@ -1180,7 +1181,7 @@ export const useFinanceStore = create((set, get) => ({
 
   updateSettings: async (partial) => {
     const previousSettings = get().settings;
-    const settings = { ...previousSettings, ...partial };
+    const settings = { ...previousSettings, ...partial, updatedAt: new Date().toISOString() };
     saveSettings(settings);
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
     const log = buildSettingsActivity(previousSettings, settings, partial);
@@ -3382,6 +3383,8 @@ export const useFinanceStore = create((set, get) => ({
       const userId = authData.user?.id;
       if (!userId) throw new Error('No authenticated Supabase user');
       const state = get();
+      const settingsPayload = sanitizeSettingsForSync(state.settings);
+      const settingsUpdatedAt = state.settings.updatedAt || new Date().toISOString();
       const rows = [
         ...STORE_KEYS.flatMap((storeName) => {
           const tombstones = state.syncMeta.deletedRecords[storeName] || [];
@@ -3390,6 +3393,14 @@ export const useFinanceStore = create((set, get) => ({
             .map((record) => buildSyncRecord(userId, storeName, record));
         }),
         ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
+        {
+          user_id: userId,
+          store_name: 'settings',
+          record_id: 'singleton',
+          payload: settingsPayload,
+          updated_at: settingsUpdatedAt,
+          deleted_at: null,
+        },
       ];
       await upsertRemoteRecords(client, rows);
 
@@ -3439,8 +3450,47 @@ export const useFinanceStore = create((set, get) => ({
       let nextConflicts = [...state.syncMeta.conflicts];
       const nextLastPulledAt = { ...perStoreCursors };
       let latestTimestamp = null;
+      let nextSettings = null;
 
       for (const change of changes) {
+        if (change.store_name === 'settings') {
+          const storeCursor = perStoreCursors.settings;
+          if (storeCursor && change.updated_at < storeCursor) continue;
+          if (!change.payload) continue; // settings has no tombstone semantics
+
+          const localSettings = nextSettings || state.settings;
+          const localChangedSinceSync = isChangedAfter(localSettings.updatedAt, storeCursor);
+          const remoteChangedSinceSync = isChangedAfter(change.updated_at, storeCursor);
+          const localSanitized = sanitizeSettingsForSync(localSettings);
+          const remoteSanitized = sanitizeSettingsForSync(change.payload);
+
+          if (remoteChangedSinceSync && localChangedSinceSync && recordsDiffer(localSanitized, remoteSanitized)) {
+            nextConflicts = upsertConflict(
+              nextConflicts,
+              buildConflict({
+                storeName: 'settings',
+                remoteChange: change,
+                localRecord: localSettings,
+                localTombstone: null,
+              }),
+            );
+            continue;
+          }
+
+          // No conflict: take the newer side. If remote is newer (or equal), merge it in
+          // while preserving device-local fields.
+          if (!localChangedSinceSync || new Date(change.updated_at).getTime() >= new Date(localSettings.updatedAt || 0).getTime()) {
+            nextSettings = mergeRemoteSettings(localSettings, { ...change.payload, updatedAt: change.updated_at });
+          }
+          nextConflicts = removeConflict(nextConflicts, 'settings:singleton');
+          if (!nextLastPulledAt.settings || change.updated_at > nextLastPulledAt.settings) {
+            nextLastPulledAt.settings = change.updated_at;
+          }
+          if (!latestTimestamp || change.updated_at > latestTimestamp) {
+            latestTimestamp = change.updated_at;
+          }
+          continue;
+        }
         if (!STORE_KEYS.includes(change.store_name)) continue;
         const storeCursor = perStoreCursors[change.store_name];
         // Skip records already processed by this store's cursor
@@ -3494,12 +3544,16 @@ export const useFinanceStore = create((set, get) => ({
         conflicts: nextConflicts,
       };
       saveSyncMeta(nextSyncMeta);
-      set({
+      if (nextSettings) {
+        saveSettings(nextSettings);
+      }
+      set((current) => ({
         supabaseSyncStatus: 'synced',
-        supabaseLastSyncedAt: latestTimestamp || get().supabaseLastSyncedAt,
+        supabaseLastSyncedAt: latestTimestamp || current.supabaseLastSyncedAt,
         supabaseError: '',
         syncMeta: nextSyncMeta,
-      });
+        ...(nextSettings ? { settings: nextSettings, derived: buildDerived({ ...current, settings: nextSettings }) } : {}),
+      }));
       await get().reloadStoreData();
     } catch (error) {
       set({ supabaseSyncStatus: 'error', supabaseError: error.message });
@@ -3510,6 +3564,24 @@ export const useFinanceStore = create((set, get) => ({
   resolveConflictUseRemote: async (conflictId) => {
     const conflict = get().syncMeta.conflicts.find((item) => item.id === conflictId);
     if (!conflict) return;
+
+    if (conflict.storeName === 'settings') {
+      const merged = mergeRemoteSettings(get().settings, {
+        ...conflict.remoteRecord,
+        updatedAt: conflict.remoteUpdatedAt,
+      });
+      saveSettings(merged);
+      set((state) => {
+        const nextSyncMeta = {
+          ...state.syncMeta,
+          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
+          lastPulledAt: { ...state.syncMeta.lastPulledAt, settings: conflict.remoteUpdatedAt },
+        };
+        saveSyncMeta(nextSyncMeta);
+        return { settings: merged, syncMeta: nextSyncMeta, derived: buildDerived({ ...state, settings: merged }) };
+      });
+      return;
+    }
 
     if (conflict.remoteDeletedAt) {
       await deleteRecord(conflict.storeName, conflict.recordId);
@@ -3558,6 +3630,29 @@ export const useFinanceStore = create((set, get) => ({
     if (authError) throw authError;
     const userId = authData.user?.id;
     if (!userId) throw new Error('No authenticated Supabase user');
+
+    if (conflict.storeName === 'settings') {
+      const localSettings = { ...get().settings, updatedAt: new Date().toISOString() };
+      saveSettings(localSettings);
+      await upsertRemoteRecords(client, [{
+        user_id: userId,
+        store_name: 'settings',
+        record_id: 'singleton',
+        payload: sanitizeSettingsForSync(localSettings),
+        updated_at: localSettings.updatedAt,
+        deleted_at: null,
+      }]);
+      set((state) => {
+        const nextSyncMeta = {
+          ...state.syncMeta,
+          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
+          lastPulledAt: { ...state.syncMeta.lastPulledAt, settings: localSettings.updatedAt },
+        };
+        saveSyncMeta(nextSyncMeta);
+        return { settings: localSettings, syncMeta: nextSyncMeta, derived: buildDerived({ ...state, settings: localSettings }) };
+      });
+      return;
+    }
 
     const localRecord = get()[conflict.storeName].find((item) => item.id === conflict.recordId);
     const localTombstone = (get().syncMeta.deletedRecords[conflict.storeName] || []).find((item) => item.id === conflict.recordId);

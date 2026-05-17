@@ -241,12 +241,24 @@ export async function exportDatabaseSnapshot(settings, storeFilter = null) {
   };
 }
 
+// Fields that are intentionally per-device and must never travel through sync.
+// Theme/locale are user-pickable per device; API keys and the offline toggle
+// are local credentials/preferences.
+const DEVICE_LOCAL_SETTINGS_KEYS = ['theme', 'locale', 'finnhubApiKey', 'alphaVantageApiKey', 'localOnlyMode'];
+
 export function sanitizeSettingsForSync(settings) {
-  return {
-    ...settings,
-    finnhubApiKey: '',
-    alphaVantageApiKey: '',
-  };
+  const out = { ...settings };
+  for (const key of DEVICE_LOCAL_SETTINGS_KEYS) delete out[key];
+  return out;
+}
+
+// Apply a remote settings payload while preserving this device's local-only fields.
+export function mergeRemoteSettings(localSettings, remotePayload) {
+  const preserved = {};
+  for (const key of DEVICE_LOCAL_SETTINGS_KEYS) {
+    if (key in localSettings) preserved[key] = localSettings[key];
+  }
+  return { ...DEFAULT_SETTINGS, ...remotePayload, ...preserved };
 }
 
 export async function importDatabaseSnapshot(snapshot) {

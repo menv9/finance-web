@@ -23,6 +23,7 @@ vi.mock('../utils/storage', () => ({
   saveSettings: vi.fn(() => {}),
   saveSyncMeta: vi.fn(() => {}),
   sanitizeSettingsForSync: vi.fn((settings) => settings),
+  mergeRemoteSettings: vi.fn((local, remote) => ({ ...local, ...remote })),
 }));
 
 vi.mock('../utils/supabase', () => ({
