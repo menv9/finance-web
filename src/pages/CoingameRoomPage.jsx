@@ -923,14 +923,16 @@ export default function CoingameRoomPage() {
       }
 
       const PLANET_R = 420;
-      const PLANET_Y = -560;
+      // Positioned behind and slightly below the ship so it's framed by the
+      // rear-bulkhead opening when the player looks out the back.
+      const PLANET_POS = new THREE.Vector3(0, -350, -1500);
       const planetMat = new THREE.MeshStandardMaterial({
         map: makeEarthTexture(),
         roughness: 0.7, metalness: 0.05,
         emissive: 0x0a1638, emissiveIntensity: 0.2,
       });
       const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R, 96, 64), planetMat);
-      planet.position.set(0, PLANET_Y, 0);
+      planet.position.copy(PLANET_POS);
       scene.add(planet);
 
       // Cloud layer (procedural fallback; replaced by real texture if available)
