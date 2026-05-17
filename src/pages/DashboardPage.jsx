@@ -345,7 +345,7 @@ export default function DashboardPage() {
             data={visibleNetWorthData}
             color="var(--accent)"
             topOpacity={0.32}
-            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+            priceFormatter={hideKpis ? () => '••••' : (v) => formatCurrencyCompact(v, currency, locale)}
             visibleRange={visibleNetWorthRange}
           />
         ) : (
@@ -366,7 +366,7 @@ export default function DashboardPage() {
             <LWGroupedHistogram
               seriesA={{ data: lwCashflowData.map((d) => ({ time: d.incomeTime, value: d.incomeCents })), color: 'var(--accent)' }}
               seriesB={{ data: lwCashflowData.map((d) => ({ time: d.expenseTime, value: d.expenseCents })), color: 'var(--danger)' }}
-              priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+              priceFormatter={hideKpis ? () => '••••' : (v) => formatCurrencyCompact(v, currency, locale)}
               showAllMonthLabels
             />
           ) : (
@@ -385,7 +385,7 @@ export default function DashboardPage() {
           }
           className={'lg:col-span-5 ' + rise(4)}
         >
-          <RecentActivity items={recentActivity} currency={currency} locale={locale} />
+          <RecentActivity items={recentActivity} currency={currency} locale={locale} hideAmounts={hideKpis} />
         </Card>
       </section>
 
@@ -406,7 +406,7 @@ export default function DashboardPage() {
               <div key={item.label} className="rounded-md border border-rule bg-surface-sunken px-4 py-3">
                 <p className="eyebrow mb-1">{item.label}</p>
                 <p className={`numeric text-lg font-medium ${item.color}`}>
-                  {formatCurrency(item.valueCents, currency, locale)}
+                  {hideKpis ? '••••' : formatCurrency(item.valueCents, currency, locale)}
                 </p>
               </div>
             ))}
@@ -426,7 +426,7 @@ export default function DashboardPage() {
               <p className="mt-2 text-xs text-ink-muted">
                 Discretionary remaining:{' '}
                 <span className="numeric font-medium text-ink">
-                  {formatCurrency(Math.max(0, totalIncomeCents - distributedTotalCents), currency, locale)}
+                  {hideKpis ? '••••' : formatCurrency(Math.max(0, totalIncomeCents - distributedTotalCents), currency, locale)}
                 </span>
               </p>
             </div>
@@ -460,8 +460,12 @@ export default function DashboardPage() {
                     (e.type === 'dividend' ? 'text-positive bg-positive-soft' : 'text-danger bg-danger-soft')
                   }
                 >
-                  {e.type === 'dividend' ? '+' : '−'}
-                  {formatCurrency(Math.abs(e.amountCents), currency, locale).replace(/^[−-]/, '')}
+                  {hideKpis ? '••••' : (
+                    <>
+                      {e.type === 'dividend' ? '+' : '−'}
+                      {formatCurrency(Math.abs(e.amountCents), currency, locale).replace(/^[−-]/, '')}
+                    </>
+                  )}
                 </span>
               </li>
             ))}

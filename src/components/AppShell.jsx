@@ -208,7 +208,7 @@ function CalendarIcon() {
   );
 }
 
-function MonthOverview({ metrics, baseCurrency, locale, t }) {
+function MonthOverview({ metrics, baseCurrency, locale, t, hideAmounts = false }) {
   const monthLabel = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(new Date()),
     [locale],
@@ -237,8 +237,12 @@ function MonthOverview({ metrics, baseCurrency, locale, t }) {
             netPositive ? 'text-positive' : 'text-danger',
           )}
         >
-          {netPositive ? '+' : '−'}
-          {formatCurrency(Math.abs(net), baseCurrency, locale)}
+          {hideAmounts ? '••••' : (
+            <>
+              {netPositive ? '+' : '−'}
+              {formatCurrency(Math.abs(net), baseCurrency, locale)}
+            </>
+          )}
         </span>
       </div>
 
@@ -253,13 +257,13 @@ function MonthOverview({ metrics, baseCurrency, locale, t }) {
           <div className="flex flex-col">
             <span className="eyebrow text-[0.55rem] text-ink-faint">{t('shell.monthOverview.income')}</span>
             <span className="numeric text-positive">
-              {formatCurrency(income, baseCurrency, locale)}
+              {hideAmounts ? '••••' : formatCurrency(income, baseCurrency, locale)}
             </span>
           </div>
           <div className="flex flex-col items-end">
             <span className="eyebrow text-[0.55rem] text-ink-faint">{t('shell.monthOverview.spent')}</span>
             <span className="numeric text-danger">
-              {formatCurrency(expenses, baseCurrency, locale)}
+              {hideAmounts ? '••••' : formatCurrency(expenses, baseCurrency, locale)}
             </span>
           </div>
         </div>
@@ -950,6 +954,7 @@ export function AppShell({ children }) {
             baseCurrency={baseCurrency}
             locale={locale}
             t={t}
+            hideAmounts={hideAmounts}
           />
           <nav aria-label={t('nav.primaryMobile')} className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
             {moreLinks.map((link) => {

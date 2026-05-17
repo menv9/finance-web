@@ -1,7 +1,7 @@
 import { EmptyState } from './ui';
 import { formatCurrency } from '../utils/formatters';
 
-export function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription }) {
+export function RecentActivity({ items, currency, locale, emptyTitle, emptyDescription, hideAmounts = false }) {
   if (!items.length) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
@@ -33,8 +33,12 @@ export function RecentActivity({ items, currency, locale, emptyTitle, emptyDescr
                     : amountClass)
               }
             >
-              {isPortfolioSaleLoss ? '−' : item.direction === 'in' ? '+' : '−'}
-              {formatCurrency(Math.abs(visualAmountCents), currency, locale).replace(/^[−-]/, '')}
+              {hideAmounts ? '••••' : (
+                <>
+                  {isPortfolioSaleLoss ? '−' : item.direction === 'in' ? '+' : '−'}
+                  {formatCurrency(Math.abs(visualAmountCents), currency, locale).replace(/^[−-]/, '')}
+                </>
+              )}
             </span>
           </li>
         );
