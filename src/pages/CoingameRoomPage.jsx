@@ -731,22 +731,6 @@ export default function CoingameRoomPage() {
       }
       return new THREE.MeshStandardMaterial(params);
     }
-
-    // Back-bulkhead viewport — fills the octagonal hole cut in the rear
-    // interior partition of the ship hull (Blender Y=10.95 → Three z=-10.95).
-    const BACK_WINDOW = { w: 15, h: 8, x: 0, y: 5.5, z: -10.95 };
-    {
-      const winGeom = new THREE.PlaneGeometry(BACK_WINDOW.w, BACK_WINDOW.h);
-      const winMat = new THREE.MeshStandardMaterial({
-        color: 0x08101c, roughness: 0.08, metalness: 0.1,
-        emissive: 0x1a3055, emissiveIntensity: 0.35,
-        transparent: true, opacity: 0.55, side: THREE.DoubleSide,
-      });
-      const backWindow = new THREE.Mesh(winGeom, winMat);
-      backWindow.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
-      scene.add(backWindow);
-    }
-
     {
       const mtlLoader = new MTLLoader();
       mtlLoader.setPath('/models/spaceship/');
@@ -1556,15 +1540,7 @@ export default function CoingameRoomPage() {
 
     // ── Furniture map: id → { group, isStaged } ──────────────────────────────
     const furnitureMap = {};
-    // Invisible collider so the player can't walk through the back-bulkhead
-    // window. Lives in staticMap so it persists across wallGroup rebuilds.
-    const backWindowCollider = new THREE.Mesh(
-      new THREE.BoxGeometry(BACK_WINDOW.w, BACK_WINDOW.h, 0.3),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    );
-    backWindowCollider.position.set(BACK_WINDOW.x, BACK_WINDOW.y, BACK_WINDOW.z);
-    scene.add(backWindowCollider);
-    const staticMap = { fc_cube: bucket, back_window: backWindowCollider };
+    const staticMap = { fc_cube: bucket };
     sceneRef.current = {
       scene, furnitureMap, staticMap, isOwner, nameCanvas, nameCtx, nameTex, STATIC_KEY,
       lights: { hemi, ceil: ceilLight, fills: fillLights }, floorMat, bucket,
