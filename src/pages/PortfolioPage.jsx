@@ -1885,7 +1885,16 @@ export default function PortfolioPage() {
         title={isAllPortfoliosView ? 'All portfolios' : activePortfolio?.name || 'Portfolio'}
         description={isAllPortfoliosView ? 'Combined view across every investment portfolio.' : activePortfolio?.description || 'Portfolio-specific holdings and performance.'}
         density="compact"
-        action={<Button variant="secondary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>}
+        action={
+          <div className="inline-flex gap-2">
+            {activePortfolio && !isAllPortfoliosView ? (
+              <Button variant="ghost" size="sm" onClick={() => openEditPortfolio(activePortfolio.id)}>
+                <EditIcon /> Edit
+              </Button>
+            ) : null}
+            <Button variant="secondary" size="sm" onClick={openNewPortfolio}><PlusIcon /> Create portfolio</Button>
+          </div>
+        }
       >
         {investmentPortfolios.length ? (
           <div className="flex flex-wrap items-center gap-2">
