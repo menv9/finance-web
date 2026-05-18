@@ -25,6 +25,19 @@ export function recordsDiffer(localRecord, remotePayload) {
 }
 
 export function detectConflict({ localRecord, localTombstone, remoteChange, lastPulledAt }) {
+  // On first sync for a store (no cursor) we can't tell whether local state was
+  // already in sync with remote or independently authored. Treat anything that
+  // disagrees with remote as a conflict so the user picks a winner instead of
+  // silently overwriting one side.
+  if (!lastPulledAt) {
+    if (remoteChange.deleted_at) {
+      if (localTombstone || localRecord?.deletedAt) return false;
+      return Boolean(localRecord);
+    }
+    if (localTombstone && remoteChange.payload) return true;
+    return localRecord ? recordsDiffer(localRecord, remoteChange.payload) : false;
+  }
+
   const remoteChangedAfterSync = isChangedAfter(remoteChange.updated_at, lastPulledAt);
   if (!remoteChangedAfterSync) return false;
 
@@ -37,8 +50,6 @@ export function detectConflict({ localRecord, localTombstone, remoteChange, last
   if (!localChangedAfterSync) return false;
 
   if (remoteChange.deleted_at) {
-    // If local is also deleted (either via tombstone or a record with deletedAt),
-    // both sides agree — no conflict.
     if (localTombstone || localRecord?.deletedAt) return false;
     return Boolean(localRecord);
   }

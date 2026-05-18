@@ -74,6 +74,55 @@ describe('sync conflict detection', () => {
     expect(result).toBe(true);
   });
 
+  it('flags conflict on first sync when local and remote disagree', () => {
+    const result = detectConflict({
+      lastPulledAt: undefined,
+      localRecord: { id: 'exp-1', description: 'Local', updatedAt: '2026-04-20T09:00:00.000Z' },
+      localTombstone: null,
+      remoteChange: {
+        record_id: 'exp-1',
+        updated_at: '2026-04-20T08:00:00.000Z',
+        deleted_at: null,
+        payload: { id: 'exp-1', description: 'Remote', updatedAt: '2026-04-20T08:00:00.000Z' },
+      },
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('does not flag conflict on first sync when local matches remote', () => {
+    const payload = { id: 'exp-1', description: 'Same', updatedAt: '2026-04-20T08:00:00.000Z' };
+    const result = detectConflict({
+      lastPulledAt: undefined,
+      localRecord: payload,
+      localTombstone: null,
+      remoteChange: {
+        record_id: 'exp-1',
+        updated_at: '2026-04-20T08:00:00.000Z',
+        deleted_at: null,
+        payload,
+      },
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('does not flag conflict on first sync when local record is absent', () => {
+    const result = detectConflict({
+      lastPulledAt: undefined,
+      localRecord: null,
+      localTombstone: null,
+      remoteChange: {
+        record_id: 'exp-1',
+        updated_at: '2026-04-20T08:00:00.000Z',
+        deleted_at: null,
+        payload: { id: 'exp-1', description: 'Remote only' },
+      },
+    });
+
+    expect(result).toBe(false);
+  });
+
   it('does not flag conflict when both local and remote are deletions', () => {
     const result = detectConflict({
       lastPulledAt: '2026-04-20T10:00:00.000Z',
