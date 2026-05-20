@@ -22,7 +22,6 @@ const SECTION_TO_TAB = {
   targets: 'data',
   import: 'data',
   sync: 'sync',
-  conflicts: 'sync',
   history: 'sync',
   backup: 'backup',
   danger: 'backup',
@@ -188,19 +187,11 @@ export default function SettingsPage() {
   const exportBackup = useFinanceStore((state) => state.exportBackup);
   const importBackup = useFinanceStore((state) => state.importBackup);
   const signOutSupabase = useFinanceStore((state) => state.signOutSupabase);
-  const pushToSupabase = useFinanceStore((state) => state.pushToSupabase);
-  const pullFromSupabase = useFinanceStore((state) => state.pullFromSupabase);
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
   const supabaseUser = useFinanceStore((state) => state.supabaseUser);
   const supabaseSyncStatus = useFinanceStore((state) => state.supabaseSyncStatus);
   const supabaseLastSyncedAt = useFinanceStore((state) => state.supabaseLastSyncedAt);
   const supabaseError = useFinanceStore((state) => state.supabaseError);
-  const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
-  const resolveConflictUseRemote = useFinanceStore((state) => state.resolveConflictUseRemote);
-  const resolveConflictKeepLocal = useFinanceStore((state) => state.resolveConflictKeepLocal);
-  const enableLocalOnlyMode = useFinanceStore((state) => state.enableLocalOnlyMode);
-  const disableLocalOnlyMode = useFinanceStore((state) => state.disableLocalOnlyMode);
-  const localOnlyMode = Boolean(settings.localOnlyMode);
   const activityLog = useFinanceStore((state) => state.activityLog);
   const undoActivityLog = useFinanceStore((state) => state.undoActivityLog);
 
@@ -516,43 +507,6 @@ export default function SettingsPage() {
                 );
               })}
             </div>
-          </Card>
-
-          <Card
-            id="cloud-sync"
-            eyebrow={t('settings.cloudSync.eyebrow')}
-            title={t('settings.cloudSync.title')}
-            description={t('settings.cloudSync.description')}
-            className={rise(2)}
-          >
-            <Toggle
-              id="cloud-sync-toggle"
-              checked={!localOnlyMode}
-              onChange={async (checked) => {
-                if (checked) {
-                  await disableLocalOnlyMode();
-                  if (!supabaseUser) navigate('/login');
-                  return;
-                }
-                const ok = await confirm({
-                  title: t('settings.cloudSync.switchTitle'),
-                  description: supabaseUser
-                    ? t('settings.cloudSync.switchDescriptionSignedIn')
-                    : t('settings.cloudSync.switchDescriptionAnon'),
-                  confirmLabel: t('settings.cloudSync.switchConfirm'),
-                  confirmVariant: 'primary',
-                });
-                if (ok) await enableLocalOnlyMode();
-              }}
-              label={localOnlyMode ? t('settings.cloudSync.localOnly') : t('settings.cloudSync.enabled')}
-              description={
-                localOnlyMode
-                  ? t('settings.cloudSync.offDescription')
-                  : supabaseUser
-                    ? t('settings.cloudSync.signedInAs', { email: supabaseUser.email })
-                    : t('settings.cloudSync.signInPrompt')
-              }
-            />
           </Card>
 
           <Card
@@ -972,162 +926,46 @@ export default function SettingsPage() {
             )}
           </Card>
 
-          {localOnlyMode ? (
-            <Card
-              id="sync"
-              eyebrow={t('settings.sync.eyebrow')}
-              title={t('settings.sync.localOnlyTitle')}
-              description={t('settings.sync.localOnlyDescription')}
-              action={
-                <span className="inline-flex items-center gap-1.5 text-xs text-ink-faint">
-                  <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-ink-faint" />
-                  {t('settings.sync.offline')}
-                </span>
-              }
-              className={rise(7)}
-            >
-              <p className="text-sm text-ink-muted leading-relaxed">
-                {t('settings.sync.localOnlyExplain')}
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={async () => {
-                    await disableLocalOnlyMode();
-                    navigate('/login');
-                  }}
-                >
-                  {t('settings.sync.signInToEnable')}
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Card
-              id="sync"
-              eyebrow={t('settings.sync.eyebrow')}
-              title={t('settings.sync.title')}
-              description={t('settings.sync.description')}
-              action={
-                <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
-                  <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
-                  {supabaseUser ? t('settings.sync.signedInAs', { email: supabaseUser.email }) : t('settings.sync.notSignedIn')}
-                </span>
-              }
-              className={rise(7)}
-            >
-              <div className="flex flex-wrap gap-2">
-                <Button disabled={!supabaseUser} onClick={() => pushToSupabase()}>
-                  {t('settings.sync.push')}
-                </Button>
-                <Button variant="secondary" disabled={!supabaseUser} onClick={() => pullFromSupabase()}>
-                  {t('settings.sync.pull')}
-                </Button>
-                <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
-                  {t('common.signOut')}
-                </Button>
-              </div>
-
-              <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
-                <div className="flex gap-3">
-                  <dt className="eyebrow w-20">{t('settings.sync.status')}</dt>
-                  <dd className="text-ink">{supabaseSyncStatus}</dd>
-                </div>
-                <div className="flex gap-3">
-                  <dt className="eyebrow w-20">{t('settings.sync.last')}</dt>
-                  <dd className="text-ink numeric">
-                    {supabaseLastSyncedAt
-                      ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
-                      : '—'}
-                  </dd>
-                </div>
-                <div className="flex gap-3">
-                  <dt className="eyebrow w-20">{t('settings.sync.error')}</dt>
-                  <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
-                    {supabaseError || t('common.none')}
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="mt-6 pt-4 border-t border-rule">
-                <button
-                  type="button"
-                  className="text-xs text-ink-faint hover:text-ink underline-offset-2 hover:underline transition-colors duration-180"
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: t('settings.cloudSync.switchTitle'),
-                      description: supabaseUser
-                        ? t('settings.cloudSync.switchDescriptionSignedIn')
-                        : t('settings.cloudSync.switchDescriptionAnon'),
-                      confirmLabel: t('settings.cloudSync.switchConfirm'),
-                      confirmVariant: 'primary',
-                    });
-                    if (ok) await enableLocalOnlyMode();
-                  }}
-                >
-                  {t('settings.sync.switchToLocalOnly')}
-                </button>
-              </div>
-            </Card>
-          )}
-
-          {!localOnlyMode && (
           <Card
-            id="conflicts"
-            eyebrow={t('settings.conflicts.eyebrow')}
-            title={t('settings.conflicts.title')}
-            description={t('settings.conflicts.description')}
+            id="sync"
+            eyebrow={t('settings.sync.eyebrow')}
+            title={t('settings.sync.title')}
+            description={t('settings.sync.description')}
+            action={
+              <span className={'inline-flex items-center gap-1.5 text-xs ' + (supabaseUser ? 'text-positive' : 'text-ink-faint')}>
+                <span aria-hidden className={'inline-block h-1.5 w-1.5 rounded-full ' + (supabaseUser ? 'bg-positive' : 'bg-ink-faint')} />
+                {supabaseUser ? t('settings.sync.signedInAs', { email: supabaseUser.email }) : t('settings.sync.notSignedIn')}
+              </span>
+            }
             className={rise(7)}
           >
-            {conflicts.length ? (
-              <div className="grid gap-4">
-                {conflicts.map((conflict) => (
-                  <div key={conflict.id} className="rounded-md border border-rule-strong bg-surface-raised p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm text-ink">
-                          {conflict.storeName} / {conflict.recordId}
-                        </p>
-                        <p className="eyebrow mt-1">
-                          {t('settings.conflicts.remoteUpdated', { when: new Date(conflict.remoteUpdatedAt).toLocaleString(settings.locale) })}
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center rounded-sm bg-danger-soft px-2 py-0.5 text-xs text-danger border border-danger/30">
-                        {t('settings.conflicts.badge')}
-                      </span>
-                    </div>
-                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                      <div className="rounded-md bg-surface-sunken p-3">
-                        <p className="eyebrow mb-2">{t('settings.conflicts.local')}</p>
-                        <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
-                          {JSON.stringify(conflict.localTombstone || conflict.localRecord, null, 2)}
-                        </pre>
-                      </div>
-                      <div className="rounded-md bg-surface-sunken p-3">
-                        <p className="eyebrow mb-2">{t('settings.conflicts.remote')}</p>
-                        <pre className="overflow-auto whitespace-pre-wrap text-xs text-ink-muted font-mono">
-                          {JSON.stringify(
-                            conflict.remoteDeletedAt
-                              ? { deletedAt: conflict.remoteDeletedAt }
-                              : conflict.remoteRecord,
-                            null,
-                            2,
-                          )}
-                        </pre>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button onClick={() => resolveConflictKeepLocal(conflict.id)}>{t('settings.conflicts.keepLocal')}</Button>
-                      <Button variant="secondary" onClick={() => resolveConflictUseRemote(conflict.id)}>
-                        {t('settings.conflicts.useRemote')}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" disabled={!supabaseUser} onClick={() => signOutSupabase()}>
+                {t('common.signOut')}
+              </Button>
+            </div>
+
+            <dl className="mt-6 grid gap-2 rounded-md border border-rule bg-surface-sunken p-4 text-xs">
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">{t('settings.sync.status')}</dt>
+                <dd className="text-ink">{supabaseSyncStatus}</dd>
               </div>
-            ) : (
-              <p className="text-sm text-ink-muted">{t('settings.conflicts.none')}</p>
-            )}
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">{t('settings.sync.last')}</dt>
+                <dd className="text-ink numeric">
+                  {supabaseLastSyncedAt
+                    ? new Date(supabaseLastSyncedAt).toLocaleString(settings.locale)
+                    : '—'}
+                </dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="eyebrow w-20">{t('settings.sync.error')}</dt>
+                <dd className={supabaseError ? 'text-danger' : 'text-ink-muted'}>
+                  {supabaseError || t('common.none')}
+                </dd>
+              </div>
+            </dl>
           </Card>
-          )}
 
         </>)}
 

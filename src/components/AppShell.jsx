@@ -288,7 +288,6 @@ export function AppShell({ children }) {
   const supabaseConfigured = useFinanceStore((state) => state.supabaseConfigured);
   const supabaseSyncStatus = useFinanceStore((state) => state.supabaseSyncStatus);
   const supabaseError = useFinanceStore((state) => state.supabaseError);
-  const conflicts = useFinanceStore((state) => state.syncMeta.conflicts);
   const profile = useFinanceStore((state) => state.profile);
   const appMode = useFinanceStore((state) => state.appMode);
   const setAppMode = useFinanceStore((state) => state.setAppMode);
@@ -842,7 +841,7 @@ export function AppShell({ children }) {
                 }
               >
                 <SettingsIcon />
-                {(conflicts.length > 0 || supabaseSyncStatus === 'error') && (
+                {supabaseSyncStatus === 'error' && (
                   <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-danger border-2 border-canvas" />
                 )}
               </NavLink>
@@ -959,7 +958,7 @@ export function AppShell({ children }) {
           <nav aria-label={t('nav.primaryMobile')} className="flex flex-1 min-h-0 flex-col overflow-y-auto px-3 py-3">
             {moreLinks.map((link) => {
               const isSettings = link.to === '/settings';
-              const showBadge = isSettings && (conflicts.length > 0 || supabaseSyncStatus === 'error');
+              const showBadge = isSettings && supabaseSyncStatus === 'error';
               return (
                 <NavLink
                   key={link.to}

@@ -1,24 +1,22 @@
 import { create } from 'zustand';
 import { DEFAULT_SETTINGS } from '../data/defaults';
 import {
+  cacheSettingsLocally,
+  cleanupLegacyIndexedDB,
   clearAllStores,
   clearActiveUserId,
-  clearLocalUserData,
   deleteRecord,
   ensureEntitySyncFields,
-  ensureSeedData,
   exportDatabaseSnapshot,
-  getAllRecords,
+  fetchAllStoresForCurrentUser,
   getActiveUserId,
+  getAllRecords,
   getRecord,
   importDatabaseSnapshot,
-  loadSyncMeta,
   loadSettings,
   putRecord,
   saveSettings,
   saveSyncMeta,
-  sanitizeSettingsForSync,
-  mergeRemoteSettings,
   setActiveUserId,
 } from '../utils/storage';
 import {
@@ -32,12 +30,9 @@ import {
 import {
   clearSupabaseBrowserClient,
   createSupabaseBrowserClient,
-  fetchRemoteChanges,
   getSupabaseBrowserClient,
   getSupabaseConfig,
-  upsertRemoteRecords,
 } from '../utils/supabase';
-import { buildConflict, detectConflict, isChangedAfter, recordsDiffer, removeConflict, upsertConflict } from '../utils/sync';
 import { fetchTickerPrice } from '../utils/yahoo';
 import { loadAppMode, saveAppMode } from '../utils/appMode';
 import { makeId } from '../utils/makeId';
@@ -230,9 +225,10 @@ function teardownRealtime() {
   }
 }
 
-// Subscribe to postgres_changes on finance_records for this user.
-// Debounces pulls so a burst of writes (e.g. multi-record save) triggers one pull.
-function subscribeRealtime(client, userId, onChange) {
+// Subscribe to postgres_changes on finance_records for this user and patch
+// zustand state directly when other devices write. Our own writes echo back
+// here too, but the updatedAt comparison below dedupes them.
+function subscribeRealtime(client, userId, applyChange) {
   realtimeChannel = client
     .channel(`finance-records-${userId}`)
     .on('postgres_changes', {
@@ -240,14 +236,80 @@ function subscribeRealtime(client, userId, onChange) {
       schema: 'public',
       table: 'finance_records',
       filter: `user_id=eq.${userId}`,
-    }, () => {
-      if (realtimePullTimer) clearTimeout(realtimePullTimer);
-      realtimePullTimer = setTimeout(() => {
-        realtimePullTimer = null;
-        onChange();
-      }, 300);
+    }, (msg) => {
+      const row = msg.new && Object.keys(msg.new).length ? msg.new : msg.old;
+      if (!row) return;
+      applyChange({
+        event: msg.eventType,
+        storeName: row.store_name,
+        recordId: row.record_id,
+        payload: msg.new?.payload ?? null,
+        updatedAt: msg.new?.updated_at ?? null,
+      });
     })
     .subscribe();
+}
+
+// Patch zustand state from a Supabase realtime event. Skips changes that the
+// current device has already applied locally (the row's updatedAt is <= the
+// one we already have), which is what dedupes our own writes echoing back.
+function applyRealtimeChange(get, set, { event, storeName, recordId, payload }) {
+  if (!storeName) return;
+
+  if (storeName === 'settings') {
+    if (event === 'DELETE') return; // settings is never hard-deleted
+    if (!payload) return;
+    const current = get().settings;
+    const currentTs = new Date(current.updatedAt || 0).getTime();
+    const incomingTs = new Date(payload.updatedAt || 0).getTime();
+    if (incomingTs <= currentTs) return;
+    const next = { ...DEFAULT_SETTINGS, ...payload, theme: current.theme, locale: current.locale };
+    cacheSettingsLocally(next);
+    set((state) => ({ settings: next, derived: buildDerived({ ...state, settings: next }) }));
+    return;
+  }
+
+  if (storeName === 'savings') {
+    if (event === 'DELETE') {
+      const current = get().savingsConfig;
+      if (!current || current.id !== recordId) return;
+      set((state) => ({ savingsConfig: SAVINGS_DEFAULT, derived: buildDerived({ ...state, savingsConfig: SAVINGS_DEFAULT }) }));
+      return;
+    }
+    if (!payload) return;
+    const current = get().savingsConfig;
+    const currentTs = new Date(current?.updatedAt || 0).getTime();
+    const incomingTs = new Date(payload.updatedAt || 0).getTime();
+    if (incomingTs <= currentTs) return;
+    set((state) => ({ savingsConfig: payload, derived: buildDerived({ ...state, savingsConfig: payload }) }));
+    return;
+  }
+
+  if (!STORE_KEYS.includes(storeName)) return;
+
+  if (event === 'DELETE') {
+    const list = get()[storeName] || [];
+    if (!list.some((item) => item.id === recordId)) return;
+    set((state) => {
+      const nextList = (state[storeName] || []).filter((item) => item.id !== recordId);
+      const nextState = { ...state, [storeName]: nextList };
+      return { [storeName]: nextList, derived: buildDerived(nextState) };
+    });
+    return;
+  }
+
+  if (!payload) return;
+  const list = get()[storeName] || [];
+  const existing = list.find((item) => item.id === recordId);
+  const currentTs = new Date(existing?.updatedAt || 0).getTime();
+  const incomingTs = new Date(payload.updatedAt || 0).getTime();
+  if (existing && incomingTs <= currentTs) return;
+  const incoming = ensureEntitySyncFields(payload, payload.updatedAt);
+  set((state) => {
+    const next = upsertItem(state[storeName] || [], incoming);
+    const nextState = { ...state, [storeName]: next };
+    return { [storeName]: next, derived: buildDerived(nextState) };
+  });
 }
 
 const SAVINGS_DEFAULT = {
@@ -595,28 +657,6 @@ function getStateRecords(state, storeName) {
   return state[storeName] || [];
 }
 
-function buildSyncRecord(userId, storeName, record) {
-  return {
-    user_id: userId,
-    store_name: storeName,
-    record_id: record.id,
-    payload: record,
-    updated_at: record.updatedAt || new Date().toISOString(),
-    deleted_at: null,
-  };
-}
-
-function buildDeleteTombstone(userId, storeName, tombstone) {
-  return {
-    user_id: userId,
-    store_name: storeName,
-    record_id: tombstone.id,
-    payload: null,
-    updated_at: tombstone.updatedAt,
-    deleted_at: tombstone.deletedAt,
-  };
-}
-
 function getStoreStateKey(storeName) {
   return STORE_STATE_KEY[storeName] || storeName;
 }
@@ -892,42 +932,50 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   reloadStoreData: async () => {
-    const settings = loadSettings();
-    const syncMeta = loadSyncMeta();
-    const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
-    const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
-    normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
+    const buckets = await fetchAllStoresForCurrentUser();
+
+    // Cloud settings win over the localStorage cache for fields that DO sync;
+    // the bootstrap-cached version is just there for fast theme paint.
+    const cachedSettings = loadSettings();
+    const cloudSettings = buckets.settings?.[0];
+    const settings = cloudSettings
+      ? { ...DEFAULT_SETTINGS, ...cloudSettings, theme: cachedSettings.theme, locale: cachedSettings.locale }
+      : cachedSettings;
+    cacheSettingsLocally(settings);
+
+    const lists = STORE_KEYS.map((key) => (buckets[key] || []).map((item) => ensureEntitySyncFields(item)));
+    lists[14] = await migrateInitialCashToBankAccounts(lists[14], settings);
     const portfolioRecords = await normalizeInvestmentPortfolioRecords({
-      investmentPortfolios: normalizedRecords[3],
-      holdings: normalizedRecords[4],
-      dividends: normalizedRecords[5],
-      portfolioCashflows: normalizedRecords[6],
-      portfolioSales: normalizedRecords[7],
+      investmentPortfolios: lists[3],
+      holdings: lists[4],
+      dividends: lists[5],
+      portfolioCashflows: lists[6],
+      portfolioSales: lists[7],
     }, settings);
+
     set((state) => {
       const nextState = {
         ...state,
         settings,
-        syncMeta,
-        expenses: normalizedRecords[0],
-        fixedExpenses: normalizedRecords[1],
-        incomes: normalizedRecords[2],
+        expenses: lists[0],
+        fixedExpenses: lists[1],
+        incomes: lists[2],
         investmentPortfolios: portfolioRecords.investmentPortfolios,
         holdings: portfolioRecords.holdings,
         dividends: portfolioRecords.dividends,
         portfolioCashflows: portfolioRecords.portfolioCashflows,
         portfolioSales: portfolioRecords.portfolioSales,
-        savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
-        savingsEntries: normalizedRecords[9],
-        savingsGoals: normalizedRecords[10],
-        budgets: normalizedRecords[11],
-        rollovers: normalizedRecords[12],
-        transfers: normalizedRecords[13],
-        bankAccounts: normalizedRecords[14],
-        debts: normalizedRecords[15],
-        attachments: normalizedRecords[16],
-        activityLog: normalizedRecords[17],
-        portfolioSnapshots: normalizedRecords[18],
+        savingsConfig: lists[8][0] || SAVINGS_DEFAULT,
+        savingsEntries: lists[9],
+        savingsGoals: lists[10],
+        budgets: lists[11],
+        rollovers: lists[12],
+        transfers: lists[13],
+        bankAccounts: lists[14],
+        debts: lists[15],
+        attachments: lists[16],
+        activityLog: lists[17],
+        portfolioSnapshots: lists[18],
       };
       return { ...nextState, derived: buildDerived(nextState) };
     });
@@ -939,58 +987,37 @@ export const useFinanceStore = create((set, get) => ({
       set((state) => state.hydrated ? state : {
         hydrated: true,
         supabaseSyncStatus: 'error',
-        supabaseError: state.supabaseError || 'Startup took too long. Opened the local workspace anyway.',
+        supabaseError: state.supabaseError || 'Startup took too long.',
       });
-    }, 6_000);
+    }, 8_000);
     try {
-      await ensureSeedData();
-      const settings = loadSettings();
-      const syncMeta = loadSyncMeta();
-      const records = await Promise.all(STORE_KEYS.map((storeName) => getAllRecords(storeName)));
-      const normalizedRecords = records.map((list) => list.map((item) => ensureEntitySyncFields(item)));
-      normalizedRecords[14] = await migrateInitialCashToBankAccounts(normalizedRecords[14], settings);
-      const portfolioRecords = await normalizeInvestmentPortfolioRecords({
-        investmentPortfolios: normalizedRecords[3],
-        holdings: normalizedRecords[4],
-        dividends: normalizedRecords[5],
-        portfolioCashflows: normalizedRecords[6],
-        portfolioSales: normalizedRecords[7],
-      }, settings);
-      await Promise.all(
-        STORE_KEYS.map(async (storeName, index) => {
-          const dirty = normalizedRecords[index].filter((item) => !records[index].find((original) => original.id === item.id && original.updatedAt));
-          await Promise.all(dirty.map((item) => putRecord(storeName, item)));
-        }),
-      );
-      const nextState = {
-        settings,
-        expenses: normalizedRecords[0],
-        fixedExpenses: normalizedRecords[1],
-        incomes: normalizedRecords[2],
-        investmentPortfolios: portfolioRecords.investmentPortfolios,
-        holdings: portfolioRecords.holdings,
-        dividends: portfolioRecords.dividends,
-        portfolioCashflows: portfolioRecords.portfolioCashflows,
-        portfolioSales: portfolioRecords.portfolioSales,
-        savingsConfig: normalizedRecords[8][0] || SAVINGS_DEFAULT,
-        savingsEntries: normalizedRecords[9],
-        savingsGoals: normalizedRecords[10],
-        budgets: normalizedRecords[11],
-        rollovers: normalizedRecords[12],
-        transfers: normalizedRecords[13],
-        bankAccounts: normalizedRecords[14],
-        debts: normalizedRecords[15],
-        attachments: normalizedRecords[16],
-        activityLog: normalizedRecords[17],
-        portfolioSnapshots: normalizedRecords[18],
-        hydrated: false,
-        supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
-        syncMeta,
-      };
-      set({ ...nextState, derived: buildDerived(nextState) });
+      // One-time best-effort cleanup of the legacy IndexedDB database. Runs
+      // before anything else so we don't race the first cloud write.
+      cleanupLegacyIndexedDB();
+
+      // Paint with cached settings immediately (theme/locale) so the UI isn't
+      // a flash of white while we wait for the first Supabase round-trip.
+      const cachedSettings = loadSettings();
+      set({
+        settings: cachedSettings,
+        supabaseConfigured: Boolean(getSupabaseConfig().url && getSupabaseConfig().anonKey),
+      });
+
+      // Open the Supabase client and resolve the session before touching any
+      // data layer — cloud is the only source of truth now.
+      await get().initializeSupabase();
+
+      const { supabaseUser } = get();
+      if (!supabaseUser) {
+        // Not signed in: nothing to hydrate. The router lands the user on
+        // the public landing/login page.
+        set({ hydrated: true });
+        return;
+      }
+
+      await get().reloadStoreData();
       await cleanupGeneratedPortfolioIncomesForState(get, set);
       await get().autoCreateFixedExpenses();
-      await get().initializeSupabase();
     } catch (error) {
       set({
         supabaseSyncStatus: 'error',
@@ -1048,46 +1075,30 @@ export const useFinanceStore = create((set, get) => ({
       supabaseError: '',
     });
 
-    // Already signed in on app load — pull latest data immediately
+    // Already signed in on app load — kick off the social-side fetches.
+    // Finance data is hydrated by bootstrap (reloadStoreData) which now reads
+    // straight from Supabase, so no separate pull is needed.
     if (data.session) {
       window.setTimeout(() => {
-        get().pullFromSupabase().catch(() => {});
         get().loadProfile().catch(() => {});
         get().loadFriendships().catch(() => {});
       }, 0);
     }
 
-    // Re-register focus handler so switching back to the tab syncs silently
-    if (focusHandler) window.removeEventListener('focus', focusHandler);
-    focusHandler = () => {
-      const { supabaseUser, supabaseSyncStatus } = get();
-      if (!supabaseUser) return;
-      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-      get().pullFromSupabase().catch(() => {});
-    };
-    window.addEventListener('focus', focusHandler);
-
-    // Realtime: push-based cross-device sync. Subscribes to finance_records
-    // changes for this user and triggers a debounced pull on any event.
-    // Falls back to polling if realtime fails to subscribe (network/quota).
+    // Polling + focus pulls are gone in cloud-only mode. Realtime is the only
+    // cross-device sync channel and patches zustand state directly.
     teardownRealtime();
-    if (data.session?.user?.id) {
-      subscribeRealtime(client, data.session.user.id, () => {
-        const { supabaseSyncStatus } = get();
-        if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-        get().pullFromSupabase().catch(() => {});
-      });
+    if (focusHandler) {
+      window.removeEventListener('focus', focusHandler);
+      focusHandler = null;
     }
-
-    // Polling fallback: lighter interval (30 s) since realtime carries the load.
-    // Catches anything realtime missed (dropped websocket, paused tab, etc.).
-    if (autoPullInterval) clearInterval(autoPullInterval);
-    autoPullInterval = setInterval(() => {
-      const { supabaseUser, supabaseSyncStatus } = get();
-      if (!supabaseUser) return;
-      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-      get().pullFromSupabase().catch(() => {});
-    }, 30_000);
+    if (autoPullInterval) {
+      clearInterval(autoPullInterval);
+      autoPullInterval = null;
+    }
+    if (data.session?.user?.id) {
+      subscribeRealtime(client, data.session.user.id, (change) => applyRealtimeChange(get, set, change));
+    }
 
     const {
       data: { subscription },
@@ -1102,38 +1113,23 @@ export const useFinanceStore = create((set, get) => ({
       if (event === 'SIGNED_IN') {
         const newUserId = session?.user?.id;
         window.setTimeout(async () => {
-          const storedUserId = getActiveUserId();
-          if (newUserId && storedUserId && newUserId !== storedUserId) {
-            // Different user on same device — wipe everything
-            await clearAllStores();
-            clearLocalUserData();
-            await get().reloadStoreData();
-          } else if (newUserId && !storedUserId) {
-            // First-ever login or login after anonymous use — wipe local data so
-            // it doesn't get pushed up to the new account as if it were theirs
-            await clearAllStores();
-            saveSyncMeta({ lastPulledAt: {}, deletedRecords: {}, conflicts: [] });
-            await get().reloadStoreData();
-          }
           if (newUserId) setActiveUserId(newUserId);
-          get().pullFromSupabase().catch(() => {});
+          // Cloud is truth — hydrate zustand from the just-signed-in user's
+          // rows. No local wipe needed: Supabase RLS already scopes reads to
+          // the active user.
+          await get().reloadStoreData().catch(() => {});
           get().loadProfile().catch(() => {});
           get().loadFriendships().catch(() => {});
-          // Re-subscribe realtime under the new user's filter
           teardownRealtime();
           if (newUserId) {
-            subscribeRealtime(client, newUserId, () => {
-              const { supabaseSyncStatus } = get();
-              if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-              get().pullFromSupabase().catch(() => {});
-            });
+            subscribeRealtime(client, newUserId, (change) => applyRealtimeChange(get, set, change));
           }
         }, 0);
       }
       if (event === 'SIGNED_OUT') {
         teardownRealtime();
         clearActiveUserId();
-        clearLocalUserData();
+        // Drop in-memory caches; leave Supabase rows untouched.
         set({
           profile: null,
           friends: [],
@@ -1141,11 +1137,26 @@ export const useFinanceStore = create((set, get) => ({
           pendingOutgoing: [],
           profileStatus: 'idle',
           profileError: '',
+          expenses: [],
+          fixedExpenses: [],
+          incomes: [],
+          investmentPortfolios: [],
+          holdings: [],
+          dividends: [],
+          portfolioCashflows: [],
+          portfolioSales: [],
+          savingsConfig: SAVINGS_DEFAULT,
+          savingsEntries: [],
+          savingsGoals: [],
+          budgets: [],
+          rollovers: [],
+          transfers: [],
+          bankAccounts: [],
+          debts: [],
+          attachments: [],
+          activityLog: [],
+          portfolioSnapshots: [],
         });
-        window.setTimeout(async () => {
-          await clearAllStores();
-          await get().reloadStoreData();
-        }, 0);
       }
     });
 
@@ -1500,43 +1511,9 @@ export const useFinanceStore = create((set, get) => ({
     get().triggerAutoPush();
   },
 
-  saveSupabaseSettings: async (partial) => {
-    const previousSettings = get().settings;
-    const settings = { ...previousSettings, ...partial };
-    saveSettings(settings);
-    set((state) => ({
-      settings,
-      supabaseConfigured: Boolean(getSupabaseConfig(settings).url && getSupabaseConfig(settings).anonKey),
-      derived: buildDerived({ ...state, settings }),
-    }));
-    const log = buildSettingsActivity(previousSettings, settings, partial, 'Updated sync settings');
-    if (log) await persistActivityLogs(set, [log]);
-    await get().initializeSupabase();
-  },
-
-  enableLocalOnlyMode: async () => {
-    try { await get().signOutSupabase(); } catch { /* no session, ignore */ }
-    await get().saveSupabaseSettings({ localOnlyMode: true });
-  },
-
-  // After this resolves, supabaseConfigured is true again and the user can sign in
-  // normally. Existing local records flow up to Supabase automatically on the next
-  // triggerAutoPush tick after sign-in — pushToSupabase serializes the full local
-  // state, so no explicit migration step is needed.
-  disableLocalOnlyMode: async () => {
-    await get().saveSupabaseSettings({ localOnlyMode: false });
-  },
-
-  triggerAutoPush: () => {
-    if (autoPushTimer) clearTimeout(autoPushTimer);
-    autoPushTimer = setTimeout(() => {
-      autoPushTimer = null;
-      const { supabaseUser, supabaseSyncStatus, pushToSupabase } = get();
-      if (!supabaseUser) return;
-      if (supabaseSyncStatus === 'syncing-up' || supabaseSyncStatus === 'syncing-down') return;
-      pushToSupabase().catch(() => {});
-    }, 1000);
-  },
+  // Writes go to Supabase directly inside putRecord/deleteRecord (see
+  // src/utils/storage.js); kept as a no-op for any lingering callers.
+  triggerAutoPush: () => {},
 
   saveEntity: async (storeName, entity, { skipAutoCreate = false, skipAccountAdjustment = false, allowUnassignedPortfolio = false } = {}) => {
     let value = entity;
@@ -2834,13 +2811,8 @@ export const useFinanceStore = create((set, get) => ({
       before: null,
       after: { id: 'wipe-all-data' },
       undoable: false,
-      summary: 'Erased all local financial records',
+      summary: 'Erased all financial records',
     })]);
-    if (get().supabaseUser) {
-      await get().pushToSupabase();
-    } else {
-      get().triggerAutoPush();
-    }
   },
 
   importBackup: async (snapshot) => {
@@ -3308,10 +3280,6 @@ export const useFinanceStore = create((set, get) => ({
           await putRecord('attachments', synced);
           set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
         }
-
-        // Directly upsert just this attachment record — avoids being blocked by
-        // a concurrent pushToSupabase that's already syncing the expense save
-        await upsertRemoteRecords(client, [buildSyncRecord(userId, 'attachments', synced)]);
         return synced;
       }
     }
@@ -3371,306 +3339,6 @@ export const useFinanceStore = create((set, get) => ({
     }
 
     return null;
-  },
-
-  pushToSupabase: async () => {
-    const client = getSupabaseBrowserClient();
-    if (!client) throw new Error('Supabase is not configured');
-    set({ supabaseSyncStatus: 'syncing-up', supabaseError: '' });
-    try {
-      const { data: authData, error: authError } = await client.auth.getUser();
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('No authenticated Supabase user');
-      const state = get();
-      const settingsPayload = sanitizeSettingsForSync(state.settings);
-      const settingsUpdatedAt = state.settings.updatedAt || new Date().toISOString();
-      const rows = [
-        ...STORE_KEYS.flatMap((storeName) => {
-          const tombstones = state.syncMeta.deletedRecords[storeName] || [];
-          return getStateRecords(state, storeName)
-            .filter((record) => !tombstones.some((tombstone) => tombstone.id === record.id))
-            .map((record) => buildSyncRecord(userId, storeName, record));
-        }),
-        ...STORE_KEYS.flatMap((storeName) => (state.syncMeta.deletedRecords[storeName] || []).map((tombstone) => buildDeleteTombstone(userId, storeName, tombstone))),
-        {
-          user_id: userId,
-          store_name: 'settings',
-          record_id: 'singleton',
-          payload: settingsPayload,
-          updated_at: settingsUpdatedAt,
-          deleted_at: null,
-        },
-      ];
-      await upsertRemoteRecords(client, rows);
-
-      // Upload any attachment files not yet in Supabase Storage
-      const unsynced = get().attachments.filter((a) => !a.storagePath);
-      for (const att of unsynced) {
-        const blobRecord = await getRecord('attachmentBlobs', att.id);
-        if (!blobRecord?.blob) continue;
-        const path = `${userId}/${att.id}`;
-        const { error: uploadError } = await client.storage
-          .from('expense-attachments')
-          .upload(path, blobRecord.blob, { contentType: att.mimeType, upsert: true });
-        if (!uploadError) {
-          const synced = { ...att, storagePath: path, updatedAt: new Date().toISOString() };
-          await putRecord('attachments', synced);
-          await upsertRemoteRecords(client, [buildSyncRecord(userId, 'attachments', synced)]);
-          set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
-        }
-      }
-
-      set({
-        supabaseSyncStatus: 'synced',
-        supabaseLastSyncedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
-      throw error;
-    }
-  },
-
-  pullFromSupabase: async () => {
-    const client = getSupabaseBrowserClient();
-    if (!client) throw new Error('Supabase is not configured');
-    set({ supabaseSyncStatus: 'syncing-down', supabaseError: '' });
-    try {
-      const { data: authData, error: authError } = await client.auth.getUser();
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('No authenticated Supabase user');
-      const state = get();
-      const perStoreCursors = state.syncMeta.lastPulledAt || {};
-      const cursorValues = Object.values(perStoreCursors).filter(Boolean);
-      // Use the minimum cursor so stores that are behind don't miss changes
-      const since = cursorValues.length > 0 ? cursorValues.sort().at(0) : null;
-      const changes = await fetchRemoteChanges(client, userId, since);
-      const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
-      let nextConflicts = [...state.syncMeta.conflicts];
-      const nextLastPulledAt = { ...perStoreCursors };
-      let latestTimestamp = null;
-      let nextSettings = null;
-
-      for (const change of changes) {
-        if (change.store_name === 'settings') {
-          const storeCursor = perStoreCursors.settings;
-          if (storeCursor && change.updated_at < storeCursor) continue;
-          if (!change.payload) continue; // settings has no tombstone semantics
-
-          const localSettings = nextSettings || state.settings;
-          const localChangedSinceSync = isChangedAfter(localSettings.updatedAt, storeCursor);
-          const remoteChangedSinceSync = isChangedAfter(change.updated_at, storeCursor);
-          const localSanitized = sanitizeSettingsForSync(localSettings);
-          const remoteSanitized = sanitizeSettingsForSync(change.payload);
-
-          if (remoteChangedSinceSync && localChangedSinceSync && recordsDiffer(localSanitized, remoteSanitized)) {
-            nextConflicts = upsertConflict(
-              nextConflicts,
-              buildConflict({
-                storeName: 'settings',
-                remoteChange: change,
-                localRecord: localSettings,
-                localTombstone: null,
-              }),
-            );
-            continue;
-          }
-
-          // No conflict: take the newer side. If remote is newer (or equal), merge it in
-          // while preserving device-local fields.
-          if (!localChangedSinceSync || new Date(change.updated_at).getTime() >= new Date(localSettings.updatedAt || 0).getTime()) {
-            nextSettings = mergeRemoteSettings(localSettings, { ...change.payload, updatedAt: change.updated_at });
-          }
-          nextConflicts = removeConflict(nextConflicts, 'settings:singleton');
-          if (!nextLastPulledAt.settings || change.updated_at > nextLastPulledAt.settings) {
-            nextLastPulledAt.settings = change.updated_at;
-          }
-          if (!latestTimestamp || change.updated_at > latestTimestamp) {
-            latestTimestamp = change.updated_at;
-          }
-          continue;
-        }
-        if (!STORE_KEYS.includes(change.store_name)) continue;
-        const storeCursor = perStoreCursors[change.store_name];
-        // Skip records already processed by this store's cursor
-        if (storeCursor && change.updated_at < storeCursor) continue;
-        const localRecord = getStateRecords(state, change.store_name).find((item) => item.id === change.record_id);
-        const localTombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
-        if (detectConflict({ localRecord, localTombstone, remoteChange: change, lastPulledAt: storeCursor })) {
-          nextConflicts = upsertConflict(
-            nextConflicts,
-            buildConflict({
-              storeName: change.store_name,
-              remoteChange: change,
-              localRecord,
-              localTombstone,
-            }),
-          );
-          continue;
-        }
-
-        if (change.deleted_at) {
-          await deleteRecord(change.store_name, change.record_id);
-          nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
-        } else if (change.payload) {
-          // If we deleted locally but the tombstone hasn't been pushed yet, preserve
-          // the deletion instead of resurrecting the record from the server.
-          const tombstone = (state.syncMeta.deletedRecords[change.store_name] || []).find((item) => item.id === change.record_id);
-          if (tombstone && new Date(tombstone.updatedAt).getTime() > new Date(change.updated_at).getTime()) {
-            nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
-            if (!nextDeletedRecords[change.store_name].some((item) => item.id === tombstone.id)) {
-              nextDeletedRecords[change.store_name].push(tombstone);
-            }
-          } else {
-            await putRecord(change.store_name, ensureEntitySyncFields(change.payload, change.updated_at));
-            nextDeletedRecords[change.store_name] = (nextDeletedRecords[change.store_name] || []).filter((item) => item.id !== change.record_id);
-          }
-        }
-        nextConflicts = removeConflict(nextConflicts, `${change.store_name}:${change.record_id}`);
-
-        // Advance this store's cursor independently
-        if (!nextLastPulledAt[change.store_name] || change.updated_at > nextLastPulledAt[change.store_name]) {
-          nextLastPulledAt[change.store_name] = change.updated_at;
-        }
-        if (!latestTimestamp || change.updated_at > latestTimestamp) {
-          latestTimestamp = change.updated_at;
-        }
-      }
-
-      const nextSyncMeta = {
-        lastPulledAt: nextLastPulledAt,
-        deletedRecords: nextDeletedRecords,
-        conflicts: nextConflicts,
-      };
-      saveSyncMeta(nextSyncMeta);
-      if (nextSettings) {
-        saveSettings(nextSettings);
-      }
-      set((current) => ({
-        supabaseSyncStatus: 'synced',
-        supabaseLastSyncedAt: latestTimestamp || current.supabaseLastSyncedAt,
-        supabaseError: '',
-        syncMeta: nextSyncMeta,
-        ...(nextSettings ? { settings: nextSettings, derived: buildDerived({ ...current, settings: nextSettings }) } : {}),
-      }));
-      await get().reloadStoreData();
-    } catch (error) {
-      set({ supabaseSyncStatus: 'error', supabaseError: error.message });
-      throw error;
-    }
-  },
-
-  resolveConflictUseRemote: async (conflictId) => {
-    const conflict = get().syncMeta.conflicts.find((item) => item.id === conflictId);
-    if (!conflict) return;
-
-    if (conflict.storeName === 'settings') {
-      const merged = mergeRemoteSettings(get().settings, {
-        ...conflict.remoteRecord,
-        updatedAt: conflict.remoteUpdatedAt,
-      });
-      saveSettings(merged);
-      set((state) => {
-        const nextSyncMeta = {
-          ...state.syncMeta,
-          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
-          lastPulledAt: { ...state.syncMeta.lastPulledAt, settings: conflict.remoteUpdatedAt },
-        };
-        saveSyncMeta(nextSyncMeta);
-        return { settings: merged, syncMeta: nextSyncMeta, derived: buildDerived({ ...state, settings: merged }) };
-      });
-      return;
-    }
-
-    if (conflict.remoteDeletedAt) {
-      await deleteRecord(conflict.storeName, conflict.recordId);
-      set((state) => {
-        const nextList = state[conflict.storeName].filter((item) => item.id !== conflict.recordId);
-        const nextDeletedRecords = {
-          ...state.syncMeta.deletedRecords,
-          [conflict.storeName]: (state.syncMeta.deletedRecords[conflict.storeName] || []).filter((item) => item.id !== conflict.recordId),
-        };
-        const nextSyncMeta = {
-          ...state.syncMeta,
-          deletedRecords: nextDeletedRecords,
-          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
-        };
-        saveSyncMeta(nextSyncMeta);
-        const nextState = { ...state, [conflict.storeName]: nextList };
-        return { [conflict.storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
-      });
-      return;
-    }
-
-    const remoteRecord = ensureEntitySyncFields(conflict.remoteRecord, conflict.remoteUpdatedAt);
-    await putRecord(conflict.storeName, remoteRecord);
-    set((state) => {
-      const nextList = upsertItem(state[conflict.storeName], remoteRecord);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        [conflict.storeName]: (state.syncMeta.deletedRecords[conflict.storeName] || []).filter((item) => item.id !== conflict.recordId),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
-      };
-      saveSyncMeta(nextSyncMeta);
-      const nextState = { ...state, [conflict.storeName]: nextList };
-      return { [conflict.storeName]: nextList, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
-    });
-  },
-
-  resolveConflictKeepLocal: async (conflictId) => {
-    const client = getSupabaseBrowserClient();
-    const conflict = get().syncMeta.conflicts.find((item) => item.id === conflictId);
-    if (!client || !conflict) return;
-    const { data: authData, error: authError } = await client.auth.getUser();
-    if (authError) throw authError;
-    const userId = authData.user?.id;
-    if (!userId) throw new Error('No authenticated Supabase user');
-
-    if (conflict.storeName === 'settings') {
-      const localSettings = { ...get().settings, updatedAt: new Date().toISOString() };
-      saveSettings(localSettings);
-      await upsertRemoteRecords(client, [{
-        user_id: userId,
-        store_name: 'settings',
-        record_id: 'singleton',
-        payload: sanitizeSettingsForSync(localSettings),
-        updated_at: localSettings.updatedAt,
-        deleted_at: null,
-      }]);
-      set((state) => {
-        const nextSyncMeta = {
-          ...state.syncMeta,
-          conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
-          lastPulledAt: { ...state.syncMeta.lastPulledAt, settings: localSettings.updatedAt },
-        };
-        saveSyncMeta(nextSyncMeta);
-        return { settings: localSettings, syncMeta: nextSyncMeta, derived: buildDerived({ ...state, settings: localSettings }) };
-      });
-      return;
-    }
-
-    const localRecord = get()[conflict.storeName].find((item) => item.id === conflict.recordId);
-    const localTombstone = (get().syncMeta.deletedRecords[conflict.storeName] || []).find((item) => item.id === conflict.recordId);
-
-    if (localTombstone && !localRecord) {
-      await upsertRemoteRecords(client, [buildDeleteTombstone(userId, conflict.storeName, localTombstone)]);
-    } else if (localRecord) {
-      await upsertRemoteRecords(client, [buildSyncRecord(userId, conflict.storeName, localRecord)]);
-    }
-
-    set((state) => {
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        conflicts: removeConflict(state.syncMeta.conflicts, conflictId),
-      };
-      saveSyncMeta(nextSyncMeta);
-      return { syncMeta: nextSyncMeta };
-    });
   },
 
   // ── Social: activity feed ─────────────────────────────────────────────────

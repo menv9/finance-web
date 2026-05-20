@@ -12,10 +12,7 @@ function createScopedStorage(key) {
 
 let supabaseClient = null;
 
-export function getSupabaseConfig(settings) {
-  if (settings?.localOnlyMode) {
-    return { url: '', anonKey: '' };
-  }
+export function getSupabaseConfig() {
   return {
     url: import.meta.env.VITE_SUPABASE_URL || '',
     anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',

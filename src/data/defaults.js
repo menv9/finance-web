@@ -20,7 +20,6 @@ export const DEFAULT_SETTINGS = {
   categories: DEFAULT_CATEGORIES,
   holdingPlatforms: ['Trade Republic', 'IBKR', 'DEGIRO'],
   finnhubApiKey: '',
-  localOnlyMode: false,
   modules: {
     portfolio: false,
     social: true,

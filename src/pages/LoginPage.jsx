@@ -37,7 +37,6 @@ export default function LoginPage() {
   const signInWithPassword = useFinanceStore((s) => s.signInWithPassword);
   const sendPasswordReset = useFinanceStore((s) => s.sendPasswordReset);
   const resetAuthStatus = useFinanceStore((s) => s.resetAuthStatus);
-  const enableLocalOnlyMode = useFinanceStore((s) => s.enableLocalOnlyMode);
   const navigate = useNavigate();
 
   // If the user lands here after backing out of an OAuth flow, the status can
@@ -137,16 +136,6 @@ export default function LoginPage() {
     setEmail('');
     setPassword('');
     clearError();
-  }
-
-  async function handleContinueLocally() {
-    clearError();
-    try {
-      await enableLocalOnlyMode();
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      setLocalError(err.message || t('login.errorLocal'));
-    }
   }
 
   return (
@@ -334,19 +323,6 @@ export default function LoginPage() {
               {t('login.privacyLine2')}
             </p>
 
-            <div className="pt-2 border-t border-rule space-y-1.5">
-              <button
-                type="button"
-                onClick={handleContinueLocally}
-                disabled={loading}
-                className="block w-full text-center text-sm text-ink-muted hover:text-ink underline-offset-2 hover:underline transition-colors duration-180 disabled:opacity-50"
-              >
-                {t('login.continueLocal')}
-              </button>
-              <p className="text-center text-xs text-ink-faint leading-relaxed">
-                {t('login.continueLocalHint')}
-              </p>
-            </div>
           </div>
         )}
       </div>

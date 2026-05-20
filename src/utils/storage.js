@@ -1,10 +1,27 @@
-import { DEFAULT_CATEGORIES, DEFAULT_DATA, DEFAULT_SETTINGS } from '../data/defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from '../data/defaults';
+import {
+  fetchAllForUser,
+  fetchStore,
+  removeMany,
+  removeRecord,
+  saveSettings as cloudSaveSettings,
+  upsertMany,
+  upsertRecord,
+  wipeAllForUser,
+} from '../data/cloudStore';
 
-const DB_NAME = 'personal-finance-tracker';
-const DB_VERSION = 13;
-const STORE_NAMES = ['expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings', 'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries', 'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts', 'attachments', 'activityLog', 'portfolioSnapshots', 'attachmentBlobs'];
+// ---------------------------------------------------------------------------
+// Persistence layer (Phase 2a: cloud-only)
+//
+// `finance_records` in Supabase is the source of truth. The helpers below keep
+// the same names/signatures the rest of the app already uses so call sites
+// don't need to change in this pass. IndexedDB is no longer touched here.
+// Settings still live in localStorage as a fast device-local cache for the
+// boot path; the in-memory zustand state is hydrated from Supabase right after
+// bootstrap and used as truth from then on.
+// ---------------------------------------------------------------------------
+
 const SETTINGS_KEY = 'pft-settings';
-const SYNC_META_KEY = 'pft-sync-meta';
 const LEGACY_DEFAULT_CATEGORIES = [
   'Vivienda',
   'Transporte',
@@ -28,105 +45,69 @@ function normalizeSettings(settings) {
   };
 }
 
-// Per-version data migrations. Add an entry here whenever DB_VERSION is bumped.
-// Each function receives the IDBDatabase and the upgrade transaction.
-// Versions 1-13 predate this registry; no migrations are registered for them.
-const MIGRATIONS = {
-  // Example for future contributors:
-  // 14: (_db, tx) => {
-  //   const store = tx.objectStore('expenses');
-  //   // mutate records, add indexes, etc.
-  // },
-};
-
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const db = request.result;
-      const oldVersion = event.oldVersion;
-
-      // Ensure all stores exist (always safe to run)
-      STORE_NAMES.forEach((storeName) => {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: 'id' });
-        }
-      });
-
-      // Run any pending migrations in order, starting after the last known version
-      const fromVersion = Math.max(oldVersion, 13);
-      for (let v = fromVersion + 1; v <= DB_VERSION; v++) {
-        if (MIGRATIONS[v]) MIGRATIONS[v](db, event.target.transaction);
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function withStore(storeName, mode, callback) {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, mode);
-    const store = transaction.objectStore(storeName);
-    const request = callback(store);
-
-    transaction.oncomplete = () => resolve(request?.result);
-    transaction.onerror = () => reject(transaction.error);
-    if (request) {
-      request.onerror = () => reject(request.error);
-    }
-  });
-}
+// --- Per-record helpers (cloud-backed) -------------------------------------
 
 export async function getRecord(storeName, id) {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.get(id);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
+  const records = await fetchStore(storeName);
+  return records.find((r) => r.id === id) ?? null;
 }
 
 export async function getAllRecords(storeName) {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  return fetchStore(storeName);
 }
 
 export async function putRecord(storeName, record) {
-  await withStore(storeName, 'readwrite', (store) => store.put(record));
+  await upsertRecord(storeName, record);
 }
 
 export async function putManyRecords(storeName, records) {
-  await withStore(storeName, 'readwrite', (store) => {
-    records.forEach((record) => store.put(record));
-  });
+  await upsertMany(storeName, records);
 }
 
 export async function deleteRecord(storeName, id) {
-  await withStore(storeName, 'readwrite', (store) => store.delete(id));
+  await removeRecord(storeName, id);
+}
+
+export async function deleteManyRecords(storeName, ids) {
+  await removeMany(storeName, ids);
 }
 
 export async function clearAllStores() {
-  await Promise.all(
-    STORE_NAMES.map((storeName) => withStore(storeName, 'readwrite', (store) => store.clear())),
-  );
+  await wipeAllForUser();
 }
+
+// Single-shot hydration for bootstrap: pulls every row for the current user
+// in one round-trip and returns `{ [storeName]: payload[] }`.
+export async function fetchAllStoresForCurrentUser() {
+  return fetchAllForUser();
+}
+
+// --- One-time migration: drop the legacy IndexedDB database ---------------
+// Phase 1 of the cloud-only switchover left a hefty `personal-finance-tracker`
+// IDB on every existing device. Nothing reads it anymore; this just frees the
+// space. Marker keeps us from re-deleting on every boot.
+
+const IDB_CLEANUP_KEY = 'pft-idb-cleanup-v1';
+const LEGACY_DB_NAME = 'personal-finance-tracker';
+
+export function cleanupLegacyIndexedDB() {
+  if (typeof window === 'undefined' || !window.indexedDB) return;
+  if (localStorage.getItem(IDB_CLEANUP_KEY)) return;
+  try {
+    const req = window.indexedDB.deleteDatabase(LEGACY_DB_NAME);
+    req.onsuccess = () => localStorage.setItem(IDB_CLEANUP_KEY, '1');
+    req.onerror = () => { /* leave the marker unset so we retry next boot */ };
+    req.onblocked = () => { /* same — try again next time */ };
+  } catch {
+    // best-effort: never break boot over this
+  }
+}
+
+// --- Settings (localStorage cache + cloud singleton) -----------------------
 
 export function loadSettings() {
   const raw = localStorage.getItem(SETTINGS_KEY);
   if (!raw) return DEFAULT_SETTINGS;
-
   try {
     return normalizeSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
   } catch {
@@ -134,39 +115,59 @@ export function loadSettings() {
   }
 }
 
+// Write to localStorage immediately (so the next cold start has the right
+// theme/locale before the cloud round-trip finishes) and asynchronously
+// upsert the same payload into Supabase. Errors propagate so callers can
+// decide whether to revert.
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
+  const normalized = normalizeSettings(settings);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized));
+  // Fire-and-forget: cloud write doesn't block the UI thread. Callers that
+  // need the awaited write should use `saveSettingsToCloud` directly.
+  cloudSaveSettings(normalized).catch(() => {});
 }
+
+export async function saveSettingsToCloud(settings) {
+  const normalized = normalizeSettings(settings);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized));
+  await cloudSaveSettings(normalized);
+  return normalized;
+}
+
+export function cacheSettingsLocally(settings) {
+  const normalized = normalizeSettings(settings);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+// --- Sync-engine stubs (Phase 2a: dead code kept callable) -----------------
+// These exist so the old call sites keep compiling. They will be deleted
+// outright in Phase 2b once the sync engine itself is gone.
 
 export function loadSyncMeta() {
-  const raw = localStorage.getItem(SYNC_META_KEY);
-  if (!raw) {
-    return {
-      lastPulledAt: {},
-      deletedRecords: {},
-      conflicts: [],
-    };
-  }
-
-  try {
-    return {
-      lastPulledAt: {},
-      deletedRecords: {},
-      conflicts: [],
-      ...JSON.parse(raw),
-    };
-  } catch {
-    return {
-      lastPulledAt: {},
-      deletedRecords: {},
-      conflicts: [],
-    };
-  }
+  return { lastPulledAt: {}, deletedRecords: {}, conflicts: [] };
 }
 
-export function saveSyncMeta(meta) {
-  localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+export function saveSyncMeta() {
+  // no-op
 }
+
+export function sanitizeSettingsForSync(settings) {
+  return settings;
+}
+
+export function mergeRemoteSettings(_local, remote) {
+  return remote;
+}
+
+export function ensureEntitySyncFields(entity, fallbackTimestamp = new Date().toISOString()) {
+  return {
+    ...entity,
+    updatedAt: entity.updatedAt || fallbackTimestamp,
+  };
+}
+
+// --- Active user pointer (localStorage; still useful) ----------------------
 
 const ACTIVE_USER_KEY = 'pft-active-user';
 
@@ -184,12 +185,16 @@ export function clearActiveUserId() {
 
 export function clearLocalUserData() {
   localStorage.removeItem(SETTINGS_KEY);
-  localStorage.removeItem(SYNC_META_KEY);
 }
 
-// Optional demo seed. Drop a file at `src/data/demo.json` exported from
-// Settings → Backup → Export JSON and it will be used as the seed for any
-// fresh browser instead of the hardcoded defaults. Safe if absent.
+// --- Seed / backup helpers --------------------------------------------------
+// Seeding is now a no-op: a fresh user starts with whatever Supabase returns
+// (usually empty). The onboarding flow handles first-run UX.
+
+export async function ensureSeedData() {
+  // no-op (cloud is truth)
+}
+
 const demoModules = import.meta.glob('../data/demo.json', { eager: true, import: 'default' });
 const DEMO_BACKUP = Object.values(demoModules)[0] || null;
 
@@ -197,97 +202,40 @@ export function getDemoSettings() {
   return DEMO_BACKUP?.settings || null;
 }
 
-export async function ensureSeedData() {
-  const seedFlag = localStorage.getItem('pft-seeded');
-  if (seedFlag) return;
-
-  const demoData = DEMO_BACKUP?.data;
-
-  await Promise.all(
-    STORE_NAMES.map((storeName) =>
-      putManyRecords(storeName, (demoData?.[storeName]) || DEFAULT_DATA[storeName] || []),
-    ),
-  );
-
-  if (DEMO_BACKUP?.settings) {
-    const existing = localStorage.getItem(SETTINGS_KEY);
-    if (!existing) {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...DEMO_BACKUP.settings }));
-    }
-  }
-
-  localStorage.setItem('pft-seeded', 'true');
-}
-
-export function ensureEntitySyncFields(entity, fallbackTimestamp = new Date().toISOString()) {
-  return {
-    ...entity,
-    updatedAt: entity.updatedAt || fallbackTimestamp,
-  };
-}
-
+// Export the user's cloud state as a JSON snapshot. The optional
+// `storeFilter` matches the previous behavior of per-module exports.
 export async function exportDatabaseSnapshot(settings, storeFilter = null) {
   const isModule = storeFilter !== null;
-  const names = isModule ? STORE_NAMES.filter((n) => storeFilter.includes(n)) : STORE_NAMES;
-  const stores = await Promise.all(
-    names.map(async (storeName) => [storeName, await getAllRecords(storeName)]),
+  const buckets = await fetchAllForUser();
+  const entries = Object.entries(buckets).filter(([storeName]) =>
+    isModule ? storeFilter.includes(storeName) : storeName !== 'settings',
   );
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    // Module backups omit settings — they're device-local and identity-managed
     ...(isModule ? {} : { settings }),
-    data: Object.fromEntries(stores),
+    data: Object.fromEntries(entries),
   };
 }
 
-// Fields that are intentionally per-device and must never travel through sync.
-// Theme/locale are user-pickable per device; API keys and the offline toggle
-// are local credentials/preferences.
-const DEVICE_LOCAL_SETTINGS_KEYS = ['theme', 'locale', 'finnhubApiKey', 'alphaVantageApiKey', 'localOnlyMode'];
-
-export function sanitizeSettingsForSync(settings) {
-  const out = { ...settings };
-  for (const key of DEVICE_LOCAL_SETTINGS_KEYS) delete out[key];
-  return out;
-}
-
-// Apply a remote settings payload while preserving this device's local-only fields.
-export function mergeRemoteSettings(localSettings, remotePayload) {
-  const preserved = {};
-  for (const key of DEVICE_LOCAL_SETTINGS_KEYS) {
-    if (key in localSettings) preserved[key] = localSettings[key];
-  }
-  return { ...DEFAULT_SETTINGS, ...remotePayload, ...preserved };
-}
-
+// Import a JSON snapshot: hard-replace each store's contents in Supabase.
+// For now we simply upsert the records by id; existing records with ids not
+// in the snapshot are left alone (callers can call clearAllStores first if
+// they want a true replace).
 export async function importDatabaseSnapshot(snapshot) {
   const entries = Object.entries(snapshot.data || {});
-  await Promise.all(
-    entries.map(async ([storeName, records]) => {
-      if (!STORE_NAMES.includes(storeName)) return;
-      const db = await openDatabase();
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        store.clear();
-        (records || []).forEach((record) => store.put(record));
-        transaction.oncomplete = resolve;
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }),
-  );
+  for (const [storeName, records] of entries) {
+    if (!Array.isArray(records) || records.length === 0) continue;
+    await upsertMany(storeName, records);
+  }
   if (snapshot.settings) {
-    const currentSettings = loadSettings();
-    saveSettings({
+    const merged = {
       ...DEFAULT_SETTINGS,
       ...snapshot.settings,
       locale: DEFAULT_SETTINGS.locale,
-      // Never restore device-local / identity-managed fields from a backup
-      theme: currentSettings.theme,
-    });
+      // Backup files don't override the active device's theme.
+      theme: loadSettings().theme,
+    };
+    await saveSettingsToCloud(merged);
   }
-  // Reset sync state so old tombstones / cursors / conflicts don't corrupt the
-  // newly imported data on the next push or pull.
-  saveSyncMeta({ lastPulledAt: {}, deletedRecords: {}, conflicts: [] });
 }
