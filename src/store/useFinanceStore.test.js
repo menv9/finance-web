@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../utils/storage', () => ({
+  cacheSettingsLocally: vi.fn((s) => s),
+  cleanupLegacyIndexedDB: vi.fn(),
   clearAllStores: vi.fn(async () => {}),
+  clearActiveUserId: vi.fn(),
   deleteRecord: vi.fn(async () => {}),
   ensureEntitySyncFields: vi.fn((entity, fallbackTimestamp = new Date().toISOString()) => ({
     ...entity,
     updatedAt: entity.updatedAt || fallbackTimestamp,
   })),
-  ensureSeedData: vi.fn(async () => {}),
   exportDatabaseSnapshot: vi.fn(async () => ({})),
+  fetchAllStoresForCurrentUser: vi.fn(async () => ({})),
+  getActiveUserId: vi.fn(() => null),
   getAllRecords: vi.fn(async () => []),
   getRecord: vi.fn(async () => null),
   importDatabaseSnapshot: vi.fn(async () => {}),
@@ -18,21 +22,16 @@ vi.mock('../utils/storage', () => ({
     allocationTargets: [],
     modules: { portfolio: true },
   })),
-  loadSyncMeta: vi.fn(() => ({ lastPulledAt: {}, deletedRecords: {}, conflicts: [] })),
   putRecord: vi.fn(async () => {}),
   saveSettings: vi.fn(() => {}),
-  saveSyncMeta: vi.fn(() => {}),
-  sanitizeSettingsForSync: vi.fn((settings) => settings),
-  mergeRemoteSettings: vi.fn((local, remote) => ({ ...local, ...remote })),
+  setActiveUserId: vi.fn(),
 }));
 
 vi.mock('../utils/supabase', () => ({
   clearSupabaseBrowserClient: vi.fn(),
   createSupabaseBrowserClient: vi.fn(() => null),
-  fetchRemoteChanges: vi.fn(async () => []),
   getSupabaseBrowserClient: vi.fn(() => null),
   getSupabaseConfig: vi.fn(() => ({ url: '', anonKey: '' })),
-  upsertRemoteRecords: vi.fn(async () => {}),
 }));
 
 vi.mock('../utils/yahoo', () => ({
@@ -40,7 +39,7 @@ vi.mock('../utils/yahoo', () => ({
 }));
 
 const { fetchTickerPrice } = await import('../utils/yahoo');
-const { getAllRecords, putRecord } = await import('../utils/storage');
+const { fetchAllStoresForCurrentUser, getAllRecords, putRecord } = await import('../utils/storage');
 const { useFinanceStore } = await import('./useFinanceStore');
 
 function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 10000, currency: 'EUR' }]) {
@@ -53,7 +52,6 @@ function resetStore(accounts = [{ id: 'bank-a', name: 'Main', balanceCents: 1000
       allocationTargets: [],
       modules: { portfolio: true },
     },
-    syncMeta: { lastPulledAt: {}, deletedRecords: {}, conflicts: [] },
     expenses: [],
     fixedExpenses: [],
     incomes: [],
@@ -835,15 +833,9 @@ describe('investment portfolios', () => {
       activityLog: [],
       portfolioSnapshots: [],
     };
-    const order = [
-      'expenses', 'fixedExpenses', 'incomes', 'investmentPortfolios', 'holdings',
-      'dividends', 'portfolioCashflows', 'portfolioSales', 'savings', 'savingsEntries',
-      'savingsGoals', 'budgets', 'rollovers', 'transfers', 'bankAccounts', 'debts',
-      'attachments', 'activityLog', 'portfolioSnapshots',
-    ];
-    vi.mocked(getAllRecords).mockImplementation(async (storeName) => storeData[storeName] || []);
+    vi.mocked(fetchAllStoresForCurrentUser).mockResolvedValueOnce(storeData);
 
-    await useFinanceStore.getState().bootstrap();
+    await useFinanceStore.getState().reloadStoreData();
 
     const state = useFinanceStore.getState();
     expect(state.investmentPortfolios).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'ipr-main', name: 'Main Portfolio' })]));
@@ -853,7 +845,6 @@ describe('investment portfolios', () => {
     expect(state.portfolioCashflows[0].portfolioId).toBe('ipr-main');
     expect(state.portfolioSales[0].portfolioId).toBe('ipr-main');
     expect(vi.mocked(putRecord)).toHaveBeenCalledWith('investmentPortfolios', expect.objectContaining({ id: 'ipr-main' }));
-    expect(order).toContain('investmentPortfolios');
   });
 
   it('keeps explicitly unassigned holdings unassigned during bootstrap', async () => {
@@ -878,9 +869,9 @@ describe('investment portfolios', () => {
       activityLog: [],
       portfolioSnapshots: [],
     };
-    vi.mocked(getAllRecords).mockImplementation(async (storeName) => storeData[storeName] || []);
+    vi.mocked(fetchAllStoresForCurrentUser).mockResolvedValueOnce(storeData);
 
-    await useFinanceStore.getState().bootstrap();
+    await useFinanceStore.getState().reloadStoreData();
 
     const state = useFinanceStore.getState();
     expect(state.holdings[0].portfolioId).toBe('');

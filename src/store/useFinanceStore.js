@@ -16,7 +16,6 @@ import {
   loadSettings,
   putRecord,
   saveSettings,
-  saveSyncMeta,
   setActiveUserId,
 } from '../utils/storage';
 import {
@@ -789,36 +788,14 @@ async function cleanupGeneratedPortfolioIncomesForState(get, set) {
     const nextDividends = state.dividends.map((dividend) =>
       updatedDividendIds.has(dividend.id) ? dividendsToUpdate.find((item) => item.id === dividend.id) : dividend
     );
-    const nextDeletedRecords = {
-      ...state.syncMeta.deletedRecords,
-      incomes: [
-        ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => !deletedIncomeIds.has(item.id)),
-        ...[...deletedIncomeIds].map((id) => ({ id, updatedAt: timestamp, deletedAt: timestamp })),
-      ],
-      portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => !updatedSaleIds.has(item.id)),
-      dividends: (state.syncMeta.deletedRecords.dividends || []).filter((item) => !updatedDividendIds.has(item.id)),
-    };
-    const nextSyncMeta = {
-      ...state.syncMeta,
-      deletedRecords: nextDeletedRecords,
-      conflicts: state.syncMeta.conflicts.filter(
-        (item) =>
-          !deletedIncomeIds.has(item.id?.replace('incomes:', '')) &&
-          !updatedSaleIds.has(item.id?.replace('portfolioSales:', '')) &&
-          !updatedDividendIds.has(item.id?.replace('dividends:', '')),
-      ),
-    };
-    saveSyncMeta(nextSyncMeta);
     const nextState = {
       ...state,
       incomes: nextIncomes,
       portfolioSales: nextPortfolioSales,
       dividends: nextDividends,
-      syncMeta: nextSyncMeta,
     };
-    return { ...nextState, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+    return { ...nextState, derived: buildDerived(nextState) };
   });
-  if (typeof get().triggerAutoPush === 'function') get().triggerAutoPush();
 }
 
 async function persistActivityLogs(set, logs) {
@@ -879,11 +856,6 @@ export const useFinanceStore = create((set, get) => ({
   coingameIsAdmin: false,
   coingameAdminStatus: 'idle',
   coingameAdminError: '',
-  syncMeta: {
-    lastPulledAt: {},
-    deletedRecords: {},
-    conflicts: [],
-  },
   expenses: [],
   fixedExpenses: [],
   incomes: [],
@@ -1197,7 +1169,6 @@ export const useFinanceStore = create((set, get) => ({
     set((state) => ({ settings, derived: buildDerived({ ...state, settings }) }));
     const log = buildSettingsActivity(previousSettings, settings, partial);
     if (log) await persistActivityLogs(set, [log]);
-    get().triggerAutoPush();
     if (partial.modules?.social !== undefined && partial.modules.social !== previousSettings.modules?.social) {
       const user = get().supabaseUser;
       if (user && get().profile) {
@@ -1220,7 +1191,6 @@ export const useFinanceStore = create((set, get) => ({
       before: previous,
       after: record,
     })]);
-    get().triggerAutoPush();
   },
 
   saveSavingsEntry: async (entry) => {
@@ -1318,7 +1288,6 @@ export const useFinanceStore = create((set, get) => ({
         buildActivityLog({ storeName, action: 'update', before, after: linkedRecord }),
       ),
     ]);
-    get().triggerAutoPush();
     return record;
   },
 
@@ -1352,7 +1321,6 @@ export const useFinanceStore = create((set, get) => ({
         after: null,
       })]);
     }
-    get().triggerAutoPush();
   },
 
   saveSavingsGoal: async (goal) => {
@@ -1370,17 +1338,7 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('savingsGoals', record);
     set((state) => {
       const nextSavingsGoals = upsertItem(state.savingsGoals, record);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        savingsGoals: (state.syncMeta.deletedRecords.savingsGoals || []).filter((item) => item.id !== record.id),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `savingsGoals:${record.id}`),
-      };
-      saveSyncMeta(nextSyncMeta);
-      return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
+      return { savingsGoals: nextSavingsGoals };
     });
     await persistActivityLogs(set, [buildActivityLog({
       storeName: 'savingsGoals',
@@ -1388,7 +1346,6 @@ export const useFinanceStore = create((set, get) => ({
       before: existing,
       after: record,
     })]);
-    get().triggerAutoPush();
     return record;
   },
 
@@ -1398,20 +1355,7 @@ export const useFinanceStore = create((set, get) => ({
     const timestamp = new Date().toISOString();
     set((state) => {
       const nextSavingsGoals = state.savingsGoals.filter((item) => item.id !== id);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        savingsGoals: [
-          ...(state.syncMeta.deletedRecords.savingsGoals || []).filter((item) => item.id !== id),
-          { id, updatedAt: timestamp, deletedAt: timestamp },
-        ],
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `savingsGoals:${id}`),
-      };
-      saveSyncMeta(nextSyncMeta);
-      return { savingsGoals: nextSavingsGoals, syncMeta: nextSyncMeta };
+      return { savingsGoals: nextSavingsGoals };
     });
     if (previous) {
       await persistActivityLogs(set, [buildActivityLog({
@@ -1421,7 +1365,6 @@ export const useFinanceStore = create((set, get) => ({
         after: null,
       })]);
     }
-    get().triggerAutoPush();
   },
 
   saveDebt: async (debt) => {
@@ -1449,19 +1392,8 @@ export const useFinanceStore = create((set, get) => ({
     await putRecord('debts', record);
     set((state) => {
       const nextDebts = upsertItem(state.debts, record);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => item.id !== record.id),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `debts:${record.id}`),
-      };
-      saveSyncMeta(nextSyncMeta);
       return {
         debts: nextDebts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived({ ...state, debts: nextDebts }),
       };
     });
@@ -1471,7 +1403,6 @@ export const useFinanceStore = create((set, get) => ({
       before: existing,
       after: record,
     })]);
-    get().triggerAutoPush();
     return record;
   },
 
@@ -1481,22 +1412,8 @@ export const useFinanceStore = create((set, get) => ({
     const timestamp = new Date().toISOString();
     set((state) => {
       const nextDebts = state.debts.filter((item) => item.id !== id);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        debts: [
-          ...(state.syncMeta.deletedRecords.debts || []).filter((item) => item.id !== id),
-          { id, updatedAt: timestamp, deletedAt: timestamp },
-        ],
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => item.id !== `debts:${id}`),
-      };
-      saveSyncMeta(nextSyncMeta);
       return {
         debts: nextDebts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived({ ...state, debts: nextDebts }),
       };
     });
@@ -1508,12 +1425,7 @@ export const useFinanceStore = create((set, get) => ({
         after: null,
       })]);
     }
-    get().triggerAutoPush();
   },
-
-  // Writes go to Supabase directly inside putRecord/deleteRecord (see
-  // src/utils/storage.js); kept as a no-op for any lingering callers.
-  triggerAutoPush: () => {},
 
   saveEntity: async (storeName, entity, { skipAutoCreate = false, skipAccountAdjustment = false, allowUnassignedPortfolio = false } = {}) => {
     let value = entity;
@@ -1592,32 +1504,11 @@ export const useFinanceStore = create((set, get) => ({
       const nextDebts = storeName === 'debts'
         ? nextList
         : applyDebtAdjustments(state.debts || [], debtAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== record.id),
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-        ...(debtAdjustments.size
-          ? { debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => !debtAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => (
-          item.id !== `${storeName}:${record.id}` &&
-          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))) &&
-          (!debtAdjustments.size || !debtAdjustments.has(item.id?.replace('debts:', '')))
-        )),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts, debts: nextDebts };
       return {
         [storeName]: nextList,
         bankAccounts: nextBankAccounts,
         debts: nextDebts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -1627,7 +1518,6 @@ export const useFinanceStore = create((set, get) => ({
       before: previous,
       after: record,
     })]);
-    get().triggerAutoPush();
     // When a fixed expense is saved, immediately check if it needs an expense entry this month
     if (storeName === 'fixedExpenses' && !skipAutoCreate) {
       await get().autoCreateFixedExpenses();
@@ -1746,35 +1636,11 @@ export const useFinanceStore = create((set, get) => ({
       const nextDebts = storeName === 'debts'
         ? nextList
         : applyDebtAdjustments(state.debts || [], debtAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        [storeName]: [
-          ...(state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== id),
-          { id, updatedAt: timestamp, deletedAt: timestamp },
-        ],
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-        ...(debtAdjustments.size
-          ? { debts: (state.syncMeta.deletedRecords.debts || []).filter((item) => !debtAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter((item) => (
-          item.id !== `${storeName}:${id}` &&
-          (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))) &&
-          (!debtAdjustments.size || !debtAdjustments.has(item.id?.replace('debts:', '')))
-        )),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = { ...state, [storeName]: nextList, bankAccounts: nextBankAccounts, debts: nextDebts };
       return {
         [storeName]: nextList,
         bankAccounts: nextBankAccounts,
         debts: nextDebts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -1803,7 +1669,6 @@ export const useFinanceStore = create((set, get) => ({
         after: null,
       })]);
     }
-    get().triggerAutoPush();
     } finally {
       _cascadingDeletes.delete(cascadeKey);
     }
@@ -1853,27 +1718,6 @@ export const useFinanceStore = create((set, get) => ({
       const nextPortfolioSales = upsertItem(state.portfolioSales, sale);
       const nextPortfolioCashflows = upsertItem(state.portfolioCashflows, cashflow);
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
-        portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
-        portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter(
-          (item) =>
-            item.id !== `holdings:${nextHolding.id}` &&
-            item.id !== `portfolioSales:${sale.id}` &&
-            item.id !== `portfolioCashflows:${cashflow.id}` &&
-            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
-        ),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = {
         ...state,
         holdings: nextHoldings,
@@ -1886,7 +1730,6 @@ export const useFinanceStore = create((set, get) => ({
         portfolioSales: nextPortfolioSales,
         portfolioCashflows: nextPortfolioCashflows,
         bankAccounts: nextBankAccounts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -1896,7 +1739,6 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName: 'portfolioSales', action: 'create', before: null, after: sale }),
       buildActivityLog({ storeName: 'portfolioCashflows', action: 'create', before: null, after: cashflow }),
     ]);
-    get().triggerAutoPush();
     return sale;
   },
 
@@ -1982,34 +1824,6 @@ export const useFinanceStore = create((set, get) => ({
         ? state.incomes.filter((item) => item.id !== currentIncome.id)
         : state.incomes;
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        holdings: (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== nextHolding.id),
-        portfolioSales: (state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== nextSale.id),
-        portfolioCashflows: (state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== nextCashflow.id),
-        incomes: currentIncome
-          ? [
-              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== currentIncome.id),
-              { id: currentIncome.id, updatedAt: timestamp, deletedAt: timestamp },
-            ]
-          : state.syncMeta.deletedRecords.incomes || [],
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter(
-          (item) =>
-            item.id !== `holdings:${nextHolding.id}` &&
-            item.id !== `portfolioSales:${nextSale.id}` &&
-            item.id !== `portfolioCashflows:${nextCashflow.id}` &&
-            item.id !== `incomes:${currentIncome?.id}` &&
-            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
-        ),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = {
         ...state,
         holdings: nextHoldings,
@@ -2024,7 +1838,6 @@ export const useFinanceStore = create((set, get) => ({
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -2035,7 +1848,6 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName: 'portfolioCashflows', action: currentCashflow ? 'update' : 'create', before: currentCashflow || null, after: nextCashflow }),
       ...(currentIncome ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: currentIncome, after: null })] : []),
     ]);
-    get().triggerAutoPush();
     return nextSale;
   },
 
@@ -2082,44 +1894,6 @@ export const useFinanceStore = create((set, get) => ({
         : state.portfolioCashflows;
       const nextIncomes = income ? state.incomes.filter((item) => item.id !== income.id) : state.incomes;
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        portfolioSales: [
-          ...(state.syncMeta.deletedRecords.portfolioSales || []).filter((item) => item.id !== sale.id),
-          { id: sale.id, updatedAt: timestamp, deletedAt: timestamp },
-        ],
-        portfolioCashflows: cashflow
-          ? [
-              ...(state.syncMeta.deletedRecords.portfolioCashflows || []).filter((item) => item.id !== cashflow.id),
-              { id: cashflow.id, updatedAt: timestamp, deletedAt: timestamp },
-            ]
-          : state.syncMeta.deletedRecords.portfolioCashflows || [],
-        incomes: income
-          ? [
-              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== income.id),
-              { id: income.id, updatedAt: timestamp, deletedAt: timestamp },
-            ]
-          : state.syncMeta.deletedRecords.incomes || [],
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-      };
-      if (restoredHolding) {
-        nextDeletedRecords.holdings = (state.syncMeta.deletedRecords.holdings || []).filter((item) => item.id !== restoredHolding.id);
-      }
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter(
-          (item) =>
-            item.id !== `portfolioSales:${sale.id}` &&
-            item.id !== `portfolioCashflows:${cashflow?.id}` &&
-            item.id !== `holdings:${restoredHolding?.id}` &&
-            item.id !== `incomes:${income?.id}` &&
-            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
-        ),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = {
         ...state,
         holdings: nextHoldings,
@@ -2134,7 +1908,6 @@ export const useFinanceStore = create((set, get) => ({
         portfolioCashflows: nextPortfolioCashflows,
         incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -2145,7 +1918,6 @@ export const useFinanceStore = create((set, get) => ({
       ...(cashflow ? [buildActivityLog({ storeName: 'portfolioCashflows', action: 'delete', before: cashflow, after: null })] : []),
       ...(income ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: income, after: null })] : []),
     ]);
-    get().triggerAutoPush();
   },
 
   cleanupGeneratedPortfolioIncomes: async () => {
@@ -2235,7 +2007,6 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = { ...state, expenses: nextExpenses, bankAccounts: nextBankAccounts };
       return { expenses: nextExpenses, bankAccounts: nextBankAccounts, derived: buildDerived(nextState) };
     });
-    get().triggerAutoPush();
   },
 
   saveDividend: async (entity) => {
@@ -2283,36 +2054,11 @@ export const useFinanceStore = create((set, get) => ({
         ? state.incomes.filter((income) => income.id !== currentIncome.id)
         : state.incomes;
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        dividends: (state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== record.id),
-        incomes: currentIncome
-          ? [
-              ...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== currentIncome.id),
-              { id: currentIncome.id, updatedAt: timestamp, deletedAt: timestamp },
-            ]
-          : state.syncMeta.deletedRecords.incomes || [],
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter(
-          (item) =>
-            item.id !== `dividends:${record.id}` &&
-            item.id !== `incomes:${currentIncome?.id}` &&
-            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
-        ),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes, bankAccounts: nextBankAccounts };
       return {
         dividends: nextDividends,
         incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -2321,7 +2067,6 @@ export const useFinanceStore = create((set, get) => ({
       buildActivityLog({ storeName: 'dividends', action: current ? 'update' : 'create', before: current, after: record }),
       ...(currentIncome ? [buildActivityLog({ storeName: 'incomes', action: 'delete', before: currentIncome, after: null })] : []),
     ]);
-    get().triggerAutoPush();
     return record;
   },
 
@@ -2394,22 +2139,13 @@ export const useFinanceStore = create((set, get) => ({
 
     await Promise.all(snapshotRecords.map((record) => putRecord('portfolioSnapshots', record)));
     set((current) => {
-      const nextDeletedRecords = {
-        ...current.syncMeta.deletedRecords,
-        portfolioSnapshots: (current.syncMeta.deletedRecords.portfolioSnapshots || [])
-          .filter((item) => !snapshotRecords.some((record) => record.id === item.id)),
-      };
-      const nextSyncMeta = { ...current.syncMeta, deletedRecords: nextDeletedRecords };
-      saveSyncMeta(nextSyncMeta);
       return {
         portfolioSnapshots: snapshotRecords.reduce(
           (items, record) => upsertItem(items, record),
           current.portfolioSnapshots || [],
         ),
-        syncMeta: nextSyncMeta,
       };
     });
-    get().triggerAutoPush();
     return portfolioId ? snapshotRecords.find((record) => record.portfolioId === portfolioId) || null : globalRecord;
   },
 
@@ -2436,33 +2172,11 @@ export const useFinanceStore = create((set, get) => ({
       const nextDividends = state.dividends.filter((item) => item.id !== id);
       const nextIncomes = current.linkedIncomeId ? state.incomes.filter((item) => item.id !== current.linkedIncomeId) : state.incomes;
       const nextBankAccounts = applyBankAccountAdjustments(state.bankAccounts || [], bankAccountAdjustments, timestamp);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        dividends: [...(state.syncMeta.deletedRecords.dividends || []).filter((item) => item.id !== id), { id, updatedAt: timestamp, deletedAt: timestamp }],
-        incomes: current.linkedIncomeId
-          ? [...(state.syncMeta.deletedRecords.incomes || []).filter((item) => item.id !== current.linkedIncomeId), { id: current.linkedIncomeId, updatedAt: timestamp, deletedAt: timestamp }]
-          : state.syncMeta.deletedRecords.incomes || [],
-        ...(bankAccountAdjustments.size
-          ? { bankAccounts: (state.syncMeta.deletedRecords.bankAccounts || []).filter((item) => !bankAccountAdjustments.has(item.id)) }
-          : {}),
-      };
-      const nextSyncMeta = {
-        ...state.syncMeta,
-        deletedRecords: nextDeletedRecords,
-        conflicts: state.syncMeta.conflicts.filter(
-          (item) =>
-            item.id !== `dividends:${id}` &&
-            item.id !== `incomes:${current.linkedIncomeId}` &&
-            (!bankAccountAdjustments.size || !bankAccountAdjustments.has(item.id?.replace('bankAccounts:', ''))),
-        ),
-      };
-      saveSyncMeta(nextSyncMeta);
       const nextState = { ...state, dividends: nextDividends, incomes: nextIncomes, bankAccounts: nextBankAccounts };
       return {
         dividends: nextDividends,
         incomes: nextIncomes,
         bankAccounts: nextBankAccounts,
-        syncMeta: nextSyncMeta,
         derived: buildDerived(nextState),
       };
     });
@@ -2477,7 +2191,6 @@ export const useFinanceStore = create((set, get) => ({
           })]
         : []),
     ]);
-    get().triggerAutoPush();
   },
 
   addPortfolioBuy: async (spec) => {
@@ -2543,7 +2256,6 @@ export const useFinanceStore = create((set, get) => ({
     await persistActivityLogs(set, toPut.map(({ storeName, record }) =>
       buildActivityLog({ storeName, action: 'create', before: null, after: record }),
     ));
-    get().triggerAutoPush();
     return cashflow;
   },
 
@@ -2608,7 +2320,6 @@ export const useFinanceStore = create((set, get) => ({
     await persistActivityLogs(set, toPut.map(({ storeName, record }) =>
       buildActivityLog({ storeName, action: 'create', before: null, after: record }),
     ));
-    get().triggerAutoPush();
     return { expense, savingsEntry };
   },
 
@@ -2733,25 +2444,9 @@ export const useFinanceStore = create((set, get) => ({
   exportBackup: async (storeFilter = null) => exportDatabaseSnapshot(get().settings, storeFilter),
 
   wipeAllData: async ({ resetAccountSetup = false } = {}) => {
-    const timestamp = new Date().toISOString();
     const state = get();
-    const nextDeletedRecords = { ...state.syncMeta.deletedRecords };
-    for (const storeName of STORE_KEYS) {
-      const records = getStateRecords(state, storeName);
-      nextDeletedRecords[storeName] = [
-        ...(nextDeletedRecords[storeName] || []).filter((item) => !records.some((record) => record.id === item.id)),
-        ...records.map((record) => ({ id: record.id, updatedAt: timestamp, deletedAt: timestamp })),
-      ];
-    }
-    const nextSyncMeta = {
-      ...state.syncMeta,
-      deletedRecords: nextDeletedRecords,
-      conflicts: [],
-    };
     await clearAllStores();
     _cascadingDeletes.clear();
-    saveSyncMeta(nextSyncMeta);
-    localStorage.setItem('pft-seeded', 'true');
     // Keep settings (currency, locale, theme, API keys) — reset financial fields only
     const current = state.settings;
     const resetSetupFields = resetAccountSetup
@@ -2782,7 +2477,6 @@ export const useFinanceStore = create((set, get) => ({
       const nextState = {
         ...currentState,
         settings: nextSettings,
-        syncMeta: nextSyncMeta,
         expenses: [],
         fixedExpenses: [],
         incomes: [],
@@ -2826,7 +2520,6 @@ export const useFinanceStore = create((set, get) => ({
       undoable: false,
       summary: 'Imported backup data',
     })]);
-    get().triggerAutoPush();
   },
 
   undoActivityLog: async (logId) => {
@@ -2847,34 +2540,19 @@ export const useFinanceStore = create((set, get) => ({
     } else if (log.action === 'create') {
       await deleteRecord(storeName, log.recordId);
       set((state) => {
-        const nextDeletedRecords = {
-          ...state.syncMeta.deletedRecords,
-          [storeName]: [
-            ...(state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== log.recordId),
-            { id: log.recordId, updatedAt: timestamp, deletedAt: timestamp },
-          ],
-        };
-        const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
-        saveSyncMeta(nextSyncMeta);
         const nextValue = isSavingsConfig
           ? SAVINGS_DEFAULT
           : (state[stateKey] || []).filter((item) => item.id !== log.recordId);
-        const nextState = { ...state, [stateKey]: nextValue, syncMeta: nextSyncMeta };
-        return { [stateKey]: nextValue, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+        const nextState = { ...state, [stateKey]: nextValue };
+        return { [stateKey]: nextValue, derived: buildDerived(nextState) };
       });
     } else if (log.action === 'update' || log.action === 'delete') {
       const restored = ensureEntitySyncFields({ ...(log.before || {}), updatedAt: timestamp }, timestamp);
       await putRecord(storeName, restored);
       set((state) => {
-        const nextDeletedRecords = {
-          ...state.syncMeta.deletedRecords,
-          [storeName]: (state.syncMeta.deletedRecords[storeName] || []).filter((item) => item.id !== restored.id),
-        };
-        const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
-        saveSyncMeta(nextSyncMeta);
         const nextValue = isSavingsConfig ? restored : upsertItem(state[stateKey] || [], restored);
-        const nextState = { ...state, [stateKey]: nextValue, syncMeta: nextSyncMeta };
-        return { [stateKey]: nextValue, syncMeta: nextSyncMeta, derived: buildDerived(nextState) };
+        const nextState = { ...state, [stateKey]: nextValue };
+        return { [stateKey]: nextValue, derived: buildDerived(nextState) };
       });
     } else {
       return null;
@@ -2902,7 +2580,6 @@ export const useFinanceStore = create((set, get) => ({
         ...state.activityLog.map((item) => (item.id === log.id ? updatedLog : item)),
       ],
     }));
-    get().triggerAutoPush();
     return updatedLog;
   },
 
@@ -3304,13 +2981,7 @@ export const useFinanceStore = create((set, get) => ({
 
     set((state) => {
       const nextAttachments = state.attachments.filter((a) => a.id !== id);
-      const nextDeletedRecords = {
-        ...state.syncMeta.deletedRecords,
-        attachments: [...(state.syncMeta.deletedRecords.attachments || []).filter((t) => t.id !== id), tombstone],
-      };
-      const nextSyncMeta = { ...state.syncMeta, deletedRecords: nextDeletedRecords };
-      saveSyncMeta(nextSyncMeta);
-      return { attachments: nextAttachments, syncMeta: nextSyncMeta };
+      return { attachments: nextAttachments };
     });
 
     await persistActivityLogs(set, [buildActivityLog({
@@ -3319,7 +2990,6 @@ export const useFinanceStore = create((set, get) => ({
       before: attachment,
       after: null,
     })]);
-    get().triggerAutoPush();
   },
 
   // Returns an object URL (from local blob) or a signed Supabase Storage URL.

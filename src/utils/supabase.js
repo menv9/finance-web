@@ -46,26 +46,3 @@ export function clearSupabaseBrowserClient() {
   supabaseClient = null;
 }
 
-export async function upsertRemoteRecords(client, records) {
-  if (!records.length) return;
-  const { error } = await client.from('finance_records').upsert(records, {
-    onConflict: 'user_id,store_name,record_id',
-  });
-  if (error) throw error;
-}
-
-export async function fetchRemoteChanges(client, userId, sinceIso) {
-  let query = client
-    .from('finance_records')
-    .select('store_name, record_id, payload, updated_at, deleted_at')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: true });
-
-  if (sinceIso) {
-    query = query.gte('updated_at', sinceIso);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
-}

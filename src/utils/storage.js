@@ -140,26 +140,6 @@ export function cacheSettingsLocally(settings) {
   return normalized;
 }
 
-// --- Sync-engine stubs (Phase 2a: dead code kept callable) -----------------
-// These exist so the old call sites keep compiling. They will be deleted
-// outright in Phase 2b once the sync engine itself is gone.
-
-export function loadSyncMeta() {
-  return { lastPulledAt: {}, deletedRecords: {}, conflicts: [] };
-}
-
-export function saveSyncMeta() {
-  // no-op
-}
-
-export function sanitizeSettingsForSync(settings) {
-  return settings;
-}
-
-export function mergeRemoteSettings(_local, remote) {
-  return remote;
-}
-
 export function ensureEntitySyncFields(entity, fallbackTimestamp = new Date().toISOString()) {
   return {
     ...entity,
@@ -187,13 +167,9 @@ export function clearLocalUserData() {
   localStorage.removeItem(SETTINGS_KEY);
 }
 
-// --- Seed / backup helpers --------------------------------------------------
-// Seeding is now a no-op: a fresh user starts with whatever Supabase returns
-// (usually empty). The onboarding flow handles first-run UX.
-
-export async function ensureSeedData() {
-  // no-op (cloud is truth)
-}
+// --- Backup helpers --------------------------------------------------------
+// A fresh user starts with whatever Supabase returns (usually empty). The
+// onboarding flow handles first-run UX, so no seeding step exists anymore.
 
 const demoModules = import.meta.glob('../data/demo.json', { eager: true, import: 'default' });
 const DEMO_BACKUP = Object.values(demoModules)[0] || null;
