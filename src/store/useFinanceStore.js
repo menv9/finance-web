@@ -11,7 +11,6 @@ import {
   fetchAllStoresForCurrentUser,
   getActiveUserId,
   getAllRecords,
-  getRecord,
   importDatabaseSnapshot,
   loadSettings,
   putRecord,
@@ -2917,18 +2916,27 @@ export const useFinanceStore = create((set, get) => ({
   // ── Attachments ───────────────────────────────────────────────────────────
 
   uploadAttachment: async (expenseId, file) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) throw new Error('Supabase client not initialized');
+    const { data: authData } = await client.auth.getUser();
+    const userId = authData?.user?.id;
+    if (!userId) throw new Error('Not signed in');
+
     const id = makeId('att');
+    const path = `${userId}/${id}`;
+    const { error: uploadError } = await client.storage
+      .from('expense-attachments')
+      .upload(path, file, { contentType: file.type, upsert: true });
+    if (uploadError) throw uploadError;
+
     const attachment = ensureEntitySyncFields({
       id,
       expenseId,
       fileName: file.name,
       mimeType: file.type || 'application/octet-stream',
       size: file.size,
-      storagePath: null,
+      storagePath: path,
     });
-
-    // Cache blob locally
-    await putRecord('attachmentBlobs', { id, blob: file });
     await putRecord('attachments', attachment);
     set((state) => ({ attachments: upsertItem(state.attachments, attachment) }));
     await persistActivityLogs(set, [buildActivityLog({
@@ -2937,30 +2945,6 @@ export const useFinanceStore = create((set, get) => ({
       before: null,
       after: attachment,
     })]);
-
-    // Upload to Supabase Storage and push metadata directly (bypass full-push race conditions)
-    const client = getSupabaseBrowserClient();
-    if (client) {
-      const { data: authData } = await client.auth.getUser();
-      const userId = authData?.user?.id;
-      if (userId) {
-        const path = `${userId}/${id}`;
-        const { error: uploadError } = await client.storage
-          .from('expense-attachments')
-          .upload(path, file, { contentType: file.type, upsert: true });
-
-        const synced = uploadError
-          ? attachment
-          : { ...attachment, storagePath: path, updatedAt: new Date().toISOString() };
-
-        if (!uploadError) {
-          await putRecord('attachments', synced);
-          set((state) => ({ attachments: upsertItem(state.attachments, synced) }));
-        }
-        return synced;
-      }
-    }
-
     return attachment;
   },
 
@@ -2968,22 +2952,13 @@ export const useFinanceStore = create((set, get) => ({
     const attachment = get().attachments.find((a) => a.id === id);
     if (!attachment) return;
 
-    await deleteRecord('attachmentBlobs', id);
-
     const client = getSupabaseBrowserClient();
     if (client && attachment.storagePath) {
       await client.storage.from('expense-attachments').remove([attachment.storagePath]);
     }
-
     await deleteRecord('attachments', id);
-    const timestamp = new Date().toISOString();
-    const tombstone = { id, updatedAt: timestamp, deletedAt: timestamp };
 
-    set((state) => {
-      const nextAttachments = state.attachments.filter((a) => a.id !== id);
-      return { attachments: nextAttachments };
-    });
-
+    set((state) => ({ attachments: state.attachments.filter((a) => a.id !== id) }));
     await persistActivityLogs(set, [buildActivityLog({
       storeName: 'attachments',
       action: 'delete',
@@ -2992,23 +2967,16 @@ export const useFinanceStore = create((set, get) => ({
     })]);
   },
 
-  // Returns an object URL (from local blob) or a signed Supabase Storage URL.
-  // Caller should revoke object URLs when done if they persist.
+  // Returns a short-lived signed URL for the attachment's file in Supabase
+  // Storage. Returns null if the user is offline or the row has no path.
   getAttachmentUrl: async (attachment) => {
-    const blobRecord = await getRecord('attachmentBlobs', attachment.id);
-    if (blobRecord?.blob) {
-      return URL.createObjectURL(blobRecord.blob);
-    }
-
     const client = getSupabaseBrowserClient();
-    if (client && attachment.storagePath) {
-      const { data, error } = await client.storage
-        .from('expense-attachments')
-        .createSignedUrl(attachment.storagePath, 3600);
-      if (!error && data?.signedUrl) return data.signedUrl;
-    }
-
-    return null;
+    if (!client || !attachment?.storagePath) return null;
+    const { data, error } = await client.storage
+      .from('expense-attachments')
+      .createSignedUrl(attachment.storagePath, 3600);
+    if (error) return null;
+    return data?.signedUrl ?? null;
   },
 
   // ── Social: activity feed ─────────────────────────────────────────────────
