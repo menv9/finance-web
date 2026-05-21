@@ -116,7 +116,6 @@ export async function upsertRecord(storeName, record, { recordId } = {}) {
         record_id: id,
         payload,
         updated_at: updatedAt,
-        deleted_at: null,
       },
       { onConflict: 'user_id,store_name,record_id' },
     );
@@ -134,7 +133,6 @@ export async function upsertMany(storeName, records) {
     record_id: resolveRecordId(storeName, record),
     payload: { ...record, updatedAt },
     updated_at: updatedAt,
-    deleted_at: null,
   }));
   const { error } = await client()
     .from('finance_records')
