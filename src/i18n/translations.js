@@ -471,7 +471,6 @@ export const translations = {
       errorMagicSend: 'Could not send magic link. Try again.',
       errorResetEmail: 'Enter your email to receive a reset link.',
       errorResetSend: 'Could not send reset link. Try again.',
-      errorLocal: 'Could not switch to local mode.',
     },
     resetPassword: {
       eyebrow: 'Finance — Quarterly Ledger',
@@ -2092,7 +2091,6 @@ export const translations = {
       errorMagicSend: 'No se pudo enviar el enlace mágico. Inténtalo otra vez.',
       errorResetEmail: 'Introduce tu email para recibir un enlace de recuperación.',
       errorResetSend: 'No se pudo enviar el enlace. Inténtalo otra vez.',
-      errorLocal: 'No se pudo cambiar a modo local.',
     },
     resetPassword: {
       eyebrow: 'Finance — Libro Trimestral',

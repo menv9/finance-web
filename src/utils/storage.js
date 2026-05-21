@@ -163,10 +163,6 @@ export function clearActiveUserId() {
   localStorage.removeItem(ACTIVE_USER_KEY);
 }
 
-export function clearLocalUserData() {
-  localStorage.removeItem(SETTINGS_KEY);
-}
-
 // --- Backup helpers --------------------------------------------------------
 // A fresh user starts with whatever Supabase returns (usually empty). The
 // onboarding flow handles first-run UX, so no seeding step exists anymore.
