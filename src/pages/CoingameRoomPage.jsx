@@ -825,6 +825,15 @@ export default function CoingameRoomPage() {
               spaceshipHullColliders.push(box);
             }
           });
+          // Invisible bulkhead bridging the rear engine opening — the hull mesh
+          // has no rear wall (engines were sliced off when the interior was made),
+          // so without this the player walks out into space. The planet viewport
+          // behind it stays visible because we only collide, never render.
+          // World Z of rear opening ≈ +14.5 to +16; wingspan ±32.
+          spaceshipHullColliders.push(new THREE.Box3(
+            new THREE.Vector3(-32, PLAYER_FOOT, 14.5),
+            new THREE.Vector3( 32, PLAYER_HEAD, 16.5),
+          ));
         }, undefined, (err) => {
           console.warn('Failed to load spaceship interior OBJ', err);
         });
@@ -878,6 +887,11 @@ export default function CoingameRoomPage() {
               spaceshipHullColliders.push(box);
             }
           });
+          // Mirror the rear bulkhead from the MTL-success path
+          spaceshipHullColliders.push(new THREE.Box3(
+            new THREE.Vector3(-32, PLAYER_FOOT, 14.5),
+            new THREE.Vector3( 32, PLAYER_HEAD, 16.5),
+          ));
         });
       });
     }
