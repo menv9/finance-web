@@ -550,7 +550,7 @@ export default function CoingameRoomPage() {
     composer.addPass(new RenderPass(scene, camera));
     // (resolution, strength, radius, threshold) — threshold keeps lit surfaces
     // out of the bloom so only emissive materials light up.
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 0.85, 0.55, 0.2);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 0.45, 0.5, 0.45);
     composer.addPass(bloomPass);
     composer.addPass(new OutputPass());
     // Transient "kick" accumulators decayed each frame for game-feel punch.
@@ -1576,11 +1576,11 @@ export default function CoingameRoomPage() {
       evolveCube: (stage) => {
         bucket.userData.setStage?.(stage);
         // Big celebratory punch when the cube levels up
-        bloomKick += 1.8; camShake += 0.5; fovKick += 6;
+        bloomKick += 0.7; camShake += 0.5; fovKick += 6;
       },
       // Called from the click handler — crit gives a much bigger jolt
       kick: (crit) => {
-        bloomKick += crit ? 1.1 : 0.28;
+        bloomKick += crit ? 0.45 : 0.12;
         camShake += crit ? 0.42 : 0.09;
         fovKick += crit ? 4.5 : 0.9;
       },
@@ -2128,7 +2128,7 @@ export default function CoingameRoomPage() {
       });
 
       // Bloom strength eases toward target; pumping glows harder, kicks add punch
-      const targetBloom = (sceneRef.current?.hypePumping ? 1.5 : 0.85) + bloomKick;
+      const targetBloom = (sceneRef.current?.hypePumping ? 0.85 : 0.45) + bloomKick;
       bloomPass.strength += (targetBloom - bloomPass.strength) * Math.min(1, dt * 6);
       bloomKick *= 0.9;
 
