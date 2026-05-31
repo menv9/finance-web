@@ -5,6 +5,10 @@ import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import * as LucideIcons from 'lucide-react';
 import { fetchCoinById, spotPrice } from '../utils/coingameApi';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -388,6 +392,8 @@ export default function CoingameRoomPage() {
         setCritFlash(true);
         setTimeout(() => setCritFlash(false), 380);
       }
+      // 3D punch: bloom flash + camera shake + FOV kick (bigger on crit)
+      sceneRef.current?.kick?.(isCrit);
 
       const earned = Math.max(1, Math.floor(clickPower * comboMult * (isCrit ? 10 : 1) * hypeMultiplier));
       setRoomCoins((c) => c + earned);
@@ -397,7 +403,9 @@ export default function CoingameRoomPage() {
       const fId = ++floaterIdRef.current;
       const x = 36 + Math.random() * 28;
       const y = 26 + Math.random() * 30;
-      setFloaters((f) => [...f, { id: fId, amount: earned, x, y, isCombo: newCombo >= 5, isCrit }]);
+      const dx = (Math.random() - 0.5) * 72; // sideways drift so floaters arc instead of stacking
+      const rot = (Math.random() - 0.5) * 22;
+      setFloaters((f) => [...f, { id: fId, amount: earned, x, y, dx, rot, isCombo: newCombo >= 5, isCrit }]);
       setTimeout(() => setFloaters((f) => f.filter((fl) => fl.id !== fId)), 1400);
       clearTimeout(comboTimerRef.current);
       comboTimerRef.current = setTimeout(() => setCombo(0), 1500);
@@ -531,8 +539,24 @@ export default function CoingameRoomPage() {
     scene.fog = new THREE.FogExp2(0x060806, 0.0008);
 
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 3000);
+    const BASE_FOV = 50;
     camera.position.set(0, 8, 15);
     camera.lookAt(0, 1.5, 0);
+
+    // ── Post-processing: bloom makes the emissive neon actually glow ───────────
+    const composer = new EffectComposer(renderer);
+    composer.setSize(W, H);
+    composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    composer.addPass(new RenderPass(scene, camera));
+    // (resolution, strength, radius, threshold) — threshold keeps lit surfaces
+    // out of the bloom so only emissive materials light up.
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 0.85, 0.55, 0.2);
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+    // Transient "kick" accumulators decayed each frame for game-feel punch.
+    let bloomKick = 0;  // extra bloom on click/crit/evolve
+    let camShake = 0;   // positional camera jitter
+    let fovKick = 0;    // FOV punch
 
     // ── Lighting ──────────────────────────────────────────────────────────────
     const initAmbient = localStorage.getItem(`cg-room-ambient-${coinId}`) || '#22c55e';
@@ -1549,7 +1573,17 @@ export default function CoingameRoomPage() {
       wallGroup, previewWall,
       buildMode: false,
       hypePumping: false,
-      evolveCube: (stage) => { bucket.userData.setStage?.(stage); },
+      evolveCube: (stage) => {
+        bucket.userData.setStage?.(stage);
+        // Big celebratory punch when the cube levels up
+        bloomKick += 1.8; camShake += 0.5; fovKick += 6;
+      },
+      // Called from the click handler — crit gives a much bigger jolt
+      kick: (crit) => {
+        bloomKick += crit ? 1.1 : 0.28;
+        camShake += crit ? 0.42 : 0.09;
+        fovKick += crit ? 4.5 : 0.9;
+      },
     };
 
     // ── Orbit controls ────────────────────────────────────────────────────────
@@ -2012,6 +2046,20 @@ export default function CoingameRoomPage() {
       );
       camera.lookAt(px2, 1.5, pz2);
 
+      // Camera game-feel: positional shake + FOV punch, both decaying each frame
+      if (camShake > 0.001) {
+        camera.position.x += (Math.random() - 0.5) * camShake;
+        camera.position.y += (Math.random() - 0.5) * camShake;
+        camera.position.z += (Math.random() - 0.5) * camShake;
+        camShake *= 0.86;
+      }
+      const targetFov = BASE_FOV + (sceneRef.current?.hypePumping ? 5 : 0) + fovKick;
+      if (Math.abs(camera.fov - targetFov) > 0.02) {
+        camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 6);
+        camera.updateProjectionMatrix();
+      }
+      fovKick *= 0.9;
+
       // Earth rotation + cloud drift + starfield drift
       const space = scene.userData.spaceRefs;
       if (space) {
@@ -2079,7 +2127,12 @@ export default function CoingameRoomPage() {
         dot.material.emissiveIntensity = 1.8 + Math.sin(t * 2.4 + dot.userData.basePhase) * 1.2;
       });
 
-      renderer.render(scene, camera);
+      // Bloom strength eases toward target; pumping glows harder, kicks add punch
+      const targetBloom = (sceneRef.current?.hypePumping ? 1.5 : 0.85) + bloomKick;
+      bloomPass.strength += (targetBloom - bloomPass.strength) * Math.min(1, dt * 6);
+      bloomKick *= 0.9;
+
+      composer.render();
     }
     animate();
 
@@ -2087,6 +2140,8 @@ export default function CoingameRoomPage() {
       W = wrap.clientWidth; H = wrap.clientHeight;
       camera.aspect = W / H; camera.updateProjectionMatrix();
       renderer.setSize(W, H, false);
+      composer.setSize(W, H);
+      bloomPass.setSize(W, H);
     });
     ro.observe(wrap);
 
@@ -2109,6 +2164,7 @@ export default function CoingameRoomPage() {
         ambientNodes = null;
       }
       if (audioCtx) { try { audioCtx.close(); } catch (e) { /* ignore */ } }
+      composer.dispose();
       renderer.dispose();
       sceneRef.current = null;
     };
@@ -2502,7 +2558,9 @@ export default function CoingameRoomPage() {
                 left: `${fl.x}%`,
                 top: `${fl.y}%`,
                 pointerEvents: 'none',
-                animation: 'rc-float 1.4s ease-out forwards',
+                '--rc-dx': `${fl.dx ?? 0}px`,
+                '--rc-rot': `${fl.rot ?? 0}deg`,
+                animation: `${fl.isCrit ? 'rc-float-crit' : 'rc-float'} 1.4s ease-out forwards`,
                 fontSize: fl.isCrit ? 22 : fl.isCombo ? 19 : 14,
                 fontWeight: 900,
                 color: fl.isCrit ? '#fbbf24' : fl.isCombo ? '#f59e0b' : '#4ade80',

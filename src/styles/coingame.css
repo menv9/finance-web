@@ -2451,9 +2451,15 @@ button.cg-back-link {
 }
 
 @keyframes rc-float {
-  0%   { opacity: 1; transform: translateY(0) scale(1); }
-  18%  { opacity: 1; transform: translateY(-14px) scale(1.14); }
-  100% { opacity: 0; transform: translateY(-80px) scale(0.82); }
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  18%  { opacity: 1; transform: translate(calc(var(--rc-dx, 0px) * 0.25), -14px) rotate(calc(var(--rc-rot, 0deg) * 0.3)) scale(1.14); }
+  100% { opacity: 0; transform: translate(var(--rc-dx, 0px), -86px) rotate(var(--rc-rot, 0deg)) scale(0.82); }
+}
+@keyframes rc-float-crit {
+  0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.5); }
+  14%  { opacity: 1; transform: translate(calc(var(--rc-dx, 0px) * 0.2), -10px) rotate(calc(var(--rc-rot, 0deg) * 0.3)) scale(1.55); }
+  32%  { transform: translate(calc(var(--rc-dx, 0px) * 0.4), -26px) rotate(calc(var(--rc-rot, 0deg) * 0.6)) scale(1.18); }
+  100% { opacity: 0; transform: translate(var(--rc-dx, 0px), -104px) rotate(var(--rc-rot, 0deg)) scale(0.9); }
 }
 @keyframes rc-combo-pop {
   0%   { opacity: 0; transform: scale(0.6); }
