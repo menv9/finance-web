@@ -829,10 +829,10 @@ export default function CoingameRoomPage() {
           // has no rear wall (engines were sliced off when the interior was made),
           // so without this the player walks out into space. The planet viewport
           // behind it stays visible because we only collide, never render.
-          // World Z of rear opening ≈ +14.5 to +16; wingspan ±32.
+          // Rear opening is at world Z ≈ -16 (Earth planet is at z=-1500, hull_nose is at +Z).
           spaceshipHullColliders.push(new THREE.Box3(
-            new THREE.Vector3(-32, PLAYER_FOOT, 14.5),
-            new THREE.Vector3( 32, PLAYER_HEAD, 16.5),
+            new THREE.Vector3(-32, PLAYER_FOOT, -16.5),
+            new THREE.Vector3( 32, PLAYER_HEAD, -14.5),
           ));
         }, undefined, (err) => {
           console.warn('Failed to load spaceship interior OBJ', err);
@@ -889,8 +889,8 @@ export default function CoingameRoomPage() {
           });
           // Mirror the rear bulkhead from the MTL-success path
           spaceshipHullColliders.push(new THREE.Box3(
-            new THREE.Vector3(-32, PLAYER_FOOT, 14.5),
-            new THREE.Vector3( 32, PLAYER_HEAD, 16.5),
+            new THREE.Vector3(-32, PLAYER_FOOT, -16.5),
+            new THREE.Vector3( 32, PLAYER_HEAD, -14.5),
           ));
         });
       });
