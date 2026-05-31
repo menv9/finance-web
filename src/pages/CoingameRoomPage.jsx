@@ -731,7 +731,7 @@ export default function CoingameRoomPage() {
       hull_wing:       { color: 0x525e74, roughness: 0.28, metalness: 0.95, texture: hullTexShared, texRepeat: [3, 2] },
       hull_nose:       { color: 0xa6a8af, roughness: 0.38, metalness: 0.85, texture: hullTexShared, texRepeat: [2, 1] },
       engine_glow:     { color: 0x1a2026, roughness: 0.45, metalness: 0.6,  emissive: trimHex, emissiveIntensity: 3.0 },
-      canopy_glass:    { color: 0x08101c, roughness: 0.08, metalness: 0.1,  emissive: 0x1a3055, emissiveIntensity: 0.35, transparent: true, opacity: 0.55 },
+      canopy_glass:    { color: 0x08101c, roughness: 0.08, metalness: 0.1,  emissive: 0x1a3055, emissiveIntensity: 0.35, transparent: true, opacity: 0.55, transmission: 0.7, clearcoat: 1 },
       deck_floor:      { color: 0x1a1f2a, roughness: 0.55, metalness: 0.75, texture: hullTexShared, texRepeat: [4, 4] },
       hull_trim:       { color: 0x0c1418, roughness: 0.40, metalness: 0.3,  emissive: trimHex, emissiveIntensity: 4.5 },
       console:         { color: 0x242938, roughness: 0.40, metalness: 0.7,  emissive: trimHex, emissiveIntensity: 0.6 },
@@ -753,6 +753,13 @@ export default function CoingameRoomPage() {
         t.needsUpdate = true;
         params.map = t;
       }
+      // canopy_glass and any future slot with `transmission` need MeshPhysicalMaterial
+      // for refractive glass instead of flat alpha
+      if (cfg.transmission !== undefined) {
+        params.transmission = cfg.transmission;
+        if (cfg.clearcoat !== undefined) params.clearcoat = cfg.clearcoat;
+        return new THREE.MeshPhysicalMaterial(params);
+      }
       return new THREE.MeshStandardMaterial(params);
     }
     {
@@ -764,6 +771,7 @@ export default function CoingameRoomPage() {
         hullLoader.setMaterials(mtlCreator);
         hullLoader.load('/models/spaceship/Spaceship_interior.obj', (group) => {
           if (!sceneRef.current || sceneRef.current.scene !== scene) return;
+          const hullEmissiveMats = [];
           group.traverse((c) => {
             if (c.isMesh) {
               const slotName = c.material?.name;
@@ -772,11 +780,17 @@ export default function CoingameRoomPage() {
               c.castShadow = false;
               c.receiveShadow = true;
               c.userData.hullSlot = slotName;
+              // Slots that should re-tint with the room's ambient color
+              if (slotName === 'engine_glow' || slotName === 'hull_trim' || slotName === 'console' || slotName === 'interior_floor') {
+                hullEmissiveMats.push(c.material);
+              }
             }
           });
           group.position.set(0, 0, 0);
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
+          // Expose for the ambient-color effect to retint
+          sceneRef.current.hullEmissiveMats = hullEmissiveMats;
           scene.add(group);
           // Per-triangle AABBs for EVERY face in the hull. Floor and ceiling faces fall
           // outside the player's vertical range (y=[0.15, 1.4]) so they auto-exclude geometrically —
@@ -1600,6 +1614,16 @@ export default function CoingameRoomPage() {
     const mouse = new THREE.Vector2();
     const intersectPt = new THREE.Vector3();
 
+    // Box3 pool reused by the per-frame collision pass — eliminates the GC storm
+    // of allocating fresh AABBs every frame the player moves
+    const colliderPool = [];
+    const colliders = [];
+    const moveTestBox = new THREE.Box3();
+    function acquireBox(idx) {
+      if (idx >= colliderPool.length) colliderPool.push(new THREE.Box3());
+      return colliderPool[idx];
+    }
+
     function getPickables() {
       return [
         ...Object.values(furnitureMap).map((f) => f.group),
@@ -1620,6 +1644,9 @@ export default function CoingameRoomPage() {
       mouse.x = ((e.clientX - rect.left) / W) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / H) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
+      // Reset .far — the camera-occlusion cast in animate() shortens this each frame,
+      // so picks past last frame's tRad would silently miss.
+      raycaster.far = Infinity;
 
       // ── Build mode: draw/delete walls ───────────────────────────────────────
       if (sceneRef.current?.buildMode && sceneRef.current?.isOwner) {
@@ -1904,23 +1931,29 @@ export default function CoingameRoomPage() {
           Math.max(-hdBound, Math.min(hdBound, z)),
         ];
 
-        // Build collider list this frame
-        const colliders = [];
-        wallGroup.children.forEach((c) => { if (c.userData.wallId) colliders.push(new THREE.Box3().setFromObject(c)); });
+        // Build collider list this frame — reuse Box3 instances from the pool
+        // instead of allocating fresh ones (the hull colliders are cached at load
+        // time and pushed by reference; only dynamic walls/furniture/static get reused)
+        colliders.length = 0;
+        let poolIdx = 0;
+        wallGroup.children.forEach((c) => {
+          if (c.userData.wallId) { const b = acquireBox(poolIdx++); b.setFromObject(c); colliders.push(b); }
+        });
         Object.entries(staticMap).forEach(([id, g]) => {
           if (id === 'fc_cube') return;
-          if (g && g.isObject3D) colliders.push(new THREE.Box3().setFromObject(g));
+          if (g && g.isObject3D) { const b = acquireBox(poolIdx++); b.setFromObject(g); colliders.push(b); }
         });
-        Object.values(furnitureMap).forEach((f) => { if (f?.group?.isObject3D) colliders.push(new THREE.Box3().setFromObject(f.group)); });
+        Object.values(furnitureMap).forEach((f) => {
+          if (f?.group?.isObject3D) { const b = acquireBox(poolIdx++); b.setFromObject(f.group); colliders.push(b); }
+        });
         // Spaceship hull walls — cached once on load, not recomputed every frame
         for (const b of spaceshipHullColliders) colliders.push(b);
 
         const pr = 0.45;
-        const testBox = new THREE.Box3();
         const blockedAt = (x, z) => {
-          testBox.min.set(x - pr, 0.15, z - pr);
-          testBox.max.set(x + pr, 1.4, z + pr);
-          for (const b of colliders) if (b.intersectsBox(testBox)) return true;
+          moveTestBox.min.set(x - pr, 0.15, z - pr);
+          moveTestBox.max.set(x + pr, 1.4, z + pr);
+          for (const b of colliders) if (b.intersectsBox(moveTestBox)) return true;
           return false;
         };
 
@@ -2164,6 +2197,24 @@ export default function CoingameRoomPage() {
         ambientNodes = null;
       }
       if (audioCtx) { try { audioCtx.close(); } catch (e) { /* ignore */ } }
+      // Dispose every geometry, material, and texture in the scene before the
+      // renderer goes away — otherwise HMR + re-entry leaks the GPU heap.
+      const disposedTextures = new Set();
+      const disposeMaterial = (m) => {
+        if (!m) return;
+        ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap', 'envMap'].forEach((k) => {
+          const t = m[k];
+          if (t && !disposedTextures.has(t)) { disposedTextures.add(t); try { t.dispose(); } catch (_) {} }
+        });
+        try { m.dispose(); } catch (_) {}
+      };
+      scene.traverse((obj) => {
+        if (obj.geometry) { try { obj.geometry.dispose(); } catch (_) {} }
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
+          else disposeMaterial(obj.material);
+        }
+      });
       composer.dispose();
       renderer.dispose();
       sceneRef.current = null;
@@ -2278,6 +2329,9 @@ export default function CoingameRoomPage() {
         if (obj.isLight) obj.color.set(c);
       });
     });
+
+    // Hull slots that bake trimHex emissive at OBJ load — repaint on color change
+    (ref.hullEmissiveMats || []).forEach((m) => { m.emissive.set(c); });
 
     localStorage.setItem(`cg-room-ambient-${coinId}`, ambientColor);
   }, [ambientColor, coinId]);
