@@ -8,9 +8,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import LWAreaChart from '../components/charts/LWAreaChart';
 import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
-import LWSalesChart from '../components/charts/LWSalesChart';
+import TrendChart from '../components/charts/TrendChart';
 import { PageHeader } from '../components/PageHeader';
 import { DividendForm } from '../components/forms/DividendForm';
 import { HoldingForm } from '../components/forms/HoldingForm';
@@ -2014,12 +2013,12 @@ export default function PortfolioPage() {
 
         {lwPortfolioValueData.main.length ? (
           <div style={{ height: 280 }}>
-            <LWAreaChart
-              data={lwPortfolioValueData.main}
-              color="var(--accent)"
-              topOpacity={0.22}
-              secondSeries={{ data: lwPortfolioValueData.cost, color: 'var(--danger)', topOpacity: 0.06, bottomOpacity: 0.06, dashed: true }}
-              priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+            <TrendChart
+              series={[
+                { data: lwPortfolioValueData.main, color: 'var(--accent)', fill: true, fillOpacity: 0.22, label: 'Value' },
+                { data: lwPortfolioValueData.cost, color: 'var(--danger)', fill: true, fillOpacity: 0.06, dashed: true, label: 'Cost basis' },
+              ]}
+              valueFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
               visibleRange={lwPortfolioValueRange}
             />
           </div>
@@ -2282,7 +2281,7 @@ export default function PortfolioPage() {
         className={rise(6)}
       >
         {lwSalesData.length ? (
-          <LWSalesChart data={lwSalesData} priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)} />
+          <TrendChart baseline series={[{ data: lwSalesData, label: 'Realized P&L' }]} valueFormatter={(v) => formatCurrencyCompact(v, currency, locale)} />
         ) : (
           <EmptyState title={t('portfolio.salesPerformanceCard.emptyTitle')} description={t('portfolio.salesPerformanceCard.emptyDescription')} />
         )}

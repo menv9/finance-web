@@ -5,8 +5,7 @@ import { BatchDeleteBar } from '../components/BatchDeleteBar';
 import { useBatchSelect } from '../hooks/useBatchSelect';
 import { useSortable } from '../hooks/useSortable';
 import { sortRows } from '../utils/sort';
-import LWAreaChart from '../components/charts/LWAreaChart';
-import LWLineSegments from '../components/charts/LWLineSegments';
+import TrendChart from '../components/charts/TrendChart';
 import { PageHeader } from '../components/PageHeader';
 import { SavingsEntryForm } from '../components/forms/SavingsEntryForm';
 import { useFinanceStore } from '../store/useFinanceStore';
@@ -774,11 +773,10 @@ export default function SavingsPage() {
           </div>
           <div className="flex min-h-28 items-center pt-3 md:h-[124px] md:min-h-0">
             {lwTrendData.length > 0 ? (
-              <LWAreaChart
-                data={lwTrendData}
-                color="var(--accent)"
-                topOpacity={0.3}
-                priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+              <TrendChart
+                compact
+                series={[{ data: lwTrendData, color: 'var(--accent)', fill: true, fillOpacity: 0.3, label: 'Saved' }]}
+                valueFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-center text-xs text-ink-faint">
@@ -995,9 +993,9 @@ export default function SavingsPage() {
         }
       >
         {lwHistorySegments.length > 0 ? (
-          <LWLineSegments
-            segments={lwHistorySegments}
-            priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+          <TrendChart
+            series={lwHistorySegments.map((seg) => ({ data: seg.data, color: seg.color, label: seg.label || seg.key }))}
+            valueFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
           />
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -1088,13 +1086,10 @@ export default function SavingsPage() {
           </div>
         }
       >
-        <LWAreaChart
-          data={lwProjectionData}
-          color="#f59e0b"
-          topOpacity={0.32}
-          referenceY={goalCents > 0 ? goalCents : null}
-          referenceColor="var(--positive)"
-          priceFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
+        <TrendChart
+          series={[{ data: lwProjectionData, color: '#f59e0b', fill: true, fillOpacity: 0.32, label: 'Projected' }]}
+          referenceLine={goalCents > 0 ? { y: goalCents, color: 'var(--positive)', label: 'Goal' } : null}
+          valueFormatter={(v) => formatCurrencyCompact(v, currency, locale)}
         />
       </Card>
 

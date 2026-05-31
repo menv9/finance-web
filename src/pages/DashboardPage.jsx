@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import LWAreaChart from '../components/charts/LWAreaChart';
+import TrendChart from '../components/charts/TrendChart';
 import LWGroupedHistogram from '../components/charts/LWGroupedHistogram';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { buildRecentActivity } from '../utils/finance';
@@ -341,11 +341,9 @@ export default function DashboardPage() {
         className={rise(2)}
       >
         {lwNetWorthData.length ? (
-          <LWAreaChart
-            data={visibleNetWorthData}
-            color="var(--accent)"
-            topOpacity={0.32}
-            priceFormatter={hideKpis ? () => '••••' : (v) => formatCurrencyCompact(v, currency, locale)}
+          <TrendChart
+            series={[{ data: visibleNetWorthData, color: 'var(--accent)', fill: true, fillOpacity: 0.32, label: 'Net worth' }]}
+            valueFormatter={hideKpis ? () => '••••' : (v) => formatCurrencyCompact(v, currency, locale)}
             visibleRange={visibleNetWorthRange}
           />
         ) : (
