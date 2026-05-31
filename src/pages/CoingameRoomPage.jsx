@@ -789,6 +789,53 @@ export default function CoingameRoomPage() {
           group.position.set(0, 0, 0);
           group.userData.spaceshipHull = true;
           spaceshipHullGroup = group;
+
+          // ── Rear bulkhead with circular porthole ──────────────────────────
+          // The exported interior hull has no rear wall (engines were sliced
+          // off). Add a flat hull_panel bulkhead with a hole, and a refractive
+          // glass disc filling the hole. Joins the hull group so the per-tri
+          // collider pass below auto-includes its triangles.
+          const BULK_Z = -13.5, BULK_W = 11, BULK_BOT = 0.05, BULK_TOP = 8.6;
+          const PORTHOLE_R = 3.0, PORTHOLE_CY = 4.0, PORTHOLE_SEGS = 48;
+          const bulkShape = new THREE.Shape();
+          bulkShape.moveTo(-BULK_W, BULK_BOT);
+          bulkShape.lineTo( BULK_W, BULK_BOT);
+          bulkShape.lineTo( BULK_W, BULK_TOP);
+          bulkShape.lineTo(-BULK_W, BULK_TOP);
+          bulkShape.lineTo(-BULK_W, BULK_BOT);
+          const portholeHole = new THREE.Path();
+          for (let i = 0; i <= PORTHOLE_SEGS; i++) {
+            const a = (i / PORTHOLE_SEGS) * Math.PI * 2;
+            const x = Math.cos(a) * PORTHOLE_R;
+            const y = PORTHOLE_CY + Math.sin(a) * PORTHOLE_R;
+            if (i === 0) portholeHole.moveTo(x, y);
+            else portholeHole.lineTo(x, y);
+          }
+          bulkShape.holes.push(portholeHole);
+          const bulkGeo = new THREE.ShapeGeometry(bulkShape);
+          const bulkMat = buildHullMaterial('hull_panel');
+          bulkMat.side = THREE.DoubleSide;
+          const bulkMesh = new THREE.Mesh(bulkGeo, bulkMat);
+          bulkMesh.position.set(0, 0, BULK_Z);
+          bulkMesh.userData.hullSlot = 'hull_panel';
+          group.add(bulkMesh);
+          // Glass porthole (slightly aft of bulkhead so the rim occludes the seam)
+          const glassGeo = new THREE.CircleGeometry(PORTHOLE_R * 0.98, PORTHOLE_SEGS);
+          const glassMat = buildHullMaterial('canopy_glass');
+          glassMat.side = THREE.DoubleSide;
+          const glassMesh = new THREE.Mesh(glassGeo, glassMat);
+          glassMesh.position.set(0, PORTHOLE_CY, BULK_Z - 0.05);
+          glassMesh.userData.hullSlot = 'canopy_glass';
+          group.add(glassMesh);
+          // Thin emissive trim ring around the porthole for definition
+          const trimGeo = new THREE.TorusGeometry(PORTHOLE_R, 0.08, 8, PORTHOLE_SEGS);
+          const trimMat = buildHullMaterial('hull_trim');
+          const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+          trimMesh.position.set(0, PORTHOLE_CY, BULK_Z + 0.02);
+          trimMesh.userData.hullSlot = 'hull_trim';
+          group.add(trimMesh);
+          hullEmissiveMats.push(trimMat);
+
           // Expose for the ambient-color effect to retint
           sceneRef.current.hullEmissiveMats = hullEmissiveMats;
           scene.add(group);
